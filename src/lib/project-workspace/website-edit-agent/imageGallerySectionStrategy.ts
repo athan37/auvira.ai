@@ -7,7 +7,7 @@ import {
   isSafeWritePath,
 } from '../workspaceEditShared';
 import { buildImageAttachmentGuidance } from './enrichEditPrompt';
-import { patchGenericSectionForImages } from './patchGenericSectionImages';
+import { patchPageForUploadedImages } from './patchGenericSectionImages';
 import { verifyEditApplied } from './verifyEditApplied';
 import type { WebsiteEditAgentOptions, WebsiteEditAgentResult } from './types';
 
@@ -134,7 +134,7 @@ Return JSON: { "files": [{ "path": "${SITE_CONFIG}", "content": "..." }], "summa
   const pageBefore = await readRel(PAGE_TSX);
   if (pageBefore) {
     beforeFiles[PAGE_TSX] = pageBefore;
-    const { content: patchedPage, patched } = patchGenericSectionForImages(pageBefore);
+    const { content: patchedPage, patched } = patchPageForUploadedImages(pageBefore);
     if (patched) {
       await writeRel(PAGE_TSX, patchedPage);
     }

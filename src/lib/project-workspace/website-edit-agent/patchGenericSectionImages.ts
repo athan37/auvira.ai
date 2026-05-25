@@ -51,3 +51,46 @@ export function patchGenericSectionForImages(pageContent: string): {
 
   return { content: pageContent, patched: false };
 }
+
+/**
+ * DocumentationSection often uses item.description as img src; gallery edits use imageUrl.
+ */
+export function patchDocumentationSectionForImages(pageContent: string): {
+  content: string;
+  patched: boolean;
+} {
+  if (!pageContent.includes('function DocumentationSection')) {
+    return { content: pageContent, patched: false };
+  }
+  const needsFix = /src=\{item\.description\}/.test(pageContent);
+  if (!needsFix) {
+    return { content: pageContent, patched: false };
+  }
+  return {
+    content: pageContent.replace(
+      /src=\{item\.description\}/g,
+      'src={item.imageUrl || item.description}'
+    ),
+    patched: true,
+  };
+}
+
+/** Apply all page.tsx patches needed for uploaded image sections. */
+export function patchPageForUploadedImages(pageContent: string): {
+  content: string;
+  patched: boolean;
+} {
+  let content = pageContent;
+  let patched = false;
+  const doc = patchDocumentationSectionForImages(content);
+  if (doc.patched) {
+    content = doc.content;
+    patched = true;
+  }
+  const generic = patchGenericSectionForImages(content);
+  if (generic.patched) {
+    content = generic.content;
+    patched = true;
+  }
+  return { content, patched };
+}

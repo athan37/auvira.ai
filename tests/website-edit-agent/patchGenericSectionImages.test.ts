@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { patchGenericSectionForImages } from '../../src/lib/project-workspace/website-edit-agent/patchGenericSectionImages';
+import {
+  patchDocumentationSectionForImages,
+  patchGenericSectionForImages,
+} from '../../src/lib/project-workspace/website-edit-agent/patchGenericSectionImages';
 
 const MINIMAL_GENERIC = `
 function GenericSection({ section }: { section: SiteSection }) {
@@ -20,6 +23,17 @@ describe('patchGenericSectionForImages', () => {
     expect(patched).toBe(true);
     expect(content).toContain('imageUrl');
     expect(content).toContain('<img');
+  });
+
+  it('fixes DocumentationSection to use imageUrl or description', () => {
+    const src = `
+function DocumentationSection({ section }) {
+  return <img src={item.description} alt={item.title} />;
+}
+`;
+    const { content, patched } = patchDocumentationSectionForImages(src);
+    expect(patched).toBe(true);
+    expect(content).toContain('item.imageUrl || item.description');
   });
 
   it('skips when imageUrl already present', () => {

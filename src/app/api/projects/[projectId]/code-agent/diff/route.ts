@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOwnerProject } from '@/lib/api/projectAccess';
 import { getLatestEditJob } from '@/lib/project-workspace/editJobLogger';
+import type { IEditJobLogEntry } from '@/models/ProjectEditJob';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -42,7 +43,7 @@ export async function GET(
     summary: job.summary || null,
     error: job.error || null,
     buildLog: job.buildLog || null,
-    logs: (job.logs ?? []).map((log) => ({
+    logs: (job.logs ?? []).map((log: IEditJobLogEntry) => ({
       type: log.type,
       message: log.message,
       createdAt: log.createdAt,
