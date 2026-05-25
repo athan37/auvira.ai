@@ -28,11 +28,11 @@ After deployment, the owner can chat to update the site — "Add pricing section
 
 #### Owner-facing UI (dashboard → editor)
 
-| Step | What owners see |
-|------|-----------------|
-| **Dashboard** | Getting-started checklist; **In progress** clone jobs with **Continue setup**; **New from URL** or **Start without a URL** |
+| Step             | What owners see                                                                                                                                                                |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Dashboard**    | Getting-started checklist; **In progress** clone jobs with **Continue setup**; **New from URL** or **Start without a URL**                                                     |
 | **Clone wizard** | Phase progress (bar stays below 100% until publish completes); **Pick a look** template gallery before **Build Preview**; unified **Save backup copy** / **Publish live site** |
-| **Editor** | Draft preview (left); Chat / Changes / **Publish** tabs; sticky **Publish live** when there are unpublished edits; plain status (**Live**, **Updating live site…**) |
+| **Editor**       | Draft preview (left); Chat / Changes / **Publish** tabs; sticky **Publish live** when there are unpublished edits; plain status (**Live**, **Updating live site…**)            |
 
 **Language:** Primary actions avoid GitLab/Vercel jargon — use **backup copy**, **draft preview**, and **live website**. Advanced links to the GitLab repo are optional.
 
@@ -42,8 +42,8 @@ After deployment, the owner can chat to update the site — "Add pricing section
 
 Owners can add products under **Publish → Product catalog** in the project editor. Products are stored in MongoDB (`Product` model, scoped by `projectId`). **Add products to draft preview** merges a product grid into `src/lib/siteConfig.ts` in the local workspace; **Publish live site** deploys that draft.
 
-- `GET/POST /api/projects/[projectId]/catalog` — list / create products  
-- `POST /api/projects/[projectId]/catalog/sync` — inject catalog into draft `siteConfig`  
+- `GET/POST /api/projects/[projectId]/catalog` — list / create products
+- `POST /api/projects/[projectId]/catalog/sync` — inject catalog into draft `siteConfig`
 
 Sites remain static export (`output: 'export'`); listings use inquiry CTAs or external product links, not native checkout.
 
@@ -76,7 +76,7 @@ Verifies GitLab commit visibility, SHA-pinned Vercel deploy, and production HTML
 
 1. [Vercel](https://vercel.com) → **Add Project** → import `athan37/la-mue-site-builder`.
 2. **Production Branch:** `main` (pushes to `main` deploy production; other branches get Preview URLs if enabled).
-3. **Environment variables** (Production + Preview): copy from `.env.example` — use [MongoDB Atlas](https://www.mongodb.com/atlas) for `MONGODB_URI`, set `NEXTAUTH_URL` and `NEXT_PUBLIC_APP_URL` to your Vercel URL, add Google OAuth, GitLab, MiniMax, and `VERCEL_API_TOKEN` (not `VERCEL_TOKEN` — that name is reserved on Vercel).
+3. **Environment variables** (Production + Preview): copy from `.env.example` — MongoDB, NextAuth, Google OAuth, GitLab, MiniMax, etc. **Do not** add `VERCEL_TOKEN` or `VERCEL_API_TOKEN` in the Vercel dashboard (reserved names). Optional customer-site deploys: `SITE_AGENT_VERCEL_TOKEN`.
 4. Update **Google OAuth** redirect URIs for your production domain.
 5. Push to `main` and confirm a deployment appears under Vercel → **Deployments**.
 
@@ -107,21 +107,22 @@ cp .env.example .env.local
 ```
 
 Edit `.env.local`:
+
 - `GITLAB_TOKEN`: Your GitLab personal access token
 - `GITLAB_GROUP_ID`: The ID of your GitLab group where projects will be created
-- `VERCEL_API_TOKEN`: Vercel personal access token for deploying customer sites (required on Vercel hosting; use this name in the dashboard — `VERCEL_TOKEN` is reserved)
-- `VERCEL_API_TEAM_ID`: Vercel team ID (optional; legacy `VERCEL_TEAM_ID` still works locally)
+- `SITE_AGENT_VERCEL_TOKEN`: Optional — Vercel API token so the app can create/deploy **customer** sites (not required to host this app on Vercel)
+- `SITE_AGENT_VERCEL_TEAM_ID`: Optional team ID if your token is team-scoped
 
 ### 3. Configure MiniMax API
 
 Set in `.env.local` (see `.env.example`):
 
-| Variable | Example |
-|----------|---------|
-| `LLM_PROVIDER` | `minimax` (default — direct API) |
-| `MINIMAX_API_KEY` | `sk-cp-...` |
+| Variable          | Example                                        |
+| ----------------- | ---------------------------------------------- |
+| `LLM_PROVIDER`    | `minimax` (default — direct API)               |
+| `MINIMAX_API_KEY` | `sk-cp-...`                                    |
 | `MINIMAX_API_URL` | `https://api.minimax.io/anthropic/v1/messages` |
-| `MINIMAX_MODEL` | `MiniMax-M2.7-highspeed` |
+| `MINIMAX_MODEL`   | `MiniMax-M2.7-highspeed`                       |
 
 **Optional:** use a local proxy instead (`LLM_PROVIDER=minimax-proxy`, `MINIMAX_PROXY_URL=http://localhost:3457/minimax-json`).
 
@@ -148,12 +149,12 @@ Vercel integration enables automatic deployment to a live URL. Without it, you c
 1. **Create Vercel Token:**
    - Go to https://vercel.com/account/tokens
    - Create a new token with scope `full` or `deployments`
-   - Add `VERCEL_API_TOKEN` to `.env.local` (or `VERCEL_TOKEN` locally only)
+   - Add `SITE_AGENT_VERCEL_TOKEN` to `.env.local` (optional; legacy `VERCEL_API_TOKEN` / `VERCEL_TOKEN` still work locally)
 
 2. **Find Vercel Team ID (if using a team):**
    - Go to https://vercel.com/account/teams
    - Your team ID is in the team settings URL
-   - Add `VERCEL_API_TEAM_ID` to `.env.local` (optional)
+   - Add `SITE_AGENT_VERCEL_TEAM_ID` to `.env.local` only if using a team-scoped token (optional)
 
 3. **Note:** Vercel will automatically import the GitLab repo and deploy. First deploy may take 1-3 minutes.
 
@@ -183,18 +184,18 @@ Clone-job preview-chat on `/clone/jobs/[id]` is a separate flow.
 npm run dev
 ```
 
-| Variable | Purpose |
-|----------|---------|
-| `LLM_PROVIDER` | `minimax` (default), `minimax-proxy`, or `gemini` |
+| Variable                    | Purpose                                            |
+| --------------------------- | -------------------------------------------------- |
+| `LLM_PROVIDER`              | `minimax` (default), `minimax-proxy`, or `gemini`  |
 | `WEBSITE_EDIT_LLM_PROVIDER` | Optional: set to `gemini` for agent tool-loop only |
 
 **Troubleshooting**
 
-| Symptom | Fix |
-|--------|-----|
-| `No files were changed` | Retry; for complex edits be more specific |
-| `I had trouble understanding` | MiniMax JSON failed twice — try `WEBSITE_EDIT_LLM_PROVIDER=gemini` |
-| Preview 503 | Restart page; preview dev server may be hung (see workspace bootstrap) |
+| Symptom                       | Fix                                                                    |
+| ----------------------------- | ---------------------------------------------------------------------- |
+| `No files were changed`       | Retry; for complex edits be more specific                              |
+| `I had trouble understanding` | MiniMax JSON failed twice — try `WEBSITE_EDIT_LLM_PROVIDER=gemini`     |
+| Preview 503                   | Restart page; preview dev server may be hung (see workspace bootstrap) |
 
 ## Test API Endpoints
 
@@ -236,6 +237,7 @@ curl -X POST http://localhost:3000/api/agent/rebuild \
 ```
 
 Response includes:
+
 - `stageLogs`: array of stage entries with timestamps and durations
 - `duration_ms`: total elapsed time
 - `businessProfile`: extracted business info
@@ -281,6 +283,7 @@ curl -X POST http://localhost:3000/api/agent/edit \
 ```
 
 Response includes:
+
 - `stageLogs`: array of stage entries with timestamps and durations
 - `duration_ms`: total elapsed time
 - `updatedSiteSpec`: the modified site specification
@@ -319,16 +322,16 @@ NEXTAUTH_URL=http://localhost:3000
 
 ### API Endpoints
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/projects` | List all projects for the authenticated user |
-| GET | `/api/projects/[projectId]` | Get a single project (owner-gated) |
-| POST | `/api/projects/clone` | Clone a URL and save as a project |
-| POST | `/api/projects/scratch/propose` | Generate a website plan (no DB save) |
-| POST | `/api/projects/scratch/build` | Build from plan and save as project |
-| POST | `/api/projects/[projectId]/code-agent/edit/stream` | Owner website edit (SSE) |
-| GET | `/api/projects/[projectId]/messages` | Get chat history |
-| GET | `/api/projects/[projectId]/deployment-status` | Poll Vercel deployment status |
+| Method | Endpoint                                           | Description                                  |
+| ------ | -------------------------------------------------- | -------------------------------------------- |
+| GET    | `/api/projects`                                    | List all projects for the authenticated user |
+| GET    | `/api/projects/[projectId]`                        | Get a single project (owner-gated)           |
+| POST   | `/api/projects/clone`                              | Clone a URL and save as a project            |
+| POST   | `/api/projects/scratch/propose`                    | Generate a website plan (no DB save)         |
+| POST   | `/api/projects/scratch/build`                      | Build from plan and save as project          |
+| POST   | `/api/projects/[projectId]/code-agent/edit/stream` | Owner website edit (SSE)                     |
+| GET    | `/api/projects/[projectId]/messages`               | Get chat history                             |
+| GET    | `/api/projects/[projectId]/deployment-status`      | Poll Vercel deployment status                |
 
 ### Key Design Decisions
 
@@ -368,6 +371,7 @@ curl -X POST http://localhost:3000/api/agent/rebuild \
 ```
 
 Expected:
+
 - `ok: true`
 - `generatedSiteValidation.ok: true`
 - `contentFidelity.passed: true`
@@ -394,6 +398,7 @@ curl -X POST http://localhost:3000/api/agent/propose-website-plan \
 ```
 
 Expected:
+
 - `ok: true`
 - `websitePlan` exists
 - `phone: "512-555-9999"` is not blocked (512-555 is a real Austin exchange)
@@ -429,6 +434,7 @@ curl -X POST http://localhost:3000/api/agent/build-from-plan \
 ```
 
 Expected:
+
 - `ok: true`
 - `mode: "scratch"`
 - `generatedSiteValidation.ok: true`
@@ -443,6 +449,7 @@ curl "http://localhost:3000/api/projects/YOUR_PROJECT_ID/deployment-status"
 ```
 
 Expected:
+
 - `ok: true`
 - `status: "ready" | "building" | "pending" | "failed"`
 - `commitVerified: true` only when the live Vercel build matches the commit you just deployed
@@ -469,11 +476,13 @@ Every generated website must pass a local build validation before it is committe
 ### Architecture Rules
 
 The LLM only generates JSON data:
+
 - `factualSiteData` — strictly extracted facts from the crawled site
 - `siteSpec` — section titles, body copy, items, CTAs
 - `designBrief` — color palette, typography, layout enum values
 
 The LLM never generates:
+
 - React code or components
 - Tailwind class strings
 - CSS or imports
@@ -496,6 +505,7 @@ All actual code comes from `templates.ts` — deterministic, pre-audited templat
 ### Fail-Fast Behavior
 
 If the build gate fails:
+
 - No GitLab project is created
 - No code is committed
 - No Vercel deployment is triggered
@@ -506,6 +516,7 @@ This keeps broken code from ever reaching Vercel, which cannot be undeployed.
 ### Chat Edit Safety
 
 The same build gate protects chat edits:
+
 - After an edit request, `validateGeneratedSite()` runs on the updated files
 - Only if validation passes does the commit happen
 - If validation fails, the previous live website stays safe and unchanged
@@ -530,7 +541,8 @@ curl -X POST http://localhost:3000/api/agent/rebuild \
 
 ## Live Preview via Vercel
 
-After rebuild, if `VERCEL_API_TOKEN` is configured, the system:
+After rebuild, if `SITE_AGENT_VERCEL_TOKEN` is configured, the system:
+
 1. Creates a Vercel project connected to your GitLab repo
 2. Creates a deploy hook for the main branch
 3. Triggers the deployment automatically
@@ -547,6 +559,7 @@ After rebuild, if `VERCEL_API_TOKEN` is configured, the system:
 ### Deployment Status
 
 Response includes `deployment.status`:
+
 - `"triggered"` — Deploy hook created and triggered successfully
 - `"trigger_failed"` — Deploy hook was created but triggering failed
 - `"failed"` — Vercel project creation itself failed
@@ -554,34 +567,38 @@ Response includes `deployment.status`:
 ### If Deployment Does Not Start
 
 **Check Vercel dashboard:**
+
 1. Go to `deployment.projectUrl` (shown in response)
 2. Check if deployment appears under "Deployments" tab
 3. If not, click "Create Deployments" or push a new commit
 
 **Common issues:**
+
 - **Deploy hook 404**: The hook ID returned by Vercel API was malformed. Solution: delete the project and retry.
 - **Deploy hook returns error**: The git credential may be invalid. Reconnect GitLab in Vercel dashboard.
 - **Project created but no deployment**: Vercel requires a git push or manual trigger for first deployment.
 
 **Manual trigger via API:**
+
 ```bash
 # Get deploy hook URL from project
 curl -s "https://api.vercel.com/v2/projects/<projectId>" \
-  -H "Authorization: Bearer $VERCEL_API_TOKEN" | jq '.link.deployHooks[-1].url'
+  -H "Authorization: Bearer $SITE_AGENT_VERCEL_TOKEN" | jq '.link.deployHooks[-1].url'
 
 # Trigger deployment
 curl -X POST "<deploy-hook-url>" \
-  -H "Authorization: Bearer $VERCEL_API_TOKEN"
+  -H "Authorization: Bearer $SITE_AGENT_VERCEL_TOKEN"
 ```
 
 **Manual Vercel Import:**
+
 1. Go to https://vercel.com/import/git
 2. Paste your GitLab repo URL: `https://gitlab.com/<namespace>/<project>.git`
 3. Vercel will auto-detect Next.js and deploy
 
 ### Vercel API Fallback
 
-If you don't have `VERCEL_API_TOKEN`, the GitLab repo is still created. You can always manually import the repo URL into Vercel.
+If you don't have `SITE_AGENT_VERCEL_TOKEN`, the GitLab repo is still created. You can always manually import the repo URL into Vercel.
 
 ## Deployment Readiness Tracking
 
@@ -606,6 +623,7 @@ Vercel deployments are triggered asynchronously. After rebuild, the API returns 
 ### UI Behavior
 
 The `DeploymentStatusCard` component shows in the bottom-right corner of the workspace:
+
 - **Not ready**: "Open Live Site" button is disabled/grayed, shows warning about 404
 - **Ready**: "Open Live Site" button is enabled and green
 
@@ -616,6 +634,7 @@ curl "http://localhost:3000/api/vercel/deployment-status?projectName=clone-linds
 ```
 
 Response:
+
 ```json
 {
   "ok": true,
@@ -634,21 +653,25 @@ Response:
 ### Troubleshooting
 
 **Vercel deployment returns 404 after rebuild:**
+
 - Wait 1-3 minutes — Vercel may still be building
 - Check deployment status at `deployment.projectUrl`
 - If status is `trigger_failed`, the deploy hook was created but trigger failed — manually trigger via Vercel dashboard
 
 **Deploy hook creation failed (trigger_failed status):**
+
 - This is non-fatal — the Vercel project is still created
 - Go to Vercel dashboard and click "Create Deployments" or push a new commit
 - Or use the manual trigger via API shown above
 
 **GitLab Pages URL returns 404:**
+
 - Check that the pipeline passed (CI/CD → Pipelines)
 - Ensure the project is public or Pages is enabled
 - Wait 1-2 minutes after pipeline completion
 
 **Pipeline failed:**
+
 - Check the pipeline log for build errors
 - Common issue: `next build` may have TypeScript errors in generated code
 - Verify `package.json` has `"build": "next build"` script
@@ -687,6 +710,7 @@ After rebuilding a website, the owner can maintain and update their site through
 ### Supported Edits
 
 **Simple content updates:**
+
 - Add/update FAQ, pricing, booking CTA, testimonials
 - Update contact info, phone, hours, address
 - Change tone or improve CTAs
@@ -694,6 +718,7 @@ After rebuilding a website, the owner can maintain and update their site through
 - Make site look more premium
 
 **Complex features (placeholder only):**
+
 - Booking backend, login, payments, CRM, inventory
 - These add a placeholder CTA section with note that full integration is not implemented in MVP
 

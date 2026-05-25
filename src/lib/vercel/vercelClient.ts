@@ -10,7 +10,7 @@ export class VercelClient {
 
     if (!this.token) {
       throw new Error(
-        'VERCEL_API_TOKEN is required (or legacy VERCEL_TOKEN for local dev)'
+        'SITE_AGENT_VERCEL_TOKEN is required to deploy customer sites via the Vercel API'
       );
     }
 

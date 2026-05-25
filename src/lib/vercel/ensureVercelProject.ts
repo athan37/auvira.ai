@@ -35,7 +35,7 @@ export type EnsureVercelProjectResult = {
 
 /**
  * Ensure a WebsiteProject has a linked Vercel project. Creates one on first call
- * when VERCEL_API_TOKEN is configured and GitLab is linked.
+ * when SITE_AGENT_VERCEL_TOKEN is configured and GitLab is linked.
  */
 export async function ensureVercelProjectLinked(
   project: Pick<IWebsiteProject, 'name' | 'deployment' | 'gitlab'>
@@ -45,7 +45,7 @@ export async function ensureVercelProjectLinked(
   }
 
   if (!hasVercelApiToken()) {
-    console.warn('[ensureVercel] VERCEL_API_TOKEN not set — skipping Vercel link');
+    console.warn('[ensureVercel] SITE_AGENT_VERCEL_TOKEN not set — skipping Vercel link');
     return { deployment: project.deployment ?? null, created: false };
   }
 

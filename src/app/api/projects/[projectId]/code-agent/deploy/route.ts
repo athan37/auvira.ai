@@ -46,7 +46,7 @@ export async function POST(
       {
         ok: false,
         error:
-          'VERCEL_API_TOKEN is not configured on the server (set in Vercel env vars or local .env).',
+          'SITE_AGENT_VERCEL_TOKEN is not configured (optional — only needed to publish customer sites to Vercel).',
       },
       { status: 503 }
     );

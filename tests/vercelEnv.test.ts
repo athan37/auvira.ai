@@ -10,8 +10,10 @@ describe('vercelEnv', () => {
 
   beforeEach(() => {
     for (const key of [
+      'SITE_AGENT_VERCEL_TOKEN',
       'VERCEL_API_TOKEN',
       'VERCEL_TOKEN',
+      'SITE_AGENT_VERCEL_TEAM_ID',
       'VERCEL_API_TEAM_ID',
       'VERCEL_TEAM_ID',
     ]) {
@@ -27,10 +29,11 @@ describe('vercelEnv', () => {
     }
   });
 
-  it('prefers VERCEL_API_TOKEN over legacy VERCEL_TOKEN', () => {
+  it('prefers SITE_AGENT_VERCEL_TOKEN over legacy names', () => {
     process.env.VERCEL_TOKEN = 'legacy';
-    process.env.VERCEL_API_TOKEN = '  api-token  ';
-    expect(getVercelApiToken()).toBe('api-token');
+    process.env.VERCEL_API_TOKEN = 'api';
+    process.env.SITE_AGENT_VERCEL_TOKEN = '  site-agent-token  ';
+    expect(getVercelApiToken()).toBe('site-agent-token');
     expect(hasVercelApiToken()).toBe(true);
   });
 
@@ -39,9 +42,9 @@ describe('vercelEnv', () => {
     expect(getVercelApiToken()).toBe('legacy-only');
   });
 
-  it('prefers VERCEL_API_TEAM_ID over VERCEL_TEAM_ID', () => {
+  it('prefers SITE_AGENT_VERCEL_TEAM_ID over legacy team ids', () => {
     process.env.VERCEL_TEAM_ID = 'team-a';
-    process.env.VERCEL_API_TEAM_ID = 'team-b';
+    process.env.SITE_AGENT_VERCEL_TEAM_ID = 'team-b';
     expect(getVercelTeamId()).toBe('team-b');
   });
 });

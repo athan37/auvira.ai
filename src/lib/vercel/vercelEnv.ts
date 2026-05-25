@@ -1,10 +1,11 @@
 /**
- * Vercel API credentials. Use VERCEL_API_* on Vercel-hosted projects;
- * VERCEL_TOKEN / VERCEL_TEAM_ID remain supported for local .env.
+ * Vercel API credentials for deploying customer sites from the app.
+ * Use SITE_AGENT_VERCEL_* in Vercel project env — names starting with VERCEL_ are reserved.
  */
 
 export function getVercelApiToken(): string {
   return (
+    process.env.SITE_AGENT_VERCEL_TOKEN?.trim() ||
     process.env.VERCEL_API_TOKEN?.trim() ||
     process.env.VERCEL_TOKEN?.trim() ||
     ''
@@ -13,6 +14,7 @@ export function getVercelApiToken(): string {
 
 export function getVercelTeamId(): string | undefined {
   const id =
+    process.env.SITE_AGENT_VERCEL_TEAM_ID?.trim() ||
     process.env.VERCEL_API_TEAM_ID?.trim() ||
     process.env.VERCEL_TEAM_ID?.trim();
   return id || undefined;
