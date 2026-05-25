@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getOwnerProject, getServerUserId } from '@/lib/api/projectAccess';
+import { getOwnerProject, getProjectActorUserId } from '@/lib/api/projectAccess';
 import {
   bootstrapProjectPreview,
   checkPreviewHealthy,
@@ -54,7 +54,7 @@ export async function POST(
     }
   }
 
-  const userId = await getServerUserId();
+  const userId = await getProjectActorUserId(project);
   if (!userId) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
   }

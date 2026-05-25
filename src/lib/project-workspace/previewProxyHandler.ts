@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOwnerProject } from '@/lib/api/projectAccess';
-import { checkPreviewHealthy } from '@/lib/project-workspace/bootstrapProjectPreview';
+import { getGitWorkspacePath } from '@/lib/project-workspace/gitWorkspaceManager';
+import {
+  checkWorkspacePreviewHealthy,
+  isReservedWorkspacePreviewPort,
+} from '@/lib/preview/workspacePreviewHealth';
 import { buildPreviewLoadingHtml } from '@/lib/project-workspace/codePreviewServe';
 import { rewritePreviewAssetPaths } from '@/lib/project-workspace/previewProxyRewrite';
 
@@ -168,8 +172,12 @@ export async function handlePreviewProxyGet(
   }
 
   const port = project.preview?.port;
+  const workspacePath =
+    project.preview?.workspacePath?.trim() || getGitWorkspacePath(projectId);
   if (port && project.preview?.status === 'ready') {
-    const healthy = await checkPreviewHealthy(port);
+    const healthy =
+      !isReservedWorkspacePreviewPort(port) &&
+      (await checkWorkspacePreviewHealthy(port, workspacePath));
     if (!healthy) {
       return new NextResponse(
         buildPreviewLoadingHtml(

@@ -12,7 +12,7 @@ export interface ParsedSiteConfig {
     type?: string;
     title?: string;
     body?: string;
-    items?: Array<{ title?: string; description?: string }>;
+    items?: Array<{ title?: string; description?: string; imageUrl?: string }>;
   }>;
 }
 
@@ -127,7 +127,8 @@ export function patchRemoveBanner(content: string, bannerText: string): string {
   return rebuildSiteConfigFile(content, parsed);
 }
 
-function rebuildSiteConfigFile(original: string, config: ParsedSiteConfig): string {
+/** Write parsed config back into siteConfig.ts preserving export style. */
+export function rebuildSiteConfigFile(original: string, config: ParsedSiteConfig): string {
   const json = JSON.stringify(config, null, 2);
   if (/export const siteConfig:\s*SiteConfig\s*=\s*\{/.test(original)) {
     return original.replace(

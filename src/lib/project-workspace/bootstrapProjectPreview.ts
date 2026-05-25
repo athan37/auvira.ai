@@ -10,6 +10,10 @@ import {
 import { repairPreviewWorkspace } from '@/lib/preview/repairPreviewWorkspace';
 import { startWorkspaceDevServer } from '@/lib/preview/startWorkspaceDevServer';
 import { stopPreviewServerByPort } from '@/lib/preview/stopPreviewServer';
+import {
+  checkWorkspacePreviewHealthy,
+  isReservedWorkspacePreviewPort,
+} from '@/lib/preview/workspacePreviewHealth';
 import { getNpmPath } from '@/lib/runtime/nodeRuntime';
 import { isVercelServerless } from '@/lib/runtime/isVercelServerless';
 import { isSandboxPreviewEnabled } from '@/lib/runtime/isSandboxPreviewEnabled';
@@ -105,8 +109,13 @@ async function bootstrapGitlabProject(
 ): Promise<void> {
   const projectId = project._id.toString();
 
+  const workspacePath = getGitWorkspacePath(projectId);
+
   if (project.preview?.port) {
-    const healthy = await checkPreviewHealthy(project.preview.port);
+    const port = project.preview.port;
+    const portOk = !isReservedWorkspacePreviewPort(port);
+    const healthy =
+      portOk && (await checkWorkspacePreviewHealthy(port, workspacePath));
     if (healthy && project.preview.status === 'ready') {
       await WebsiteProject.updateOne(
         { _id: projectId },
@@ -125,10 +134,19 @@ async function bootstrapGitlabProject(
       return;
     }
     if (!healthy) {
+      const reason = !portOk
+        ? 'port is reserved for Site Agent app'
+        : 'preview does not match workspace';
       console.warn(
-        `[bootstrap] Stale preview on port ${project.preview.port} for ${projectId} — restarting`
+        `[bootstrap] Stale preview on port ${port} for ${projectId} (${reason}) — restarting`
       );
-      await stopPreviewServerByPort(project.preview.port);
+      if (portOk) {
+        await stopPreviewServerByPort(port);
+      }
+      await WebsiteProject.updateOne(
+        { _id: projectId },
+        { $unset: { 'preview.port': '', 'preview.url': '' } }
+      );
     }
   }
 
@@ -147,11 +165,11 @@ async function bootstrapGitlabProject(
   );
 
   const gitInfo = await ensureGitWorkspace(project, userId);
-  const workspacePath = gitInfo.workspacePath;
+  const resolvedWorkspacePath = gitInfo.workspacePath;
 
-  await repairPreviewWorkspace(workspacePath);
+  await repairPreviewWorkspace(resolvedWorkspacePath);
 
-  const nodeModulesPath = join(workspacePath, 'node_modules');
+  const nodeModulesPath = join(resolvedWorkspacePath, 'node_modules');
   const needsInstall = !existsSync(nodeModulesPath);
 
   await WebsiteProject.updateOne(
@@ -159,7 +177,7 @@ async function bootstrapGitlabProject(
     {
       $set: {
         'codeWorkspace.status': 'ready',
-        'codeWorkspace.workspacePath': workspacePath,
+        'codeWorkspace.workspacePath': resolvedWorkspacePath,
         'codeWorkspace.branch': gitInfo.branch,
         'codeWorkspace.headSha': gitInfo.headSha,
         'codeWorkspace.source': 'gitlab',
@@ -173,7 +191,7 @@ async function bootstrapGitlabProject(
   );
 
   if (needsInstall) {
-    await runNpmInstall(workspacePath);
+    await runNpmInstall(resolvedWorkspacePath);
   }
 
   await setSetupStage(projectId, 'starting_server', {
@@ -183,7 +201,7 @@ async function bootstrapGitlabProject(
 
   const port = allocatePort();
   const previewUrl = `http://127.0.0.1:${port}`;
-  await startWorkspaceDevServer(workspacePath, port, { timeoutMs: 180_000 });
+  await startWorkspaceDevServer(resolvedWorkspacePath, port, { timeoutMs: 180_000 });
 
   await WebsiteProject.updateOne(
     { _id: projectId },
@@ -192,7 +210,7 @@ async function bootstrapGitlabProject(
         'preview.status': 'ready',
         'preview.url': previewUrl,
         'preview.port': port,
-        'preview.workspacePath': workspacePath,
+        'preview.workspacePath': resolvedWorkspacePath,
         'preview.previewMode': 'workspace',
         'preview.startedAt': new Date(),
         'codeWorkspace.status': 'ready',
@@ -340,8 +358,11 @@ export async function bootstrapProjectPreview(
 function getLocalWorkspaceStatus(project: IWebsiteProject) {
   const deploymentLiveUrl = project.deployment?.liveUrl || null;
   const previewPort = project.preview?.port ?? null;
+  const previewPortInvalid =
+    previewPort != null && isReservedWorkspacePreviewPort(previewPort);
   let stage = (project.codeWorkspace?.setupStage as WorkspaceSetupStage) || 'idle';
-  const previewReady = project.preview?.status === 'ready' && !!previewPort;
+  const previewReady =
+    project.preview?.status === 'ready' && !!previewPort && !previewPortInvalid;
   const workspaceReady = project.codeWorkspace?.status === 'ready';
   const ready = previewReady && workspaceReady;
 

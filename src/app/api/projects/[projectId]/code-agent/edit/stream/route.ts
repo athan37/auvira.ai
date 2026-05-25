@@ -586,7 +586,14 @@ export async function POST(
           previewVerify = await verifyEditVisibleInPreview({
             previewUrl: previewUrlForVerify,
             imagePaths: attachments.map((a) => a.publicUrl),
-            sectionPhrases: ['Our products', 'Product documentation', 'Product images'],
+            sectionPhrases: [
+              'Our products',
+              'Our work',
+              'Gallery',
+              'Product documentation',
+              'Product images',
+              'Featured Product',
+            ],
           });
           await appendEditJobLog(
             jobId,

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getOwnerProject, getServerUserId } from '@/lib/api/projectAccess';
+import { getOwnerProject, getProjectActorUserId } from '@/lib/api/projectAccess';
 import { WebsiteProject } from '@/models/WebsiteProject';
 import { createProjectWorkspace } from '@/lib/project-workspace/createProjectWorkspace';
 import { resolveWorkspaceForEdit } from '@/lib/project-workspace/resolveWorkspaceGateway';
@@ -15,6 +15,7 @@ import {
   saveWorkspaceImages,
 } from '@/lib/project-workspace/workspaceAssets';
 import { getProjectSandbox } from '@/lib/sandbox/sandboxClient';
+import { writeSandboxFile } from '@/lib/sandbox/sandboxFsWrite';
 import { SANDBOX_WORKDIR } from '@/lib/sandbox/types';
 import crypto from 'crypto';
 import path from 'path';
@@ -70,7 +71,7 @@ export async function POST(
     );
   }
 
-  const userId = await getServerUserId();
+  const userId = await getProjectActorUserId(project);
   if (!userId) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
   }
@@ -117,7 +118,11 @@ export async function POST(
         const id = crypto.randomUUID().replace(/-/g, '').slice(0, 12);
         const filename = `${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}-${id}${path.extname(file.name) || '.jpg'}`;
         const relativePath = `${uploadDir}/${filename}`;
-        await sb.fs.writeFile(path.posix.join(SANDBOX_WORKDIR, relativePath), file.buffer);
+        await writeSandboxFile(
+          sb,
+          path.posix.join(SANDBOX_WORKDIR, relativePath),
+          file.buffer
+        );
         const publicUrl = `/uploads/${filename}`;
         attachments.push({
           id,

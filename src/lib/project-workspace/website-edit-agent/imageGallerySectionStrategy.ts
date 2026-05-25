@@ -4,14 +4,9 @@ import {
   computeWorkspaceHashes,
   getChangedFilesFromHashes,
 } from '../workspaceEditShared';
-import {
-  buildGallerySectionPayload,
-  prependGallerySectionInSiteConfig,
-} from './gallerySiteConfig';
-import {
-  pageCanRenderGallerySection,
-  patchPageForUploadedImages,
-} from './patchGenericSectionImages';
+import { applyImagePlacementToSiteConfig, describePlacementForOwner } from './applyImagePlacementPlan';
+import { planImagePlacement } from './imagePlacementPlan';
+import { pageCanRenderGallerySection, patchPageForUploadedImages } from './patchGenericSectionImages';
 import { verifyEditApplied } from './verifyEditApplied';
 import type { WebsiteEditAgentOptions, WebsiteEditAgentResult } from './types';
 
@@ -19,7 +14,7 @@ const SITE_CONFIG = 'src/lib/siteConfig.ts';
 const PAGE_TSX = 'src/app/page.tsx';
 
 /**
- * Section + uploaded images: update siteConfig (top of sections) and patch page.tsx so images render.
+ * Section + uploaded images: analyze site structure → plan placement → apply siteConfig + page patches.
  */
 export async function runImageGallerySectionStrategy(
   options: WebsiteEditAgentOptions,
@@ -60,8 +55,19 @@ export async function runImageGallerySectionStrategy(
     return null;
   }
 
-  const section = buildGallerySectionPayload(attachments, options.ownerMessage);
-  const updatedSiteConfig = prependGallerySectionInSiteConfig(siteConfigContent, section);
+  const { plan, snapshot, usedLlm } = await planImagePlacement({
+    ownerMessage: options.ownerMessage,
+    attachments,
+    siteConfigContent,
+    pageContent: pageBefore,
+  });
+
+  const updatedSiteConfig = applyImagePlacementToSiteConfig(
+    siteConfigContent,
+    plan,
+    attachments,
+    snapshot
+  );
 
   const beforeFiles: Record<string, string> = {
     [SITE_CONFIG]: siteConfigContent,
@@ -97,9 +103,9 @@ export async function runImageGallerySectionStrategy(
     return {
       ok: false,
       strategy: 'image_gallery',
-      error: 'page.tsx does not render gallery item images (DocumentationSection or GenericSection patch missing).',
+      error: 'page.tsx does not render gallery item images (missing gallery/generic renderer).',
       ownerMessage:
-        "Your images were saved, but this site's page template still can't display a product gallery. Please try again after the latest deploy.",
+        "Your images were saved, but this site's page template still can't display them. Please try again after the latest deploy.",
     };
   }
 
@@ -127,15 +133,16 @@ export async function runImageGallerySectionStrategy(
     return null;
   }
 
-  const title = String(section.title ?? 'Product images');
-  const count = attachments.length;
-  const ownerMessage = `Added "${title}" near the top of your homepage with ${count} product image${count === 1 ? '' : 's'}. Scroll below the hero to see the gallery.`;
+  const ownerMessage = describePlacementForOwner(plan, attachments.length);
+  const summary = usedLlm
+    ? `${ownerMessage} (placement chosen from your site layout.)`
+    : `${ownerMessage} (placement chosen by site structure rules.)`;
 
   return {
     ok: true,
     strategy: 'image_gallery',
-    summary: ownerMessage,
-    ownerMessage,
+    summary,
+    ownerMessage: summary,
     changedFiles,
   };
 }

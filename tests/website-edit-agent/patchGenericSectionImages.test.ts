@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
+  pageCanRenderGallerySection,
   patchDocumentationSectionForImages,
   patchGenericSectionForImages,
+  patchPageForUploadedImages,
 } from '../../src/lib/project-workspace/website-edit-agent/patchGenericSectionImages';
 
 const MINIMAL_GENERIC = `
@@ -62,5 +64,39 @@ function GenericSection({ section }) {
     const { content, patched } = patchGenericSectionForImages(MINIMAL_GENERIC);
     const second = patchGenericSectionForImages(content);
     expect(second.patched).toBe(false);
+  });
+
+  it('injects GenericSection when SectionRenderer default is null', () => {
+    const page = `
+function SectionRenderer({ section }) {
+  switch (section.type) {
+    case 'services': return null;
+    default: return null;
+  }
+}
+`;
+    expect(pageCanRenderGallerySection(page)).toBe(true);
+    const { content, patched } = patchPageForUploadedImages(page);
+    expect(patched).toBe(true);
+    expect(content).toContain('function GenericSection');
+    expect(content).toContain('default: return <GenericSection section={section} />');
+    expect(content).toContain('imageUrl');
+  });
+
+  it('pageCanRenderGallerySection passes when orphan DocumentationSection but GenericSection is patchable', () => {
+    const page = `
+function DocumentationSection({ section }) {
+  return <section><p>{section.body}</p></section>;
+}
+${MINIMAL_GENERIC}
+function SectionRenderer({ section }) {
+  switch (section.type) {
+    default: return <GenericSection section={section} />;
+  }
+}
+`;
+    expect(pageCanRenderGallerySection(page)).toBe(true);
+    const { patched } = patchPageForUploadedImages(page);
+    expect(patched).toBe(true);
   });
 });

@@ -271,10 +271,17 @@ export function ProjectPreviewChat({
       formData.append('files', img.file);
     }
 
-    const res = await fetch(`/api/projects/${projectId}/code-agent/upload-assets`, {
-      method: 'POST',
-      body: formData,
-    });
+    let res: Response;
+    try {
+      res = await fetch(`/api/projects/${projectId}/code-agent/upload-assets`, {
+        method: 'POST',
+        body: formData,
+      });
+    } catch {
+      throw new Error(
+        'Could not reach the server. Make sure `npm run dev` is running at http://localhost:3000, then try again.'
+      );
+    }
     const data = await res.json();
     if (!data.ok) {
       throw new Error(data.error || 'Image upload failed');

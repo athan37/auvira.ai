@@ -6,6 +6,7 @@ import { enrichEditPrompt } from './enrichEditPrompt';
 import { runSingleShotStrategy } from './singleShotStrategy';
 import { runSectionConfigStrategy } from './sectionConfigStrategy';
 import { runImageGallerySectionStrategy } from './imageGallerySectionStrategy';
+import { runGalleryItemDescriptionStrategy } from './galleryItemDescriptionStrategy';
 import { runAgentLoop } from './WebsiteEditAgent';
 import type {
   AgentStepEvent,
@@ -78,6 +79,16 @@ export async function runWebsiteEditAgent(
     ? await options.gateway.computeHashes()
     : await computeWorkspaceHashes(options.workspacePath);
   const hasAttachments = (options.attachments?.length ?? 0) > 0;
+
+  if (options.mode === 'gitlab') {
+    const galleryCaptions = await runGalleryItemDescriptionStrategy(options, beforeHashes);
+    if (galleryCaptions?.ok) {
+      return galleryCaptions;
+    }
+    if (galleryCaptions && !galleryCaptions.ok) {
+      return galleryCaptions;
+    }
+  }
 
   if (!hasAttachments && decision.strategy === 'single_shot') {
     const beforeFiles = await snapshotStyleTargets(options);

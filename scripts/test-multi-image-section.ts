@@ -17,12 +17,12 @@ import { getGitWorkspacePath } from '../src/lib/project-workspace/gitWorkspaceMa
 import { saveWorkspaceImages } from '../src/lib/project-workspace/workspaceAssets';
 import { repairPreviewWorkspace } from '../src/lib/preview/repairPreviewWorkspace';
 import { startWorkspaceDevServer } from '../src/lib/preview/startWorkspaceDevServer';
-import { checkPreviewHealthy } from '../src/lib/project-workspace/bootstrapProjectPreview';
 import type { WorkspaceAssetAttachment } from '../src/lib/project-workspace/workspaceAssetTypes';
 
 const PROJECT_ID = process.argv[2] || '6a135ba264e7672599597ea1';
 const PROMPT =
-  "these are great documentations of all the product, let's make a section for it";
+  process.env.TEST_GALLERY_PROMPT ||
+  "these are really important images of our product, let's make a section for it";
 const DEV_USER = '507f1f77bcf86cd799439011';
 
 const DEFAULT_IMAGES = [

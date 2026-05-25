@@ -50,6 +50,16 @@ export async function getOwnerProject(projectId: string) {
 }
 
 /**
+ * User id for project-scoped API routes: session user, or project owner when dev bypass applies.
+ */
+export async function getProjectActorUserId(
+  project: NonNullable<Awaited<ReturnType<typeof getOwnerProject>>>
+): Promise<string | null> {
+  const sessionUserId = await getServerUserId();
+  return sessionUserId ?? project.ownerId?.toString() ?? null;
+}
+
+/**
  * Returns 401 JSON if not authenticated.
  */
 export async function requireAuth() {

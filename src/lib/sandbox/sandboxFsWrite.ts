@@ -61,12 +61,73 @@ export async function writeSandboxFileViaCommand(
   }
 }
 
+/** Binary file write fallback when the Files API returns 400. */
+async function writeSandboxBinaryViaCommand(
+  sandbox: Sandbox,
+  absPath: string,
+  data: Buffer
+): Promise<void> {
+  const encoded = data.toString('base64');
+  const dir = absPath.replace(/\/[^/]+$/, '');
+  await sandbox.runCommand({ cmd: 'mkdir', args: ['-p', dir] });
+
+  if (encoded.length <= MAX_ARG_BYTES) {
+    const result = await sandbox.runCommand({
+      cmd: 'node',
+      args: [
+        '-e',
+        `const fs=require("fs");const p=process.argv[1];const b=Buffer.from(process.argv[2],"base64");fs.mkdirSync(require("path").dirname(p),{recursive:true});fs.writeFileSync(p,b);`,
+        absPath,
+        encoded,
+      ],
+    });
+    if (result.exitCode === 0) return;
+  }
+
+  const tmpPath = `/tmp/site-agent-bin-${Date.now()}.b64`;
+  const chunkSize = 48_000;
+  await sandbox.fs.writeFile(tmpPath, '', 'utf8');
+  for (let i = 0; i < encoded.length; i += chunkSize) {
+    const chunk = encoded.slice(i, i + chunkSize);
+    const append = await sandbox.runCommand({
+      cmd: 'sh',
+      args: ['-c', `printf '%s' '${chunk.replace(/'/g, "'\\''")}' >> '${tmpPath}'`],
+    });
+    if (append.exitCode !== 0) {
+      throw new Error('Sandbox chunked binary write failed');
+    }
+  }
+
+  const decode = await sandbox.runCommand({
+    cmd: 'node',
+    args: [
+      '-e',
+      `const fs=require("fs");const src=process.argv[1];const dest=process.argv[2];const b=Buffer.from(fs.readFileSync(src,"utf8"),"base64");fs.mkdirSync(require("path").dirname(dest),{recursive:true});fs.writeFileSync(dest,b);`,
+      tmpPath,
+      absPath,
+    ],
+  });
+  if (decode.exitCode !== 0) {
+    const stderr = await decode.stderr();
+    throw new Error(stderr.slice(0, 300) || 'Sandbox binary decode write failed');
+  }
+}
+
 /** Prefer SDK fs.writeFile; fall back to in-VM write on 400. */
 export async function writeSandboxFile(
   sandbox: Sandbox,
   absPath: string,
-  content: string
+  content: string | Buffer
 ): Promise<void> {
+  if (Buffer.isBuffer(content)) {
+    try {
+      await sandbox.fs.writeFile(absPath, content);
+    } catch (err) {
+      if (!isSandboxWriteError(err)) throw err;
+      await writeSandboxBinaryViaCommand(sandbox, absPath, content);
+    }
+    return;
+  }
   try {
     await sandbox.fs.writeFile(absPath, content, 'utf8');
   } catch (err) {

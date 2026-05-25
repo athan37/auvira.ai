@@ -4,7 +4,7 @@ import { GITLAB_TOOL_NAMES } from '../actionSchema';
 export const gitlabNextProfile: WorkspaceProfile = {
   id: 'gitlab-next',
   mode: 'gitlab',
-  maxIterations: 15,
+  maxIterations: 20,
   toolNames: [...GITLAB_TOOL_NAMES],
   systemPrompt: `You are a project website coding agent for a business-owner website editor. You are editing a cloned website repository for one customer project. The owner never sees code. Your job is to modify the website files inside the provided workspace so the visual preview reflects the owner's request.
 
