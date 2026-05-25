@@ -152,7 +152,7 @@ async function inspectRealProject(projectId: string): Promise<void> {
   }
 
   const { connectMongoDB } = await import('../src/lib/mongodb');
-  const { WebsiteProject } = await import('../models/WebsiteProject');
+  const { WebsiteProject } = await import('../src/models/WebsiteProject');
   await connectMongoDB();
 
   const project = await WebsiteProject.findById(projectId).lean();
