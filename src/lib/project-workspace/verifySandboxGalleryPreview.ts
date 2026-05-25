@@ -1,4 +1,4 @@
-import { pageHasGalleryRenderer } from './website-edit-agent/patchGallerySection';
+import { canRenderUploadedImages } from './website-edit-agent/universalImageRenderer';
 import { validateGalleryInSiteConfigSource } from './website-edit-agent/validateGallerySiteConfig';
 import type { WorkspaceAssetAttachment } from './workspaceAssetTypes';
 import { verifyEditVisibleInPreview } from './verifyEditVisibleInPreview';
@@ -24,10 +24,10 @@ export async function verifyGalleryEditOnSandbox(input: {
     return { ok: false, reason: configCheck.reason, imagesFound: 0, htmlLength: 0 };
   }
 
-  if (!pageHasGalleryRenderer(input.pageSource)) {
+  if (!canRenderUploadedImages(input.pageSource)) {
     return {
       ok: false,
-      reason: 'page.tsx missing GallerySection or case "gallery"',
+      reason: 'page.tsx cannot render gallery item images (missing gallery/generic renderer)',
       imagesFound: 0,
       htmlLength: 0,
     };

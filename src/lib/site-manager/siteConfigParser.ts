@@ -1,5 +1,6 @@
 import { promises as fs } from 'fs';
 import path from 'path';
+import { ensureSiteConfigTypesSupportGallery } from '@/lib/builder/siteConfigTypes';
 
 export interface ParsedSiteConfig {
   contact: {
@@ -130,16 +131,19 @@ export function patchRemoveBanner(content: string, bannerText: string): string {
 /** Write parsed config back into siteConfig.ts preserving export style. */
 export function rebuildSiteConfigFile(original: string, config: ParsedSiteConfig): string {
   const json = JSON.stringify(config, null, 2);
+  let updated: string;
   if (/export const siteConfig:\s*SiteConfig\s*=\s*\{/.test(original)) {
-    return original.replace(
+    updated = original.replace(
       /export const siteConfig:\s*SiteConfig\s*=\s*\{[\s\S]*\};?\s*$/,
       `export const siteConfig: SiteConfig = ${json};\n`
     );
+  } else {
+    updated = original.replace(
+      /export const siteConfig\s*=\s*\{[\s\S]*\};?\s*$/,
+      `export const siteConfig = ${json};\n`
+    );
   }
-  return original.replace(
-    /export const siteConfig\s*=\s*\{[\s\S]*\};?\s*$/,
-    `export const siteConfig = ${json};\n`
-  );
+  return ensureSiteConfigTypesSupportGallery(updated);
 }
 
 export { SITE_CONFIG_REL };

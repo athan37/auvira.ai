@@ -6,16 +6,17 @@ import {
 } from '../workspaceEditShared';
 import { applyImagePlacementToSiteConfig, describePlacementForOwner } from './applyImagePlacementPlan';
 import { planImagePlacement } from './imagePlacementPlan';
-import { pageCanRenderGallerySection, patchPageForUploadedImages } from './patchGenericSectionImages';
+import {
+  applyUniversalImageRenderer,
+  canRenderUploadedImages,
+} from './universalImageRenderer';
+import { resolveSiteWorkspace } from './resolveSiteWorkspace';
 import { verifyEditApplied } from './verifyEditApplied';
 import { validateGalleryInSiteConfigSource } from './validateGallerySiteConfig';
 import type { WebsiteEditAgentOptions, WebsiteEditAgentResult } from './types';
 
-const SITE_CONFIG = 'src/lib/siteConfig.ts';
-const PAGE_TSX = 'src/app/page.tsx';
-
 /**
- * Section + uploaded images: analyze site structure → plan placement → apply siteConfig + page patches.
+ * Next.js image upload pipeline: plan placement → siteConfig → universal page renderer.
  */
 export async function runImageGallerySectionStrategy(
   options: WebsiteEditAgentOptions,
@@ -23,6 +24,21 @@ export async function runImageGallerySectionStrategy(
 ): Promise<WebsiteEditAgentResult | null> {
   const attachments = options.attachments ?? [];
   if (attachments.length === 0 || options.mode !== 'gitlab') {
+    return null;
+  }
+
+  const workspace = await resolveSiteWorkspace({
+    workspacePath: options.workspacePath,
+    mode: options.mode,
+    gateway: options.gateway,
+  });
+
+  const siteConfigPath = workspace.siteConfigPath;
+  const pagePath = workspace.pagePath;
+  const siteConfigContent = workspace.siteConfigContent;
+  const pageBefore = workspace.pageContent;
+
+  if (!siteConfigPath || !pagePath || !siteConfigContent || !pageBefore) {
     return null;
   }
 
@@ -46,16 +62,6 @@ export async function runImageGallerySectionStrategy(
     }
   }
 
-  const siteConfigContent = await readRel(SITE_CONFIG);
-  if (!siteConfigContent) {
-    return null;
-  }
-
-  const pageBefore = await readRel(PAGE_TSX);
-  if (!pageBefore) {
-    return null;
-  }
-
   const { plan, snapshot, usedLlm } = await planImagePlacement({
     ownerMessage: options.ownerMessage,
     attachments,
@@ -71,13 +77,13 @@ export async function runImageGallerySectionStrategy(
   );
 
   const beforeFiles: Record<string, string> = {
-    [SITE_CONFIG]: siteConfigContent,
-    [PAGE_TSX]: pageBefore,
+    [siteConfigPath]: siteConfigContent,
+    [pagePath]: pageBefore,
   };
 
-  await writeRel(SITE_CONFIG, updatedSiteConfig);
+  await writeRel(siteConfigPath, updatedSiteConfig);
 
-  const afterWriteConfig = (await readRel(SITE_CONFIG)) ?? '';
+  const afterWriteConfig = (await readRel(siteConfigPath)) ?? '';
   const galleryCheck = validateGalleryInSiteConfigSource(afterWriteConfig, attachments);
   if (!galleryCheck.ok) {
     return {
@@ -89,29 +95,29 @@ export async function runImageGallerySectionStrategy(
     };
   }
 
+  const renderPatch = applyUniversalImageRenderer(pageBefore, workspace.archetype);
   let pageAfter = pageBefore;
-  const { content: patchedPage, patched } = patchPageForUploadedImages(pageBefore);
-  if (patched) {
-    await writeRel(PAGE_TSX, patchedPage);
-    pageAfter = patchedPage;
+  if (renderPatch.patched) {
+    await writeRel(pagePath, renderPatch.content);
+    pageAfter = renderPatch.content;
   } else {
-    pageAfter = (await readRel(PAGE_TSX)) ?? pageBefore;
+    pageAfter = (await readRel(pagePath)) ?? pageBefore;
   }
 
-  if (!pageCanRenderGallerySection(pageAfter)) {
+  if (!canRenderUploadedImages(pageAfter, workspace.archetype)) {
     return {
       ok: false,
       strategy: 'image_gallery',
-      error: 'page.tsx does not render gallery item images (missing gallery/generic renderer).',
+      error: `page does not render gallery images (archetype=${workspace.archetype}, anchors=${renderPatch.anchors.join(',') || 'none'})`,
       ownerMessage:
         "Your images were saved, but this site's page template still can't display them. Please try again after the latest deploy.",
     };
   }
 
-  const afterSiteConfig = (await readRel(SITE_CONFIG)) ?? updatedSiteConfig;
+  const afterSiteConfig = (await readRel(siteConfigPath)) ?? updatedSiteConfig;
   const afterFiles: Record<string, string> = {
-    [SITE_CONFIG]: afterSiteConfig,
-    [PAGE_TSX]: pageAfter,
+    [siteConfigPath]: afterSiteConfig,
+    [pagePath]: pageAfter,
   };
 
   const verification = verifyEditApplied(options.ownerMessage, beforeFiles, afterFiles);

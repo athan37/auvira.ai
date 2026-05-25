@@ -5,8 +5,7 @@ import { routeEditRequest } from './intentRouter';
 import { enrichEditPrompt } from './enrichEditPrompt';
 import { runSingleShotStrategy } from './singleShotStrategy';
 import { runSectionConfigStrategy } from './sectionConfigStrategy';
-import { runImageGallerySectionStrategy } from './imageGallerySectionStrategy';
-import { runGalleryItemDescriptionStrategy } from './galleryItemDescriptionStrategy';
+import { routeAttachmentEdits } from './attachmentRouter';
 import { runAgentLoop } from './WebsiteEditAgent';
 import type {
   AgentStepEvent,
@@ -59,12 +58,14 @@ async function captureChangedFileContents(
   return captured;
 }
 
-export { routeEditRequest, isTrivialStyleEdit } from './intentRouter';
+export { routeEditRequest, isTrivialStyleEdit, hasImageAttachments } from './intentRouter';
 export { verifyEditApplied, summarizeActualChanges } from './verifyEditApplied';
+export { resolveSiteWorkspace, detectPageArchetype } from './resolveSiteWorkspace';
+export type { SiteWorkspaceSnapshot, PageArchetype } from './resolveSiteWorkspace';
 export type { WebsiteEditAgentOptions, WebsiteEditAgentResult, AgentStepEvent };
 
 /**
- * Main entry: route request → single-shot or agent loop.
+ * Main entry: route request → attachment pipeline, single-shot, or agent loop.
  */
 export async function runWebsiteEditAgent(
   options: WebsiteEditAgentOptions,
@@ -80,13 +81,13 @@ export async function runWebsiteEditAgent(
     : await computeWorkspaceHashes(options.workspacePath);
   const hasAttachments = (options.attachments?.length ?? 0) > 0;
 
-  if (options.mode === 'gitlab') {
-    const galleryCaptions = await runGalleryItemDescriptionStrategy(options, beforeHashes);
-    if (galleryCaptions?.ok) {
-      return galleryCaptions;
+  if (hasAttachments) {
+    const attachmentResult = await routeAttachmentEdits(options, beforeHashes);
+    if (attachmentResult?.ok) {
+      return attachmentResult;
     }
-    if (galleryCaptions && !galleryCaptions.ok) {
-      return galleryCaptions;
+    if (attachmentResult && !attachmentResult.ok) {
+      return attachmentResult;
     }
   }
 
@@ -114,45 +115,10 @@ export async function runWebsiteEditAgent(
     }
   }
 
-  if (decision.intent === 'section' && options.mode === 'gitlab') {
-    if (hasAttachments) {
-      const beforeFiles: Record<string, string> = {};
-      for (const rel of ['src/lib/siteConfig.ts', 'src/app/page.tsx']) {
-        const content = await readWorkspaceRel(options, rel);
-        if (content) beforeFiles[rel] = content;
-      }
-      const gallery = await runImageGallerySectionStrategy(options, beforeHashes);
-      if (gallery?.ok) {
-        return gallery;
-      }
-      if (gallery && !gallery.ok) {
-        return gallery;
-      }
-      const fast = await runSingleShotStrategy(options, beforeHashes);
-      if (fast?.ok && fast.changedFiles?.length) {
-        const capturedAfter = await captureChangedFileContents(options, fast.changedFiles);
-        const verification = verifyEditApplied(options.ownerMessage, beforeFiles, {
-          ...beforeFiles,
-          ...capturedAfter,
-        });
-        if (verification.ok) {
-          return fast;
-        }
-        return {
-          ok: false,
-          strategy: 'single_shot',
-          error: verification.reason,
-          ownerMessage: "I couldn't safely apply that change. Please try rephrasing your request.",
-        };
-      }
-      if (fast?.ok) {
-        return fast;
-      }
-    } else {
-      const sectionFast = await runSectionConfigStrategy(options, beforeHashes);
-      if (sectionFast?.ok) {
-        return sectionFast;
-      }
+  if (decision.intent === 'section' && options.mode === 'gitlab' && !hasAttachments) {
+    const sectionFast = await runSectionConfigStrategy(options, beforeHashes);
+    if (sectionFast?.ok) {
+      return sectionFast;
     }
   }
 

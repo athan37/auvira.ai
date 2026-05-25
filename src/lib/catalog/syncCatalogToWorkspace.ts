@@ -3,35 +3,12 @@ import path from 'path';
 import { getGitWorkspacePath } from '@/lib/project-workspace/gitWorkspaceManager';
 import { buildProductsSection, type CatalogProductInput } from '@/lib/catalog/buildProductsSection';
 
+import { SITE_CONFIG_TYPE_BLOCK } from '@/lib/builder/siteConfigTypes';
+
 const SITE_CONFIG_HEADER = `// Site configuration - business content only
 // This file is auto-generated. Edits will be overwritten.
 
-export type SiteSection = {
-  type: 'services' | 'about' | 'features' | 'faq' | 'testimonials' | 'contact' | 'generic';
-  title: string;
-  subtitle?: string;
-  body?: string;
-  items?: Array<{ title: string; description?: string }>;
-};
-
-export type SiteConfig = {
-  businessName: string;
-  tagline?: string;
-  description?: string;
-  hero: {
-    eyebrow?: string;
-    headline: string;
-    subheadline?: string;
-    primaryCta?: string;
-    secondaryCta?: string;
-  };
-  contact: {
-    phone?: string;
-    email?: string;
-    address?: string;
-  };
-  sections: SiteSection[];
-};
+${SITE_CONFIG_TYPE_BLOCK}
 
 export const siteConfig: SiteConfig = `;
 

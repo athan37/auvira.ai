@@ -1,6 +1,11 @@
 import type { EditIntent, EditStrategyKind, RouterDecision } from './types';
 import { hasExplicitEditTarget } from './enrichEditPrompt';
 
+/** True when the owner attached one or more images to this edit request. */
+export function hasImageAttachments(attachmentCount: number): boolean {
+  return attachmentCount > 0;
+}
+
 function classifyIntent(message: string): EditIntent {
   const lower = message.toLowerCase();
 

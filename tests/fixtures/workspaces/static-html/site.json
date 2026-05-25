@@ -1,0 +1,7 @@
+{
+  "siteTitle": "Static Test",
+  "tagline": "Local business",
+  "sections": [
+    { "type": "services", "title": "Services", "body": "", "items": [] }
+  ]
+}

@@ -1,6 +1,7 @@
 import type { SiteSpec, DesignBrief } from '../agent/schemas';
 import type { GeneratedFile } from './types';
 import { pickBackgroundColor, extractCssColor } from './cssColor';
+import { SITE_CONFIG_TYPE_BLOCK } from './siteConfigTypes';
 
 // Hardcoded premium theme presets by industry
 // These are SAFE, PREDEFINED themes - no LLM arbitrary classes
@@ -496,32 +497,7 @@ export function generateSiteConfig(siteSpec: SiteSpec): string {
   return `// Site configuration - business content only
 // This file is auto-generated. Edits will be overwritten.
 
-export type SiteSection = {
-  type: 'services' | 'about' | 'features' | 'faq' | 'testimonials' | 'contact' | 'generic';
-  title: string;
-  subtitle?: string;
-  body?: string;
-  items?: Array<{ title: string; description?: string }>;
-};
-
-export type SiteConfig = {
-  businessName: string;
-  tagline?: string;
-  description?: string;
-  hero: {
-    eyebrow?: string;
-    headline: string;
-    subheadline?: string;
-    primaryCta?: string;
-    secondaryCta?: string;
-  };
-  contact: {
-    phone?: string;
-    email?: string;
-    address?: string;
-  };
-  sections: SiteSection[];
-};
+${SITE_CONFIG_TYPE_BLOCK}
 
 export const siteConfig: SiteConfig = ${siteConfigJson};
 `;

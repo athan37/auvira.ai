@@ -42,12 +42,13 @@ describe('WebsiteEditAgent loop (mocked LLM)', () => {
         .mockResolvedValueOnce({
           ok: true,
           data: {
-            thought: 'write blue',
+            thought: 'write blue page preset',
             action: {
               tool: 'write_file',
               args: {
-                path: 'src/app/globals.css',
-                content: 'body { background: #2563eb; }',
+                path: 'src/app/page.tsx',
+                content:
+                  'const preset = { pageBg: "bg-blue-600", heroBg: "bg-blue-600", surfaceBg: "bg-blue-50" };\nexport default function Home() { return <main className={preset.pageBg}>Hi</main>; }',
               },
             },
           },
@@ -77,9 +78,9 @@ describe('WebsiteEditAgent loop (mocked LLM)', () => {
     });
 
     expect(result.ok).toBe(true);
-    expect(result.changedFiles).toContain('src/app/globals.css');
-    const css = await fs.readFile(path.join(dir, 'src/app/globals.css'), 'utf-8');
-    expect(css).toContain('#2563eb');
+    expect(result.changedFiles).toContain('src/app/page.tsx');
+    const page = await fs.readFile(path.join(dir, 'src/app/page.tsx'), 'utf-8');
+    expect(page).toContain('bg-blue-600');
 
     await fs.rm(dir, { recursive: true, force: true });
   });

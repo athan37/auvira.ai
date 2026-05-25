@@ -33,6 +33,8 @@ import {
 } from '@/lib/project-workspace/editFailureDetail';
 import { verifyEditVisibleInPreview } from '@/lib/project-workspace/verifyEditVisibleInPreview';
 import { verifyGalleryEditOnSandbox } from '@/lib/project-workspace/verifySandboxGalleryPreview';
+import { resolveSiteWorkspace } from '@/lib/project-workspace/website-edit-agent/resolveSiteWorkspace';
+import { validateStaticGalleryFiles } from '@/lib/project-workspace/website-edit-agent/staticImageGalleryStrategy';
 import { promises as fs } from 'fs';
 import path from 'path';
 import crypto from 'crypto';
@@ -442,26 +444,33 @@ export async function POST(
           return;
         }
 
-        if (
-          attachments.length > 0 &&
-          !changedPaths.some((p) => p.includes('siteConfig'))
-        ) {
-          emit('step', { id: 'apply_change', label: 'Applying your requested change', status: 'failed' });
-          emit('step', { id: 'validate', label: 'Checking the preview', status: 'failed' });
-          emit('step', { id: 'finish', label: 'Preview not updated', status: 'failed' });
-          await fail(
-            'Images were uploaded, but your homepage content was not updated. Please try again.',
-            {
-              stage: 'agent_failed',
-              technicalMessage: 'No siteConfig.ts change after edit with attachments',
-              extra: {
-                strategy: agentResult.strategy,
-                changedPaths,
-                attachmentCount: attachments.length,
-              },
-            }
-          );
-          return;
+        if (attachments.length > 0) {
+          const imageContentChanged =
+            mode === 'static'
+              ? changedPaths.some((p) => p === 'index.html' || p === 'site.json')
+              : changedPaths.some((p) => p.includes('siteConfig') || p.includes('page.tsx'));
+          if (!imageContentChanged) {
+            emit('step', { id: 'apply_change', label: 'Applying your requested change', status: 'failed' });
+            emit('step', { id: 'validate', label: 'Checking the preview', status: 'failed' });
+            emit('step', { id: 'finish', label: 'Preview not updated', status: 'failed' });
+            await fail(
+              'Images were uploaded, but your homepage content was not updated. Please try again.',
+              {
+                stage: 'agent_failed',
+                technicalMessage:
+                  mode === 'static'
+                    ? 'No index.html or site.json change after edit with attachments'
+                    : 'No siteConfig.ts or page.tsx change after edit with attachments',
+                extra: {
+                  strategy: agentResult.strategy,
+                  changedPaths,
+                  attachmentCount: attachments.length,
+                  mode,
+                },
+              }
+            );
+            return;
+          }
         }
 
         const activeGateway = gateway;
@@ -585,14 +594,64 @@ export async function POST(
             status: 'active',
           });
           if (isSandbox && activeGateway) {
-            const siteConfigAfter = await activeGateway.readFile('src/lib/siteConfig.ts').catch(() => '');
-            const pageAfter = await activeGateway.readFile('src/app/page.tsx').catch(() => '');
-            previewVerify = await verifyGalleryEditOnSandbox({
-              previewUrl: previewUrlForVerify,
-              siteConfigSource: siteConfigAfter,
-              pageSource: pageAfter,
-              attachments,
+            const workspaceSnap = await resolveSiteWorkspace({
+              workspacePath,
+              mode,
+              gateway: activeGateway,
             });
+            if (mode === 'static' && workspaceSnap.indexHtmlContent) {
+              const staticCheck = validateStaticGalleryFiles(
+                workspaceSnap.indexHtmlContent,
+                workspaceSnap.siteJsonContent,
+                attachments
+              );
+              previewVerify = {
+                ok: staticCheck.ok,
+                reason: staticCheck.reason,
+                imagesFound: staticCheck.ok ? attachments.length : 0,
+                htmlLength: workspaceSnap.indexHtmlContent.length,
+              };
+            } else {
+              const siteConfigAfter =
+                (workspaceSnap.siteConfigPath &&
+                  (await activeGateway.readFile(workspaceSnap.siteConfigPath).catch(() => ''))) ||
+                '';
+              const pageAfter =
+                (workspaceSnap.pagePath &&
+                  (await activeGateway.readFile(workspaceSnap.pagePath).catch(() => ''))) ||
+                '';
+              previewVerify = await verifyGalleryEditOnSandbox({
+                previewUrl: previewUrlForVerify,
+                siteConfigSource: siteConfigAfter,
+                pageSource: pageAfter,
+                attachments,
+              });
+            }
+          } else if (mode === 'static' && workspacePath) {
+            const workspaceSnap = await resolveSiteWorkspace({
+              workspacePath,
+              mode: 'static',
+            });
+            if (workspaceSnap.indexHtmlContent) {
+              const staticCheck = validateStaticGalleryFiles(
+                workspaceSnap.indexHtmlContent,
+                workspaceSnap.siteJsonContent,
+                attachments
+              );
+              previewVerify = await verifyEditVisibleInPreview({
+                previewUrl: previewUrlForVerify,
+                imagePaths: attachments.map((a) => a.publicUrl),
+                sectionPhrases: ['Gallery', 'Our products', 'Our work'],
+              });
+              if (!previewVerify.ok && staticCheck.ok) {
+                previewVerify = {
+                  ok: true,
+                  reason: staticCheck.reason,
+                  imagesFound: attachments.length,
+                  htmlLength: workspaceSnap.indexHtmlContent.length,
+                };
+              }
+            }
           } else {
             previewVerify = await verifyEditVisibleInPreview({
               previewUrl: previewUrlForVerify,

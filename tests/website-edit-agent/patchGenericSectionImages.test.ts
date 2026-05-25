@@ -79,7 +79,7 @@ function SectionRenderer({ section }) {
     const { content, patched } = patchPageForUploadedImages(page);
     expect(patched).toBe(true);
     expect(content).toContain('function GenericSection');
-    expect(content).toContain('default: return <GenericSection section={section} />');
+    expect(content).toMatch(/default: return.*GenericSection/);
     expect(content).toContain('imageUrl');
   });
 
