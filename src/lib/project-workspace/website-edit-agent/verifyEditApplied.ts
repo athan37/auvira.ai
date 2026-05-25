@@ -22,6 +22,46 @@ function findPageTsxContent(files: Record<string, string>): string | null {
   return null;
 }
 
+const PRESET_BACKGROUND_KEYS = ['pageBg', 'heroBg', 'surfaceBg', 'mutedBg'] as const;
+
+/** Extract inline `const preset = { ... }` JSON (single-line or multiline). */
+function extractPresetObjectLiteral(pageContent: string): string | null {
+  const marker = pageContent.indexOf('const preset = ');
+  if (marker < 0) return null;
+  const start = pageContent.indexOf('{', marker);
+  if (start < 0) return null;
+  let depth = 0;
+  for (let i = start; i < pageContent.length; i++) {
+    const ch = pageContent[i];
+    if (ch === '{') depth += 1;
+    else if (ch === '}') {
+      depth -= 1;
+      if (depth === 0) return pageContent.slice(start, i + 1);
+    }
+  }
+  return null;
+}
+
+function extractPresetBackgroundClasses(pageContent: string): string {
+  const presetJson = extractPresetObjectLiteral(pageContent);
+  if (!presetJson) return pageContent;
+  const values: string[] = [];
+  for (const key of PRESET_BACKGROUND_KEYS) {
+    const km = presetJson.match(new RegExp(`"${key}"\\s*:\\s*"([^"]*)"`, 'i'));
+    if (km?.[1]) values.push(km[1]);
+  }
+  return values.length > 0 ? values.join(' ') : pageContent;
+}
+
+/** Match Tailwind bg/from/to/via classes and gradient stops (e.g. from-green-800). */
+function tailwindBackgroundUsesColor(text: string, color: string): boolean {
+  const escaped = color.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return (
+    new RegExp(`(?:bg-|from-|to-|via-)${escaped}(?:-[0-9]{2,3})?(?:\\s|"|'|$)`, 'i').test(text) ||
+    new RegExp(`(?:^|[\\s/"'])${escaped}-[0-9]{2,3}(?:\\s|"|'|$)`, 'i').test(text)
+  );
+}
+
 /** Tailwind sites store colors in page.tsx preset — globals.css alone won't update the preview. */
 function verifyVisibleBackgroundOnPage(
   message: string,
@@ -49,26 +89,8 @@ function verifyVisibleBackgroundOnPage(
     return null;
   }
 
-  /** Preset keys that control page/section backgrounds (not buttons or cards). */
-  const presetBgKeys = [
-    'pageBg',
-    'heroBg',
-    'surfaceBg',
-    'mutedBg',
-    'navBg',
-    'contactBg',
-    'footerBg',
-  ];
-  const presetBgBlob = (() => {
-    const m = pageAfter.match(/const preset\s*=\s*(\{[\s\S]*?\});/);
-    if (!m) return pageAfter;
-    const blob: string[] = [];
-    for (const key of presetBgKeys) {
-      const km = m[1].match(new RegExp(`"${key}"\\s*:\\s*"([^"]*)"`, 'i'));
-      if (km) blob.push(km[1]);
-    }
-    return blob.length > 0 ? blob.join(' ') : pageAfter;
-  })();
+  const presetBgBlob = extractPresetBackgroundClasses(pageAfter);
+  const pageBgSurface = `${presetBgBlob} ${pageAfter}`;
 
   const backgroundConflictColors = [
     'green',
@@ -81,30 +103,29 @@ function verifyVisibleBackgroundOnPage(
   ];
 
   for (const color of requestedColors) {
-    const tailwindBg = new RegExp(`bg-${color}(?:-\\d{2,3})?`, 'i');
-    if (!tailwindBg.test(presetBgBlob)) {
+    if (!tailwindBackgroundUsesColor(pageBgSurface, color)) {
       continue;
     }
 
     const conflicting = backgroundConflictColors.filter(
       (c) =>
         c !== color &&
-        new RegExp(`bg-${c}(?:-\\d{2,3})?`, 'i').test(presetBgBlob) &&
+        tailwindBackgroundUsesColor(presetBgBlob, c) &&
         !messageHasKeyword(lowerMsg, c)
     );
 
     if (isBackgroundRequest && conflicting.length > 0) {
       return {
         ok: false,
-        reason: `page.tsx preset still uses ${conflicting.map((c) => `bg-${c}`).join(', ')}; set pageBg/heroBg to bg-${color} instead.`,
-        evidence: conflicting.map((c) => `conflicting bg-${c} in preset background keys`),
+        reason: `page.tsx preset still uses ${conflicting.map((c) => `bg-${c}`).join(', ')}; set pageBg/heroBg to ${color} instead.`,
+        evidence: conflicting.map((c) => `conflicting ${c} in preset background keys`),
       };
     }
 
     return {
       ok: true,
       reason: `Visible Tailwind background (${color}) found in page.tsx preset.`,
-      evidence: [`bg-${color} present in preset background keys`],
+      evidence: [`${color} present in pageBg/heroBg (including gradients)`],
     };
   }
 

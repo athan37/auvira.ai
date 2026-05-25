@@ -45,6 +45,17 @@ describe('verifyEditApplied', () => {
     expect(r.ok).toBe(true);
   });
 
+  it('passes green background when preset uses gradient from-green (not only bg-green)', () => {
+    const before = `const preset = {"pageBg":"bg-gradient-to-br from-red-800 via-red-700 to-red-900","heroBg":"bg-red-700"};`;
+    const after = `const preset = {"pageBg":"bg-gradient-to-br from-green-800 via-green-700 to-green-900","heroBg":"bg-gradient-to-br from-green-900 to-green-950"};`;
+    const r = verifyEditApplied(
+      'change background color of the site to green',
+      { 'src/app/page.tsx': before },
+      { 'src/app/page.tsx': after }
+    );
+    expect(r.ok).toBe(true);
+  });
+
   it('passes blue background when preset is blue but buttons still use bg-white', () => {
     const after = `const preset = {
       pageBg: "bg-blue-500",
