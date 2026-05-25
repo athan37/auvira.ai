@@ -45,3 +45,13 @@ export const OWNER_COPY = {
   publishConfirm:
     'Publish your latest draft to your live website? We save a backup first, then update your live site.',
 } as const;
+
+export const SITE_MANAGER_COPY = {
+  businessWatchTitle: 'Business Watch',
+  weCheckThis: 'We check this for you',
+  applyFix: 'Apply fix',
+  ignore: 'Ignore',
+  runCheckNow: 'Run check now',
+  confirmDetails: 'Confirm business details',
+  updatingLive: 'Updating your live website…',
+} as const;

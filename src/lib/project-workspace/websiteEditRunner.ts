@@ -29,11 +29,6 @@ export interface WebsiteEditOptions {
   attachments?: import('./workspaceAssetTypes').WorkspaceAssetAttachment[];
 }
 
-/** @deprecated Use check via runWebsiteEdit — TS agent has no sidecar */
-export async function checkAdkAgentHealth(): Promise<{ ok: boolean; error?: string }> {
-  return { ok: true };
-}
-
 export { routeEditRequest, isTrivialStyleEdit } from './website-edit-agent/intentRouter';
 
 /**

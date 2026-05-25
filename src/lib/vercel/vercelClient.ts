@@ -1,16 +1,20 @@
+import { getVercelApiToken, getVercelTeamId } from './vercelEnv';
+
 export class VercelClient {
   public token: string;
   public teamId?: string;
   private baseUrl: string = 'https://api.vercel.com';
 
   constructor() {
-    this.token = process.env.VERCEL_TOKEN || '';
+    this.token = getVercelApiToken();
 
     if (!this.token) {
-      throw new Error('VERCEL_TOKEN is required');
+      throw new Error(
+        'VERCEL_API_TOKEN is required (or legacy VERCEL_TOKEN for local dev)'
+      );
     }
 
-    this.teamId = process.env.VERCEL_TEAM_ID;
+    this.teamId = getVercelTeamId();
   }
 
   private buildUrl(endpoint: string): string {

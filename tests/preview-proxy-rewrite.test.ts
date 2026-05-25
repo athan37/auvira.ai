@@ -19,4 +19,16 @@ describe('rewriteHtmlAssetPaths', () => {
     expect(out).toContain(`${base}/_next/static/css/app/layout.css`);
     expect(out).not.toMatch(/"\/_next\//);
   });
+
+  it('rewrites owner upload image src paths', () => {
+    const html = '<img src="/uploads/hero-abc123.png" alt="Team" />';
+    const out = rewriteHtmlAssetPaths(html, projectId);
+    expect(out).toContain(`src="${base}/uploads/hero-abc123.png"`);
+  });
+
+  it('rewrites upload paths in CSS url()', () => {
+    const css = '.hero { background-image: url(/uploads/banner.png); }';
+    const out = rewriteHtmlAssetPaths(css, projectId);
+    expect(out).toContain(`url(${base}/uploads/banner.png)`);
+  });
 });

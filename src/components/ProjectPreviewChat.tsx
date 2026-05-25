@@ -251,12 +251,18 @@ export function ProjectPreviewChat({
         ? 'Add this image to my website where it fits best.'
         : 'Add these images to my website where they fit best.');
 
-    const imagePreviews = pendingImages.map((img) => img.previewUrl);
     setInput('');
     setSending(true);
     setUploadError(null);
     onEditStart?.();
-    setMessages((prev) => [...prev, { role: 'user', content: userMsg, imagePreviews }]);
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: 'user',
+        content: userMsg,
+        imagePreviews: pendingImages.map((img) => img.previewUrl),
+      },
+    ]);
     setShowSteps(true);
     setAgentSteps(getInitialSteps(userMsg));
 
@@ -267,8 +273,21 @@ export function ProjectPreviewChat({
 
     try {
       attachments = await uploadPendingImages();
+      const serverPreviewUrls = attachments.map((a) => a.previewUrl);
       pendingImages.forEach((img) => URL.revokeObjectURL(img.previewUrl));
       setPendingImages([]);
+      if (serverPreviewUrls.length > 0) {
+        setMessages((prev) => {
+          const next = [...prev];
+          for (let i = next.length - 1; i >= 0; i--) {
+            if (next[i].role === 'user' && next[i].imagePreviews?.length) {
+              next[i] = { ...next[i], imagePreviews: serverPreviewUrls };
+              break;
+            }
+          }
+          return next;
+        });
+      }
 
       const response = await fetch(`/api/projects/${projectId}/code-agent/edit/stream`, {
         method: 'POST',

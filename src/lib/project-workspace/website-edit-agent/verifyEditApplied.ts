@@ -15,7 +15,7 @@ function messageHasKeyword(message: string, keyword: string): boolean {
 
 /**
  * Deterministic verification that an edit was actually applied.
- * Ported from adk-coding-agent/project_agent.py verify_edit_applied.
+ * Verifies the workspace reflects the intended edit before publish.
  */
 export function verifyEditApplied(
   message: string,

@@ -6,9 +6,10 @@ import { ProjectPreviewChat, type EditCompleteResult } from '@/components/Projec
 import { ChangedFilesPanel } from '@/components/project/ChangedFilesPanel';
 import { SaveDeployActions } from '@/components/SaveDeployActions';
 import { PublishedStatusCard } from '@/components/PublishedStatusCard';
+import { BusinessWatchCard } from '@/components/site-manager/BusinessWatchCard';
 import { OWNER_COPY } from '@/lib/owner/ownerCopy';
 
-type Tab = 'chat' | 'changes' | 'publish';
+type Tab = 'chat' | 'changes' | 'publish' | 'watch';
 
 interface Deployment {
   provider?: string;
@@ -68,6 +69,7 @@ export function ProjectEditorSidebar({
     { id: 'chat', label: 'Chat' },
     { id: 'changes', label: 'Changes' },
     { id: 'publish', label: 'Publish' },
+    { id: 'watch', label: 'Watch' },
   ];
 
   return (
@@ -139,6 +141,10 @@ export function ProjectEditorSidebar({
               onDeploySuccess={onDeploySuccess}
             />
           </div>
+        )}
+
+        {tab === 'watch' && (
+          <BusinessWatchCard projectId={projectId} onRefresh={onDeploySuccess} />
         )}
       </div>
 

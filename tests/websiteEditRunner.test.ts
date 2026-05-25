@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { routeEditRequest } from '../src/lib/project-workspace/website-edit-agent/intentRouter';
 
 describe('routeEditRequest', () => {
@@ -10,19 +10,5 @@ describe('routeEditRequest', () => {
   it('routes add section to agent_loop', () => {
     const d = routeEditRequest('add a testimonials section');
     expect(d.strategy).toBe('agent_loop');
-  });
-});
-
-describe('checkAdkAgentHealth (deprecated stub)', () => {
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it('returns ok for TS-only path', async () => {
-    const { checkAdkAgentHealth } = await import(
-      '../src/lib/project-workspace/websiteEditRunner'
-    );
-    const result = await checkAdkAgentHealth();
-    expect(result.ok).toBe(true);
   });
 });

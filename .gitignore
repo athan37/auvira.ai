@@ -22,13 +22,6 @@ coverage/
 .env.local
 .env.*.local
 
-# Python (adk-coding-agent)
-__pycache__/
-*.py[cod]
-.venv/
-venv/
-*.egg-info/
-
 # IDE
 .vscode/
 .idea/

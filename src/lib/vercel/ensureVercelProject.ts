@@ -1,6 +1,7 @@
 import { generateUniqueProjectName } from '@/lib/clone/persistClonePreview';
 import type { IDeploymentInfo, IWebsiteProject } from '@/models/WebsiteProject';
 import { createVercelProject } from './createVercelProject';
+import { hasVercelApiToken } from './vercelEnv';
 import type { VercelDeploymentResult } from './types';
 
 export function vercelResultToDeploymentInfo(
@@ -34,7 +35,7 @@ export type EnsureVercelProjectResult = {
 
 /**
  * Ensure a WebsiteProject has a linked Vercel project. Creates one on first call
- * when VERCEL_TOKEN is configured and GitLab is linked.
+ * when VERCEL_API_TOKEN is configured and GitLab is linked.
  */
 export async function ensureVercelProjectLinked(
   project: Pick<IWebsiteProject, 'name' | 'deployment' | 'gitlab'>
@@ -43,8 +44,8 @@ export async function ensureVercelProjectLinked(
     return { deployment: project.deployment, created: false };
   }
 
-  if (!process.env.VERCEL_TOKEN) {
-    console.warn('[ensureVercel] VERCEL_TOKEN not set — skipping Vercel link');
+  if (!hasVercelApiToken()) {
+    console.warn('[ensureVercel] VERCEL_API_TOKEN not set — skipping Vercel link');
     return { deployment: project.deployment ?? null, created: false };
   }
 

@@ -7,6 +7,7 @@ import { appendEditJobLog } from '@/lib/project-workspace/editJobLogger';
 import { saveWorkspaceToGitLab } from '@/lib/project-workspace/commitWorkspaceToGitLab';
 import { ensureVercelProjectLinked } from '@/lib/vercel/ensureVercelProject';
 import { triggerVercelDeployment } from '@/lib/vercel/triggerVercelDeployment';
+import { hasVercelApiToken } from '@/lib/vercel/vercelEnv';
 
 export const runtime = 'nodejs';
 
@@ -40,9 +41,13 @@ export async function POST(
     );
   }
 
-  if (!process.env.VERCEL_TOKEN) {
+  if (!hasVercelApiToken()) {
     return NextResponse.json(
-      { ok: false, error: 'VERCEL_TOKEN is not configured on the server.' },
+      {
+        ok: false,
+        error:
+          'VERCEL_API_TOKEN is not configured on the server (set in Vercel env vars or local .env).',
+      },
       { status: 503 }
     );
   }

@@ -10,7 +10,14 @@ export type ActionType =
   | 'force_sync_workspace_to_gitlab'
   | 'vercel_deploy'
   | 'deploy_code_workspace_changes'
-  | 'deploy_preview_changes';
+  | 'deploy_preview_changes'
+  | 'watch_created'
+  | 'watch_failed'
+  | 'fix_proposed'
+  | 'fix_approved'
+  | 'fix_applied'
+  | 'fix_failed'
+  | 'owner_notified';
 
 export interface IProjectAction extends Document {
   projectId: mongoose.Types.ObjectId;
@@ -43,6 +50,13 @@ const ProjectActionSchema = new Schema<IProjectAction>(
         'vercel_deploy',
         'deploy_code_workspace_changes',
         'deploy_preview_changes',
+        'watch_created',
+        'watch_failed',
+        'fix_proposed',
+        'fix_approved',
+        'fix_applied',
+        'fix_failed',
+        'owner_notified',
       ],
       required: true,
     },

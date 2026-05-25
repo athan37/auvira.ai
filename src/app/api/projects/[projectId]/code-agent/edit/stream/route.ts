@@ -1,5 +1,5 @@
 /**
- * Owner website editing — code mode only (ADK agent + validation + ProjectEditJob).
+ * Owner website editing — TypeScript WebsiteEditAgent + validation + ProjectEditJob.
  * Save commits local changes to GitLab. Deploy is handled by /code-agent/deploy.
  */
 import { NextRequest, NextResponse } from 'next/server';

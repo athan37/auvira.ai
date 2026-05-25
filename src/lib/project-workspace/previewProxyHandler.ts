@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getOwnerProject } from '@/lib/api/projectAccess';
 import { checkPreviewHealthy } from '@/lib/project-workspace/bootstrapProjectPreview';
 import { buildPreviewLoadingHtml } from '@/lib/project-workspace/codePreviewServe';
-import { rewriteHtmlAssetPaths } from '@/lib/project-workspace/previewProxyRewrite';
+import { rewritePreviewAssetPaths } from '@/lib/project-workspace/previewProxyRewrite';
 
 export { rewriteHtmlAssetPaths } from '@/lib/project-workspace/previewProxyRewrite';
 
@@ -194,17 +194,21 @@ export async function handlePreviewProxyGet(
     const contentType = result.headers['content-type'];
     const ctStr = Array.isArray(contentType) ? contentType[0] : contentType || '';
     const isHtml = ctStr.includes('text/html');
+    const isCss = ctStr.includes('text/css');
 
-    if (isHtml && result.body.length > 0) {
+    if ((isHtml || isCss) && result.body.length > 0) {
       try {
-        const htmlText = result.body.toString('utf8');
-        const rewritten = rewriteHtmlAssetPaths(htmlText, projectId);
-        if (rewritten !== htmlText) {
+        const text = result.body.toString('utf8');
+        const rewritten = rewritePreviewAssetPaths(text, projectId);
+        if (rewritten !== text) {
           filteredHeaders.delete('content-length');
           filteredHeaders.delete('content-encoding');
           filteredHeaders.delete('etag');
           filteredHeaders.delete('last-modified');
-          filteredHeaders.set('content-type', 'text/html; charset=utf-8');
+          filteredHeaders.set(
+            'content-type',
+            isHtml ? 'text/html; charset=utf-8' : 'text/css; charset=utf-8'
+          );
           filteredHeaders.set('cache-control', 'no-store');
           filteredHeaders.set('x-frame-options', 'SAMEORIGIN');
           filteredHeaders.delete('content-security-policy');

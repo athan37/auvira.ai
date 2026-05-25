@@ -76,7 +76,7 @@ Verifies GitLab commit visibility, SHA-pinned Vercel deploy, and production HTML
 
 1. [Vercel](https://vercel.com) → **Add Project** → import `athan37/la-mue-site-builder`.
 2. **Production Branch:** `main` (pushes to `main` deploy production; other branches get Preview URLs if enabled).
-3. **Environment variables** (Production + Preview): copy from `.env.example` — use [MongoDB Atlas](https://www.mongodb.com/atlas) for `MONGODB_URI`, set `NEXTAUTH_URL` and `NEXT_PUBLIC_APP_URL` to your Vercel URL, add Google OAuth, GitLab, MiniMax, and `VERCEL_*` tokens.
+3. **Environment variables** (Production + Preview): copy from `.env.example` — use [MongoDB Atlas](https://www.mongodb.com/atlas) for `MONGODB_URI`, set `NEXTAUTH_URL` and `NEXT_PUBLIC_APP_URL` to your Vercel URL, add Google OAuth, GitLab, MiniMax, and `VERCEL_API_TOKEN` (not `VERCEL_TOKEN` — that name is reserved on Vercel).
 4. Update **Google OAuth** redirect URIs for your production domain.
 5. Push to `main` and confirm a deployment appears under Vercel → **Deployments**.
 
@@ -109,8 +109,8 @@ cp .env.example .env.local
 Edit `.env.local`:
 - `GITLAB_TOKEN`: Your GitLab personal access token
 - `GITLAB_GROUP_ID`: The ID of your GitLab group where projects will be created
-- `VERCEL_TOKEN`: Your Vercel API token (optional - enables automatic Vercel deployment)
-- `VERCEL_TEAM_ID`: Your Vercel team ID (optional, only if using a team account)
+- `VERCEL_API_TOKEN`: Vercel personal access token for deploying customer sites (required on Vercel hosting; use this name in the dashboard — `VERCEL_TOKEN` is reserved)
+- `VERCEL_API_TEAM_ID`: Vercel team ID (optional; legacy `VERCEL_TEAM_ID` still works locally)
 
 ### 3. Configure MiniMax API
 
@@ -148,12 +148,12 @@ Vercel integration enables automatic deployment to a live URL. Without it, you c
 1. **Create Vercel Token:**
    - Go to https://vercel.com/account/tokens
    - Create a new token with scope `full` or `deployments`
-   - Add `VERCEL_TOKEN` to `.env.local`
+   - Add `VERCEL_API_TOKEN` to `.env.local` (or `VERCEL_TOKEN` locally only)
 
 2. **Find Vercel Team ID (if using a team):**
    - Go to https://vercel.com/account/teams
    - Your team ID is in the team settings URL
-   - Add `VERCEL_TEAM_ID` to `.env.local` (optional)
+   - Add `VERCEL_API_TEAM_ID` to `.env.local` (optional)
 
 3. **Note:** Vercel will automatically import the GitLab repo and deploy. First deploy may take 1-3 minutes.
 
@@ -195,13 +195,6 @@ npm run dev
 | `No files were changed` | Retry; for complex edits be more specific |
 | `I had trouble understanding` | MiniMax JSON failed twice — try `WEBSITE_EDIT_LLM_PROVIDER=gemini` |
 | Preview 503 | Restart page; preview dev server may be hung (see workspace bootstrap) |
-
-**Optional: dev-only Python agent** at `/dev-coding-agent` (not used for owner edits):
-
-```bash
-make adk-agent
-DEV_CODING_AGENT_ENABLED=true
-```
 
 ## Test API Endpoints
 
@@ -333,7 +326,7 @@ NEXTAUTH_URL=http://localhost:3000
 | POST | `/api/projects/clone` | Clone a URL and save as a project |
 | POST | `/api/projects/scratch/propose` | Generate a website plan (no DB save) |
 | POST | `/api/projects/scratch/build` | Build from plan and save as project |
-| POST | `/api/projects/[projectId]/chat` | Send a chat edit message |
+| POST | `/api/projects/[projectId]/code-agent/edit/stream` | Owner website edit (SSE) |
 | GET | `/api/projects/[projectId]/messages` | Get chat history |
 | GET | `/api/projects/[projectId]/deployment-status` | Poll Vercel deployment status |
 
@@ -537,7 +530,7 @@ curl -X POST http://localhost:3000/api/agent/rebuild \
 
 ## Live Preview via Vercel
 
-After rebuild, if `VERCEL_TOKEN` is configured, the system:
+After rebuild, if `VERCEL_API_TOKEN` is configured, the system:
 1. Creates a Vercel project connected to your GitLab repo
 2. Creates a deploy hook for the main branch
 3. Triggers the deployment automatically
@@ -574,11 +567,11 @@ Response includes `deployment.status`:
 ```bash
 # Get deploy hook URL from project
 curl -s "https://api.vercel.com/v2/projects/<projectId>" \
-  -H "Authorization: Bearer $VERCEL_TOKEN" | jq '.link.deployHooks[-1].url'
+  -H "Authorization: Bearer $VERCEL_API_TOKEN" | jq '.link.deployHooks[-1].url'
 
 # Trigger deployment
 curl -X POST "<deploy-hook-url>" \
-  -H "Authorization: Bearer $VERCEL_TOKEN"
+  -H "Authorization: Bearer $VERCEL_API_TOKEN"
 ```
 
 **Manual Vercel Import:**
@@ -588,7 +581,7 @@ curl -X POST "<deploy-hook-url>" \
 
 ### Vercel API Fallback
 
-If you don't have `VERCEL_TOKEN`, the GitLab repo is still created. You can always manually import the repo URL into Vercel.
+If you don't have `VERCEL_API_TOKEN`, the GitLab repo is still created. You can always manually import the repo URL into Vercel.
 
 ## Deployment Readiness Tracking
 
