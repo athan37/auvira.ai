@@ -1,9 +1,6 @@
 import type { Sandbox } from '@vercel/sandbox';
-import {
-  checkPreviewUrlHealthy,
-  waitForPreviewReady,
-} from '@/lib/preview/waitForPreviewReady';
 import { getProjectSandbox } from './sandboxClient';
+import { waitForSandboxPreview } from './sandboxPreviewHealth';
 import { SANDBOX_WORKDIR } from './types';
 
 /** Stop dev server and remove stale Next/webpack output (fixes missing chunk e.g. ./819.js). */
@@ -27,22 +24,13 @@ export async function startSandboxDevServerDetached(sandbox: Sandbox): Promise<v
   });
 }
 
-async function waitForSandboxPreview(previewUrl: string): Promise<void> {
-  try {
-    await waitForPreviewReady(previewUrl, { timeoutMs: 120_000, intervalMs: 1500 });
-  } catch {
-    const healthy = await checkPreviewUrlHealthy(previewUrl, 15_000);
-    if (!healthy) {
-      throw new Error(`Sandbox preview at ${previewUrl} did not become healthy`);
-    }
-  }
-}
-
 /**
  * Fresh `next dev` after edits — production build artifacts in .next break the dev bundler.
  */
 export async function restartSandboxDevServer(projectId: string): Promise<string> {
   const sandbox = await getProjectSandbox(projectId);
+  const { repairPreviewSandbox } = await import('./repairPreviewSandbox');
+  await repairPreviewSandbox(projectId).catch(() => {});
   await clearSandboxDevArtifacts(sandbox);
   await startSandboxDevServerDetached(sandbox);
   const previewUrl = sandbox.domain(3000);

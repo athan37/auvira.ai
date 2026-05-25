@@ -8,7 +8,6 @@ import { AppShell } from '@/components/layout/AppShell';
 import { ProjectPreviewFrame } from '@/components/ProjectPreviewFrame';
 import { ProjectEditorSidebar } from '@/components/project/ProjectEditorSidebar';
 import { UnpublishedChangesBadge } from '@/components/UnpublishedChangesBadge';
-import { OwnerGettingStartedChecklist } from '@/components/owner/OwnerGettingStartedChecklist';
 import { ownerProjectStatusLabel } from '@/lib/owner/ownerCopy';
 import { Badge, statusToBadgeTone } from '@/components/ui/Badge';
 import { Spinner } from '@/components/ui/Spinner';
@@ -165,8 +164,7 @@ export default function ProjectPage() {
       }
     >
       <div className="flex flex-col lg:flex-row flex-1 min-h-0 h-[calc(100vh-3.5rem)] p-3 lg:p-4 gap-3 lg:gap-4">
-        <div className="flex-1 min-h-[320px] lg:min-h-0 min-w-0 flex flex-col gap-3">
-          <OwnerGettingStartedChecklist context="editor" className="shrink-0 hidden lg:block" />
+        <div className="flex-1 min-h-[320px] lg:min-h-0 min-w-0 flex flex-col">
           <ProjectPreviewFrame
             projectId={projectId}
             codeWorkspaceVersion={project.codeWorkspace?.version}

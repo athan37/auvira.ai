@@ -5,10 +5,7 @@ import {
   SETUP_STAGE_LABELS,
   type WorkspaceSetupStage,
 } from '@/lib/project-workspace/bootstrapProjectPreview';
-import {
-  checkPreviewUrlHealthy,
-  waitForPreviewReady,
-} from '@/lib/preview/waitForPreviewReady';
+import { checkPreviewUrlHealthy } from '@/lib/preview/waitForPreviewReady';
 
 export { checkPreviewUrlHealthy };
 import { logProjectStep } from '@/lib/project-logs/projectLogger';
@@ -84,17 +81,11 @@ import {
   clearSandboxDevArtifacts,
   startSandboxDevServerDetached,
 } from './sandboxDevServer';
-
-async function waitForSandboxPreview(previewUrl: string): Promise<void> {
-  try {
-    await waitForPreviewReady(previewUrl, { timeoutMs: 120_000, intervalMs: 1500 });
-  } catch {
-    const healthy = await checkPreviewUrlHealthy(previewUrl, 15_000);
-    if (!healthy) {
-      throw new Error(`Sandbox preview at ${previewUrl} did not become healthy`);
-    }
-  }
-}
+import { repairPreviewSandbox } from './repairPreviewSandbox';
+import {
+  assertSandboxPageSyntax,
+  waitForSandboxPreview,
+} from './sandboxPreviewHealth';
 
 async function resumeSandboxDevServer(
   project: IWebsiteProject,
@@ -113,6 +104,9 @@ async function resumeSandboxDevServer(
     'codeWorkspace.status': 'setting_up',
     'preview.status': 'building',
   });
+
+  await repairPreviewSandbox(projectId).catch(() => {});
+  await assertSandboxPageSyntax(projectId);
 
   const previewUrl = sandbox.domain(3000);
   const healthy = await checkPreviewUrlHealthy(previewUrl, 5000);

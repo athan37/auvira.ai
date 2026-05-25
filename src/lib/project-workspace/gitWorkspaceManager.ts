@@ -40,6 +40,20 @@ export async function workspaceExists(projectId: string): Promise<boolean> {
   }
 }
 
+/** True when clone has minimum files needed for preview (package.json + git metadata). */
+export async function isGitWorkspaceUsable(projectId: string): Promise<boolean> {
+  const workspacePath = getGitWorkspacePath(projectId);
+  try {
+    const [pkgStat, gitStat] = await Promise.all([
+      fs.stat(path.join(workspacePath, 'package.json')),
+      fs.stat(path.join(workspacePath, '.git')),
+    ]);
+    return pkgStat.isFile() && gitStat.isDirectory();
+  } catch {
+    return false;
+  }
+}
+
 export async function getGitWorkspaceStatus(projectId: string): Promise<GitWorkspaceInfo | null> {
   const workspacePath = getGitWorkspacePath(projectId);
   const repoDir = getGitWorkspaceRepoDir(projectId);
@@ -107,7 +121,7 @@ export async function ensureGitWorkspace(project: IWebsiteProject, userId?: stri
     metadata: { sourceUrl: project.sourceUrl },
   }).catch(() => {});
 
-  if (await workspaceExists(projectId)) {
+  if (await isGitWorkspaceUsable(projectId)) {
     // Reuse existing workspace
     const status = await getGitWorkspaceStatus(projectId);
     if (status) {
@@ -124,6 +138,15 @@ export async function ensureGitWorkspace(project: IWebsiteProject, userId?: stri
         metadata: { branch: status.branch, hasLocalChanges: status.hasLocalChanges },
       }).catch(() => {});
       return status;
+    }
+  } else if (await workspaceExists(projectId)) {
+    console.warn(
+      `[workspace] ${projectId}: corrupt workspace (missing package.json or .git) — removing and re-cloning`
+    );
+    try {
+      await fs.rm(repoDir, { recursive: true, force: true });
+    } catch {
+      /* best-effort; clone below may still fail if files are locked */
     }
   }
 

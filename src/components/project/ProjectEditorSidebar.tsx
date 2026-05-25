@@ -156,6 +156,7 @@ export function ProjectEditorSidebar({
           <p className="text-[10px] text-zinc-400 text-center mt-1">{OWNER_COPY.publishLiveHint}</p>
         </div>
       )}
+
     </div>
   );
 }
