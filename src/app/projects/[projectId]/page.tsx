@@ -62,9 +62,9 @@ export default function ProjectPage() {
   const [error, setError] = useState<string | null>(null);
   const [latestJobId, setLatestJobId] = useState<string | null>(null);
   const [diffRefreshKey, setDiffRefreshKey] = useState(0);
+  const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
   const [previewReady, setPreviewReady] = useState(false);
   const [editInProgress, setEditInProgress] = useState(false);
-  const [changesTabTrigger, setChangesTabTrigger] = useState(0);
 
   const fetchProject = useCallback(async () => {
     try {
@@ -94,11 +94,15 @@ export default function ProjectPage() {
     setDiffRefreshKey((k) => k + 1);
   }, [fetchProject]);
 
+  const devBypassAuth =
+    process.env.NEXT_PUBLIC_SITE_AGENT_DEV_BYPASS_AUTH === '1' &&
+    process.env.NODE_ENV === 'development';
+
   useEffect(() => {
-    if (sessionStatus === 'unauthenticated') {
+    if (!devBypassAuth && sessionStatus === 'unauthenticated') {
       router.push('/auth/signin');
     }
-  }, [sessionStatus, router]);
+  }, [sessionStatus, router, devBypassAuth]);
 
   useEffect(() => {
     if (sessionStatus === 'authenticated' && projectId) {
@@ -106,7 +110,7 @@ export default function ProjectPage() {
     }
   }, [sessionStatus, projectId, fetchProject]);
 
-  if (sessionStatus === 'loading' || loading) {
+  if ((!devBypassAuth && sessionStatus === 'loading') || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-zinc-50">
         <Spinner />
@@ -182,15 +186,16 @@ export default function ProjectPage() {
             editInProgress={editInProgress}
             deployment={project.deployment}
             lastPublishedAt={project.lastPublishedAt}
-            changesTabTrigger={changesTabTrigger}
             onEditStart={() => setEditInProgress(true)}
             onEditSuccess={() => fetchProject()}
-            onEditComplete={({ jobId, ok, showChangesTab }) => {
+            onEditComplete={({ jobId, ok }) => {
               setEditInProgress(false);
               if (jobId) setLatestJobId(jobId);
               setDiffRefreshKey((k) => k + 1);
-              if (showChangesTab) setChangesTabTrigger((t) => t + 1);
-              if (ok) fetchProject();
+              if (ok) {
+                setPreviewRefreshKey((k) => k + 1);
+                fetchProject();
+              }
             }}
             onRollbackSuccess={handleDeploySuccess}
             onDeploySuccess={handleDeploySuccess}

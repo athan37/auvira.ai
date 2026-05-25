@@ -196,7 +196,7 @@ function buildIntentGuidance(
   return lines.join('\n');
 }
 
-function buildImageAttachmentGuidance(attachments: WorkspaceAssetAttachment[]): string {
+export function buildImageAttachmentGuidance(attachments: WorkspaceAssetAttachment[]): string {
   if (attachments.length === 0) return '';
 
   const lines = [

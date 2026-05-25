@@ -25,6 +25,8 @@ export interface ToolResult {
   [key: string]: unknown;
 }
 
+import type { WorkspaceGateway } from '../workspaceGateway';
+
 export interface ToolContext {
   workspacePath: string;
   mode: WorkspaceMode;
@@ -33,6 +35,7 @@ export interface ToolContext {
   beforeFiles: Record<string, string>;
   afterFiles: Record<string, string>;
   recordChange: (relativePath: string, content?: string) => void;
+  gateway?: WorkspaceGateway;
 }
 
 export type ToolHandler = (
@@ -56,6 +59,7 @@ export interface WebsiteEditAgentOptions {
   projectId: string;
   mode: WorkspaceMode;
   attachments?: import('../workspaceAssetTypes').WorkspaceAssetAttachment[];
+  gateway?: WorkspaceGateway;
 }
 
 export interface WebsiteEditAgentResult {

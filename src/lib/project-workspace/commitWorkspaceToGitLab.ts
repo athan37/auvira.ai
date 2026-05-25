@@ -4,6 +4,11 @@ import {
   publishWorkspaceToGitLab,
 } from '@/lib/gitlab/publishWorkspace';
 import { getGitWorkspacePath, hasUncommittedChanges } from '@/lib/project-workspace/gitWorkspaceManager';
+import {
+  publishSandboxWorkspaceToGitLab,
+  sandboxHasUncommittedChanges,
+} from '@/lib/sandbox/publishSandboxWorkspace';
+import { isSandboxPreviewEnabled } from '@/lib/runtime/isSandboxPreviewEnabled';
 
 export type CommitWorkspaceResult = {
   commitSha: string;
@@ -42,16 +47,26 @@ export async function commitWorkspaceToGitLab(
     throw new Error('Code workspace not ready.');
   }
 
-  const workspacePath = getGitWorkspacePath(projectId);
-  const result = await publishWorkspaceToGitLab({
-    workspacePath,
-    gitlabProjectId: project.gitlab.projectId,
-    branch: project.gitlab.defaultBranch || 'main',
-    commitMessage:
-      commitMessage ||
-      project.codeWorkspace.lastEditSummary ||
-      'Website updates from code editor',
-  });
+  const useSandbox = isSandboxPreviewEnabled() && Boolean(project.gitlab?.projectId);
+  const result = useSandbox
+    ? await publishSandboxWorkspaceToGitLab({
+        project,
+        projectId,
+        commitMessage:
+          commitMessage ||
+          project.codeWorkspace.lastEditSummary ||
+          'Website updates from code editor',
+        branch: project.gitlab.defaultBranch || 'main',
+      })
+    : await publishWorkspaceToGitLab({
+        workspacePath: getGitWorkspacePath(projectId),
+        gitlabProjectId: project.gitlab.projectId,
+        branch: project.gitlab.defaultBranch || 'main',
+        commitMessage:
+          commitMessage ||
+          project.codeWorkspace.lastEditSummary ||
+          'Website updates from code editor',
+      });
 
   return {
     commitSha: result.commitSha,
@@ -69,7 +84,10 @@ export async function syncWorkspaceToGitLabIfDirty(
   projectId: string,
   commitMessage?: string
 ): Promise<SyncWorkspaceResult> {
-  const dirty = await hasUncommittedChanges(projectId);
+  const dirty =
+    isSandboxPreviewEnabled() && project.gitlab?.projectId
+      ? await sandboxHasUncommittedChanges(projectId)
+      : await hasUncommittedChanges(projectId);
   if (!dirty) {
     return {
       synced: false,
@@ -103,6 +121,20 @@ export async function forceSyncWorkspaceToGitLab(
 
   if (!project.codeWorkspace || project.codeWorkspace.status !== 'ready') {
     throw new Error('Code workspace not ready.');
+  }
+
+  if (isSandboxPreviewEnabled() && project.gitlab?.projectId) {
+    const result = await publishSandboxWorkspaceToGitLab({
+      project,
+      projectId,
+      commitMessage: commitMessage || 'Force sync: local preview to GitLab',
+      branch: project.gitlab.defaultBranch || 'main',
+    });
+    return {
+      commitSha: result.commitSha,
+      pushed: result.published,
+      changedFiles: result.changedFiles.length,
+    };
   }
 
   const workspacePath = getGitWorkspacePath(projectId);

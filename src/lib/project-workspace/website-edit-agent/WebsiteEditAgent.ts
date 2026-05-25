@@ -25,16 +25,32 @@ function getAgentLlm(): LLMProvider {
 
 async function captureWorkspaceFiles(
   workspacePath: string,
-  mode: 'gitlab' | 'static'
+  mode: 'gitlab' | 'static',
+  gateway?: import('../workspaceGateway').WorkspaceGateway
 ): Promise<Record<string, string>> {
   const files: Record<string, string> = {};
 
   if (mode === 'static') {
     for (const fn of ['index.html', 'styles.css', 'site.json']) {
       try {
-        files[fn] = await fs.readFile(path.join(workspacePath, fn), 'utf-8');
+        files[fn] = gateway
+          ? await gateway.readFile(fn)
+          : await fs.readFile(path.join(workspacePath, fn), 'utf-8');
       } catch {
         /* missing */
+      }
+    }
+    return files;
+  }
+
+  if (gateway) {
+    const paths = await gateway.searchFiles('*');
+    for (const rel of paths.slice(0, 200)) {
+      try {
+        const content = await gateway.readFile(rel);
+        if (content.length < 100_000) files[rel] = content;
+      } catch {
+        /* skip */
       }
     }
     return files;
@@ -68,12 +84,15 @@ async function captureWorkspaceFiles(
 
 async function captureAfterState(
   workspacePath: string,
-  changedFiles: string[]
+  changedFiles: string[],
+  gateway?: import('../workspaceGateway').WorkspaceGateway
 ): Promise<Record<string, string>> {
   const after: Record<string, string> = {};
   for (const fn of changedFiles) {
     try {
-      after[fn] = await fs.readFile(path.join(workspacePath, fn), 'utf-8');
+      after[fn] = gateway
+        ? await gateway.readFile(fn)
+        : await fs.readFile(path.join(workspacePath, fn), 'utf-8');
     } catch {
       /* missing */
     }
@@ -114,7 +133,11 @@ export async function runAgentLoop(
   const profile = getProfileForMode(options.mode);
   const llm = getAgentLlm();
   const changedFiles: string[] = [];
-  const beforeFiles = await captureWorkspaceFiles(options.workspacePath, options.mode);
+  const beforeFiles = await captureWorkspaceFiles(
+    options.workspacePath,
+    options.mode,
+    options.gateway
+  );
   const afterFiles: Record<string, string> = {};
 
   const ctx: ToolContext = {
@@ -124,6 +147,7 @@ export async function runAgentLoop(
     changedFiles,
     beforeFiles,
     afterFiles,
+    gateway: options.gateway,
     recordChange: (relPath, content) => {
       if (!changedFiles.includes(relPath)) {
         changedFiles.push(relPath);
@@ -193,7 +217,11 @@ export async function runAgentLoop(
 
       emitStep(onStep, 'apply_change', applyLabel, 'completed');
 
-      const capturedAfter = await captureAfterState(options.workspacePath, changedFiles);
+      const capturedAfter = await captureAfterState(
+        options.workspacePath,
+        changedFiles,
+        options.gateway
+      );
       const afterSnapshot: Record<string, string> = { ...beforeFiles, ...capturedAfter };
 
       const verification = verifyEditApplied(
@@ -247,10 +275,14 @@ export async function runAgentLoop(
   }
 
   emitStep(onStep, 'apply_change', applyLabel, 'failed');
+  const partialHint =
+    changedFiles.length > 0
+      ? ' Some files were updated but the edit did not finish — check the preview and try again.'
+      : '';
   return {
     ok: false,
     strategy: 'agent_loop',
     error: 'Max iterations reached',
-    ownerMessage: 'I ran out of steps to complete your request. Please try a more specific change.',
+    ownerMessage: `I ran out of steps to complete your request.${partialHint} Try a shorter, specific edit (e.g. "change background to blue" or "change hero headline to: Your text here").`,
   };
 }

@@ -26,19 +26,25 @@ export async function runSectionConfigStrategy(
     return null;
   }
 
-  let siteConfigContent = '';
-  try {
-    siteConfigContent = await fs.readFile(
-      path.join(options.workspacePath, SITE_CONFIG),
-      'utf-8'
-    );
-  } catch {
+  async function readRel(rel: string): Promise<string | null> {
+    try {
+      return options.gateway
+        ? await options.gateway.readFile(rel)
+        : await fs.readFile(path.join(options.workspacePath, rel), 'utf-8');
+    } catch {
+      return null;
+    }
+  }
+
+  const siteConfigContent = await readRel(SITE_CONFIG);
+  if (!siteConfigContent) {
     return null;
   }
 
   let pageSnippet = '';
   try {
-    const pageContent = await fs.readFile(path.join(options.workspacePath, PAGE_TSX), 'utf-8');
+    const pageContent = await readRel(PAGE_TSX);
+    if (!pageContent) throw new Error('missing');
     if (pageContent.length <= 4000) {
       pageSnippet = pageContent;
     } else {
@@ -103,7 +109,11 @@ Return JSON: { "files": [{ "path": "${SITE_CONFIG}", "content": "..." }], "summa
     const normalized = file.path.replace(/^\/+/, '');
     if (normalized !== SITE_CONFIG || !isSafeWritePath(normalized)) continue;
 
-    await fs.writeFile(path.join(options.workspacePath, normalized), file.content, 'utf-8');
+    if (options.gateway) {
+      await options.gateway.writeFile(normalized, file.content);
+    } else {
+      await fs.writeFile(path.join(options.workspacePath, normalized), file.content, 'utf-8');
+    }
     wroteSiteConfig = true;
   }
 
@@ -111,9 +121,10 @@ Return JSON: { "files": [{ "path": "${SITE_CONFIG}", "content": "..." }], "summa
     return null;
   }
 
+  const afterSiteConfig = await readRel(SITE_CONFIG);
   const afterFiles: Record<string, string> = {
     ...beforeFiles,
-    [SITE_CONFIG]: await fs.readFile(path.join(options.workspacePath, SITE_CONFIG), 'utf-8'),
+    [SITE_CONFIG]: afterSiteConfig ?? '',
   };
 
   const verification = verifyEditApplied(options.ownerMessage, beforeFiles, afterFiles);
@@ -121,7 +132,9 @@ Return JSON: { "files": [{ "path": "${SITE_CONFIG}", "content": "..." }], "summa
     return null;
   }
 
-  const afterHashes = await computeWorkspaceHashes(options.workspacePath);
+  const afterHashes = options.gateway
+    ? await options.gateway.computeHashes()
+    : await computeWorkspaceHashes(options.workspacePath);
   const changedFiles = getChangedFilesFromHashes(beforeHashes, afterHashes);
   if (changedFiles.length === 0) {
     return null;

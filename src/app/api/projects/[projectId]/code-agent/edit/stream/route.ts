@@ -3,12 +3,16 @@
  * Save commits local changes to GitLab. Deploy is handled by /code-agent/deploy.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerUserId } from '@/lib/api/projectAccess';
+import { getOwnerProject, getServerUserId } from '@/lib/api/projectAccess';
+import { repairPreviewWorkspace } from '@/lib/preview/repairPreviewWorkspace';
+import { checkPreviewHealthy } from '@/lib/project-workspace/bootstrapProjectPreview';
 import { connectMongoDB } from '@/lib/mongodb';
 import { WebsiteProject } from '@/models/WebsiteProject';
 import { createProjectWorkspace } from '@/lib/project-workspace/createProjectWorkspace';
-import { ensureGitWorkspace } from '@/lib/project-workspace/gitWorkspaceManager';
 import { runWebsiteEdit } from '@/lib/project-workspace/websiteEditRunner';
+import { resolveWorkspaceForEdit } from '@/lib/project-workspace/resolveWorkspaceGateway';
+import { LocalFsGateway, type WorkspaceGateway } from '@/lib/project-workspace/workspaceGateway';
+import { validateSandboxWorkspace } from '@/lib/sandbox/validateSandboxWorkspace';
 import type { WorkspaceAssetAttachment } from '@/lib/project-workspace/workspaceAssetTypes';
 import { createDirectorySnapshot, restoreDirectorySnapshot } from '@/lib/project-workspace/snapshotManager';
 import { validateWorkspace } from '@/lib/project-workspace/validateWorkspace';
@@ -26,6 +30,7 @@ import crypto from 'crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const maxDuration = 300;
 
 const BLOCKED_PATTERNS = [
   '.env', '.env.local', '.env.production', '.env.development',
@@ -48,10 +53,6 @@ function isBlockedPath(relativePath: string): boolean {
   );
 }
 
-async function computeGitWorkspaceHashes(workspacePath: string): Promise<Record<string, string>> {
-  return computeWorkspaceHashes(workspacePath);
-}
-
 async function computeStaticWorkspaceHashes(workspacePath: string): Promise<Record<string, string>> {
   const hashes: Record<string, string> = {};
   for (const fn of ['index.html', 'styles.css', 'site.json']) {
@@ -65,27 +66,31 @@ async function computeStaticWorkspaceHashes(workspacePath: string): Promise<Reco
   return hashes;
 }
 
-async function computeHashes(workspacePath: string, source: 'gitlab' | 'generated') {
+async function computeHashes(
+  gateway: WorkspaceGateway,
+  source: 'gitlab' | 'generated'
+) {
   return source === 'gitlab'
-    ? computeGitWorkspaceHashes(workspacePath)
-    : computeStaticWorkspaceHashes(workspacePath);
+    ? gateway.computeHashes()
+    : computeStaticWorkspaceHashes(gateway.getWorkspacePath());
 }
 
 export async function POST(
   request: NextRequest,
   { params }: { params: { projectId: string } }
 ) {
-  const userId = await getServerUserId();
-  if (!userId) {
-    return NextResponse.json({ detail: 'Unauthorized' }, { status: 401 });
-  }
-
   await connectMongoDB();
 
   const projectId = params.projectId;
-  const project = await WebsiteProject.findOne({ _id: projectId, ownerId: userId });
+  const project = await getOwnerProject(projectId);
   if (!project) {
     return NextResponse.json({ detail: 'Project not found' }, { status: 404 });
+  }
+
+  const sessionUserId = await getServerUserId();
+  const userId = sessionUserId ?? project.ownerId?.toString() ?? '';
+  if (!userId) {
+    return NextResponse.json({ detail: 'Unauthorized' }, { status: 401 });
   }
 
   const body = await request.json();
@@ -141,14 +146,16 @@ export async function POST(
       let jobId = '';
       let snapshotPath: string | null = null;
       let workspacePath = '';
+      let gateway: WorkspaceGateway | null = null;
       let source: 'gitlab' | 'generated' = 'generated';
       let mode: 'gitlab' | 'static' = 'static';
+      let isSandbox = false;
       let beforeHashes: Record<string, string> = {};
 
       const fail = async (
         ownerMessage: string,
         technicalDetail?: string,
-        options?: { showChangesTab?: boolean }
+        options?: { hasPartialChanges?: boolean }
       ) => {
         if (jobId) {
           await markEditJobStatus(jobId, 'failed', { error: ownerMessage });
@@ -163,7 +170,7 @@ export async function POST(
             ok: false,
             ownerMessage,
             jobId,
-            showChangesTab: options?.showChangesTab ?? false,
+            hasPartialChanges: options?.hasPartialChanges ?? false,
           },
         });
         closeStream();
@@ -171,7 +178,8 @@ export async function POST(
 
       const keepPartialChanges = async (summary: string) => {
         if (!jobId || !workspacePath) return false;
-        const afterHashes = await computeHashes(workspacePath, source);
+        if (!gateway) return false;
+        const afterHashes = await computeHashes(gateway, source);
         const changedPaths = getChangedPathsFromHashes(beforeHashes, afterHashes).filter(
           (f) => !isBlockedPath(f)
         );
@@ -181,7 +189,18 @@ export async function POST(
           workspacePath,
           beforeHashes,
           afterHashes,
-          snapshotPath
+          snapshotPath,
+          isSandbox
+            ? {
+                readRelFile: async (rel) => {
+                  try {
+                    return await gateway!.readFile(rel);
+                  } catch {
+                    return null;
+                  }
+                },
+              }
+            : undefined
         );
         await attachChangedFiles(jobId, changedFiles);
         const newVersion = previewVersionBefore + 1;
@@ -222,14 +241,13 @@ export async function POST(
         const hasGitLab = Boolean(project.gitlab?.repoUrl);
 
         if (hasGitLab) {
-          const gitInfo = await ensureGitWorkspace(project, userId);
-          workspacePath = gitInfo.workspacePath;
-          mode = 'gitlab';
-          source = 'gitlab';
-          await markEditJobStatus(jobId, 'running', {
-            workspacePath,
-            baseCommitSha: gitInfo.headSha,
-          });
+          const resolved = await resolveWorkspaceForEdit(project, userId);
+          gateway = resolved.gateway;
+          workspacePath = resolved.workspacePath;
+          mode = resolved.mode;
+          source = resolved.source;
+          isSandbox = resolved.sandbox;
+          await markEditJobStatus(jobId, 'running', { workspacePath });
         } else {
           let wp = project.codeWorkspace?.workspacePath;
           if (!wp || project.codeWorkspace?.status !== 'ready') {
@@ -250,19 +268,29 @@ export async function POST(
           workspacePath = wp;
           mode = 'static';
           source = 'generated';
+          gateway = new LocalFsGateway(workspacePath);
           await markEditJobStatus(jobId, 'running', { workspacePath });
+        }
+
+        if (!gateway) {
+          throw new Error('Workspace gateway not initialized');
         }
 
         await appendEditJobLog(jobId, 'workspace_prepare_done', 'Workspace ready', {
           workspacePath,
           source,
+          sandbox: isSandbox,
         });
         emit('step', { id: 'loading', label: 'Loading your website draft', status: 'completed' });
 
-        beforeHashes = await computeHashes(workspacePath, source);
+        beforeHashes = await computeHashes(gateway, source);
 
-        await appendEditJobLog(jobId, 'snapshot_created', 'Creating snapshot');
-        snapshotPath = await createDirectorySnapshot(workspacePath, projectId);
+        if (!isSandbox) {
+          await appendEditJobLog(jobId, 'snapshot_created', 'Creating snapshot');
+          snapshotPath = await createDirectorySnapshot(workspacePath, projectId);
+        } else {
+          await appendEditJobLog(jobId, 'snapshot_created', 'Snapshot skipped (sandbox VM)');
+        }
         if (snapshotPath) {
           await markEditJobStatus(jobId, 'running', { snapshotPath });
           await appendEditJobLog(jobId, 'snapshot_created', 'Snapshot saved', { snapshotPath });
@@ -280,6 +308,7 @@ export async function POST(
             projectId,
             mode,
             attachments,
+            gateway,
           },
           (stepEvent) => {
             emit('step', {
@@ -300,12 +329,14 @@ export async function POST(
           await appendEditJobLog(jobId, 'agent_finished', 'Agent failed', { error: agentResult.error });
           const kept = await keepPartialChanges(agentResult.summary || 'Partial edit');
           emit('step', { id: 'apply_change', label: 'Applying your requested change', status: 'failed' });
+          emit('step', { id: 'validate', label: 'Checking the preview', status: 'failed' });
+          emit('step', { id: 'finish', label: 'Preview not updated', status: 'failed' });
           await fail(
             kept
-              ? 'Edit did not finish cleanly, but your local preview changes were kept. Use Force sync to GitLab to save them.'
+              ? "That edit didn't finish. Your preview may show unsaved local changes — open the Changes tab when you want to review or sync."
               : agentResult.error || "I couldn't apply that change. Please try again.",
             undefined,
-            { showChangesTab: kept }
+            { hasPartialChanges: kept }
           );
           return;
         }
@@ -317,7 +348,12 @@ export async function POST(
         emit('step', { id: 'apply_change', label: 'Applying your requested change', status: 'completed' });
         emit('step', { id: 'validate', label: 'Checking the preview', status: 'active' });
 
-        const afterHashes = await computeHashes(workspacePath, source);
+        if (mode === 'gitlab' && !isSandbox && workspacePath) {
+          await repairPreviewWorkspace(workspacePath);
+          await appendEditJobLog(jobId, 'workspace_repaired', 'Applied preview-safe repairs');
+        }
+
+        const afterHashes = await computeHashes(gateway, source);
         const changedPaths = getChangedPathsFromHashes(beforeHashes, afterHashes);
         const blockedChanged = changedPaths.filter((f) => isBlockedPath(f));
 
@@ -325,34 +361,50 @@ export async function POST(
           await appendEditJobLog(jobId, 'blocked_file_detected', 'Blocked paths modified', {
             paths: blockedChanged,
           });
-          if (snapshotPath) {
+          if (snapshotPath && !isSandbox) {
             await appendEditJobLog(jobId, 'rollback_started', 'Rolling back blocked file changes');
             await restoreDirectorySnapshot(workspacePath, snapshotPath);
             await appendEditJobLog(jobId, 'rollback_done', 'Rollback complete');
           }
           emit('step', { id: 'validate', label: 'Checking the preview', status: 'failed' });
+          emit('step', { id: 'finish', label: 'Preview not updated', status: 'failed' });
           await fail("I couldn't apply that change safely.");
           return;
         }
 
         if (changedPaths.length === 0) {
           emit('step', { id: 'validate', label: 'Checking the preview', status: 'failed' });
+          emit('step', { id: 'finish', label: 'Preview not updated', status: 'failed' });
           await fail("I couldn't detect any changes from that request.");
           return;
         }
 
+        const activeGateway = gateway;
         const changedFiles = await buildChangedFileDetails(
           workspacePath,
           beforeHashes,
           afterHashes,
-          snapshotPath
+          snapshotPath,
+          isSandbox && activeGateway
+            ? {
+                readRelFile: async (rel) => {
+                  try {
+                    return await activeGateway.readFile(rel);
+                  } catch {
+                    return null;
+                  }
+                },
+              }
+            : undefined
         );
         await attachChangedFiles(jobId, changedFiles);
 
         await markEditJobStatus(jobId, 'validating');
         await appendEditJobLog(jobId, 'validation_started', 'Running workspace validation');
 
-        const validation = await validateWorkspace(workspacePath, { changedFiles: changedPaths });
+        const validation = isSandbox
+          ? await validateSandboxWorkspace(projectId, changedPaths)
+          : await validateWorkspace(workspacePath, { changedFiles: changedPaths });
 
         if (!validation.ok) {
           await appendEditJobLog(jobId, 'validation_failed', validation.errors.join('; '), {
@@ -364,13 +416,14 @@ export async function POST(
             buildLog: validation.buildLog,
           });
           emit('step', { id: 'validate', label: 'Checking the preview', status: 'failed' });
+          emit('step', { id: 'finish', label: 'Preview not updated', status: 'failed' });
           const excerpt = validation.buildLog.slice(-1500);
           await fail(
             kept
-              ? 'The change broke the build, but local preview files were kept. Fix the issue or use Force sync to GitLab.'
+              ? "That edit broke the preview build. Unsaved local changes may still be visible — open the Changes tab to review or sync when ready."
               : 'The change broke the build.',
             excerpt,
-            { showChangesTab: kept }
+            { hasPartialChanges: kept }
           );
           return;
         }
@@ -378,6 +431,18 @@ export async function POST(
         await appendEditJobLog(jobId, 'validation_passed', 'Validation passed', {
           warnings: validation.warnings,
         });
+
+        const previewPort = project.preview?.port;
+        if (previewPort && !isSandbox) {
+          await new Promise((r) => setTimeout(r, 1500));
+          const previewHealthy = await checkPreviewHealthy(previewPort, 12_000);
+          await appendEditJobLog(
+            jobId,
+            previewHealthy ? 'preview_health_ok' : 'preview_health_slow',
+            previewHealthy ? 'Preview dev server healthy' : 'Preview may need a manual refresh',
+            { port: previewPort }
+          );
+        }
 
         const newVersion = previewVersionBefore + 1;
         await markEditJobStatus(jobId, 'ready', {
@@ -398,6 +463,7 @@ export async function POST(
               'codeWorkspace.source': source,
               'codeWorkspace.status': 'ready',
               'codeWorkspace.workspacePath': workspacePath,
+              'codeWorkspace.sandboxWorkspace': isSandbox,
               hasUnpublishedChanges: true,
               editingMode: 'code',
             },
@@ -427,14 +493,17 @@ export async function POST(
           }
         }
         emit('step', { id: 'apply_change', label: 'Applying your requested change', status: 'failed' });
+        emit('step', { id: 'apply_change', label: 'Applying your requested change', status: 'failed' });
+        emit('step', { id: 'validate', label: 'Checking the preview', status: 'failed' });
+        emit('step', { id: 'finish', label: 'Preview not updated', status: 'failed' });
         const ownerMessage =
           errMsg.includes('Controller is already closed') ||
           errMsg.includes('Invalid state')
-            ? 'The edit connection closed early. Your preview may still have the changes — use Force sync on the Changes tab to save them to GitLab.'
+            ? "The edit connection closed early. Your preview may still have local changes — open the Changes tab if you need to review or sync."
             : kept
-              ? 'The edit stopped early, but your local preview changes were kept. Use Force sync on the Changes tab to save them to GitLab.'
+              ? "The edit stopped early. Your preview may still have local changes — open the Changes tab if you need to review or sync."
               : "I couldn't apply that change. Please try again.";
-        await fail(ownerMessage, errMsg, { showChangesTab: kept });
+        await fail(ownerMessage, errMsg, { hasPartialChanges: kept });
         return;
       }
 

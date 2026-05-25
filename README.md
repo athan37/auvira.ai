@@ -80,6 +80,17 @@ Verifies GitLab commit visibility, SHA-pinned Vercel deploy, and production HTML
 4. After first deploy, add your Vercel URL to **Google OAuth** redirect URIs: `https://<your-domain>/api/auth/callback/google` (this step cannot be fully automated).
 5. Push to `main` and confirm a deployment appears under Vercel → **Deployments**.
 
+### Vercel Sandbox dev preview (production editor)
+
+When this app runs on Vercel (`VERCEL=1`), owner projects use [Vercel Sandbox](https://vercel.com/docs/vercel-sandbox) for a local-like preview: `git clone` → `npm install` → `npm run dev` in an isolated VM (~30 minutes per session). Chat edits run on the **same filesystem** as the dev server.
+
+- **Enable:** default on Vercel; set `SITE_AGENT_SANDBOX_ENABLED=0` to fall back to the published live URL iframe.
+- **Auth:** Vercel OIDC on deployments (recommended) or `vercel env pull` token for local SDK testing.
+- **TTL:** `SITE_AGENT_SANDBOX_TIMEOUT` (default `30m`), aligned with scratch release on editor leave.
+- **Local dev:** unchanged — still uses scratch disk + `/api/.../preview/proxy` (no Sandbox).
+
+See `docs/VERCEL_SANDBOX_IMPLEMENTATION.md` for architecture and rollout notes.
+
 ### Optional: require CI before merge
 
 GitHub → **Settings** → **Branches** → protect `main` → require status check **CI**.
@@ -316,8 +327,8 @@ NEXTAUTH_URL=http://localhost:3000
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/) → APIs & Services → Credentials
 2. Create OAuth 2.0 Client ID (Web application)
-3. Add `http://localhost:3000/api/auth/providers/google` as an authorized redirect URI
-4. Add `http://localhost:3000` as an authorized JavaScript origin
+3. Add **`http://localhost:3000/api/auth/callback/google`** as an authorized redirect URI (exact path; not `/providers/google`)
+4. Add **`http://localhost:3000`** as an authorized JavaScript origin
 5. Copy Client ID and Client Secret to `.env.local`
 
 ### API Endpoints

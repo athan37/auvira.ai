@@ -51,6 +51,9 @@ export interface IPreview {
   workspacePath?: string;
   startedAt?: Date;
   error?: string;
+  previewMode?: 'live' | 'workspace' | 'sandbox';
+  sandboxId?: string;
+  sandboxExpiresAt?: Date;
 }
 
 export interface ICodeWorkspace {
@@ -67,6 +70,7 @@ export interface ICodeWorkspace {
   lastEditSummary?: string;
   lastValidationStatus?: 'passed' | 'failed';
   error?: string;
+  sandboxWorkspace?: boolean;
 }
 
 export interface IWebsiteProject extends Document {

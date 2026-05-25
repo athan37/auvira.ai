@@ -5,9 +5,11 @@ import {
   checkPreviewHealthy,
   getWorkspaceStatusFromProject,
 } from '@/lib/project-workspace/bootstrapProjectPreview';
+import { checkPreviewUrlHealthy } from '@/lib/preview/waitForPreviewReady';
 import { pruneExpiredScratch } from '@/lib/runtime/scratchCleanup';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
 /**
@@ -30,6 +32,14 @@ export async function POST(
   }
 
   const status = getWorkspaceStatusFromProject(project);
+
+  if (status.ready && status.previewMode === 'sandbox' && status.liveUrl) {
+    const healthy = await checkPreviewUrlHealthy(status.liveUrl);
+    if (healthy) {
+      return NextResponse.json({ ok: true, ...status, reused: true });
+    }
+  }
+
   if (status.ready && status.previewPort) {
     const healthy = await checkPreviewHealthy(status.previewPort);
     if (healthy) {

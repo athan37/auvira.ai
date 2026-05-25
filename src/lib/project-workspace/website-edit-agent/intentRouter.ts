@@ -1,4 +1,5 @@
 import type { EditIntent, EditStrategyKind, RouterDecision } from './types';
+import { hasExplicitEditTarget } from './enrichEditPrompt';
 
 function classifyIntent(message: string): EditIntent {
   const lower = message.toLowerCase();
@@ -52,9 +53,13 @@ export function routeEditRequest(message: string): RouterDecision {
 
   const styleHighConfidence =
     intent === 'style' &&
-    !/\b(section|add|remove|delete|hero|paragraph|content)\b/.test(lower);
+    !/\b(section|add|remove|delete|paragraph|content)\b/.test(lower) &&
+    (!/\bhero\b/.test(lower) || /\b(background|color|colour)\b/.test(lower));
 
-  const strategy: EditStrategyKind = styleHighConfidence ? 'single_shot' : 'agent_loop';
+  const copyWithTarget = intent === 'copy' && hasExplicitEditTarget(message);
+
+  const strategy: EditStrategyKind =
+    styleHighConfidence || copyWithTarget ? 'single_shot' : 'agent_loop';
 
   return {
     intent,

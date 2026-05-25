@@ -15,13 +15,15 @@ interface WorkspaceStatus {
   previewStatus?: string;
   codeWorkspaceStatus?: string;
   previewHealthy?: boolean;
-  previewMode?: 'live' | 'workspace';
+  previewMode?: 'live' | 'workspace' | 'sandbox';
   liveUrl?: string | null;
 }
 
 interface Props {
   projectId: string;
   codeWorkspaceVersion?: number;
+  /** Bumped by parent after a successful edit to force iframe reload (Next dev HMR can miss some CSS). */
+  previewRefreshKey?: number;
   onReadyChange?: (ready: boolean) => void;
 }
 
@@ -38,6 +40,7 @@ function stageProgress(stage: string): number {
 export function ProjectPreviewFrame({
   projectId,
   codeWorkspaceVersion = 1,
+  previewRefreshKey = 0,
   onReadyChange,
 }: Props) {
   const onReadyChangeRef = useRef(onReadyChange);
@@ -46,7 +49,7 @@ export function ProjectPreviewFrame({
   const [setupStage, setSetupStage] = useState('idle');
   const [setupError, setSetupError] = useState<string | null>(null);
   const [previewReady, setPreviewReady] = useState(false);
-  const [previewMode, setPreviewMode] = useState<'live' | 'workspace'>('workspace');
+  const [previewMode, setPreviewMode] = useState<'live' | 'workspace' | 'sandbox'>('workspace');
   const [livePreviewUrl, setLivePreviewUrl] = useState<string | null>(null);
   const [iframeLoading, setIframeLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -54,8 +57,11 @@ export function ProjectPreviewFrame({
   const applyStatus = useCallback((status: WorkspaceStatus) => {
     setSetupStage(status.stage);
     setSetupLabel(status.label);
-    if (status.previewMode === 'live' && status.liveUrl) {
-      setPreviewMode('live');
+    if (
+      (status.previewMode === 'live' || status.previewMode === 'sandbox') &&
+      status.liveUrl
+    ) {
+      setPreviewMode(status.previewMode);
       setLivePreviewUrl(status.liveUrl);
     } else {
       setPreviewMode('workspace');
@@ -169,7 +175,7 @@ export function ProjectPreviewFrame({
       cancelled = true;
       if (pollTimer) clearInterval(pollTimer);
     };
-  }, [projectId, pollStatus, codeWorkspaceVersion, applyStatus, startBootstrap]);
+  }, [projectId, pollStatus, applyStatus, startBootstrap]);
 
   useEffect(() => {
     cancelWorkspaceReleaseOnEnter(projectId);
@@ -184,7 +190,7 @@ export function ProjectPreviewFrame({
   };
 
   const previewUrl = previewReady
-    ? previewMode === 'live' && livePreviewUrl
+    ? (previewMode === 'live' || previewMode === 'sandbox') && livePreviewUrl
       ? livePreviewUrl
       : `/api/projects/${projectId}/preview/proxy/?v=${codeWorkspaceVersion}&_=${refreshKey}`
     : null;
@@ -196,12 +202,22 @@ export function ProjectPreviewFrame({
     <div className="flex flex-col h-full bg-zinc-50 rounded-lg border border-zinc-200 overflow-hidden shadow-card">
       <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-zinc-200/80">
         <span className="text-sm font-medium text-zinc-700 truncate">
-          {previewMode === 'live' ? 'Live website' : 'Editable preview'}
+          {previewMode === 'sandbox'
+            ? 'Dev preview'
+            : previewMode === 'live'
+              ? 'Live website'
+              : 'Editable preview'}
         </span>
         <div className="flex items-center gap-2">
           {previewReady && (
             <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-800 capitalize">
-              {setupStage === 'ready' ? 'Live' : setupStage.replace(/_/g, ' ')}
+              {setupStage === 'ready'
+                ? previewMode === 'sandbox'
+                  ? 'Dev'
+                  : previewMode === 'live'
+                    ? 'Live'
+                    : 'Ready'
+                : setupStage.replace(/_/g, ' ')}
             </span>
           )}
           {previewReady && iframeLoading && (
@@ -268,7 +284,7 @@ export function ProjectPreviewFrame({
 
         {previewUrl && (
           <iframe
-            key={`${projectId}-${codeWorkspaceVersion}-${refreshKey}`}
+            key={`${projectId}-${codeWorkspaceVersion}-${refreshKey}-${previewRefreshKey}`}
             src={previewUrl}
             className="w-full h-full border-0"
             onLoad={() => setIframeLoading(false)}

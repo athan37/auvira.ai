@@ -12,16 +12,18 @@ export async function searchFilesTool(
   const pattern = String(args.pattern || '*');
 
   try {
-    const { stdout } = await execFileAsync(
-      'rg',
-      ['--files', '--hidden', '--glob', pattern, '.'],
-      { cwd: ctx.workspacePath, timeout: 30_000, maxBuffer: 2 * 1024 * 1024 }
-    );
-
-    const files = stdout
-      .split('\n')
-      .map((f) => f.trim())
-      .filter((f) => f && !isBlockedWorkspacePath(f));
+    const files = ctx.gateway
+      ? await ctx.gateway.searchFiles(pattern)
+      : (
+          await execFileAsync(
+            'rg',
+            ['--files', '--hidden', '--glob', pattern, '.'],
+            { cwd: ctx.workspacePath, timeout: 30_000, maxBuffer: 2 * 1024 * 1024 }
+          )
+        ).stdout
+          .split('\n')
+          .map((f) => f.trim())
+          .filter((f) => f && !isBlockedWorkspacePath(f));
 
     return { ok: true, files: files.slice(0, 500) };
   } catch (err) {

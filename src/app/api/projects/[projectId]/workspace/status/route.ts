@@ -4,6 +4,10 @@ import {
   checkPreviewHealthy,
   getWorkspaceStatusFromProject,
 } from '@/lib/project-workspace/bootstrapProjectPreview';
+import { checkPreviewUrlHealthy } from '@/lib/preview/waitForPreviewReady';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 export async function GET(
   _request: NextRequest,
@@ -18,6 +22,22 @@ export async function GET(
   }
 
   const status = getWorkspaceStatusFromProject(project);
+
+  if (status.ready && status.previewMode === 'sandbox' && status.liveUrl) {
+    const healthy = await checkPreviewUrlHealthy(status.liveUrl);
+    if (!healthy) {
+      return NextResponse.json({
+        ok: true,
+        ...status,
+        ready: false,
+        stage: 'starting_server',
+        label: 'Dev preview stopped responding — reopen to restart',
+        previewHealthy: false,
+      });
+    }
+    return NextResponse.json({ ok: true, ...status, previewHealthy: true });
+  }
+
   if (status.ready && status.previewPort) {
     const healthy = await checkPreviewHealthy(status.previewPort);
     if (!healthy) {
