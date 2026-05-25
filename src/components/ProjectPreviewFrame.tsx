@@ -1,7 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { releaseWorkspaceOnLeave } from '@/lib/runtime/releaseWorkspaceOnLeave';
+import {
+  cancelWorkspaceReleaseOnEnter,
+  scheduleWorkspaceReleaseOnLeave,
+} from '@/lib/runtime/releaseWorkspaceOnLeave';
 
 interface WorkspaceStatus {
   ok?: boolean;
@@ -169,8 +172,9 @@ export function ProjectPreviewFrame({
   }, [projectId, pollStatus, codeWorkspaceVersion, applyStatus, startBootstrap]);
 
   useEffect(() => {
+    cancelWorkspaceReleaseOnEnter(projectId);
     return () => {
-      releaseWorkspaceOnLeave(projectId);
+      scheduleWorkspaceReleaseOnLeave(projectId);
     };
   }, [projectId]);
 

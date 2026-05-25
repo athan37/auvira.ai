@@ -15,6 +15,8 @@ import {
 export interface EditCompleteResult {
   ok: boolean;
   jobId?: string;
+  /** When true, open the Changes tab (partial edits or details to review). */
+  showChangesTab?: boolean;
 }
 
 type PendingImage = {
@@ -268,6 +270,7 @@ export function ProjectPreviewChat({
 
     let jobId: string | undefined;
     let success = false;
+    let showChangesTab = false;
     let finalOwnerMessage = '';
     let attachments: WorkspaceAssetAttachment[] = [];
 
@@ -334,6 +337,7 @@ export function ProjectPreviewChat({
               const result = event.result || {};
               success = result.ok !== false;
               jobId = result.jobId || event.jobId;
+              showChangesTab = Boolean(result.showChangesTab);
               finalOwnerMessage =
                 result.ownerMessage ||
                 (success
@@ -353,7 +357,7 @@ export function ProjectPreviewChat({
       }
 
       setMessages((prev) => [...prev, { role: 'assistant', content: finalOwnerMessage }]);
-      onEditComplete?.({ ok: success, jobId });
+      onEditComplete?.({ ok: success, jobId, showChangesTab });
 
       if (success) {
         onEditSuccess?.();

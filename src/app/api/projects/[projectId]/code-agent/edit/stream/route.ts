@@ -142,7 +142,11 @@ export async function POST(
       let mode: 'gitlab' | 'static' = 'static';
       let beforeHashes: Record<string, string> = {};
 
-      const fail = async (ownerMessage: string, technicalDetail?: string) => {
+      const fail = async (
+        ownerMessage: string,
+        technicalDetail?: string,
+        options?: { showChangesTab?: boolean }
+      ) => {
         if (jobId) {
           await markEditJobStatus(jobId, 'failed', { error: ownerMessage });
           if (technicalDetail && technicalDetail !== ownerMessage) {
@@ -152,7 +156,12 @@ export async function POST(
         emit('done', {
           ok: false,
           jobId,
-          result: { ok: false, ownerMessage, jobId },
+          result: {
+            ok: false,
+            ownerMessage,
+            jobId,
+            showChangesTab: options?.showChangesTab ?? false,
+          },
         });
         closeStream();
       };
@@ -291,7 +300,9 @@ export async function POST(
           await fail(
             kept
               ? 'Edit did not finish cleanly, but your local preview changes were kept. Use Force sync to GitLab to save them.'
-              : agentResult.error || "I couldn't apply that change. Please try again."
+              : agentResult.error || "I couldn't apply that change. Please try again.",
+            undefined,
+            { showChangesTab: kept }
           );
           return;
         }
@@ -355,7 +366,8 @@ export async function POST(
             kept
               ? 'The change broke the build, but local preview files were kept. Fix the issue or use Force sync to GitLab.'
               : 'The change broke the build.',
-            excerpt
+            excerpt,
+            { showChangesTab: kept }
           );
           return;
         }
@@ -404,8 +416,9 @@ export async function POST(
         });
       } catch (error) {
         const errMsg = error instanceof Error ? error.message : 'Unknown error';
+        let kept = false;
         if (jobId && workspacePath) {
-          const kept = await keepPartialChanges('Edit interrupted');
+          kept = await keepPartialChanges('Edit interrupted');
           if (kept) {
             await appendEditJobLog(jobId, 'partial_changes_kept', 'Preserved workspace after error');
           }
@@ -415,8 +428,10 @@ export async function POST(
           errMsg.includes('Controller is already closed') ||
           errMsg.includes('Invalid state')
             ? 'The edit connection closed early. Your preview may still have the changes — use Force sync on the Changes tab to save them to GitLab.'
-            : "I couldn't apply that change. Please try again.";
-        await fail(ownerMessage, errMsg);
+            : kept
+              ? 'The edit stopped early, but your local preview changes were kept. Use Force sync on the Changes tab to save them to GitLab.'
+              : "I couldn't apply that change. Please try again.";
+        await fail(ownerMessage, errMsg, { showChangesTab: kept });
         return;
       }
 

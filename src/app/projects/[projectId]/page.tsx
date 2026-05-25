@@ -185,11 +185,11 @@ export default function ProjectPage() {
             changesTabTrigger={changesTabTrigger}
             onEditStart={() => setEditInProgress(true)}
             onEditSuccess={() => fetchProject()}
-            onEditComplete={({ jobId, ok }) => {
+            onEditComplete={({ jobId, ok, showChangesTab }) => {
               setEditInProgress(false);
               if (jobId) setLatestJobId(jobId);
               setDiffRefreshKey((k) => k + 1);
-              if (!ok) setChangesTabTrigger((t) => t + 1);
+              if (showChangesTab) setChangesTabTrigger((t) => t + 1);
               if (ok) fetchProject();
             }}
             onRollbackSuccess={handleDeploySuccess}
