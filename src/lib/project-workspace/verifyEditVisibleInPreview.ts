@@ -79,9 +79,13 @@ export async function verifyEditVisibleInPreview(
       continue;
     }
 
-    const imagesFound = imagePaths.filter(
-      (path) => lastHtml.includes(path) || lastHtml.includes(`/${path}`)
-    ).length;
+    const imagesFound = imagePaths.filter((imagePath) => {
+      if (lastHtml.includes(imagePath) || lastHtml.includes(`/${imagePath}`)) {
+        return true;
+      }
+      const base = imagePath.split('/').pop();
+      return Boolean(base && base.length > 4 && lastHtml.includes(base));
+    }).length;
 
     const phraseMatched = phrases.some((phrase) =>
       lastHtml.toLowerCase().includes(phrase.toLowerCase())

@@ -4,6 +4,7 @@ import {
   rebuildSiteConfigFile,
   type ParsedSiteConfig,
 } from '@/lib/site-manager/siteConfigParser';
+import { stripPlaceholderPhotoSections } from './validateGallerySiteConfig';
 
 export type GalleryPlacement = 'prepend' | `after:${string}`;
 
@@ -119,7 +120,11 @@ export function insertGallerySectionInSiteConfig(
 
   if (config?.sections) {
     let sections = stripGallerySectionsParsed([...config.sections]);
-    const newSection = section as ParsedSiteConfig['sections'][number];
+    sections = stripPlaceholderPhotoSections(sections);
+    const newSection = {
+      ...(section as ParsedSiteConfig['sections'][number]),
+      type: 'gallery',
+    };
 
     if (place === 'prepend') {
       sections.unshift(newSection);

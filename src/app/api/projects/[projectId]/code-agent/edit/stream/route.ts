@@ -32,6 +32,7 @@ import {
   type EditFailureStage,
 } from '@/lib/project-workspace/editFailureDetail';
 import { verifyEditVisibleInPreview } from '@/lib/project-workspace/verifyEditVisibleInPreview';
+import { verifyGalleryEditOnSandbox } from '@/lib/project-workspace/verifySandboxGalleryPreview';
 import { promises as fs } from 'fs';
 import path from 'path';
 import crypto from 'crypto';
@@ -583,18 +584,29 @@ export async function POST(
             label: 'Confirming changes appear in preview',
             status: 'active',
           });
-          previewVerify = await verifyEditVisibleInPreview({
-            previewUrl: previewUrlForVerify,
-            imagePaths: attachments.map((a) => a.publicUrl),
-            sectionPhrases: [
-              'Our products',
-              'Our work',
-              'Gallery',
-              'Product documentation',
-              'Product images',
-              'Featured Product',
-            ],
-          });
+          if (isSandbox && activeGateway) {
+            const siteConfigAfter = await activeGateway.readFile('src/lib/siteConfig.ts').catch(() => '');
+            const pageAfter = await activeGateway.readFile('src/app/page.tsx').catch(() => '');
+            previewVerify = await verifyGalleryEditOnSandbox({
+              previewUrl: previewUrlForVerify,
+              siteConfigSource: siteConfigAfter,
+              pageSource: pageAfter,
+              attachments,
+            });
+          } else {
+            previewVerify = await verifyEditVisibleInPreview({
+              previewUrl: previewUrlForVerify,
+              imagePaths: attachments.map((a) => a.publicUrl),
+              sectionPhrases: [
+                'Our products',
+                'Our work',
+                'Gallery',
+                'Product documentation',
+                'Product images',
+                'Featured Product',
+              ],
+            });
+          }
           await appendEditJobLog(
             jobId,
             previewVerify.ok ? 'preview_content_verified' : 'preview_content_missing',

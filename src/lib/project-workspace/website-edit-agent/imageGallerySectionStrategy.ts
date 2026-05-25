@@ -8,6 +8,7 @@ import { applyImagePlacementToSiteConfig, describePlacementForOwner } from './ap
 import { planImagePlacement } from './imagePlacementPlan';
 import { pageCanRenderGallerySection, patchPageForUploadedImages } from './patchGenericSectionImages';
 import { verifyEditApplied } from './verifyEditApplied';
+import { validateGalleryInSiteConfigSource } from './validateGallerySiteConfig';
 import type { WebsiteEditAgentOptions, WebsiteEditAgentResult } from './types';
 
 const SITE_CONFIG = 'src/lib/siteConfig.ts';
@@ -77,16 +78,14 @@ export async function runImageGallerySectionStrategy(
   await writeRel(SITE_CONFIG, updatedSiteConfig);
 
   const afterWriteConfig = (await readRel(SITE_CONFIG)) ?? '';
-  const missingUrls = attachments.filter(
-    (a) => !afterWriteConfig.includes(a.publicUrl)
-  );
-  if (missingUrls.length > 0) {
+  const galleryCheck = validateGalleryInSiteConfigSource(afterWriteConfig, attachments);
+  if (!galleryCheck.ok) {
     return {
       ok: false,
       strategy: 'image_gallery',
-      error: 'siteConfig was written but uploaded image URLs are missing from sections.',
+      error: galleryCheck.reason,
       ownerMessage:
-        'Images were uploaded but could not be linked into your homepage content. Please try again.',
+        'Images were uploaded but could not be linked into a gallery section. Please try again.',
     };
   }
 

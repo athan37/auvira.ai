@@ -9,6 +9,10 @@ import {
   insertGallerySectionInSiteConfig,
   stripExistingGallerySections,
 } from './gallerySiteConfig';
+import {
+  sectionItemsHaveImageUrls,
+  stripPlaceholderPhotoSections,
+} from './validateGallerySiteConfig';
 import type { ImagePlacementPlan } from './imagePlacementPlan';
 import {
   pickPreferredInsertAnchor,
@@ -69,49 +73,42 @@ export function applyImagePlacementToSiteConfig(
   }
 
   const newItems = buildItems(attachments);
+  const galleryTitle = plan.title || 'Our products';
+  const galleryBody = plan.body ?? 'Photos from our recent work and products.';
+
+  config.sections = stripPlaceholderPhotoSections(config.sections);
 
   if (plan.action === 'update_section') {
     const idx = findSectionIndex(snapshot, plan);
-    if (idx < 0 || !config.sections[idx]) {
-      return applyImagePlacementToSiteConfig(
-        siteConfigSource,
-        {
-          ...plan,
-          action: 'create_section',
-          insertAfterSectionType:
-            plan.insertAfterSectionType ?? pickPreferredInsertAnchor(snapshot),
-        },
-        attachments,
-        snapshot
-      );
-    }
+    const existing = idx >= 0 ? config.sections[idx] : null;
+    const canUpdate =
+      existing &&
+      (String(existing.type ?? '').toLowerCase() === 'gallery' ||
+        sectionItemsHaveImageUrls(existing.items));
 
-    const section = config.sections[idx] as Record<string, unknown>;
-    const existing = (section.items as Array<Record<string, unknown>>) ?? [];
-    const merged = [...existing];
-    for (const item of newItems) {
-      const match = merged.find((e) => e.imageUrl === item.imageUrl);
-      if (match) {
-        Object.assign(match, item);
-      } else {
-        merged.push(item);
-      }
+    if (canUpdate) {
+      config.sections[idx] = {
+        ...existing,
+        type: 'gallery',
+        title: galleryTitle,
+        body: galleryBody,
+        items: newItems,
+      };
+      return rebuildSiteConfigFile(siteConfigSource, config);
     }
-    section.items = merged;
-    if (plan.title) section.title = plan.title;
-    if (plan.body) section.body = plan.body;
-    if (!section.type || section.type === 'generic') {
-      section.type = plan.sectionType;
-    }
-
-    return rebuildSiteConfigFile(siteConfigSource, config);
   }
 
   let out = stripExistingGallerySections(siteConfigSource);
+  const reparsed = parseSiteConfigSource(out);
+  if (reparsed?.sections) {
+    reparsed.sections = stripPlaceholderPhotoSections(reparsed.sections);
+    out = rebuildSiteConfigFile(siteConfigSource, reparsed);
+  }
+
   const sectionPayload: Record<string, unknown> = {
-    type: plan.sectionType,
-    title: plan.title,
-    body: plan.body ?? '',
+    type: 'gallery',
+    title: galleryTitle,
+    body: galleryBody,
     items: newItems,
   };
 

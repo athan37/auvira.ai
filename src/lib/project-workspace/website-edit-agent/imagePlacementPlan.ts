@@ -65,11 +65,9 @@ function normalizePlan(raw: LlmPlanResponse, snapshot: SiteStructureSnapshot): I
     insertAfter = planImagePlacementFallback(snapshot, '').insertAfterSectionType;
   }
 
-  const sectionType = String(raw.sectionType || 'gallery').toLowerCase();
-
   return {
     action,
-    sectionType: sectionType === 'documentation' ? 'gallery' : sectionType,
+    sectionType: 'gallery',
     insertAfterSectionType: action === 'create_section' ? insertAfter : null,
     targetSectionIndex:
       typeof raw.targetSectionIndex === 'number' ? raw.targetSectionIndex : null,
@@ -118,7 +116,7 @@ Rules:
 - Prefer CREATE a dedicated "gallery" section when page has or can use gallery/generic rendering and images are new product/project photos.
 - insertAfterSectionType must be a section type that EXISTS in siteConfig (e.g. services, about) — or null only to insert at the start of sections.
 - Do NOT pick contact/faq as insert anchor unless owner asked.
-- sectionType must be rendered on this site: use "gallery" if unsure; use an existing type only if page.tsx has that case AND it fits (e.g. about for story photos).
+- sectionType must ALWAYS be "gallery" for uploaded product images (never "services", "generic", or "about" — those layouts do not show imageUrl).
 - Titles/body should match owner intent (professional, short).`,
     prompt: `Owner request: ${input.ownerMessage}
 
