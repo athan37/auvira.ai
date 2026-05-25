@@ -1,4 +1,5 @@
 import { getSandboxGateway } from './sandboxWorkspaceGateway';
+import { repairPageTsxStructure } from '@/lib/project-workspace/repairPageTsxStructure';
 
 type FileOps = {
   read: (rel: string) => Promise<string | null>;
@@ -73,4 +74,12 @@ export async function repairPreviewSandbox(projectId: string): Promise<void> {
 
   await repairPageToSiteConfigSchema(ops);
   await ensureSiteConfigNavigation(ops);
+
+  const page = await ops.read('src/app/page.tsx');
+  if (page) {
+    const { content, repaired } = repairPageTsxStructure(page);
+    if (repaired) {
+      await ops.write('src/app/page.tsx', content);
+    }
+  }
 }

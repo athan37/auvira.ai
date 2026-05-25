@@ -65,10 +65,9 @@ export function ensureSectionLoopInPage(pageContent: string): {
   if (!/siteConfig\.sections/.test(content)) {
     const mainClose = content.indexOf('</main>');
     const footerIdx = content.indexOf('<Footer');
-    const insertBefore =
-      mainClose >= 0 ? mainClose : footerIdx >= 0 ? footerIdx : content.lastIndexOf(');');
+    const hasInsertTarget = mainClose >= 0 || footerIdx >= 0 || content.lastIndexOf(');') >= 0;
 
-    if (insertBefore >= 0) {
+    if (hasInsertTarget) {
       if (!content.includes('import { siteConfig }')) {
         const importAnchor = content.indexOf('\n');
         content =
@@ -79,9 +78,18 @@ export function ensureSectionLoopInPage(pageContent: string): {
         patched = true;
         anchor = anchor || 'add_siteConfig_import';
       }
-      content = content.slice(0, insertBefore) + SECTION_LOOP_BLOCK + '\n' + content.slice(insertBefore);
-      patched = true;
-      anchor = anchor || 'inject_section_map';
+      const loopInsert = content.indexOf('</main>');
+      const loopAt =
+        loopInsert >= 0
+          ? loopInsert
+          : content.indexOf('<Footer') >= 0
+            ? content.indexOf('<Footer')
+            : content.lastIndexOf(');');
+      if (loopAt >= 0) {
+        content = content.slice(0, loopAt) + SECTION_LOOP_BLOCK + '\n' + content.slice(loopAt);
+        patched = true;
+        anchor = anchor || 'inject_section_map';
+      }
     }
   }
 

@@ -2,6 +2,7 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { validateChangedSourceSyntax } from './validateTsxSyntax';
 
 const execFileAsync = promisify(execFile);
 
@@ -70,6 +71,24 @@ export async function validateWorkspace(
     logs.push(
       'Source-only edit: skipping npm run build (editable preview uses the dev server, not static export)'
     );
+    const syntax = await validateChangedSourceSyntax(
+      async (rel) => {
+        try {
+          return await fs.readFile(path.join(resolved, rel), 'utf-8');
+        } catch {
+          return null;
+        }
+      },
+      changedList
+    );
+    if (!syntax.ok) {
+      errors.push(...syntax.errors.slice(0, 5));
+      if (syntax.errors.length > 5) {
+        errors.push(`…and ${syntax.errors.length - 5} more syntax error(s)`);
+      }
+      return { ok: false, buildLog: logs.join('\n'), errors, warnings };
+    }
+    logs.push('TS/TSX syntax check passed for changed files');
     return { ok: true, buildLog: logs.join('\n'), errors, warnings };
   }
 

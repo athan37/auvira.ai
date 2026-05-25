@@ -1,5 +1,7 @@
 import type { ValidateWorkspaceResult } from '@/lib/project-workspace/validateWorkspace';
+import { validateChangedSourceSyntax } from '@/lib/project-workspace/validateTsxSyntax';
 import { getProjectSandbox } from './sandboxClient';
+import { getSandboxGateway } from './sandboxWorkspaceGateway';
 import { SANDBOX_WORKDIR } from './types';
 
 /**
@@ -42,6 +44,31 @@ export async function validateSandboxWorkspace(
     logs.push(
       'Source-only edit: skipping npm run build (sandbox preview uses next dev; production .next breaks dev chunks)'
     );
+    try {
+      const gateway = await getSandboxGateway(projectId);
+      const syntax = await validateChangedSourceSyntax(
+        async (rel) => {
+          try {
+            return await gateway.readFile(rel);
+          } catch {
+            return null;
+          }
+        },
+        [...changed]
+      );
+      if (!syntax.ok) {
+        errors.push(...syntax.errors.slice(0, 5));
+        if (syntax.errors.length > 5) {
+          errors.push(`…and ${syntax.errors.length - 5} more syntax error(s)`);
+        }
+        return { ok: false, buildLog: logs.join('\n'), errors, warnings };
+      }
+      logs.push('TS/TSX syntax check passed for changed files');
+    } catch (e) {
+      warnings.push(
+        `Syntax check skipped: ${e instanceof Error ? e.message : String(e)}`
+      );
+    }
     return { ok: true, buildLog: logs.join('\n'), errors, warnings };
   }
 

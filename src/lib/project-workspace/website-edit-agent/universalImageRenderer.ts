@@ -1,6 +1,8 @@
 import { ensureSectionLoopInPage } from './ensureSectionLoop';
 import { GALLERY_SECTION_COMPONENT, GENERIC_SECTION_COMPONENT } from './imageRendererBlocks';
 import type { PageArchetype } from './resolveSiteWorkspace';
+import { repairPageTsxStructure } from '../repairPageTsxStructure';
+import { isValidTsxSource } from '../validateTsxSyntax';
 
 export { GALLERY_SECTION_COMPONENT, GENERIC_SECTION_COMPONENT } from './imageRendererBlocks';
 
@@ -53,18 +55,10 @@ export interface UniversalPatchResult {
 }
 
 function findSectionRendererAnchor(pageContent: string): number {
-  const patterns = [
-    'function SectionRenderer',
-    'const SectionRenderer =',
-  ];
+  const patterns = ['function SectionRenderer', 'const SectionRenderer ='];
   for (const p of patterns) {
     const idx = pageContent.indexOf(p);
     if (idx >= 0) return idx;
-  }
-  const switchIdx = pageContent.search(/switch\s*\(\s*section\.type\s*\)/);
-  if (switchIdx >= 0) {
-    const before = pageContent.lastIndexOf('function ', switchIdx);
-    return before >= 0 ? before : switchIdx;
   }
   return -1;
 }
@@ -334,6 +328,17 @@ export function applyUniversalImageRenderer(
       patched = true;
       anchors.push(...result.anchors);
     }
+  }
+
+  const structural = repairPageTsxStructure(content);
+  if (structural.repaired) {
+    content = structural.content;
+    patched = true;
+    anchors.push(...structural.notes);
+  }
+
+  if (patched && !isValidTsxSource(content, 'page.tsx')) {
+    return { content: pageContent, patched: false, anchors: ['reverted_invalid_page_tsx'] };
   }
 
   return { content, patched, anchors };
