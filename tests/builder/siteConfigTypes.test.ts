@@ -20,6 +20,8 @@ describe('siteConfigTypes', () => {
     const out = ensureSiteConfigTypesSupportGallery(legacySiteConfig);
     expect(out).toContain("'gallery'");
     expect(out).toContain('imageUrl?:');
+    expect(out).toMatch(/type:\s*'services'/);
+    expect(out).not.toMatch(/export type SiteSection = \{\s*\n\s*'services'/);
     expect(SITE_SECTION_TYPE_UNION).toContain('gallery');
   });
 

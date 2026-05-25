@@ -45,7 +45,7 @@ const LEGACY_ITEMS_TYPE_PATTERN =
 export function ensureSiteConfigTypesSupportGallery(content: string): string {
   let out = content;
   if (LEGACY_SECTION_TYPE_PATTERN.test(out) && !out.includes("'gallery'")) {
-    out = out.replace(LEGACY_SECTION_TYPE_PATTERN, SITE_SECTION_TYPE_UNION);
+    out = out.replace(LEGACY_SECTION_TYPE_PATTERN, `type: ${SITE_SECTION_TYPE_UNION}`);
   }
   if (LEGACY_ITEMS_TYPE_PATTERN.test(out) && !out.includes('imageUrl?:')) {
     out = out.replace(LEGACY_ITEMS_TYPE_PATTERN, SITE_SECTION_ITEMS_TYPE);
