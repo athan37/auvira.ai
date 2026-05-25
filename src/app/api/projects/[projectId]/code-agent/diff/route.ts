@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOwnerProject } from '@/lib/api/projectAccess';
 import { getLatestEditJob } from '@/lib/project-workspace/editJobLogger';
-import { buildEditTimingFromLogs } from '@/lib/project-workspace/editTiming';
+import { buildEditTimingFromLogs } from '@/lib/project-workspace/editTimingShared';
 import type { IEditJobLogEntry } from '@/models/ProjectEditJob';
 
 export const runtime = 'nodejs';

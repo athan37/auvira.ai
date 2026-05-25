@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { EditStepTimer } from '../../src/lib/project-workspace/editTiming';
 import {
-  EditStepTimer,
   buildEditTimingFromLogs,
   formatDurationMs,
-} from '../../src/lib/project-workspace/editTiming';
+} from '../../src/lib/project-workspace/editTimingShared';
 
 describe('editTiming', () => {
   it('formatDurationMs', () => {

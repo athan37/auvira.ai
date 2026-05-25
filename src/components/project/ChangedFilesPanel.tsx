@@ -5,7 +5,7 @@ import {
   editStatusLabel,
   formatEditJobError,
 } from '@/lib/project-workspace/editJobMessages';
-import { formatDurationMs } from '@/lib/project-workspace/editTiming';
+import { formatDurationMs } from '@/lib/project-workspace/editTimingShared';
 import { Alert } from '@/components/ui/Alert';
 import { Badge, statusToBadgeTone } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
