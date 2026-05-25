@@ -103,11 +103,11 @@ export async function runWebsiteEditAgent(
       if (verification.ok) {
         return fast;
       }
+      // Defer strict file rules — edit stream will confirm via live preview.
       return {
-        ok: false,
-        strategy: 'single_shot',
-        error: verification.reason,
-        ownerMessage: "I couldn't safely apply that change. Please try rephrasing your request.",
+        ...fast,
+        ok: true,
+        ownerMessage: fast.ownerMessage || fast.summary || 'Updated your website.',
       };
     }
     if (fast?.ok) {

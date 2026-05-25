@@ -31,10 +31,8 @@ import {
   buildEditFailureReport,
   type EditFailureStage,
 } from '@/lib/project-workspace/editFailureDetail';
-import { verifyEditVisibleInPreview } from '@/lib/project-workspace/verifyEditVisibleInPreview';
-import { verifyGalleryEditOnSandbox } from '@/lib/project-workspace/verifySandboxGalleryPreview';
+import { resolveEditPreviewVerification } from '@/lib/project-workspace/verifyPreviewForPrompt';
 import { resolveSiteWorkspace } from '@/lib/project-workspace/website-edit-agent/resolveSiteWorkspace';
-import { validateStaticGalleryFiles } from '@/lib/project-workspace/website-edit-agent/staticImageGalleryStrategy';
 import { promises as fs } from 'fs';
 import path from 'path';
 import crypto from 'crypto';
@@ -587,85 +585,34 @@ export async function POST(
           null;
 
         let previewVerify = { ok: true, reason: 'skipped', imagesFound: 0, htmlLength: 0 };
-        if (previewUrlForVerify && attachments.length > 0) {
+        if (previewUrlForVerify && changedPaths.length > 0) {
           emit('step', {
             id: 'validate',
             label: 'Confirming changes appear in preview',
             status: 'active',
           });
-          if (isSandbox && activeGateway) {
-            const workspaceSnap = await resolveSiteWorkspace({
+          let workspaceSnap;
+          if (activeGateway && workspacePath) {
+            workspaceSnap = await resolveSiteWorkspace({
               workspacePath,
               mode,
               gateway: activeGateway,
             });
-            if (mode === 'static' && workspaceSnap.indexHtmlContent) {
-              const staticCheck = validateStaticGalleryFiles(
-                workspaceSnap.indexHtmlContent,
-                workspaceSnap.siteJsonContent,
-                attachments
-              );
-              previewVerify = {
-                ok: staticCheck.ok,
-                reason: staticCheck.reason,
-                imagesFound: staticCheck.ok ? attachments.length : 0,
-                htmlLength: workspaceSnap.indexHtmlContent.length,
-              };
-            } else {
-              const siteConfigAfter =
-                (workspaceSnap.siteConfigPath &&
-                  (await activeGateway.readFile(workspaceSnap.siteConfigPath).catch(() => ''))) ||
-                '';
-              const pageAfter =
-                (workspaceSnap.pagePath &&
-                  (await activeGateway.readFile(workspaceSnap.pagePath).catch(() => ''))) ||
-                '';
-              previewVerify = await verifyGalleryEditOnSandbox({
-                previewUrl: previewUrlForVerify,
-                siteConfigSource: siteConfigAfter,
-                pageSource: pageAfter,
-                attachments,
-              });
-            }
-          } else if (mode === 'static' && workspacePath) {
-            const workspaceSnap = await resolveSiteWorkspace({
+          } else if (workspacePath && mode === 'static') {
+            workspaceSnap = await resolveSiteWorkspace({
               workspacePath,
               mode: 'static',
             });
-            if (workspaceSnap.indexHtmlContent) {
-              const staticCheck = validateStaticGalleryFiles(
-                workspaceSnap.indexHtmlContent,
-                workspaceSnap.siteJsonContent,
-                attachments
-              );
-              previewVerify = await verifyEditVisibleInPreview({
-                previewUrl: previewUrlForVerify,
-                imagePaths: attachments.map((a) => a.publicUrl),
-                sectionPhrases: ['Gallery', 'Our products', 'Our work'],
-              });
-              if (!previewVerify.ok && staticCheck.ok) {
-                previewVerify = {
-                  ok: true,
-                  reason: staticCheck.reason,
-                  imagesFound: attachments.length,
-                  htmlLength: workspaceSnap.indexHtmlContent.length,
-                };
-              }
-            }
-          } else {
-            previewVerify = await verifyEditVisibleInPreview({
-              previewUrl: previewUrlForVerify,
-              imagePaths: attachments.map((a) => a.publicUrl),
-              sectionPhrases: [
-                'Our products',
-                'Our work',
-                'Gallery',
-                'Product documentation',
-                'Product images',
-                'Featured Product',
-              ],
-            });
           }
+          previewVerify = await resolveEditPreviewVerification({
+            previewUrl: previewUrlForVerify,
+            ownerMessage: message,
+            attachments,
+            isSandbox,
+            mode,
+            workspaceSnap,
+            gateway: activeGateway ?? undefined,
+          });
           await appendEditJobLog(
             jobId,
             previewVerify.ok ? 'preview_content_verified' : 'preview_content_missing',
@@ -684,21 +631,24 @@ export async function POST(
               status: 'failed',
             });
             emit('step', { id: 'finish', label: 'Preview not updated', status: 'failed' });
-            await fail(
-              kept
-                ? 'Images were uploaded and site files changed, but the preview still does not show your new section. Use Refresh on the preview or try the edit again.'
-                : 'Images were uploaded, but the preview does not show your new product section yet. Please try the edit again.',
-              {
-                stage: 'agent_failed',
-                technicalMessage: previewVerify.reason,
-                hasPartialChanges: kept,
-                extra: {
-                  previewUrl: previewUrlForVerify,
-                  strategy: agentResult.strategy,
-                  changedPaths,
-                },
-              }
-            );
+            const userMsg =
+              attachments.length > 0
+                ? kept
+                  ? 'Images were uploaded and site files changed, but the preview still does not show your new section. Use Refresh on the preview or try the edit again.'
+                  : 'Images were uploaded, but the preview does not show your new product section yet. Please try the edit again.'
+                : kept
+                  ? 'Your changes were saved, but the preview does not reflect your request yet. Use Refresh on the preview or try the edit again.'
+                  : 'The preview does not show your requested change yet. Please try the edit again.';
+            await fail(userMsg, {
+              stage: 'agent_failed',
+              technicalMessage: previewVerify.reason,
+              hasPartialChanges: kept,
+              extra: {
+                previewUrl: previewUrlForVerify,
+                strategy: agentResult.strategy,
+                changedPaths,
+              },
+            });
             return;
           }
         }
