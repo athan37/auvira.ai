@@ -70,6 +70,20 @@ export async function runImageGallerySectionStrategy(
 
   await writeRel(SITE_CONFIG, updatedSiteConfig);
 
+  const afterWriteConfig = (await readRel(SITE_CONFIG)) ?? '';
+  const missingUrls = attachments.filter(
+    (a) => !afterWriteConfig.includes(a.publicUrl)
+  );
+  if (missingUrls.length > 0) {
+    return {
+      ok: false,
+      strategy: 'image_gallery',
+      error: 'siteConfig was written but uploaded image URLs are missing from sections.',
+      ownerMessage:
+        'Images were uploaded but could not be linked into your homepage content. Please try again.',
+    };
+  }
+
   let pageAfter = pageBefore;
   const { content: patchedPage, patched } = patchPageForUploadedImages(pageBefore);
   if (patched) {
@@ -85,7 +99,7 @@ export async function runImageGallerySectionStrategy(
       strategy: 'image_gallery',
       error: 'page.tsx does not render gallery item images (DocumentationSection or GenericSection patch missing).',
       ownerMessage:
-        "I updated your product images in the site data, but the page layout couldn't be patched to show them. Please try the edit again.",
+        "Your images were saved, but this site's page template still can't display a product gallery. Please try again after the latest deploy.",
     };
   }
 

@@ -191,8 +191,11 @@ export function ProjectPreviewFrame({
 
   const previewUrl = previewReady
     ? (previewMode === 'live' || previewMode === 'sandbox') && livePreviewUrl
-      ? livePreviewUrl
-      : `/api/projects/${projectId}/preview/proxy/?v=${codeWorkspaceVersion}&_=${refreshKey}`
+      ? (() => {
+          const sep = livePreviewUrl.includes('?') ? '&' : '?';
+          return `${livePreviewUrl}${sep}v=${codeWorkspaceVersion}&_=${refreshKey}&pr=${previewRefreshKey}`;
+        })()
+      : `/api/projects/${projectId}/preview/proxy/?v=${codeWorkspaceVersion}&_=${refreshKey}&pr=${previewRefreshKey}`
     : null;
 
   const showSetupOverlay = !previewReady || setupError;
@@ -208,6 +211,11 @@ export function ProjectPreviewFrame({
               ? 'Live website'
               : 'Editable preview'}
         </span>
+        {previewMode === 'live' && previewReady && (
+          <span className="text-[10px] text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md ml-2 hidden sm:inline">
+            Edits apply in workspace — publish to update live site
+          </span>
+        )}
         <div className="flex items-center gap-2">
           {previewReady && (
             <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-800 capitalize">

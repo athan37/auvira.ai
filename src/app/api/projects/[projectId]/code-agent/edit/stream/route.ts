@@ -31,6 +31,7 @@ import {
   buildEditFailureReport,
   type EditFailureStage,
 } from '@/lib/project-workspace/editFailureDetail';
+import { verifyEditVisibleInPreview } from '@/lib/project-workspace/verifyEditVisibleInPreview';
 import { promises as fs } from 'fs';
 import path from 'path';
 import crypto from 'crypto';
@@ -440,6 +441,28 @@ export async function POST(
           return;
         }
 
+        if (
+          attachments.length > 0 &&
+          !changedPaths.some((p) => p.includes('siteConfig'))
+        ) {
+          emit('step', { id: 'apply_change', label: 'Applying your requested change', status: 'failed' });
+          emit('step', { id: 'validate', label: 'Checking the preview', status: 'failed' });
+          emit('step', { id: 'finish', label: 'Preview not updated', status: 'failed' });
+          await fail(
+            'Images were uploaded, but your homepage content was not updated. Please try again.',
+            {
+              stage: 'agent_failed',
+              technicalMessage: 'No siteConfig.ts change after edit with attachments',
+              extra: {
+                strategy: agentResult.strategy,
+                changedPaths,
+                attachmentCount: attachments.length,
+              },
+            }
+          );
+          return;
+        }
+
         const activeGateway = gateway;
         const changedFiles = await buildChangedFileDetails(
           workspacePath,
@@ -547,6 +570,61 @@ export async function POST(
         });
         await appendEditJobLog(jobId, 'preview_ready', 'Preview ready', { version: newVersion });
 
+        const previewUrlForVerify =
+          sandboxPreviewUrl ||
+          (previewPort && !isSandbox ? `http://127.0.0.1:${previewPort}` : null) ||
+          project.preview?.url?.trim() ||
+          null;
+
+        let previewVerify = { ok: true, reason: 'skipped', imagesFound: 0, htmlLength: 0 };
+        if (previewUrlForVerify && attachments.length > 0) {
+          emit('step', {
+            id: 'validate',
+            label: 'Confirming changes appear in preview',
+            status: 'active',
+          });
+          previewVerify = await verifyEditVisibleInPreview({
+            previewUrl: previewUrlForVerify,
+            imagePaths: attachments.map((a) => a.publicUrl),
+            sectionPhrases: ['Our products', 'Product documentation', 'Product images'],
+          });
+          await appendEditJobLog(
+            jobId,
+            previewVerify.ok ? 'preview_content_verified' : 'preview_content_missing',
+            previewVerify.reason,
+            {
+              previewUrl: previewUrlForVerify,
+              imagesFound: previewVerify.imagesFound,
+              htmlLength: previewVerify.htmlLength,
+            }
+          );
+          if (!previewVerify.ok) {
+            const kept = await keepPartialChanges(agentResult.summary || 'Preview verify failed');
+            emit('step', {
+              id: 'validate',
+              label: 'Confirming changes appear in preview',
+              status: 'failed',
+            });
+            emit('step', { id: 'finish', label: 'Preview not updated', status: 'failed' });
+            await fail(
+              kept
+                ? 'Images were uploaded and site files changed, but the preview still does not show your new section. Use Refresh on the preview or try the edit again.'
+                : 'Images were uploaded, but the preview does not show your new product section yet. Please try the edit again.',
+              {
+                stage: 'agent_failed',
+                technicalMessage: previewVerify.reason,
+                hasPartialChanges: kept,
+                extra: {
+                  previewUrl: previewUrlForVerify,
+                  strategy: agentResult.strategy,
+                  changedPaths,
+                },
+              }
+            );
+            return;
+          }
+        }
+
         await WebsiteProject.updateOne(
           { _id: projectId },
           {
@@ -572,6 +650,11 @@ export async function POST(
           }
         );
 
+        const successOwnerMessage =
+          attachments.length > 0 && previewVerify.imagesFound > 0
+            ? `Added your product section with ${previewVerify.imagesFound} image(s) in the preview. Scroll just below the hero to see it.`
+            : agentResult.ownerMessage || agentResult.summary || 'Updated your website.';
+
         emit('step', { id: 'validate', label: 'Checking the preview', status: 'completed' });
         emit('step', { id: 'finish', label: 'Preview updated', status: 'completed' });
         emit('done', {
@@ -580,7 +663,8 @@ export async function POST(
           result: {
             ok: true,
             jobId,
-            ownerMessage: agentResult.summary || 'Updated your website.',
+            ownerMessage: successOwnerMessage,
+            previewVerified: previewVerify.ok,
             changedFiles: changedPaths,
             version: newVersion,
           },
