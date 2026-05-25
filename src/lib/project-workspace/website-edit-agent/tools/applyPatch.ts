@@ -54,9 +54,16 @@ export async function applyPatchTool(
   }
 
   try {
-    const { code, stderr } = await gitApply(ctx.workspacePath, patch);
-    if (code !== 0) {
-      return { ok: false, error: stderr.slice(0, 500) || 'Patch failed' };
+    if (ctx.gateway) {
+      const result = await ctx.gateway.applyPatch(patch);
+      if (!result.ok) {
+        return { ok: false, error: result.error || 'Patch failed' };
+      }
+    } else {
+      const { code, stderr } = await gitApply(ctx.workspacePath, patch);
+      if (code !== 0) {
+        return { ok: false, error: stderr.slice(0, 500) || 'Patch failed' };
+      }
     }
     ctx.recordChange(targetFile);
     return { ok: true, changedFiles: [targetFile] };

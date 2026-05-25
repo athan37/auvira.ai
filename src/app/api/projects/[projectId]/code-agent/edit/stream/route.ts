@@ -7,8 +7,10 @@ import { getServerUserId } from '@/lib/api/projectAccess';
 import { connectMongoDB } from '@/lib/mongodb';
 import { WebsiteProject } from '@/models/WebsiteProject';
 import { createProjectWorkspace } from '@/lib/project-workspace/createProjectWorkspace';
-import { ensureGitWorkspace } from '@/lib/project-workspace/gitWorkspaceManager';
 import { runWebsiteEdit } from '@/lib/project-workspace/websiteEditRunner';
+import { resolveWorkspaceForEdit } from '@/lib/project-workspace/resolveWorkspaceGateway';
+import { LocalFsGateway, type WorkspaceGateway } from '@/lib/project-workspace/workspaceGateway';
+import { validateSandboxWorkspace } from '@/lib/sandbox/validateSandboxWorkspace';
 import type { WorkspaceAssetAttachment } from '@/lib/project-workspace/workspaceAssetTypes';
 import { createDirectorySnapshot, restoreDirectorySnapshot } from '@/lib/project-workspace/snapshotManager';
 import { validateWorkspace } from '@/lib/project-workspace/validateWorkspace';
@@ -26,6 +28,7 @@ import crypto from 'crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const maxDuration = 300;
 
 const BLOCKED_PATTERNS = [
   '.env', '.env.local', '.env.production', '.env.development',
@@ -48,10 +51,6 @@ function isBlockedPath(relativePath: string): boolean {
   );
 }
 
-async function computeGitWorkspaceHashes(workspacePath: string): Promise<Record<string, string>> {
-  return computeWorkspaceHashes(workspacePath);
-}
-
 async function computeStaticWorkspaceHashes(workspacePath: string): Promise<Record<string, string>> {
   const hashes: Record<string, string> = {};
   for (const fn of ['index.html', 'styles.css', 'site.json']) {
@@ -65,10 +64,13 @@ async function computeStaticWorkspaceHashes(workspacePath: string): Promise<Reco
   return hashes;
 }
 
-async function computeHashes(workspacePath: string, source: 'gitlab' | 'generated') {
+async function computeHashes(
+  gateway: WorkspaceGateway,
+  source: 'gitlab' | 'generated'
+) {
   return source === 'gitlab'
-    ? computeGitWorkspaceHashes(workspacePath)
-    : computeStaticWorkspaceHashes(workspacePath);
+    ? gateway.computeHashes()
+    : computeStaticWorkspaceHashes(gateway.getWorkspacePath());
 }
 
 export async function POST(
@@ -141,8 +143,10 @@ export async function POST(
       let jobId = '';
       let snapshotPath: string | null = null;
       let workspacePath = '';
+      let gateway: WorkspaceGateway | null = null;
       let source: 'gitlab' | 'generated' = 'generated';
       let mode: 'gitlab' | 'static' = 'static';
+      let isSandbox = false;
       let beforeHashes: Record<string, string> = {};
 
       const fail = async (
@@ -171,7 +175,8 @@ export async function POST(
 
       const keepPartialChanges = async (summary: string) => {
         if (!jobId || !workspacePath) return false;
-        const afterHashes = await computeHashes(workspacePath, source);
+        if (!gateway) return false;
+        const afterHashes = await computeHashes(gateway, source);
         const changedPaths = getChangedPathsFromHashes(beforeHashes, afterHashes).filter(
           (f) => !isBlockedPath(f)
         );
@@ -181,7 +186,18 @@ export async function POST(
           workspacePath,
           beforeHashes,
           afterHashes,
-          snapshotPath
+          snapshotPath,
+          isSandbox
+            ? {
+                readRelFile: async (rel) => {
+                  try {
+                    return await gateway!.readFile(rel);
+                  } catch {
+                    return null;
+                  }
+                },
+              }
+            : undefined
         );
         await attachChangedFiles(jobId, changedFiles);
         const newVersion = previewVersionBefore + 1;
@@ -222,14 +238,13 @@ export async function POST(
         const hasGitLab = Boolean(project.gitlab?.repoUrl);
 
         if (hasGitLab) {
-          const gitInfo = await ensureGitWorkspace(project, userId);
-          workspacePath = gitInfo.workspacePath;
-          mode = 'gitlab';
-          source = 'gitlab';
-          await markEditJobStatus(jobId, 'running', {
-            workspacePath,
-            baseCommitSha: gitInfo.headSha,
-          });
+          const resolved = await resolveWorkspaceForEdit(project, userId);
+          gateway = resolved.gateway;
+          workspacePath = resolved.workspacePath;
+          mode = resolved.mode;
+          source = resolved.source;
+          isSandbox = resolved.sandbox;
+          await markEditJobStatus(jobId, 'running', { workspacePath });
         } else {
           let wp = project.codeWorkspace?.workspacePath;
           if (!wp || project.codeWorkspace?.status !== 'ready') {
@@ -250,19 +265,29 @@ export async function POST(
           workspacePath = wp;
           mode = 'static';
           source = 'generated';
+          gateway = new LocalFsGateway(workspacePath);
           await markEditJobStatus(jobId, 'running', { workspacePath });
+        }
+
+        if (!gateway) {
+          throw new Error('Workspace gateway not initialized');
         }
 
         await appendEditJobLog(jobId, 'workspace_prepare_done', 'Workspace ready', {
           workspacePath,
           source,
+          sandbox: isSandbox,
         });
         emit('step', { id: 'loading', label: 'Loading your website draft', status: 'completed' });
 
-        beforeHashes = await computeHashes(workspacePath, source);
+        beforeHashes = await computeHashes(gateway, source);
 
-        await appendEditJobLog(jobId, 'snapshot_created', 'Creating snapshot');
-        snapshotPath = await createDirectorySnapshot(workspacePath, projectId);
+        if (!isSandbox) {
+          await appendEditJobLog(jobId, 'snapshot_created', 'Creating snapshot');
+          snapshotPath = await createDirectorySnapshot(workspacePath, projectId);
+        } else {
+          await appendEditJobLog(jobId, 'snapshot_created', 'Snapshot skipped (sandbox VM)');
+        }
         if (snapshotPath) {
           await markEditJobStatus(jobId, 'running', { snapshotPath });
           await appendEditJobLog(jobId, 'snapshot_created', 'Snapshot saved', { snapshotPath });
@@ -280,6 +305,7 @@ export async function POST(
             projectId,
             mode,
             attachments,
+            gateway,
           },
           (stepEvent) => {
             emit('step', {
@@ -317,7 +343,7 @@ export async function POST(
         emit('step', { id: 'apply_change', label: 'Applying your requested change', status: 'completed' });
         emit('step', { id: 'validate', label: 'Checking the preview', status: 'active' });
 
-        const afterHashes = await computeHashes(workspacePath, source);
+        const afterHashes = await computeHashes(gateway, source);
         const changedPaths = getChangedPathsFromHashes(beforeHashes, afterHashes);
         const blockedChanged = changedPaths.filter((f) => isBlockedPath(f));
 
@@ -325,7 +351,7 @@ export async function POST(
           await appendEditJobLog(jobId, 'blocked_file_detected', 'Blocked paths modified', {
             paths: blockedChanged,
           });
-          if (snapshotPath) {
+          if (snapshotPath && !isSandbox) {
             await appendEditJobLog(jobId, 'rollback_started', 'Rolling back blocked file changes');
             await restoreDirectorySnapshot(workspacePath, snapshotPath);
             await appendEditJobLog(jobId, 'rollback_done', 'Rollback complete');
@@ -341,18 +367,32 @@ export async function POST(
           return;
         }
 
+        const activeGateway = gateway;
         const changedFiles = await buildChangedFileDetails(
           workspacePath,
           beforeHashes,
           afterHashes,
-          snapshotPath
+          snapshotPath,
+          isSandbox && activeGateway
+            ? {
+                readRelFile: async (rel) => {
+                  try {
+                    return await activeGateway.readFile(rel);
+                  } catch {
+                    return null;
+                  }
+                },
+              }
+            : undefined
         );
         await attachChangedFiles(jobId, changedFiles);
 
         await markEditJobStatus(jobId, 'validating');
         await appendEditJobLog(jobId, 'validation_started', 'Running workspace validation');
 
-        const validation = await validateWorkspace(workspacePath, { changedFiles: changedPaths });
+        const validation = isSandbox
+          ? await validateSandboxWorkspace(projectId, changedPaths)
+          : await validateWorkspace(workspacePath, { changedFiles: changedPaths });
 
         if (!validation.ok) {
           await appendEditJobLog(jobId, 'validation_failed', validation.errors.join('; '), {
@@ -398,6 +438,7 @@ export async function POST(
               'codeWorkspace.source': source,
               'codeWorkspace.status': 'ready',
               'codeWorkspace.workspacePath': workspacePath,
+              'codeWorkspace.sandboxWorkspace': isSandbox,
               hasUnpublishedChanges: true,
               editingMode: 'code',
             },

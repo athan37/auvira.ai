@@ -31,7 +31,8 @@ export async function buildChangedFileDetails(
   workspacePath: string,
   beforeHashes: Record<string, string>,
   afterHashes: Record<string, string>,
-  snapshotPath?: string | null
+  snapshotPath?: string | null,
+  options?: { readRelFile?: (relPath: string) => Promise<string | null> }
 ): Promise<IChangedFile[]> {
   const paths = getChangedPathsFromHashes(beforeHashes, afterHashes);
   const result: IChangedFile[] = [];
@@ -54,13 +55,27 @@ export async function buildChangedFileDetails(
         ? path.join(workspacePath, relPath)
         : null;
 
-    if (status === 'added' && afterFile) {
-      additions = await readFileLines(afterFile);
-    } else if (status === 'deleted' && beforeFile) {
-      deletions = await readFileLines(beforeFile);
-    } else if (status === 'modified' && afterFile && beforeFile) {
-      const beforeLines = await readFileLines(beforeFile);
-      const afterLines = await readFileLines(afterFile);
+    const readRel = options?.readRelFile;
+    if (status === 'added' && (afterFile || readRel)) {
+      additions = readRel && hasAfter
+        ? (await readRel(relPath))?.split('\n').length || 0
+        : afterFile
+          ? await readFileLines(afterFile)
+          : 0;
+    } else if (status === 'deleted' && (beforeFile || readRel)) {
+      deletions = snapshotPath && beforeFile
+        ? await readFileLines(beforeFile)
+        : 0;
+    } else if (status === 'modified' && (afterFile || readRel)) {
+      const beforeLines =
+        snapshotPath && beforeFile
+          ? await readFileLines(beforeFile)
+          : 0;
+      const afterLines = readRel
+        ? (await readRel(relPath))?.split('\n').length || 0
+        : afterFile
+          ? await readFileLines(afterFile)
+          : 0;
       if (afterLines >= beforeLines) additions = afterLines - beforeLines;
       else deletions = beforeLines - afterLines;
     }

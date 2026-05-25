@@ -21,12 +21,15 @@ export interface WebsiteEditResult {
   strategy?: string;
 }
 
+import type { WorkspaceGateway } from './workspaceGateway';
+
 export interface WebsiteEditOptions {
   workspacePath: string;
   ownerMessage: string;
   projectId: string;
   mode: 'gitlab' | 'static';
   attachments?: import('./workspaceAssetTypes').WorkspaceAssetAttachment[];
+  gateway?: WorkspaceGateway;
 }
 
 export { routeEditRequest, isTrivialStyleEdit } from './website-edit-agent/intentRouter';
@@ -38,17 +41,19 @@ export async function runWebsiteEdit(
   options: WebsiteEditOptions,
   onStep?: (event: AgentStepEvent) => void
 ): Promise<WebsiteEditResult> {
-  if (!isAllowedWorkspacePath(options.workspacePath)) {
+  if (!options.gateway && !isAllowedWorkspacePath(options.workspacePath)) {
     return { ok: false, error: 'Workspace path is not in an allowed directory.' };
   }
 
-  try {
-    const stat = await fs.stat(options.workspacePath);
-    if (!stat.isDirectory()) {
-      return { ok: false, error: 'Workspace path is not a directory.' };
+  if (!options.gateway) {
+    try {
+      const stat = await fs.stat(options.workspacePath);
+      if (!stat.isDirectory()) {
+        return { ok: false, error: 'Workspace path is not a directory.' };
+      }
+    } catch {
+      return { ok: false, error: 'Workspace does not exist.' };
     }
-  } catch {
-    return { ok: false, error: 'Workspace does not exist.' };
   }
 
   const result = await runWebsiteEditAgent(
@@ -58,6 +63,7 @@ export async function runWebsiteEdit(
       projectId: options.projectId,
       mode: options.mode,
       attachments: options.attachments,
+      gateway: options.gateway,
     },
     onStep
   );

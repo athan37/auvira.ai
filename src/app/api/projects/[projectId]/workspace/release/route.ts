@@ -7,6 +7,7 @@ import {
   releaseProjectScratch,
 } from '@/lib/runtime/scratchCleanup';
 import { WebsiteProject } from '@/models/WebsiteProject';
+import { stopProjectSandbox } from '@/lib/sandbox/stopProjectSandbox';
 
 export const runtime = 'nodejs';
 
@@ -28,7 +29,9 @@ export async function POST(
 
   const projectId = params.projectId;
 
-  if (!isVercelServerless() && project.preview?.port) {
+  if (project.preview?.previewMode === 'sandbox' || project.codeWorkspace?.sandboxWorkspace) {
+    await stopProjectSandbox(projectId);
+  } else if (!isVercelServerless() && project.preview?.port) {
     await stopPreviewServerByPort(project.preview.port).catch(() => {});
   }
 

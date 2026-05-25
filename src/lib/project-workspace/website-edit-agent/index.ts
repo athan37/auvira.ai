@@ -22,35 +22,43 @@ export async function runWebsiteEditAgent(
   options: WebsiteEditAgentOptions,
   onStep?: (event: AgentStepEvent) => void
 ): Promise<WebsiteEditAgentResult> {
-  if (!isAllowedWorkspacePath(options.workspacePath)) {
+  if (!options.gateway && !isAllowedWorkspacePath(options.workspacePath)) {
     return { ok: false, error: 'Workspace path is not in an allowed directory.' };
   }
 
   const decision = routeEditRequest(options.ownerMessage);
-  const beforeHashes = await computeWorkspaceHashes(options.workspacePath);
+  const beforeHashes = options.gateway
+    ? await options.gateway.computeHashes()
+    : await computeWorkspaceHashes(options.workspacePath);
   const hasAttachments = (options.attachments?.length ?? 0) > 0;
 
-  if (!hasAttachments && decision.strategy === 'single_shot') {
+  if (!options.gateway && !hasAttachments && decision.strategy === 'single_shot') {
     const fast = await runSingleShotStrategy(options, beforeHashes);
     if (fast?.ok) {
       return fast;
     }
   }
 
-  if (!hasAttachments && decision.intent === 'section' && options.mode === 'gitlab') {
+  if (!options.gateway && !hasAttachments && decision.intent === 'section' && options.mode === 'gitlab') {
     const sectionFast = await runSectionConfigStrategy(options, beforeHashes);
     if (sectionFast?.ok) {
       return sectionFast;
     }
   }
 
-  const enriched = await enrichEditPrompt(
-    options.workspacePath,
-    options.mode,
-    options.ownerMessage,
-    decision.intent,
-    options.attachments || []
-  );
+  const enriched = options.gateway
+    ? {
+        agentPrompt: options.ownerMessage,
+        originalMessage: options.ownerMessage,
+        contextFiles: [] as string[],
+      }
+    : await enrichEditPrompt(
+        options.workspacePath,
+        options.mode,
+        options.ownerMessage,
+        decision.intent,
+        options.attachments || []
+      );
 
   return runAgentLoop(
     {

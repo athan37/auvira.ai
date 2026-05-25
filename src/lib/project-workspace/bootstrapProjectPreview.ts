@@ -11,6 +11,11 @@ import { waitForPreviewReady } from '@/lib/preview/waitForPreviewReady';
 import { stopPreviewServerByPort } from '@/lib/preview/stopPreviewServer';
 import { getNpmPath } from '@/lib/runtime/nodeRuntime';
 import { isVercelServerless } from '@/lib/runtime/isVercelServerless';
+import { isSandboxPreviewEnabled } from '@/lib/runtime/isSandboxPreviewEnabled';
+import {
+  bootstrapProjectSandbox,
+  checkPreviewUrlHealthy,
+} from '@/lib/sandbox/bootstrapProjectSandbox';
 
 export type WorkspaceSetupStage =
   | 'idle'
@@ -309,7 +314,11 @@ export async function bootstrapProjectPreview(
   }
 
   if (isVercelServerless()) {
-    await bootstrapProjectPreviewHosted(project, userId);
+    if (isSandboxPreviewEnabled()) {
+      await bootstrapProjectSandbox(project, userId);
+    } else {
+      await bootstrapProjectPreviewHosted(project, userId);
+    }
     return;
   }
 
@@ -356,13 +365,28 @@ export async function bootstrapProjectPreview(
 }
 
 export function getWorkspaceStatusFromProject(project: IWebsiteProject) {
+  const rawMode = (project.preview as { previewMode?: string } | undefined)?.previewMode;
   const previewMode =
-    (project.preview as { previewMode?: string } | undefined)?.previewMode === 'live'
-      ? ('live' as const)
-      : ('workspace' as const);
-  const liveUrl = project.preview?.url || project.deployment?.liveUrl || null;
+    rawMode === 'live' ? ('live' as const) : rawMode === 'sandbox' ? ('sandbox' as const) : ('workspace' as const);
+  const liveUrl = project.deployment?.liveUrl || null;
+  const previewUrl = project.preview?.url || null;
 
-  if (previewMode === 'live' && project.preview?.status === 'ready' && liveUrl) {
+  if (previewMode === 'sandbox' && project.preview?.status === 'ready' && previewUrl) {
+    return {
+      stage: 'ready' as const,
+      label: 'Dev preview',
+      previewStatus: 'ready',
+      codeWorkspaceStatus: project.codeWorkspace?.status || 'ready',
+      ready: true,
+      error: project.preview?.error || project.codeWorkspace?.setupError || null,
+      previewPort: null,
+      previewMode: 'sandbox' as const,
+      liveUrl: previewUrl,
+      previewHealthy: true,
+    };
+  }
+
+  if (previewMode === 'live' && project.preview?.status === 'ready' && (previewUrl || liveUrl)) {
     return {
       stage: 'ready' as const,
       label: SETUP_STAGE_LABELS.ready,
@@ -372,7 +396,7 @@ export function getWorkspaceStatusFromProject(project: IWebsiteProject) {
       error: project.preview?.error || project.codeWorkspace?.setupError || null,
       previewPort: null,
       previewMode: 'live' as const,
-      liveUrl,
+      liveUrl: previewUrl || liveUrl,
       previewHealthy: true,
     };
   }

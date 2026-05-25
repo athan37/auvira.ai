@@ -20,8 +20,12 @@ export async function writeFileTool(
   }
 
   try {
-    await fs.mkdir(path.dirname(resolved), { recursive: true });
-    await fs.writeFile(resolved, content, 'utf-8');
+    if (ctx.gateway) {
+      await ctx.gateway.writeFile(pathStr, content);
+    } else {
+      await fs.mkdir(path.dirname(resolved), { recursive: true });
+      await fs.writeFile(resolved, content, 'utf-8');
+    }
     ctx.recordChange(pathStr, content);
     return { ok: true, path: pathStr };
   } catch (err) {

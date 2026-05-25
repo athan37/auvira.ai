@@ -15,7 +15,9 @@ export async function readFileTool(
   }
 
   try {
-    const content = await fs.readFile(resolved, 'utf-8');
+    const content = ctx.gateway
+      ? await ctx.gateway.readFile(pathStr)
+      : await fs.readFile(resolved, 'utf-8');
     return {
       ok: true,
       path: pathStr,

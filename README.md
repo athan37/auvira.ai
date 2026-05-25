@@ -80,6 +80,17 @@ Verifies GitLab commit visibility, SHA-pinned Vercel deploy, and production HTML
 4. After first deploy, add your Vercel URL to **Google OAuth** redirect URIs: `https://<your-domain>/api/auth/callback/google` (this step cannot be fully automated).
 5. Push to `main` and confirm a deployment appears under Vercel → **Deployments**.
 
+### Vercel Sandbox dev preview (production editor)
+
+When this app runs on Vercel (`VERCEL=1`), owner projects use [Vercel Sandbox](https://vercel.com/docs/vercel-sandbox) for a local-like preview: `git clone` → `npm install` → `npm run dev` in an isolated VM (~30 minutes per session). Chat edits run on the **same filesystem** as the dev server.
+
+- **Enable:** default on Vercel; set `SITE_AGENT_SANDBOX_ENABLED=0` to fall back to the published live URL iframe.
+- **Auth:** Vercel OIDC on deployments (recommended) or `vercel env pull` token for local SDK testing.
+- **TTL:** `SITE_AGENT_SANDBOX_TIMEOUT` (default `30m`), aligned with scratch release on editor leave.
+- **Local dev:** unchanged — still uses scratch disk + `/api/.../preview/proxy` (no Sandbox).
+
+See `docs/VERCEL_SANDBOX_IMPLEMENTATION.md` for architecture and rollout notes.
+
 ### Optional: require CI before merge
 
 GitHub → **Settings** → **Branches** → protect `main` → require status check **CI**.
