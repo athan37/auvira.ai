@@ -2,6 +2,22 @@
   "siteTitle": "Static Test",
   "tagline": "Local business",
   "sections": [
-    { "type": "services", "title": "Services", "body": "", "items": [] }
+    {
+      "type": "gallery",
+      "title": "Our products",
+      "body": "Photos from recent projects and product highlights.",
+      "items": [
+        {
+          "title": "Static A",
+          "imageUrl": "/uploads/static-a.png"
+        }
+      ]
+    },
+    {
+      "type": "services",
+      "title": "Services",
+      "body": "",
+      "items": []
+    }
   ]
 }
