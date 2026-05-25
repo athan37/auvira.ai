@@ -62,9 +62,27 @@ Verifies GitLab commit visibility, SHA-pinned Vercel deploy, and production HTML
 ### Stack
 
 - Next.js 14 + Tailwind CSS + TypeScript
-- GitLab (code storage + CI/CD)
-- Vercel (hosting + deployment)
+- GitLab (code storage for generated customer sites)
+- Vercel (hosting for this app and customer sites)
 - Local LLM proxy (any OpenAI-compatible API)
+
+## CI/CD (GitHub + Vercel)
+
+**GitHub** runs CI on every push/PR to `main` (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)): `typecheck` → `test` → `build`.
+
+**Vercel** deploys the app when you connect the GitHub repo (do not also run `vercel deploy` from Actions or you will double-deploy).
+
+### One-time Vercel setup
+
+1. [Vercel](https://vercel.com) → **Add Project** → import `athan37/la-mue-site-builder`.
+2. **Production Branch:** `main` (pushes to `main` deploy production; other branches get Preview URLs if enabled).
+3. **Environment variables** (Production + Preview): copy from `.env.example` — use [MongoDB Atlas](https://www.mongodb.com/atlas) for `MONGODB_URI`, set `NEXTAUTH_URL` and `NEXT_PUBLIC_APP_URL` to your Vercel URL, add Google OAuth, GitLab, MiniMax, and `VERCEL_*` tokens.
+4. Update **Google OAuth** redirect URIs for your production domain.
+5. Push to `main` and confirm a deployment appears under Vercel → **Deployments**.
+
+### Optional: require CI before merge
+
+GitHub → **Settings** → **Branches** → protect `main` → require status check **CI**.
 
 1. Enter an existing small-business website URL
 2. The system crawls the website and extracts business info using your local LLM proxy
