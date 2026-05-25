@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+
+# Local temp workspaces (generated sites, git mirrors, edit snapshots — can be very large)
+.tmp/
+**/.tmp/
+
+# TypeScript / tooling caches
+*.tsbuildinfo
+.turbo/
+.vercel/
+
+# Test / coverage artifacts
+coverage/
+
+# Environment variables (never commit secrets)
+.env
+.env.local
+.env.*.local
+
+# Python (adk-coding-agent)
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.cursor/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Misc local scratch
+test_write.txt

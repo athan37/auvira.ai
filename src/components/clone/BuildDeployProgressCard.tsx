@@ -1,0 +1,156 @@
+'use client';
+
+interface BuildStep {
+  key: string;
+  label: string;
+  status: 'pending' | 'running' | 'done' | 'failed';
+  startedAt?: string;
+  completedAt?: string;
+  error?: string;
+}
+
+interface Deployment {
+  provider: string;
+  status: string;
+  ready: boolean;
+  vercelProjectId?: string;
+  vercelProjectName?: string;
+  expectedProductionUrl?: string;
+  liveUrl?: string | null;
+  deploymentUrl?: string | null;
+  inspectorUrl?: string | null;
+  note?: string;
+  error?: string;
+}
+
+interface Props {
+  status: string;
+  buildSteps: BuildStep[];
+  deployment?: Deployment | null;
+  stageLabel: string;
+}
+
+const BUILD_STEP_LABELS: Record<string, string> = {
+  generate_site_spec: 'Preparing website structure',
+  generate_files: 'Generating Next.js website files',
+  validate_build: 'Running local build gate',
+  create_gitlab_project: 'Creating GitLab repository',
+  commit_files: 'Committing generated code',
+  create_vercel_project: 'Creating Vercel project',
+  trigger_deployment: 'Starting Vercel deployment',
+  wait_for_vercel: 'Waiting for Vercel to finish building',
+};
+
+function getStepIcon(step: BuildStep) {
+  switch (step.status) {
+    case 'done': return '✓';
+    case 'failed': return '✗';
+    case 'running': return '◐';
+    default: return '○';
+  }
+}
+
+function getStepColor(step: BuildStep) {
+  switch (step.status) {
+    case 'done': return 'text-green-600 bg-green-50 border-green-200';
+    case 'failed': return 'text-red-600 bg-red-50 border-red-200';
+    case 'running': return 'text-indigo-600 bg-indigo-50 border-indigo-200';
+    default: return 'text-gray-400 bg-gray-50 border-gray-200';
+  }
+}
+
+function stepDuration(step: BuildStep): string | null {
+  if (!step.startedAt) return null;
+  const start = new Date(step.startedAt).getTime();
+  const end = step.completedAt ? new Date(step.completedAt).getTime() : Date.now();
+  const seconds = Math.floor((end - start) / 1000);
+  if (seconds < 2) return null;
+  if (seconds < 60) return `${seconds}s`;
+  return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+}
+
+export default function BuildDeployProgressCard({ status, buildSteps, deployment, stageLabel }: Props) {
+  const activeSteps = buildSteps.filter(s => s.key !== 'wait_for_vercel');
+  const waitStep = buildSteps.find(s => s.key === 'wait_for_vercel');
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="px-4 py-3 border-b border-gray-200 bg-indigo-50">
+        <h2 className="font-medium text-indigo-800 text-sm">Build & Deploy Progress</h2>
+        <p className="text-xs text-indigo-600 mt-0.5">{stageLabel}</p>
+      </div>
+      <div className="p-4 space-y-3">
+        {/* Build steps */}
+        {activeSteps.map((step) => {
+          const duration = stepDuration(step);
+          return (
+            <div key={step.key} className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${getStepColor(step)}`}>
+              <span className="text-base w-5 text-center">{getStepIcon(step)}</span>
+              <span className="text-sm flex-1">{BUILD_STEP_LABELS[step.key] || step.key}</span>
+              {duration && <span className="text-xs opacity-75">{duration}</span>}
+              {step.status === 'failed' && step.error && (
+                <span className="text-xs text-red-500" title={step.error}>⚠ error</span>
+              )}
+            </div>
+          );
+        })}
+
+        {/* Vercel wait step or deployment */}
+        {(waitStep || deployment) && (
+          <div className={`mt-2 px-3 py-2 rounded-lg border ${waitStep?.status === 'running' ? 'text-blue-600 bg-blue-50 border-blue-200' : 'text-gray-400 bg-gray-50 border-gray-200'}`}>
+            {waitStep ? (
+              <>
+                <span className="text-base w-5 text-center inline-block">
+                  {waitStep.status === 'done' ? '✓' : waitStep.status === 'running' ? '◐' : '○'}
+                </span>
+                <span className="text-sm ml-2">Waiting for Vercel to finish building</span>
+                {waitStep.status === 'done' && <span className="text-xs text-green-600 ml-2">✓ done</span>}
+              </>
+            ) : (
+              <span className="text-sm">Waiting for Vercel to finish building...</span>
+            )}
+          </div>
+        )}
+
+        {/* Deployment info */}
+        {deployment && (
+          <div className="mt-3 pt-3 border-t border-gray-100 space-y-1.5">
+            {!deployment.vercelProjectId && !deployment.vercelProjectName && (
+              <div className="text-xs text-yellow-600 bg-yellow-50 border border-yellow-200 rounded px-2 py-1.5">
+                ⚠ Deployment metadata is missing. Please open the project workspace or retry.
+              </div>
+            )}
+            {deployment.expectedProductionUrl && !deployment.ready && (
+              <div className="text-xs text-gray-500">
+                Expected URL: <span className="font-mono text-gray-700">{deployment.expectedProductionUrl}</span>
+              </div>
+            )}
+            {deployment.note && !deployment.ready && (
+              <div className="text-xs text-gray-400">{deployment.note}</div>
+            )}
+            {deployment.inspectorUrl && (
+              <a
+                href={deployment.inspectorUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-indigo-600 hover:underline block"
+              >
+                View Vercel build →
+              </a>
+            )}
+            {deployment.ready && deployment.liveUrl && (
+              <a
+                href={deployment.liveUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-sm bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700"
+              >
+                ✓ Open live site
+              </a>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

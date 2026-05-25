@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-bg: #fafafa;
+  --color-surface: #ffffff;
+  --color-border: #eaeaea;
+  --color-text: #000000;
+  --color-text-muted: #666666;
+  --color-accent: #000000;
+}
+
+@layer base {
+  body {
+    @apply bg-[#fafafa] text-zinc-950 antialiased;
+  }
+}
+
+@layer utilities {
+  /* Subtle dot grid — similar to Vercel marketing/auth backgrounds */
+  .bg-vercel-grid {
+    background-color: #fafafa;
+    background-image: radial-gradient(circle, rgb(228 228 231 / 0.9) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+}

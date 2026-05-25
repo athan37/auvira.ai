@@ -1,0 +1,278 @@
+// Fixed data-driven page renderer - NO HTML string injection
+// This template is used as-is with only preset JSON substitution
+
+export const PAGE_TSX_TEMPLATE = `// @ts-nocheck
+import { siteConfig } from "@/lib/siteConfig";
+import type { SiteSection } from "@/lib/siteConfig";
+
+// Theme preset - injected at build time
+const preset = __PRESET_JSON__;
+
+function slugify(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+}
+
+// Navigation component
+function Nav() {
+  return (
+    <nav className={"sticky top-0 z-50 border-b " + preset.navBorder + " " + preset.navBg}>
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+        <a href="#" className={"font-bold text-xl tracking-tight " + preset.navText}>{siteConfig.businessName}</a>
+        {siteConfig.hero.primaryCta && (
+          <a href="#contact" className={"inline-flex items-center justify-center rounded-full px-5 py-2.5 text-sm font-bold " + preset.primaryButton}>
+            {siteConfig.hero.primaryCta}
+          </a>
+        )}
+      </div>
+    </nav>
+  );
+}
+
+// Hero section
+function Hero() {
+  const { hero } = siteConfig;
+  return (
+    <section className={"relative overflow-hidden " + preset.heroBg + " px-4 py-24 text-white sm:px-6 lg:px-8 lg:py-32"}>
+      <div className={"absolute inset-0 " + preset.heroOverlay} />
+      <div className="relative mx-auto grid max-w-7xl gap-12 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+        <div>
+          {hero.eyebrow && <p className={"mb-5 text-xs font-bold uppercase tracking-[0.3em] " + preset.heroEyebrow}>{hero.eyebrow}</p>}
+          <h1 className={"font-serif text-5xl font-semibold tracking-tight md:text-7xl " + preset.heroText}>{hero.headline}</h1>
+          {hero.subheadline && <p className={"mt-6 max-w-2xl text-xl leading-9 " + preset.heroMutedText}>{hero.subheadline}</p>}
+          <div className="mt-9 flex flex-wrap gap-4">
+            {hero.primaryCta && (
+              <a href="#contact" className={"inline-flex items-center justify-center rounded-full px-6 py-3 text-sm font-bold shadow-lg shadow-black/20 transition hover:-translate-y-0.5 " + preset.primaryButton}>{hero.primaryCta}</a>
+            )}
+            {hero.secondaryCta && (
+              <a href="#services" className={"inline-flex items-center justify-center rounded-full border-2 border-white/30 px-6 py-3 text-sm font-semibold text-white transition hover:bg-white/10 " + preset.secondaryButton}>{hero.secondaryCta}</a>
+            )}
+          </div>
+        </div>
+        <div className={"rounded-[2rem] border border-white/10 " + preset.surfaceBg + " p-8 text-slate-950 shadow-2xl"}>
+          <p className={"text-xs font-bold uppercase tracking-[0.25em] " + preset.sectionEyebrow}>Get Started</p>
+          <h2 className="mt-4 font-serif text-3xl font-semibold">Ready to work with us?</h2>
+          <p className="mt-4 leading-7 text-slate-600">Get clear next steps and a professional experience from the first conversation.</p>
+          {siteConfig.contact.phone && (
+            <div className={"mt-6 rounded-2xl " + preset.mutedBg + " p-4 font-semibold"}>{siteConfig.contact.phone}</div>
+          )}
+          {siteConfig.contact.email && (
+            <div className={"mt-3 rounded-2xl " + preset.mutedBg + " p-4 font-semibold"}>{siteConfig.contact.email}</div>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// Services section renderer
+function ServicesSection({ section }: { section: SiteSection }) {
+  return (
+    <section id="services" className={"px-4 py-20 sm:px-6 lg:px-8 " + preset.surfaceBg}>
+      <div className="mx-auto max-w-7xl">
+        <div className="mx-auto max-w-3xl text-center mb-14">
+          <p className={"mb-3 text-xs font-bold uppercase tracking-[0.28em] " + preset.sectionEyebrow}>Services</p>
+          <h2 className={"text-3xl font-semibold tracking-tight md:text-5xl " + preset.sectionTitle}>{section.title}</h2>
+          {section.body && <p className={"mt-5 text-lg leading-8 " + preset.sectionBody}>{section.body}</p>}
+        </div>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {section.items?.slice(0, 6).map((item, i) => (
+            <div key={i} className={"rounded-3xl border p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-xl " + preset.card}>
+              <div className={"mb-5 flex h-12 w-12 items-center justify-center rounded-2xl text-lg font-bold text-white " + preset.iconBadge}>{i + 1}</div>
+              <h3 className="text-lg font-bold text-slate-950">{item.title}</h3>
+              {item.description && <p className="mt-3 text-sm leading-6 text-slate-600">{item.description}</p>}
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// About section renderer
+function AboutSection({ section }: { section: SiteSection }) {
+  return (
+    <section id="about" className={"px-4 py-20 sm:px-6 lg:px-8 " + preset.mutedBg}>
+      <div className="mx-auto max-w-7xl">
+        <div className="mx-auto max-w-3xl text-center mb-14">
+          <p className={"mb-3 text-xs font-bold uppercase tracking-[0.28em] " + preset.sectionEyebrow}>About</p>
+          <h2 className={"text-3xl font-semibold tracking-tight md:text-5xl " + preset.sectionTitle}>{section.title}</h2>
+          {section.body && <p className={"mt-5 text-lg leading-8 " + preset.sectionBody}>{section.body}</p>}
+        </div>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {section.items?.slice(0, 6).map((item, i) => (
+            <div key={i} className={"rounded-3xl border p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-xl " + preset.card}>
+              <h3 className="text-lg font-bold text-slate-950">{item.title}</h3>
+              {item.description && <p className="mt-3 text-sm leading-6 text-slate-600">{item.description}</p>}
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// Features section renderer
+function FeaturesSection({ section }: { section: SiteSection }) {
+  return (
+    <section id="features" className={"px-4 py-20 sm:px-6 lg:px-8 " + preset.surfaceBg}>
+      <div className="mx-auto max-w-7xl">
+        <div className="mx-auto max-w-3xl text-center mb-14">
+          <p className={"mb-3 text-xs font-bold uppercase tracking-[0.28em] " + preset.sectionEyebrow}>Features</p>
+          <h2 className={"text-3xl font-semibold tracking-tight md:text-5xl " + preset.sectionTitle}>{section.title}</h2>
+          {section.body && <p className={"mt-5 text-lg leading-8 " + preset.sectionBody}>{section.body}</p>}
+        </div>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {section.items?.slice(0, 6).map((item, i) => (
+            <div key={i} className={"rounded-3xl border p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-xl " + preset.card}>
+              <h3 className="text-lg font-bold text-slate-950">{item.title}</h3>
+              {item.description && <p className="mt-3 text-sm leading-6 text-slate-600">{item.description}</p>}
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// FAQ section renderer
+function FaqSection({ section }: { section: SiteSection }) {
+  return (
+    <section id="faq" className={"px-4 py-20 sm:px-6 lg:px-8 " + preset.mutedBg}>
+      <div className="mx-auto max-w-7xl">
+        <div className="mx-auto max-w-3xl text-center mb-14">
+          <p className={"mb-3 text-xs font-bold uppercase tracking-[0.28em] " + preset.sectionEyebrow}>FAQ</p>
+          <h2 className={"text-3xl font-semibold tracking-tight md:text-5xl " + preset.sectionTitle}>{section.title}</h2>
+          {section.body && <p className={"mt-5 text-lg leading-8 " + preset.sectionBody}>{section.body}</p>}
+        </div>
+        <div className="space-y-4 max-w-3xl mx-auto">
+          {section.items?.slice(0, 8).map((item, i) => (
+            <div key={i} className={"rounded-2xl border p-6 " + preset.card}>
+              <h3 className="text-lg font-bold text-slate-950">{item.title}</h3>
+              {item.description && <p className="mt-2 text-sm leading-6 text-slate-600">{item.description}</p>}
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// Testimonials section renderer
+function TestimonialsSection({ section }: { section: SiteSection }) {
+  return (
+    <section id="testimonials" className={"px-4 py-20 sm:px-6 lg:px-8 " + preset.surfaceBg}>
+      <div className="mx-auto max-w-7xl">
+        <div className="mx-auto max-w-3xl text-center mb-14">
+          <p className={"mb-3 text-xs font-bold uppercase tracking-[0.28em] " + preset.sectionEyebrow}>Testimonials</p>
+          <h2 className={"text-3xl font-semibold tracking-tight md:text-5xl " + preset.sectionTitle}>{section.title}</h2>
+          {section.body && <p className={"mt-5 text-lg leading-8 " + preset.sectionBody}>{section.body}</p>}
+        </div>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {section.items?.slice(0, 6).map((item, i) => (
+            <div key={i} className={"rounded-3xl border p-7 shadow-sm " + preset.card}>
+              <p className="text-slate-600 italic">"{item.description || "Great service!"}"</p>
+              <p className="mt-4 font-semibold text-slate-950">- {item.title}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// Contact section renderer
+function ContactSection({ section }: { section: SiteSection }) {
+  const { contact } = siteConfig;
+  return (
+    <section id="contact" className={"px-4 py-20 sm:px-6 lg:px-8 " + preset.contactBg + " text-white"}>
+      <div className="mx-auto max-w-7xl">
+        <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
+          <div>
+            <p className={"mb-4 text-xs font-bold uppercase tracking-[0.28em] " + preset.heroEyebrow}>Get in Touch</p>
+            <h2 className="font-bold text-4xl tracking-tight md:text-6xl">{section.title}</h2>
+            {section.body && <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-300">{section.body}</p>}
+            <div className="mt-8 flex flex-col sm:flex-row gap-4">
+              {siteConfig.hero.primaryCta && (
+                <a href="#contact" className={"inline-flex items-center justify-center rounded-full px-6 py-3 text-sm font-bold shadow-lg shadow-black/20 transition hover:-translate-y-0.5 " + preset.primaryButton}>{siteConfig.hero.primaryCta}</a>
+              )}
+              {contact.phone && (
+                <a href={"tel:" + contact.phone.replace(/[^0-9]/g, "")} className={"inline-flex items-center justify-center rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-white hover:bg-white/10 " + preset.secondaryButton}>{contact.phone}</a>
+              )}
+            </div>
+          </div>
+          <div className={"rounded-[2rem] border border-white/10 bg-white/5 p-8 shadow-2xl"}>
+            <h3 className="text-xl font-bold">Contact Information</h3>
+            <div className="mt-6 space-y-4">
+              {contact.phone && <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-200">{contact.phone}</div>}
+              {contact.email && <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-200">{contact.email}</div>}
+              {contact.address && <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-200">{contact.address}</div>}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// Generic section renderer (fallback)
+function GenericSection({ section }: { section: SiteSection }) {
+  return (
+    <section id={slugify(section.title)} className={"px-4 py-20 sm:px-6 lg:px-8 " + preset.surfaceBg}>
+      <div className="mx-auto max-w-7xl">
+        <div className="mx-auto max-w-3xl text-center mb-14">
+          <h2 className={"text-3xl font-semibold tracking-tight md:text-5xl " + preset.sectionTitle}>{section.title}</h2>
+          {section.body && <p className={"mt-5 text-lg leading-8 " + preset.sectionBody}>{section.body}</p>}
+        </div>
+        {section.items && section.items.length > 0 && (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {section.items.slice(0, 6).map((item, i) => (
+              <div key={i} className={"rounded-3xl border p-7 shadow-sm " + preset.card}>
+                <h3 className="text-lg font-bold text-slate-950">{item.title}</h3>
+                {item.description && <p className="mt-3 text-sm leading-6 text-slate-600">{item.description}</p>}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+// Section router
+function SectionRenderer({ section }: { section: SiteSection }) {
+  switch (section.type) {
+    case "services": return <ServicesSection section={section} />;
+    case "about": return <AboutSection section={section} />;
+    case "features": return <FeaturesSection section={section} />;
+    case "faq": return <FaqSection section={section} />;
+    case "testimonials": return <TestimonialsSection section={section} />;
+    case "contact": return <ContactSection section={section} />;
+    default: return <GenericSection section={section} />;
+  }
+}
+
+// Footer
+function Footer() {
+  return (
+    <footer className={"px-4 py-8 sm:px-6 lg:px-8 " + preset.footerBg + " text-slate-400"}>
+      <div className="mx-auto max-w-7xl">
+        <p className="text-sm">© {new Date().getFullYear()} {siteConfig.businessName}. All rights reserved.</p>
+      </div>
+    </footer>
+  );
+}
+
+// Main page component
+export default function Home() {
+  return (
+    <main className={"min-h-screen " + preset.pageBg + " text-slate-950"}>
+      <Nav />
+      <Hero />
+      {siteConfig.sections.map((section, index) => (
+        <SectionRenderer key={section.type + "-" + index} section={section} />
+      ))}
+      <Footer />
+    </main>
+  );
+}
+`;
