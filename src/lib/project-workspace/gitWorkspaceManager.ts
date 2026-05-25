@@ -12,8 +12,7 @@ import path from 'path';
 import { execSync } from 'child_process';
 import type { IWebsiteProject } from '@/models/WebsiteProject';
 import { logProjectStep, safeError } from '@/lib/project-logs/projectLogger';
-
-const GIT_WORKSPACE_BASE = '.tmp/git-workspaces';
+import { scratchPath } from '@/lib/runtime/scratchDir';
 
 export interface GitWorkspaceInfo {
   workspacePath: string;
@@ -24,11 +23,11 @@ export interface GitWorkspaceInfo {
 }
 
 export function getGitWorkspacePath(projectId: string): string {
-  return path.resolve(GIT_WORKSPACE_BASE, projectId, 'repo');
+  return scratchPath('git-workspaces', projectId, 'repo');
 }
 
 export function getGitWorkspaceRepoDir(projectId: string): string {
-  return path.resolve(GIT_WORKSPACE_BASE, projectId);
+  return scratchPath('git-workspaces', projectId);
 }
 
 export async function workspaceExists(projectId: string): Promise<boolean> {

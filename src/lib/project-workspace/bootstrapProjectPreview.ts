@@ -10,6 +10,7 @@ import {
 import { waitForPreviewReady } from '@/lib/preview/waitForPreviewReady';
 import { stopPreviewServerByPort } from '@/lib/preview/stopPreviewServer';
 import { getNpmPath } from '@/lib/runtime/nodeRuntime';
+import { isVercelServerless } from '@/lib/runtime/isVercelServerless';
 
 export type WorkspaceSetupStage =
   | 'idle'
@@ -229,6 +230,74 @@ async function bootstrapGitlabProject(
 /**
  * Ensure GitLab workspace + dev preview server for owner project page.
  */
+/**
+ * On Vercel serverless: no local `next dev` preview. Show published live URL; clone repo to /tmp for edits.
+ */
+async function bootstrapProjectPreviewHosted(
+  project: IWebsiteProject,
+  userId: string
+): Promise<void> {
+  const projectId = project._id.toString();
+  const liveUrl = project.deployment?.liveUrl?.trim();
+
+  if (!liveUrl) {
+    throw new Error(
+      'No live site URL yet. Publish your website first, then reopen this project.'
+    );
+  }
+
+  await WebsiteProject.updateOne(
+    { _id: projectId },
+    {
+      $set: {
+        'codeWorkspace.status': 'setting_up',
+        'codeWorkspace.setupStage': 'cloning',
+        'codeWorkspace.setupLabel': 'Preparing workspace for edits…',
+        'preview.status': 'building',
+      },
+    }
+  );
+
+  try {
+    const gitInfo = await ensureGitWorkspace(project, userId);
+    await WebsiteProject.updateOne(
+      { _id: projectId },
+      {
+        $set: {
+          'codeWorkspace.status': 'ready',
+          'codeWorkspace.workspacePath': gitInfo.workspacePath,
+          'codeWorkspace.branch': gitInfo.branch,
+          'codeWorkspace.headSha': gitInfo.headSha,
+          'codeWorkspace.source': 'gitlab',
+          'codeWorkspace.setupStage': 'ready',
+          'codeWorkspace.setupLabel': 'Showing published live site',
+          'preview.status': 'ready',
+          'preview.url': liveUrl,
+          'preview.previewMode': 'live',
+          'preview.startedAt': new Date(),
+        },
+        $unset: { 'preview.port': '', 'codeWorkspace.setupError': '', 'preview.error': '' },
+      }
+    );
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : 'Workspace setup failed';
+    await WebsiteProject.updateOne(
+      { _id: projectId },
+      {
+        $set: {
+          'preview.status': 'ready',
+          'preview.url': liveUrl,
+          'preview.previewMode': 'live',
+          'preview.error': errMsg,
+          'codeWorkspace.setupError': errMsg,
+          'codeWorkspace.setupStage': 'ready',
+          'codeWorkspace.setupLabel': 'Live site (workspace clone failed — edits may not work)',
+        },
+      }
+    );
+  }
+}
+
 export async function bootstrapProjectPreview(
   project: IWebsiteProject,
   userId: string
@@ -237,6 +306,11 @@ export async function bootstrapProjectPreview(
 
   if (!project.gitlab?.projectId) {
     throw new Error('This project has no GitLab repository. Save the clone preview first.');
+  }
+
+  if (isVercelServerless()) {
+    await bootstrapProjectPreviewHosted(project, userId);
+    return;
   }
 
   const existing = bootstrapLocks.get(projectId);
@@ -282,6 +356,27 @@ export async function bootstrapProjectPreview(
 }
 
 export function getWorkspaceStatusFromProject(project: IWebsiteProject) {
+  const previewMode =
+    (project.preview as { previewMode?: string } | undefined)?.previewMode === 'live'
+      ? ('live' as const)
+      : ('workspace' as const);
+  const liveUrl = project.preview?.url || project.deployment?.liveUrl || null;
+
+  if (previewMode === 'live' && project.preview?.status === 'ready' && liveUrl) {
+    return {
+      stage: 'ready' as const,
+      label: SETUP_STAGE_LABELS.ready,
+      previewStatus: 'ready',
+      codeWorkspaceStatus: project.codeWorkspace?.status || 'ready',
+      ready: true,
+      error: project.preview?.error || project.codeWorkspace?.setupError || null,
+      previewPort: null,
+      previewMode: 'live' as const,
+      liveUrl,
+      previewHealthy: true,
+    };
+  }
+
   let stage = (project.codeWorkspace?.setupStage as WorkspaceSetupStage) || 'idle';
   const previewReady = project.preview?.status === 'ready' && !!project.preview?.port;
   const workspaceReady = project.codeWorkspace?.status === 'ready';
@@ -304,5 +399,8 @@ export function getWorkspaceStatusFromProject(project: IWebsiteProject) {
     ready,
     error: project.codeWorkspace?.setupError || project.preview?.error || null,
     previewPort: project.preview?.port || null,
+    previewMode: 'workspace' as const,
+    liveUrl: project.deployment?.liveUrl || null,
+    previewHealthy: ready,
   };
 }

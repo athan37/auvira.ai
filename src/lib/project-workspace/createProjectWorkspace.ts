@@ -7,15 +7,14 @@ import path from 'path';
 import type { IWebsiteProject } from '@/models/WebsiteProject';
 import { generatePageHtml } from '@/lib/preview/generatePageHtml';
 import { generatePreviewCss } from '@/lib/preview/generatePreviewCss';
-
-const WORKSPACE_BASE = '.tmp/project-workspaces';
+import { scratchPath } from '@/lib/runtime/scratchDir';
 
 export async function createProjectWorkspace(project: IWebsiteProject): Promise<{
   workspacePath: string;
   version: string;
 }> {
   const projectId = project._id.toString();
-  const workspaceDir = path.resolve(WORKSPACE_BASE, projectId);
+  const workspaceDir = scratchPath('project-workspaces', projectId);
 
   // Ensure workspace directory exists
   await fs.mkdir(workspaceDir, { recursive: true });
@@ -53,9 +52,9 @@ export async function createProjectWorkspace(project: IWebsiteProject): Promise<
 }
 
 export async function readWorkspaceFile(projectId: string, filename: string): Promise<string | null> {
-  const filePath = path.resolve(WORKSPACE_BASE, projectId, filename);
+  const filePath = scratchPath('project-workspaces', projectId, filename);
   // Safety: ensure file is within workspace
-  const workspaceDir = path.resolve(WORKSPACE_BASE, projectId);
+  const workspaceDir = scratchPath('project-workspaces', projectId);
   if (!filePath.startsWith(workspaceDir)) {
     return null;
   }
@@ -67,8 +66,8 @@ export async function readWorkspaceFile(projectId: string, filename: string): Pr
 }
 
 export async function writeWorkspaceFile(projectId: string, filename: string, content: string): Promise<boolean> {
-  const filePath = path.resolve(WORKSPACE_BASE, projectId, filename);
-  const workspaceDir = path.resolve(WORKSPACE_BASE, projectId);
+  const filePath = scratchPath('project-workspaces', projectId, filename);
+  const workspaceDir = scratchPath('project-workspaces', projectId);
   if (!filePath.startsWith(workspaceDir)) {
     return false;
   }
@@ -81,8 +80,8 @@ export async function writeWorkspaceFile(projectId: string, filename: string, co
 }
 
 export async function createWorkspaceSnapshot(projectId: string): Promise<string | null> {
-  const workspaceDir = path.resolve(WORKSPACE_BASE, projectId);
-  const snapshotDir = path.resolve(WORKSPACE_BASE, projectId, 'snapshots', Date.now().toString());
+  const workspaceDir = scratchPath('project-workspaces', projectId);
+  const snapshotDir = scratchPath('project-workspaces', projectId, 'snapshots', Date.now().toString());
   try {
     await fs.mkdir(path.join(workspaceDir, 'snapshots'), { recursive: true });
     // Simple copy: read all files and write to snapshot
@@ -113,9 +112,9 @@ export async function createWorkspaceSnapshot(projectId: string): Promise<string
 }
 
 export async function restoreFromSnapshot(projectId: string, snapshotPath: string): Promise<boolean> {
-  const workspaceDir = path.resolve(WORKSPACE_BASE, projectId);
+  const workspaceDir = scratchPath('project-workspaces', projectId);
   const snapDir = path.resolve(snapshotPath);
-  if (!snapDir.startsWith(path.resolve(WORKSPACE_BASE, projectId, 'snapshots'))) {
+  if (!snapDir.startsWith(scratchPath('project-workspaces', projectId, 'snapshots'))) {
     return false;
   }
   try {

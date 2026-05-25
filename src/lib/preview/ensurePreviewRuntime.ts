@@ -2,8 +2,7 @@ import { existsSync, mkdirSync, writeFileSync, cpSync } from 'fs';
 import { join } from 'path';
 import { spawn } from 'child_process';
 import { getNpmPath } from '@/lib/runtime/nodeRuntime';
-
-const RUNTIME_DIR = '.tmp/preview-runtime';
+import { scratchPath } from '@/lib/runtime/scratchDir';
 
 const RUNTIME_FILES = [
   {
@@ -204,7 +203,7 @@ function writeRuntimeFiles(runtimePath: string) {
  * On subsequent calls: does nothing (node_modules already present).
  */
 export async function ensurePreviewRuntime(): Promise<void> {
-  const runtimePath = join(process.cwd(), RUNTIME_DIR);
+  const runtimePath = scratchPath('preview-runtime');
   const packageJsonPath = join(runtimePath, 'package.json');
   const nodeModulesPath = join(runtimePath, 'node_modules');
 
@@ -235,11 +234,11 @@ export async function ensurePreviewRuntime(): Promise<void> {
 }
 
 export function copyRuntimeToProject(projectId: string, spec: Record<string, unknown>): string {
-  const projectPath = join(process.cwd(), '.tmp', 'project-previews', projectId);
+  const projectPath = scratchPath('project-previews', projectId);
 
   if (!existsSync(projectPath)) {
     // Copy base runtime to project workspace
-    const runtimePath = join(process.cwd(), RUNTIME_DIR);
+    const runtimePath = scratchPath('preview-runtime');
     mkdirSync(projectPath, { recursive: true });
     cpSync(runtimePath, projectPath, { recursive: true, filter: (_src, dest) => {
       // Don't copy node_modules — they'll be symlinked or reused
@@ -251,5 +250,5 @@ export function copyRuntimeToProject(projectId: string, spec: Record<string, unk
 }
 
 export function workspacePathForProject(projectId: string): string {
-  return join(process.cwd(), '.tmp', 'project-previews', projectId);
+  return scratchPath('project-previews', projectId);
 }

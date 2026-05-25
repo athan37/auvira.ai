@@ -8,6 +8,7 @@ import { stopPreviewServerByPort } from '@/lib/preview/stopPreviewServer';
 import { ensurePreviewRuntime, workspacePathForProject } from '@/lib/preview/ensurePreviewRuntime';
 import { existsSync, mkdirSync, writeFileSync, rmSync, cpSync } from 'fs';
 import { join } from 'path';
+import { scratchPath } from '@/lib/runtime/scratchDir';
 
 export const runtime = 'nodejs';
 
@@ -127,7 +128,7 @@ export async function POST(
     }
     mkdirSync(workspacePath, { recursive: true });
 
-    const runtimePath = join(process.cwd(), '.tmp', 'preview-runtime');
+    const runtimePath = scratchPath('preview-runtime');
     cpSync(runtimePath, workspacePath, { recursive: true, filter: (_src, dest) => {
       return !dest.includes('node_modules');
     }});

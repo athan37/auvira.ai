@@ -5,13 +5,15 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { getScratchRoot } from '@/lib/runtime/scratchDir';
 
-const ALLOWED_WORKSPACE_ROOTS = [
-  '.tmp/git-workspaces',
-  '.tmp/project-workspaces',
-  '/tmp/git-workspaces',
-  '/tmp/project-workspaces',
-];
+function allowedWorkspaceRoots(): string[] {
+  const root = getScratchRoot();
+  return [
+    path.join(root, 'git-workspaces'),
+    path.join(root, 'project-workspaces'),
+  ];
+}
 
 export const BLOCKED_PATH_PATTERNS = [
   '.env',
@@ -100,7 +102,7 @@ async function hashWorkspaceFile(absPath: string, ext: string): Promise<string> 
 
 export function isAllowedWorkspacePath(workspacePath: string): boolean {
   const resolved = path.resolve(workspacePath);
-  return ALLOWED_WORKSPACE_ROOTS.some((root) => resolved.startsWith(path.resolve(root)));
+  return allowedWorkspaceRoots().some((root) => resolved.startsWith(path.resolve(root)));
 }
 
 export function isSafeFileExtension(ext: string): boolean {

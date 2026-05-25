@@ -21,9 +21,13 @@ export default function SignInPage() {
           <CardBody className="p-8">
             {error && (
               <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-                {error === 'OAuthCallback'
-                  ? 'Sign-in failed. Please try again.'
-                  : 'An error occurred during sign-in.'}
+                {error === 'AccessDenied'
+                  ? 'Sign-in was denied after Google returned. Usually MONGODB_URI is missing, wrong, or Atlas is blocking Vercel (allow 0.0.0.0/0 in Network Access). Check Vercel function logs.'
+                  : error === 'Configuration'
+                    ? 'Server auth is misconfigured. Set AUTH_SECRET (or NEXTAUTH_SECRET), GOOGLE_CLIENT_ID, and GOOGLE_CLIENT_SECRET on Vercel, then redeploy.'
+                    : error === 'OAuthCallback' || error === 'OAuthSignin'
+                      ? 'Sign-in failed. Please try again.'
+                      : `Sign-in error: ${error}`}
               </div>
             )}
 

@@ -2,8 +2,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import type { IWebsiteProject } from '@/models/WebsiteProject';
 import { getGitWorkspacePath } from '@/lib/project-workspace/gitWorkspaceManager';
-
-const WORKSPACE_BASE = '.tmp/project-workspaces';
+import { scratchPath } from '@/lib/runtime/scratchDir';
 
 const BLOCKED_PATTERNS = [
   '.env',
@@ -37,7 +36,7 @@ export function resolveWorkspaceDir(project: IWebsiteProject, projectId: string)
   if (source === 'gitlab' && project.gitlab?.repoUrl) {
     return getGitWorkspacePath(projectId);
   }
-  return path.resolve(WORKSPACE_BASE, projectId);
+  return scratchPath('project-workspaces', projectId);
 }
 
 export function isBlockedServePath(relativePath: string): boolean {

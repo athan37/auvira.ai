@@ -1,7 +1,6 @@
 import { promises as fs } from 'fs';
 import path from 'path';
-
-const SNAPSHOT_BASE = '.tmp/edit-snapshots';
+import { scratchPath } from '@/lib/runtime/scratchDir';
 
 const SKIP_DIRS = new Set([
   'node_modules',
@@ -25,7 +24,7 @@ export async function createDirectorySnapshot(
   projectId: string
 ): Promise<string | null> {
   const resolvedWorkspace = path.resolve(workspacePath);
-  const snapshotDir = path.resolve(SNAPSHOT_BASE, projectId, Date.now().toString());
+  const snapshotDir = scratchPath('edit-snapshots', projectId, Date.now().toString());
 
   try {
     await fs.mkdir(snapshotDir, { recursive: true });
@@ -47,7 +46,7 @@ export async function restoreDirectorySnapshot(
   const resolvedWorkspace = path.resolve(workspacePath);
   const resolvedSnapshot = path.resolve(snapshotPath);
 
-  if (!resolvedSnapshot.startsWith(path.resolve(SNAPSHOT_BASE))) {
+  if (!resolvedSnapshot.startsWith(scratchPath('edit-snapshots'))) {
     return false;
   }
 

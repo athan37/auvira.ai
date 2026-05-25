@@ -43,7 +43,8 @@ export async function GET(
   if (source === 'gitlab' && project.gitlab?.repoUrl) {
     workspacePath = getGitWorkspacePath(projectId);
   } else {
-    workspacePath = project.codeWorkspace?.workspacePath || path.resolve('.tmp/project-workspaces', projectId);
+    const { scratchPath } = await import('@/lib/runtime/scratchDir');
+    workspacePath = project.codeWorkspace?.workspacePath || scratchPath('project-workspaces', projectId);
   }
 
   if (!(await workspaceExists(projectId)) && source === 'generated') {

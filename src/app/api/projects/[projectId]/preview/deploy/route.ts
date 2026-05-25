@@ -78,7 +78,8 @@ export async function POST(
     }
 
     // Write files to a deploy workspace
-    const deployWorkspacePath = join(process.cwd(), '.tmp', 'project-deploy', params.projectId);
+    const { scratchPath } = await import('@/lib/runtime/scratchDir');
+    const deployWorkspacePath = scratchPath('project-deploy', params.projectId);
     if (!existsSync(deployWorkspacePath)) {
       mkdirSync(deployWorkspacePath, { recursive: true });
     }

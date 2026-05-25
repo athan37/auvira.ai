@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 import { getNodeBinDir } from '@/lib/runtime/nodeRuntime';
+import { scratchPath } from '@/lib/runtime/scratchDir';
 
 const execFileAsync = promisify(execFile);
 
@@ -181,7 +182,7 @@ export async function validateGeneratedSite(
 
   const safeName = sanitizeProjectName(input.projectName);
   const timestamp = Date.now().toString(36).slice(-6);
-  const tempDir = path.join('.tmp', 'generated-sites', `${safeName}-${timestamp}`);
+  const tempDir = scratchPath('generated-sites', `${safeName}-${timestamp}`);
 
   try {
     // 1. Create temp directory

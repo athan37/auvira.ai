@@ -142,7 +142,8 @@ export async function POST(
 
   const jobId = job._id;
   const llmClient = getLLMClient();
-  const workspacePath = join(process.cwd(), '.tmp', 'generated-sites', params.jobId);
+  const { scratchPath } = await import('@/lib/runtime/scratchDir');
+  const workspacePath = scratchPath('generated-sites', params.jobId);
 
   // Initialize previewSteps and buildSummary
   const stepsInit = PREVIEW_STEPS.map(s => ({ ...s, status: 'pending' as const }));

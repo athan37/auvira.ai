@@ -70,7 +70,9 @@ export async function POST(
   }
 
   const llmClient = getLLMClient();
-  const workspacePath = job.technicalBuild?.workspacePath || join(process.cwd(), '.tmp', 'generated-sites', params.jobId);
+  const { scratchPath } = await import('@/lib/runtime/scratchDir');
+  const workspacePath =
+    job.technicalBuild?.workspacePath || scratchPath('generated-sites', params.jobId);
 
   try {
     // Step 1: Load current previewSiteSpec and generate updated spec

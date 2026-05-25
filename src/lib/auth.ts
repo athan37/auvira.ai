@@ -3,34 +3,52 @@ import GoogleProvider from 'next-auth/providers/google';
 import { User } from '@/models/User';
 import { connectMongoDB } from '@/lib/mongodb';
 
+const authSecret =
+  process.env.AUTH_SECRET?.trim() || process.env.NEXTAUTH_SECRET?.trim();
+
+const googleClientId = process.env.GOOGLE_CLIENT_ID?.trim();
+const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  // On Vercel, host/URL is inferred from request headers (VERCEL=1). Local: set NEXTAUTH_URL or AUTH_TRUST_HOST=true.
+  trustHost: true,
+  secret: authSecret,
   providers: [
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      clientId: googleClientId ?? '',
+      clientSecret: googleClientSecret ?? '',
     }),
   ],
   callbacks: {
     async signIn({ user, account, profile }) {
       if (account?.provider !== 'google') return false;
 
-      await connectMongoDB();
-
       const email = user.email;
-      if (!email) return false;
-
-      const existingUser = await User.findOne({ email });
-      if (!existingUser) {
-        await User.create({
-          email,
-          name: user.name || 'Unknown',
-          image: user.image || null,
-          authProvider: 'google',
-          authProviderId: profile?.sub || user.id || '',
-        });
+      if (!email) {
+        console.error('[auth] signIn denied: Google account has no email');
+        return false;
       }
 
-      return true;
+      try {
+        await connectMongoDB();
+        const existingUser = await User.findOne({ email });
+        if (!existingUser) {
+          await User.create({
+            email,
+            name: user.name || 'Unknown',
+            image: user.image || null,
+            authProvider: 'google',
+            authProviderId: profile?.sub || user.id || '',
+          });
+        }
+        return true;
+      } catch (err) {
+        console.error(
+          '[auth] signIn denied (check MONGODB_URI and Atlas network access):',
+          err instanceof Error ? err.message : err
+        );
+        return false;
+      }
     },
 
     async session({ session, token }) {

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { releaseWorkspaceOnLeave } from '@/lib/runtime/releaseWorkspaceOnLeave';
 
 interface WorkspaceStatus {
   ok?: boolean;
@@ -11,6 +12,8 @@ interface WorkspaceStatus {
   previewStatus?: string;
   codeWorkspaceStatus?: string;
   previewHealthy?: boolean;
+  previewMode?: 'live' | 'workspace';
+  liveUrl?: string | null;
 }
 
 interface Props {
@@ -40,8 +43,26 @@ export function ProjectPreviewFrame({
   const [setupStage, setSetupStage] = useState('idle');
   const [setupError, setSetupError] = useState<string | null>(null);
   const [previewReady, setPreviewReady] = useState(false);
+  const [previewMode, setPreviewMode] = useState<'live' | 'workspace'>('workspace');
+  const [livePreviewUrl, setLivePreviewUrl] = useState<string | null>(null);
   const [iframeLoading, setIframeLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  const applyStatus = useCallback((status: WorkspaceStatus) => {
+    setSetupStage(status.stage);
+    setSetupLabel(status.label);
+    if (status.previewMode === 'live' && status.liveUrl) {
+      setPreviewMode('live');
+      setLivePreviewUrl(status.liveUrl);
+    } else {
+      setPreviewMode('workspace');
+      setLivePreviewUrl(null);
+    }
+    if (status.ready) {
+      setPreviewReady(true);
+      onReadyChangeRef.current?.(true);
+    }
+  }, []);
   const bootstrapStarted = useRef(false);
   const pollCountRef = useRef(0);
 
@@ -52,10 +73,7 @@ export function ProjectPreviewFrame({
       });
       const data = await res.json();
       if (data.ok && data.ready) {
-        setSetupStage('ready');
-        setSetupLabel(data.label || 'Preview ready');
-        setPreviewReady(true);
-        onReadyChangeRef.current?.(true);
+        applyStatus(data as WorkspaceStatus);
         return true;
       }
       if (!data.ok) {
@@ -67,7 +85,7 @@ export function ProjectPreviewFrame({
       setSetupStage('failed');
     }
     return false;
-  }, [projectId]);
+  }, [projectId, applyStatus]);
 
   const pollStatus = useCallback(async (): Promise<WorkspaceStatus | null> => {
     try {
@@ -94,10 +112,7 @@ export function ProjectPreviewFrame({
       const initial = await pollStatus();
       if (cancelled) return;
       if (initial?.ready) {
-        setSetupStage('ready');
-        setSetupLabel(initial.label);
-        setPreviewReady(true);
-        onReadyChangeRef.current?.(true);
+        applyStatus(initial);
         return;
       }
 
@@ -110,12 +125,12 @@ export function ProjectPreviewFrame({
         const status = await pollStatus();
         if (cancelled || !status) return;
         pollCountRef.current += 1;
-        setSetupStage(status.stage);
-        setSetupLabel(status.label);
         if (status.ready) {
-          setPreviewReady(true);
-          onReadyChangeRef.current?.(true);
+          applyStatus(status);
           if (pollTimer) clearInterval(pollTimer);
+        } else {
+          setSetupStage(status.stage);
+          setSetupLabel(status.label);
         }
         if (status.stage === 'failed' && status.error) {
           setSetupError(status.error);
@@ -151,7 +166,13 @@ export function ProjectPreviewFrame({
       cancelled = true;
       if (pollTimer) clearInterval(pollTimer);
     };
-  }, [projectId, pollStatus, codeWorkspaceVersion]);
+  }, [projectId, pollStatus, codeWorkspaceVersion, applyStatus, startBootstrap]);
+
+  useEffect(() => {
+    return () => {
+      releaseWorkspaceOnLeave(projectId);
+    };
+  }, [projectId]);
 
   const handleRefresh = () => {
     setIframeLoading(true);
@@ -159,7 +180,9 @@ export function ProjectPreviewFrame({
   };
 
   const previewUrl = previewReady
-    ? `/api/projects/${projectId}/preview/proxy/?v=${codeWorkspaceVersion}&_=${refreshKey}`
+    ? previewMode === 'live' && livePreviewUrl
+      ? livePreviewUrl
+      : `/api/projects/${projectId}/preview/proxy/?v=${codeWorkspaceVersion}&_=${refreshKey}`
     : null;
 
   const showSetupOverlay = !previewReady || setupError;
@@ -168,7 +191,9 @@ export function ProjectPreviewFrame({
   return (
     <div className="flex flex-col h-full bg-zinc-50 rounded-lg border border-zinc-200 overflow-hidden shadow-card">
       <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-zinc-200/80">
-        <span className="text-sm font-medium text-zinc-700 truncate">Editable preview</span>
+        <span className="text-sm font-medium text-zinc-700 truncate">
+          {previewMode === 'live' ? 'Live website' : 'Editable preview'}
+        </span>
         <div className="flex items-center gap-2">
           {previewReady && (
             <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-800 capitalize">
@@ -244,7 +269,7 @@ export function ProjectPreviewFrame({
             className="w-full h-full border-0"
             onLoad={() => setIframeLoading(false)}
             title="Website Preview"
-            sandbox="allow-scripts allow-same-origin allow-forms allow-modals"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups"
           />
         )}
       </div>

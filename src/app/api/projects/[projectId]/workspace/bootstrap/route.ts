@@ -5,6 +5,7 @@ import {
   checkPreviewHealthy,
   getWorkspaceStatusFromProject,
 } from '@/lib/project-workspace/bootstrapProjectPreview';
+import { pruneExpiredScratch } from '@/lib/runtime/scratchCleanup';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -16,6 +17,10 @@ export async function POST(
   _request: NextRequest,
   { params }: { params: { projectId: string } }
 ) {
+  void pruneExpiredScratch().catch((err) => {
+    console.warn('[workspace/bootstrap] TTL prune failed:', err);
+  });
+
   const project = await getOwnerProject(params.projectId);
   if (!project) {
     return NextResponse.json(

@@ -12,6 +12,7 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:scratch-live": "tsx scripts/test-scratch-workflow-live.ts",
     "test:watch": "vitest",
     "clean": "rm -rf .next",
     "build:clean": "npm run clean && npm run build",

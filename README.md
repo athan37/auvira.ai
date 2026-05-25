@@ -76,8 +76,8 @@ Verifies GitLab commit visibility, SHA-pinned Vercel deploy, and production HTML
 
 1. [Vercel](https://vercel.com) → **Add Project** → import `athan37/la-mue-site-builder`.
 2. **Production Branch:** `main` (pushes to `main` deploy production; other branches get Preview URLs if enabled).
-3. **Environment variables** (Production + Preview): copy from `.env.example` — MongoDB, NextAuth, Google OAuth, GitLab, MiniMax, etc. **Do not** add `VERCEL_TOKEN` or `VERCEL_API_TOKEN` in the Vercel dashboard (reserved names). Optional customer-site deploys: `SITE_AGENT_VERCEL_TOKEN`.
-4. Update **Google OAuth** redirect URIs for your production domain.
+3. **Environment variables** (Production + Preview): `MONGODB_URI`, `NEXTAUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, GitLab, MiniMax, etc. **You do not need** `NEXTAUTH_URL` or `NEXT_PUBLIC_APP_URL` on Vercel — Auth.js detects the host when `VERCEL=1` (set automatically), and `next.config.js` sets `NEXT_PUBLIC_APP_URL` from `VERCEL_URL` at build time. Override only if you use a custom domain. Optional customer-site deploys: `SITE_AGENT_VERCEL_TOKEN`.
+4. After first deploy, add your Vercel URL to **Google OAuth** redirect URIs: `https://<your-domain>/api/auth/callback/google` (this step cannot be fully automated).
 5. Push to `main` and confirm a deployment appears under Vercel → **Deployments**.
 
 ### Optional: require CI before merge
