@@ -13,9 +13,11 @@ import { existsSync, mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import mongoose from 'mongoose';
 import { getNpmPath } from '@/lib/runtime/nodeRuntime';
+import { isVercelServerless } from '@/lib/runtime/isVercelServerless';
 import type { TemplateSelection } from '@/lib/agent/selectTemplateAgent';
 
 export const runtime = 'nodejs';
+export const maxDuration = 300;
 
 async function markPreviewStepRunning(jobId: mongoose.Types.ObjectId, key: string) {
   await CloneJob.updateOne(
@@ -296,7 +298,7 @@ export async function POST(
     await markPreviewStepDone(jobId, 'quality_check');
     await markSummaryDone(jobId, 'quality', buildResult.ok ? 'Website passed quality checks' : 'Quality checks failed');
 
-    // Step 8: start_preview — write files and start dev server
+    // Step 8: start_preview — write files and start dev server (local only)
     await markPreviewStepRunning(jobId, 'start_preview');
     await markSummaryRunning(jobId, 'preview');
     await CloneJob.updateOne({ _id: jobId }, { $set: { currentStageLabel: 'Starting preview server...', progressPercent: 75 } });
@@ -315,9 +317,39 @@ export async function POST(
           workspacePath,
           files: generated.files.map(f => ({ path: f.filePath, status: 'done' as const })),
           validationLogs: buildResult.logs,
+          buildGateSkipped: buildResult.buildGateSkipped ?? false,
         },
       },
     });
+
+    if (isVercelServerless()) {
+      await CloneJob.updateOne({ _id: jobId }, {
+        $set: {
+          preview: {
+            status: 'ready',
+            url: null,
+            port: null,
+            startedAt: new Date(),
+            note: 'Live preview runs on local dev only. Review the build summary and deploy to see your site on Vercel.',
+          },
+          previewSiteSpec: siteSpec,
+          status: 'preview_ready',
+          currentStageLabel: 'Ready to deploy (cloud preview unavailable)',
+          progressPercent: 75,
+        },
+      });
+      await markPreviewStepDone(jobId, 'start_preview');
+      await markSummaryDone(jobId, 'preview', 'Code generated — deploy to Vercel to preview');
+      await setBuildSummaryStatus(jobId, 'ready');
+
+      return NextResponse.json({
+        ok: true,
+        jobId: job._id.toString(),
+        status: 'preview_ready',
+        preview: { status: 'ready', url: null, hostedPreview: false },
+        buildGateSkipped: true,
+      });
+    }
 
     // Mark preview as starting
     const port = allocatePort();

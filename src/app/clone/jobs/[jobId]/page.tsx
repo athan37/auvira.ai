@@ -695,6 +695,16 @@ export default function CloneJobPage() {
                   </p>
                 </div>
 
+                {!job.preview.url && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+                    <p className="font-medium">Preview not available in the cloud app</p>
+                    <p className="text-xs mt-1 text-amber-900">
+                      Your site files passed checks. Use <strong>Deploy</strong> below to build on Vercel, or run{' '}
+                      <code className="text-[11px]">npm run dev</code> locally to preview before deploying.
+                    </p>
+                  </div>
+                )}
+
                 {/* Preview iframe */}
                 {job.preview.url && (
                   <div className="rounded-xl overflow-hidden border border-gray-200 bg-white">

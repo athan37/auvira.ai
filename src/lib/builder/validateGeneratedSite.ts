@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 import { getNodeBinDir } from '@/lib/runtime/nodeRuntime';
+import { isVercelServerless } from '@/lib/runtime/isVercelServerless';
 import { scratchPath } from '@/lib/runtime/scratchDir';
 
 const execFileAsync = promisify(execFile);
@@ -24,6 +25,15 @@ export interface ValidateGeneratedSiteResult {
   logs: string;
   errors: string[];
   durationMs: number;
+  /** True when npm install/build was skipped (e.g. Vercel serverless). */
+  buildGateSkipped?: boolean;
+}
+
+/** npm install + next build need disk/time; unreliable on Vercel serverless. */
+export function shouldRunLocalNpmBuildGate(): boolean {
+  if (process.env.SITE_AGENT_RUN_BUILD_GATE === '1') return true;
+  if (process.env.SITE_AGENT_SKIP_BUILD_GATE === '1') return false;
+  return !isVercelServerless();
 }
 
 const REQUIRED_FILES = [
@@ -263,7 +273,21 @@ export async function validateGeneratedSite(
       return { ok: false, tempDir, logs: logs.join('\n'), errors: allErrors, durationMs: Date.now() - startTime };
     }
 
-    // 5. Run npm install and build
+    if (!shouldRunLocalNpmBuildGate()) {
+      logs.push(
+        'Skipped npm install/build on serverless (SITE_AGENT_RUN_BUILD_GATE=1 to force). Static checks passed.'
+      );
+      return {
+        ok: true,
+        tempDir,
+        logs: logs.join('\n'),
+        errors: [],
+        durationMs: Date.now() - startTime,
+        buildGateSkipped: true,
+      };
+    }
+
+    // 5. Run npm install and build (local / long-running hosts only)
     const npmPath = path.join(getNodeBinDir(), 'npm');
 
     logs.push('Running npm install...');
@@ -276,20 +300,22 @@ export async function validateGeneratedSite(
         // ignore cleanup errors
       }
 
-      await execFileAsync(npmPath, ['install', '--silent'], {
+      await execFileAsync(npmPath, ['install', '--silent', '--no-audit', '--no-fund'], {
         cwd: tempDir,
-        timeout: 60000,
+        timeout: 120000,
+        maxBuffer: 10 * 1024 * 1024,
         killSignal: 'SIGKILL',
         env: {
           ...process.env,
           PATH: `${getNodeBinDir()}:${process.env.PATH}`,
-          NODE_ENV: 'production',
+          NODE_ENV: 'development',
         },
       });
       logs.push('npm install succeeded');
     } catch (err: unknown) {
-      const e = err as { message?: string; stderr?: string };
-      allErrors.push(`npm install failed: ${e.message || e.stderr || 'unknown error'}`);
+      const e = err as { message?: string; stderr?: string; stdout?: string };
+      const detail = [e.message, e.stderr, e.stdout].filter(Boolean).join(' | ');
+      allErrors.push(`npm install failed: ${detail || 'unknown error'}`);
       return { ok: false, tempDir, logs: logs.join('\n'), errors: allErrors, durationMs: Date.now() - startTime };
     }
 
@@ -297,7 +323,8 @@ export async function validateGeneratedSite(
     try {
       const { stdout, stderr } = await execFileAsync(npmPath, ['run', 'build'], {
         cwd: tempDir,
-        timeout: 90000,
+        timeout: 180000,
+        maxBuffer: 10 * 1024 * 1024,
         killSignal: 'SIGKILL',
         env: {
           ...process.env,

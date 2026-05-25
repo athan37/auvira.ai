@@ -15,6 +15,7 @@ import { ProjectAction } from '@/models/ProjectAction';
 import mongoose from 'mongoose';
 
 export const runtime = 'nodejs';
+export const maxDuration = 300;
 
 async function markStepRunning(jobId: mongoose.Types.ObjectId, key: string) {
   await CloneJob.updateOne(
