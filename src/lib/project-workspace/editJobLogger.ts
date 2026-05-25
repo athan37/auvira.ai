@@ -87,8 +87,16 @@ export async function attachChangedFiles(jobId: string, changedFiles: IChangedFi
 }
 
 export async function getLatestEditJob(projectId: string, jobId?: string) {
+  const projectOid = new mongoose.Types.ObjectId(projectId);
+
   if (jobId) {
-    return ProjectEditJob.findOne({ _id: jobId, projectId });
+    if (!mongoose.Types.ObjectId.isValid(jobId)) {
+      return null;
+    }
+    return ProjectEditJob.findOne({
+      _id: new mongoose.Types.ObjectId(jobId),
+      projectId: projectOid,
+    });
   }
-  return ProjectEditJob.findOne({ projectId }).sort({ createdAt: -1 });
+  return ProjectEditJob.findOne({ projectId: projectOid }).sort({ createdAt: -1 });
 }

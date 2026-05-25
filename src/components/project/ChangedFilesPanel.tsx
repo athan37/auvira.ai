@@ -96,13 +96,26 @@ export function ChangedFilesPanel({
   }
 
   if (!data?.jobId) {
+    const missingJob = Boolean(jobId);
     return (
       <Card>
-        <CardBody>
-          <h3 className="text-sm font-semibold text-zinc-900 mb-1">Changes</h3>
-          <p className="text-xs text-zinc-500">
-            After you edit the site in Chat, changed files and undo will appear here.
-          </p>
+        <CardBody className="space-y-2">
+          <h3 className="text-sm font-semibold text-zinc-900">Changes</h3>
+          {missingJob ? (
+            <>
+              <Alert variant="warning">
+                {data?.error ||
+                  'Could not load this edit. Check Chat for the latest message, then try sending your request again.'}
+              </Alert>
+              <p className="text-xs text-zinc-500">
+                Job reference: <span className="font-mono">{jobId}</span>
+              </p>
+            </>
+          ) : (
+            <p className="text-xs text-zinc-500">
+              After you edit the site in Chat, changed files and undo will appear here.
+            </p>
+          )}
         </CardBody>
       </Card>
     );

@@ -1,34 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerUserId } from '@/lib/api/projectAccess';
-import { WebsiteProject } from '@/models/WebsiteProject';
+import { getOwnerProject } from '@/lib/api/projectAccess';
 import { getLatestEditJob } from '@/lib/project-workspace/editJobLogger';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { projectId: string } }
 ) {
-  const userId = await getServerUserId();
-  if (!userId) {
-    return NextResponse.json({ detail: 'Unauthorized' }, { status: 401 });
-  }
-
-  const projectId = params.projectId;
-  const project = await WebsiteProject.findOne({ _id: projectId, ownerId: userId });
+  const project = await getOwnerProject(params.projectId);
   if (!project) {
     return NextResponse.json({ detail: 'Project not found' }, { status: 404 });
   }
 
-  const jobId = request.nextUrl.searchParams.get('jobId') || undefined;
-  const job = await getLatestEditJob(projectId, jobId);
+  const requestedJobId = request.nextUrl.searchParams.get('jobId') || undefined;
+  const job = await getLatestEditJob(params.projectId, requestedJobId);
 
   if (!job) {
     return NextResponse.json({
       ok: true,
       jobId: null,
+      requestedJobId: requestedJobId ?? null,
       status: null,
       changedFiles: [],
       summary: null,
-      error: null,
+      error: requestedJobId
+        ? 'Edit job not found for this project. It may have expired or the edit never finished saving.'
+        : null,
       buildLog: null,
       logs: [],
     });
@@ -37,11 +36,13 @@ export async function GET(
   return NextResponse.json({
     ok: true,
     jobId: job._id.toString(),
+    requestedJobId: requestedJobId ?? null,
     status: job.status,
-    changedFiles: job.changedFiles,
+    changedFiles: job.changedFiles ?? [],
     summary: job.summary || null,
     error: job.error || null,
     buildLog: job.buildLog || null,
-    logs: job.logs,
+    logs: job.logs ?? [],
+    prompt: job.prompt,
   });
 }

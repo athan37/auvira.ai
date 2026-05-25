@@ -4,6 +4,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerUserId } from '@/lib/api/projectAccess';
+import { connectMongoDB } from '@/lib/mongodb';
 import { WebsiteProject } from '@/models/WebsiteProject';
 import { createProjectWorkspace } from '@/lib/project-workspace/createProjectWorkspace';
 import { ensureGitWorkspace } from '@/lib/project-workspace/gitWorkspaceManager';
@@ -78,6 +79,8 @@ export async function POST(
   if (!userId) {
     return NextResponse.json({ detail: 'Unauthorized' }, { status: 401 });
   }
+
+  await connectMongoDB();
 
   const projectId = params.projectId;
   const project = await WebsiteProject.findOne({ _id: projectId, ownerId: userId });
