@@ -5,6 +5,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOwnerProject, getServerUserId } from '@/lib/api/projectAccess';
 import { repairPreviewWorkspace } from '@/lib/preview/repairPreviewWorkspace';
+import { repairPreviewSandbox } from '@/lib/sandbox/repairPreviewSandbox';
+import { restartSandboxDevServer } from '@/lib/sandbox/sandboxDevServer';
 import { checkPreviewHealthy } from '@/lib/project-workspace/bootstrapProjectPreview';
 import { connectMongoDB } from '@/lib/mongodb';
 import { WebsiteProject } from '@/models/WebsiteProject';
@@ -348,7 +350,15 @@ export async function POST(
         emit('step', { id: 'apply_change', label: 'Applying your requested change', status: 'completed' });
         emit('step', { id: 'validate', label: 'Checking the preview', status: 'active' });
 
-        if (mode === 'gitlab' && !isSandbox && workspacePath) {
+        if (mode === 'gitlab' && isSandbox) {
+          try {
+            await repairPreviewSandbox(projectId);
+            await appendEditJobLog(jobId, 'workspace_repaired', 'Applied preview-safe repairs (sandbox)');
+          } catch (repairErr) {
+            const msg = repairErr instanceof Error ? repairErr.message : String(repairErr);
+            await appendEditJobLog(jobId, 'workspace_repair_skipped', msg);
+          }
+        } else if (mode === 'gitlab' && workspacePath) {
           await repairPreviewWorkspace(workspacePath);
           await appendEditJobLog(jobId, 'workspace_repaired', 'Applied preview-safe repairs');
         }
@@ -432,6 +442,27 @@ export async function POST(
           warnings: validation.warnings,
         });
 
+        let sandboxPreviewUrl: string | null = null;
+        if (isSandbox) {
+          emit('step', { id: 'validate', label: 'Restarting preview server', status: 'active' });
+          try {
+            sandboxPreviewUrl = await restartSandboxDevServer(projectId);
+            await appendEditJobLog(jobId, 'preview_restarted', 'Sandbox dev server restarted', {
+              previewUrl: sandboxPreviewUrl,
+            });
+          } catch (restartErr) {
+            const msg = restartErr instanceof Error ? restartErr.message : String(restartErr);
+            await appendEditJobLog(jobId, 'preview_restart_failed', msg);
+            emit('step', { id: 'validate', label: 'Restarting preview server', status: 'failed' });
+            await fail(
+              'Your changes were saved, but the preview server needs a refresh. Close and reopen the project, or try your edit again.',
+              msg
+            );
+            return;
+          }
+          emit('step', { id: 'validate', label: 'Restarting preview server', status: 'completed' });
+        }
+
         const previewPort = project.preview?.port;
         if (previewPort && !isSandbox) {
           await new Promise((r) => setTimeout(r, 1500));
@@ -466,6 +497,13 @@ export async function POST(
               'codeWorkspace.sandboxWorkspace': isSandbox,
               hasUnpublishedChanges: true,
               editingMode: 'code',
+              ...(sandboxPreviewUrl
+                ? {
+                    'preview.url': sandboxPreviewUrl,
+                    'preview.status': 'ready',
+                    'preview.previewMode': 'sandbox',
+                  }
+                : {}),
             },
           }
         );

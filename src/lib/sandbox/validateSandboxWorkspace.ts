@@ -23,6 +23,28 @@ export async function validateSandboxWorkspace(
     return { ok: true, buildLog: 'No package.json — skipped build', errors, warnings };
   }
 
+  const changed = new Set(changedFiles || []);
+  const lockChanged =
+    changed.has('package.json') ||
+    changed.has('package-lock.json') ||
+    changed.has('yarn.lock') ||
+    changed.has('pnpm-lock.yaml');
+  const previewSafeEdit =
+    changed.size > 0 &&
+    !lockChanged &&
+    [...changed].every(
+      (f) =>
+        f.startsWith('src/') &&
+        /\.(css|scss|sass|less|tsx|jsx|ts|js|json)$/i.test(f)
+    );
+
+  if (previewSafeEdit) {
+    logs.push(
+      'Source-only edit: skipping npm run build (sandbox preview uses next dev; production .next breaks dev chunks)'
+    );
+    return { ok: true, buildLog: logs.join('\n'), errors, warnings };
+  }
+
   const build = await sandbox.runCommand({
     cmd: 'npm',
     args: ['run', 'build'],

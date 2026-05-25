@@ -80,14 +80,10 @@ async function runNpmInstall(sandbox: Sandbox): Promise<void> {
   }
 }
 
-async function startDevServerDetached(sandbox: Sandbox): Promise<void> {
-  await sandbox.runCommand({
-    cmd: 'npm',
-    args: ['run', 'dev', '--', '-H', '0.0.0.0', '-p', '3000'],
-    cwd: SANDBOX_WORKDIR,
-    detached: true,
-  });
-}
+import {
+  clearSandboxDevArtifacts,
+  startSandboxDevServerDetached,
+} from './sandboxDevServer';
 
 async function waitForSandboxPreview(previewUrl: string): Promise<void> {
   try {
@@ -121,7 +117,8 @@ async function resumeSandboxDevServer(
   const previewUrl = sandbox.domain(3000);
   const healthy = await checkPreviewUrlHealthy(previewUrl, 5000);
   if (!healthy) {
-    await startDevServerDetached(sandbox);
+    await clearSandboxDevArtifacts(sandbox);
+    await startSandboxDevServerDetached(sandbox);
     await waitForSandboxPreview(previewUrl);
   }
 
