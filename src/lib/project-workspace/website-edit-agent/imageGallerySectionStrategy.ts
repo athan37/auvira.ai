@@ -1,39 +1,25 @@
 import { promises as fs } from 'fs';
 import path from 'path';
-import { getLLMClient } from '@/lib/llm/llmClient';
 import {
   computeWorkspaceHashes,
   getChangedFilesFromHashes,
-  isSafeWritePath,
 } from '../workspaceEditShared';
-import { buildImageAttachmentGuidance } from './enrichEditPrompt';
-import { patchPageForUploadedImages } from './patchGenericSectionImages';
+import {
+  buildGallerySectionPayload,
+  prependGallerySectionInSiteConfig,
+} from './gallerySiteConfig';
+import {
+  pageCanRenderGallerySection,
+  patchPageForUploadedImages,
+} from './patchGenericSectionImages';
 import { verifyEditApplied } from './verifyEditApplied';
 import type { WebsiteEditAgentOptions, WebsiteEditAgentResult } from './types';
 
 const SITE_CONFIG = 'src/lib/siteConfig.ts';
 const PAGE_TSX = 'src/app/page.tsx';
 
-type FileEdit = { path: string; content: string };
-type LlmEditResponse = { files: FileEdit[]; summary?: string };
-
-function inferSectionTitle(message: string): string {
-  const lower = message.toLowerCase();
-  if (lower.includes('documentation') || lower.includes('document')) {
-    return 'Product documentation';
-  }
-  if (lower.includes('product')) {
-    return 'Our products';
-  }
-  if (lower.includes('gallery')) {
-    return 'Gallery';
-  }
-  return 'Featured images';
-}
-
 /**
- * Section + uploaded images: update siteConfig only (small write), then patch page.tsx for image grid.
- * Avoids single-shot full page rewrites that can trigger Vercel Sandbox Files API 400 errors.
+ * Section + uploaded images: update siteConfig (top of sections) and patch page.tsx so images render.
  */
 export async function runImageGallerySectionStrategy(
   options: WebsiteEditAgentOptions,
@@ -69,82 +55,44 @@ export async function runImageGallerySectionStrategy(
     return null;
   }
 
-  const imageGuidance = buildImageAttachmentGuidance(attachments);
-  const sectionTitle = inferSectionTitle(options.ownerMessage);
-  const llm = getLLMClient();
-
-  const result = await llm.generateJSON<LlmEditResponse>({
-    system: `You are a website content editor. Update ONLY src/lib/siteConfig.ts for a new image gallery / documentation section.
-
-Rules:
-- Append (or update) a section in siteConfig.sections with type "generic".
-- Each uploaded image becomes one item: { title: short label from filename, description?: optional caption, imageUrl: exact public URL from attachments }.
-- Use the owner's wording for section title and body when clear; otherwise title: "${sectionTitle}".
-- Do NOT remove existing sections unless the owner asked to replace them.
-- Return the FULL updated siteConfig.ts file.
-- Do not invent phone numbers or addresses.`,
-    prompt: `Owner request: ${options.ownerMessage}
-
-${imageGuidance}
-
-Suggested section title if not specified: "${sectionTitle}"
-
-Current ${SITE_CONFIG}:
-${siteConfigContent.length > 16_000 ? `${siteConfigContent.slice(0, 16_000)}\n/* truncated */` : siteConfigContent}
-
-Return JSON: { "files": [{ "path": "${SITE_CONFIG}", "content": "..." }], "summary": "short owner-facing note" }`,
-    schema: {
-      type: 'object',
-      properties: {
-        files: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              path: { type: 'string' },
-              content: { type: 'string' },
-            },
-            required: ['path', 'content'],
-          },
-        },
-        summary: { type: 'string' },
-      },
-      required: ['files'],
-    },
-  });
-
-  if (!result.ok || !result.data?.files?.length) {
-    return null;
-  }
-
-  const beforeFiles: Record<string, string> = { [SITE_CONFIG]: siteConfigContent };
-  let wroteSiteConfig = false;
-
-  for (const file of result.data.files) {
-    const normalized = file.path.replace(/^\/+/, '');
-    if (normalized !== SITE_CONFIG || !isSafeWritePath(normalized)) continue;
-    await writeRel(normalized, file.content);
-    wroteSiteConfig = true;
-  }
-
-  if (!wroteSiteConfig) {
-    return null;
-  }
-
   const pageBefore = await readRel(PAGE_TSX);
-  if (pageBefore) {
-    beforeFiles[PAGE_TSX] = pageBefore;
-    const { content: patchedPage, patched } = patchPageForUploadedImages(pageBefore);
-    if (patched) {
-      await writeRel(PAGE_TSX, patchedPage);
-    }
+  if (!pageBefore) {
+    return null;
   }
 
-  const afterSiteConfig = (await readRel(SITE_CONFIG)) ?? '';
-  const afterPage = (await readRel(PAGE_TSX)) ?? '';
+  const section = buildGallerySectionPayload(attachments, options.ownerMessage);
+  const updatedSiteConfig = prependGallerySectionInSiteConfig(siteConfigContent, section);
+
+  const beforeFiles: Record<string, string> = {
+    [SITE_CONFIG]: siteConfigContent,
+    [PAGE_TSX]: pageBefore,
+  };
+
+  await writeRel(SITE_CONFIG, updatedSiteConfig);
+
+  let pageAfter = pageBefore;
+  const { content: patchedPage, patched } = patchPageForUploadedImages(pageBefore);
+  if (patched) {
+    await writeRel(PAGE_TSX, patchedPage);
+    pageAfter = patchedPage;
+  } else {
+    pageAfter = (await readRel(PAGE_TSX)) ?? pageBefore;
+  }
+
+  if (!pageCanRenderGallerySection(pageAfter)) {
+    return {
+      ok: false,
+      strategy: 'image_gallery',
+      error: 'page.tsx does not render gallery item images (DocumentationSection or GenericSection patch missing).',
+      ownerMessage:
+        "I updated your product images in the site data, but the page layout couldn't be patched to show them. Please try the edit again.",
+    };
+  }
+
+  const afterSiteConfig = (await readRel(SITE_CONFIG)) ?? updatedSiteConfig;
   const afterFiles: Record<string, string> = {
     [SITE_CONFIG]: afterSiteConfig,
-    ...(pageBefore ? { [PAGE_TSX]: afterPage } : {}),
+    [PAGE_TSX]: pageAfter,
   };
 
   const verification = verifyEditApplied(options.ownerMessage, beforeFiles, afterFiles);
@@ -165,11 +113,15 @@ Return JSON: { "files": [{ "path": "${SITE_CONFIG}", "content": "..." }], "summa
     return null;
   }
 
+  const title = String(section.title ?? 'Product images');
+  const count = attachments.length;
+  const ownerMessage = `Added "${title}" near the top of your homepage with ${count} product image${count === 1 ? '' : 's'}. Scroll below the hero to see the gallery.`;
+
   return {
     ok: true,
     strategy: 'image_gallery',
-    summary: result.data.summary || 'Added your product images in a new section.',
-    ownerMessage: result.data.summary || 'Added your product images in a new section.',
+    summary: ownerMessage,
+    ownerMessage,
     changedFiles,
   };
 }

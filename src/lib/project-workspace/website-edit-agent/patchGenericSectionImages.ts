@@ -19,6 +19,26 @@ const IMAGE_GRID_BLOCK = `
         )}
 `;
 
+/** Extract GenericSection function source from page.tsx. */
+export function extractGenericSectionSource(pageContent: string): string | null {
+  const start = pageContent.indexOf('function GenericSection');
+  if (start < 0) return null;
+  const after = pageContent.slice(start);
+  const endMatch = after.match(/\nfunction [A-Z]/);
+  const end = endMatch?.index ?? after.length;
+  return after.slice(0, end);
+}
+
+/** True when GenericSection already maps item.imageUrl into <img> tags. */
+export function genericSectionRendersItemImages(pageContent: string): boolean {
+  const body = extractGenericSectionSource(pageContent);
+  if (!body) return false;
+  return (
+    /\.filter\(\(item\)[^)]*imageUrl/.test(body) ||
+    (/<img[\s\S]*?item\.imageUrl/.test(body) && /grid/.test(body))
+  );
+}
+
 /**
  * Ensures GenericSection in page.tsx renders uploaded product/documentation images.
  */
@@ -29,7 +49,7 @@ export function patchGenericSectionForImages(pageContent: string): {
   if (!pageContent.includes('function GenericSection')) {
     return { content: pageContent, patched: false };
   }
-  if (pageContent.includes('item.imageUrl') || pageContent.includes('imageUrl')) {
+  if (genericSectionRendersItemImages(pageContent)) {
     return { content: pageContent, patched: false };
   }
 
@@ -49,6 +69,25 @@ export function patchGenericSectionForImages(pageContent: string): {
     };
   }
 
+  // Custom 2-column GenericSection (single section.imageUrl + bullet list): add gallery below.
+  const afterSingleImageBlock =
+    /(\{section\.imageUrl && \([\s\S]*?\n          \)\}\s*\n)(        <\/div>\s*\n      <\/div>)/;
+  if (afterSingleImageBlock.test(pageContent)) {
+    return {
+      content: pageContent.replace(afterSingleImageBlock, `$1${IMAGE_GRID_BLOCK}\n$2`),
+      patched: true,
+    };
+  }
+
+  const beforeSectionClose =
+    /(function GenericSection[\s\S]*?)(        <\/div>\s*\n      <\/div>\s*\n    <\/section>)/;
+  if (beforeSectionClose.test(pageContent)) {
+    return {
+      content: pageContent.replace(beforeSectionClose, `$1${IMAGE_GRID_BLOCK}\n$2`),
+      patched: true,
+    };
+  }
+
   return { content: pageContent, patched: false };
 }
 
@@ -62,8 +101,7 @@ export function patchDocumentationSectionForImages(pageContent: string): {
   if (!pageContent.includes('function DocumentationSection')) {
     return { content: pageContent, patched: false };
   }
-  const needsFix = /src=\{item\.description\}/.test(pageContent);
-  if (!needsFix) {
+  if (!/src=\{item\.description\}/.test(pageContent)) {
     return { content: pageContent, patched: false };
   }
   return {
@@ -93,4 +131,11 @@ export function patchPageForUploadedImages(pageContent: string): {
     patched = true;
   }
   return { content, patched };
+}
+
+export function pageCanRenderGallerySection(pageContent: string): boolean {
+  if (pageContent.includes('function DocumentationSection')) {
+    return /case\s*['"]documentation['"]/.test(pageContent);
+  }
+  return genericSectionRendersItemImages(pageContent) || patchPageForUploadedImages(pageContent).patched;
 }

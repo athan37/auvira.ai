@@ -36,12 +36,31 @@ function DocumentationSection({ section }) {
     expect(content).toContain('item.imageUrl || item.description');
   });
 
-  it('skips when imageUrl already present', () => {
-    const already = MINIMAL_GENERIC.replace(
-      'function GenericSection',
-      'function GenericSection /* item.imageUrl */'
-    );
-    const { patched } = patchGenericSectionForImages(already);
-    expect(patched).toBe(false);
+  it('patches custom 2-column GenericSection layout', () => {
+    const custom = `
+function GenericSection({ section }) {
+  return (
+    <section>
+      <div className="grid">
+        {section.items && <ul>{section.items.map(() => null)}</ul>}
+      </div>
+      {section.imageUrl && (
+        <div><img src={section.imageUrl} alt="" /></div>
+      )}
+        </div>
+      </div>
+    </section>
+  );
+}
+`;
+    const { content, patched } = patchGenericSectionForImages(custom);
+    expect(patched).toBe(true);
+    expect(content).toContain('filter((item) => (item as { imageUrl?: string }).imageUrl)');
+  });
+
+  it('skips when GenericSection already renders item imageUrl grid', () => {
+    const { content, patched } = patchGenericSectionForImages(MINIMAL_GENERIC);
+    const second = patchGenericSectionForImages(content);
+    expect(second.patched).toBe(false);
   });
 });
