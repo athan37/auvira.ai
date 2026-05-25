@@ -63,6 +63,16 @@ async function main() {
   console.log('\n--- Done ---');
   console.log({ elapsedSec: (elapsedMs / 1000).toFixed(1), result: doneEvent });
 
+  const timing = (doneEvent as { timing?: { totalMs?: number; phases?: Array<{ phase: string; durationMs: number }>; slowestPhase?: string } })?.timing;
+  if (timing?.phases?.length) {
+    console.log('\n--- Timing breakdown ---');
+    console.log(`  total: ${((timing.totalMs ?? elapsedMs) / 1000).toFixed(1)}s`);
+    console.log(`  slowest: ${timing.slowestPhase}`);
+    for (const p of timing.phases) {
+      console.log(`  ${p.phase}: ${(p.durationMs / 1000).toFixed(1)}s`);
+    }
+  }
+
   console.log('\n--- Steps ---');
   for (const s of steps.filter((x) => x.type === 'step')) {
     const p = s.payload as { id?: string; status?: string; label?: string };

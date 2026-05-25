@@ -5,6 +5,7 @@ import {
   editStatusLabel,
   formatEditJobError,
 } from '@/lib/project-workspace/editJobMessages';
+import { formatDurationMs } from '@/lib/project-workspace/editTiming';
 import { Alert } from '@/components/ui/Alert';
 import { Badge, statusToBadgeTone } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -33,6 +34,11 @@ interface DiffResponse {
     createdAt: string;
     metadata?: Record<string, unknown>;
   }>;
+  timing?: {
+    totalMs: number | null;
+    phases: Array<{ phase: string; durationMs: number }>;
+    slowestPhase: string | null;
+  };
 }
 
 interface Props {
@@ -237,6 +243,30 @@ export function ChangedFilesPanel({
           <p className="text-xs text-zinc-600">{data.summary}</p>
         )}
 
+        {data.timing && data.timing.phases.length > 0 && (
+          <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 space-y-1.5">
+            <p className="text-xs font-medium text-zinc-800">Edit timing</p>
+            {data.timing.totalMs != null && (
+              <p className="text-[11px] text-zinc-500">
+                Total {formatDurationMs(data.timing.totalMs)}
+                {data.timing.slowestPhase
+                  ? ` · slowest: ${data.timing.slowestPhase.replace(/_/g, ' ')}`
+                  : ''}
+              </p>
+            )}
+            <ul className="text-[11px] text-zinc-600 space-y-0.5">
+              {data.timing.phases.map((p) => (
+                <li key={p.phase} className="flex justify-between gap-2">
+                  <span className="capitalize">{p.phase.replace(/_/g, ' ')}</span>
+                  <span className="font-mono text-zinc-500 shrink-0">
+                    {formatDurationMs(p.durationMs)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {rollbackMsg && (
           <Alert variant={rollbackMsg.ok ? 'success' : 'error'}>{rollbackMsg.text}</Alert>
         )}
@@ -296,10 +326,16 @@ export function ChangedFilesPanel({
             {showAgentLogs && (
               <ul className="mt-2 text-xs space-y-1 max-h-28 overflow-y-auto text-zinc-600">
                 {data.logs
-                  .filter((log) => log.type !== 'error_trace')
+                  .filter((log) => log.type !== 'error_trace' && log.type !== 'timing_summary')
                   .map((log, i) => (
                     <li key={i}>
                       <span className="text-zinc-400">{log.type}</span> {log.message}
+                      {typeof log.metadata?.durationMs === 'number' ? (
+                        <span className="text-zinc-400">
+                          {' '}
+                          ({formatDurationMs(log.metadata.durationMs as number)})
+                        </span>
+                      ) : null}
                       {log.type === 'error_detail' && log.metadata?.stage ? (
                         <span className="text-zinc-400"> ({String(log.metadata.stage)})</span>
                       ) : null}

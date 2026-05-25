@@ -33,6 +33,11 @@ import {
 } from '@/lib/project-workspace/editFailureDetail';
 import { resolveEditPreviewVerification } from '@/lib/project-workspace/verifyPreviewForPrompt';
 import { resolveSiteWorkspace } from '@/lib/project-workspace/website-edit-agent/resolveSiteWorkspace';
+import {
+  EditStepTimer,
+  appendTimedEditJobLog,
+  logEditTimingSummary,
+} from '@/lib/project-workspace/editTiming';
 import { promises as fs } from 'fs';
 import path from 'path';
 import crypto from 'crypto';
@@ -160,6 +165,7 @@ export async function POST(
       let mode: 'gitlab' | 'static' = 'static';
       let isSandbox = false;
       let beforeHashes: Record<string, string> = {};
+      const editTimer = new EditStepTimer();
 
       type FailOptions = {
         stage: EditFailureStage;
@@ -193,6 +199,7 @@ export async function POST(
         if (jobId) {
           await markEditJobStatus(jobId, 'failed', { error: ownerMessage });
           await logEditFailureTrace(jobId, report);
+          await logEditTimingSummary(jobId, editTimer).catch(() => {});
         }
 
         emit('done', {
@@ -271,6 +278,7 @@ export async function POST(
         emit('step', { id: 'loading', label: 'Loading your website draft', status: 'active', jobId });
 
         await appendEditJobLog(jobId, 'workspace_prepare_started', 'Preparing workspace');
+        editTimer.start('workspace_prepare');
 
         const hasGitLab = Boolean(project.gitlab?.repoUrl);
 
@@ -310,11 +318,13 @@ export async function POST(
           throw new Error('Workspace gateway not initialized');
         }
 
-        await appendEditJobLog(jobId, 'workspace_prepare_done', 'Workspace ready', {
-          workspacePath,
-          source,
-          sandbox: isSandbox,
-        });
+        await appendTimedEditJobLog(
+          jobId,
+          'workspace_prepare_done',
+          'Workspace ready',
+          editTimer.finish('workspace_prepare'),
+          { workspacePath, source, sandbox: isSandbox, phase: 'workspace_prepare' }
+        );
         emit('step', { id: 'loading', label: 'Loading your website draft', status: 'completed' });
 
         beforeHashes = await computeHashes(gateway, source);
@@ -333,6 +343,7 @@ export async function POST(
         }
 
         emit('step', { id: 'apply_change', label: 'Applying your requested change', status: 'active' });
+        editTimer.start('agent');
         await appendEditJobLog(jobId, 'agent_started', 'Running code agent', { agent: 'ts' });
 
         const agentResult = await runWebsiteEdit(
@@ -360,12 +371,19 @@ export async function POST(
         }
 
         if (!agentResult.ok) {
-          await appendEditJobLog(jobId, 'agent_finished', 'Agent failed', {
-            error: agentResult.error,
-            strategy: agentResult.strategy,
-            agent: agentResult.agent,
-            changedFiles: agentResult.changedFiles,
-          });
+          await appendTimedEditJobLog(
+            jobId,
+            'agent_finished',
+            'Agent failed',
+            editTimer.finish('agent'),
+            {
+              error: agentResult.error,
+              strategy: agentResult.strategy,
+              agent: agentResult.agent,
+              changedFiles: agentResult.changedFiles,
+              phase: 'agent',
+            }
+          );
           const kept = await keepPartialChanges(agentResult.summary || 'Partial edit');
           emit('step', { id: 'apply_change', label: 'Applying your requested change', status: 'failed' });
           emit('step', { id: 'validate', label: 'Checking the preview', status: 'failed' });
@@ -391,10 +409,13 @@ export async function POST(
           return;
         }
 
-        await appendEditJobLog(jobId, 'agent_finished', 'Agent completed', {
-          summary: agentResult.summary,
-          agent: agentResult.agent,
-        });
+        await appendTimedEditJobLog(
+          jobId,
+          'agent_finished',
+          'Agent completed',
+          editTimer.finish('agent'),
+          { summary: agentResult.summary, agent: agentResult.agent, strategy: agentResult.strategy, phase: 'agent' }
+        );
         emit('step', { id: 'apply_change', label: 'Applying your requested change', status: 'completed' });
         emit('step', { id: 'validate', label: 'Checking the preview', status: 'active' });
 
@@ -492,6 +513,7 @@ export async function POST(
         await attachChangedFiles(jobId, changedFiles);
 
         await markEditJobStatus(jobId, 'validating');
+        editTimer.start('validation');
         await appendEditJobLog(jobId, 'validation_started', 'Running workspace validation');
 
         const validation = isSandbox
@@ -499,9 +521,13 @@ export async function POST(
           : await validateWorkspace(workspacePath, { changedFiles: changedPaths });
 
         if (!validation.ok) {
-          await appendEditJobLog(jobId, 'validation_failed', validation.errors.join('; '), {
-            warnings: validation.warnings,
-          });
+          await appendTimedEditJobLog(
+            jobId,
+            'validation_failed',
+            validation.errors.join('; '),
+            editTimer.finish('validation'),
+            { warnings: validation.warnings, phase: 'validation' }
+          );
           const kept = await keepPartialChanges(agentResult.summary || 'Edit with validation errors');
           await markEditJobStatus(jobId, 'failed', {
             error: validation.errors[0] || 'Validation failed',
@@ -529,21 +555,37 @@ export async function POST(
           return;
         }
 
-        await appendEditJobLog(jobId, 'validation_passed', 'Validation passed', {
-          warnings: validation.warnings,
-        });
+        await appendTimedEditJobLog(
+          jobId,
+          'validation_passed',
+          'Validation passed',
+          editTimer.finish('validation'),
+          { warnings: validation.warnings, phase: 'validation' }
+        );
 
         let sandboxPreviewUrl: string | null = null;
         if (isSandbox) {
           emit('step', { id: 'validate', label: 'Restarting preview server', status: 'active' });
+          editTimer.start('preview_restart');
+          await appendEditJobLog(jobId, 'preview_restart_started', 'Restarting sandbox dev server');
           try {
             sandboxPreviewUrl = await restartSandboxDevServer(projectId);
-            await appendEditJobLog(jobId, 'preview_restarted', 'Sandbox dev server restarted', {
-              previewUrl: sandboxPreviewUrl,
-            });
+            await appendTimedEditJobLog(
+              jobId,
+              'preview_restarted',
+              'Sandbox dev server restarted',
+              editTimer.finish('preview_restart'),
+              { previewUrl: sandboxPreviewUrl, phase: 'preview_restart' }
+            );
           } catch (restartErr) {
             const msg = restartErr instanceof Error ? restartErr.message : String(restartErr);
-            await appendEditJobLog(jobId, 'preview_restart_failed', msg);
+            await appendTimedEditJobLog(
+              jobId,
+              'preview_restart_failed',
+              msg,
+              editTimer.finish('preview_restart'),
+              { phase: 'preview_restart' }
+            );
             emit('step', { id: 'validate', label: 'Restarting preview server', status: 'failed' });
             await fail(
               'Your changes were saved, but the preview server needs a refresh. Close and reopen the project, or try your edit again.',
@@ -560,13 +602,15 @@ export async function POST(
 
         const previewPort = project.preview?.port;
         if (previewPort && !isSandbox) {
+          editTimer.start('preview_health');
           await new Promise((r) => setTimeout(r, 1500));
           const previewHealthy = await checkPreviewHealthy(previewPort, 12_000);
-          await appendEditJobLog(
+          await appendTimedEditJobLog(
             jobId,
             previewHealthy ? 'preview_health_ok' : 'preview_health_slow',
             previewHealthy ? 'Preview dev server healthy' : 'Preview may need a manual refresh',
-            { port: previewPort }
+            editTimer.finish('preview_health'),
+            { port: previewPort, phase: 'preview_health' }
           );
         }
 
@@ -591,6 +635,8 @@ export async function POST(
             label: 'Confirming changes appear in preview',
             status: 'active',
           });
+          editTimer.start('preview_verify');
+          await appendEditJobLog(jobId, 'preview_verify_started', 'Verifying preview content');
           let workspaceSnap;
           if (activeGateway && workspacePath) {
             workspaceSnap = await resolveSiteWorkspace({
@@ -613,14 +659,16 @@ export async function POST(
             workspaceSnap,
             gateway: activeGateway ?? undefined,
           });
-          await appendEditJobLog(
+          await appendTimedEditJobLog(
             jobId,
             previewVerify.ok ? 'preview_content_verified' : 'preview_content_missing',
             previewVerify.reason,
+            editTimer.finish('preview_verify'),
             {
               previewUrl: previewUrlForVerify,
               imagesFound: previewVerify.imagesFound,
               htmlLength: previewVerify.htmlLength,
+              phase: 'preview_verify',
             }
           );
           if (!previewVerify.ok) {
@@ -683,6 +731,10 @@ export async function POST(
             ? `Added your product section with ${previewVerify.imagesFound} image(s) in the preview. Scroll just below the hero to see it.`
             : agentResult.ownerMessage || agentResult.summary || 'Updated your website.';
 
+        await logEditTimingSummary(jobId, editTimer);
+        const timingSummary = editTimer.summary();
+        const slowest = editTimer.slowest();
+
         emit('step', { id: 'validate', label: 'Checking the preview', status: 'completed' });
         emit('step', { id: 'finish', label: 'Preview updated', status: 'completed' });
         emit('done', {
@@ -695,6 +747,12 @@ export async function POST(
             previewVerified: previewVerify.ok,
             changedFiles: changedPaths,
             version: newVersion,
+            timing: {
+              totalMs: editTimer.totalMs(),
+              phases: timingSummary,
+              slowestPhase: slowest?.phase,
+              slowestMs: slowest?.durationMs,
+            },
           },
         });
       } catch (error) {

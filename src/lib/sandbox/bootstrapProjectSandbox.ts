@@ -83,6 +83,7 @@ import {
 } from './sandboxDevServer';
 import { repairPreviewSandbox } from './repairPreviewSandbox';
 import {
+  repairSandboxPageSyntax,
   assertSandboxPageSyntax,
   waitForSandboxPreview,
 } from './sandboxPreviewHealth';
@@ -106,6 +107,13 @@ async function resumeSandboxDevServer(
   });
 
   await repairPreviewSandbox(projectId).catch(() => {});
+  const pageRepair = await repairSandboxPageSyntax(projectId).catch(() => ({
+    repaired: false,
+    notes: [] as string[],
+  }));
+  if (pageRepair.notes.length > 0) {
+    console.log(`[sandbox] page.tsx repair for ${projectId}:`, pageRepair.notes.join(', '));
+  }
   await assertSandboxPageSyntax(projectId);
 
   const previewUrl = sandbox.domain(3000);
