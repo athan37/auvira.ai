@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:scratch-live": "tsx scripts/test-scratch-workflow-live.ts",
+    "test:diff-local": "node --env-file=.env $(npm root)/.bin/tsx scripts/test-diff-api-local.ts",
     "test:watch": "vitest",
     "clean": "rm -rf .next",
     "build:clean": "npm run clean && npm run build",
