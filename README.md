@@ -327,8 +327,8 @@ NEXTAUTH_URL=http://localhost:3000
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/) → APIs & Services → Credentials
 2. Create OAuth 2.0 Client ID (Web application)
-3. Add `http://localhost:3000/api/auth/providers/google` as an authorized redirect URI
-4. Add `http://localhost:3000` as an authorized JavaScript origin
+3. Add **`http://localhost:3000/api/auth/callback/google`** as an authorized redirect URI (exact path; not `/providers/google`)
+4. Add **`http://localhost:3000`** as an authorized JavaScript origin
 5. Copy Client ID and Client Secret to `.env.local`
 
 ### API Endpoints

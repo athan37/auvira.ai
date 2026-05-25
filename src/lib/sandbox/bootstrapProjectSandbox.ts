@@ -5,7 +5,12 @@ import {
   SETUP_STAGE_LABELS,
   type WorkspaceSetupStage,
 } from '@/lib/project-workspace/bootstrapProjectPreview';
-import { waitForPreviewReady } from '@/lib/preview/waitForPreviewReady';
+import {
+  checkPreviewUrlHealthy,
+  waitForPreviewReady,
+} from '@/lib/preview/waitForPreviewReady';
+
+export { checkPreviewUrlHealthy };
 import { logProjectStep } from '@/lib/project-logs/projectLogger';
 import {
   buildAuthenticatedGitLabCloneUrl,
@@ -34,19 +39,6 @@ async function setSetupStage(
       },
     }
   );
-}
-
-/** HTTP health check for public preview URLs (sandbox dev server). */
-export async function checkPreviewUrlHealthy(url: string, timeoutMs = 8000): Promise<boolean> {
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    const res = await fetch(url, { signal: controller.signal, redirect: 'follow' });
-    clearTimeout(timer);
-    return res.status >= 200 && res.status < 400;
-  } catch {
-    return false;
-  }
 }
 
 async function sandboxCommandExists(sandbox: Sandbox, cmd: string): Promise<boolean> {

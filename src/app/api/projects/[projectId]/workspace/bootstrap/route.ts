@@ -5,10 +5,11 @@ import {
   checkPreviewHealthy,
   getWorkspaceStatusFromProject,
 } from '@/lib/project-workspace/bootstrapProjectPreview';
-import { checkPreviewUrlHealthy } from '@/lib/sandbox/bootstrapProjectSandbox';
+import { checkPreviewUrlHealthy } from '@/lib/preview/waitForPreviewReady';
 import { pruneExpiredScratch } from '@/lib/runtime/scratchCleanup';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
 /**

@@ -7,15 +7,12 @@ import {
   ensureGitWorkspace,
   getGitWorkspacePath,
 } from '@/lib/project-workspace/gitWorkspaceManager';
-import { waitForPreviewReady } from '@/lib/preview/waitForPreviewReady';
+import { repairPreviewWorkspace } from '@/lib/preview/repairPreviewWorkspace';
+import { startWorkspaceDevServer } from '@/lib/preview/startWorkspaceDevServer';
 import { stopPreviewServerByPort } from '@/lib/preview/stopPreviewServer';
 import { getNpmPath } from '@/lib/runtime/nodeRuntime';
 import { isVercelServerless } from '@/lib/runtime/isVercelServerless';
 import { isSandboxPreviewEnabled } from '@/lib/runtime/isSandboxPreviewEnabled';
-import {
-  bootstrapProjectSandbox,
-  checkPreviewUrlHealthy,
-} from '@/lib/sandbox/bootstrapProjectSandbox';
 
 export type WorkspaceSetupStage =
   | 'idle'
@@ -63,7 +60,8 @@ export async function checkPreviewHealthy(port: number, timeoutMs = 8000): Promi
   return new Promise((resolve) => {
     const http = require('http');
     const req = http.get(`http://127.0.0.1:${port}`, (res: { statusCode?: number }) => {
-      resolve((res.statusCode ?? 0) >= 200 && (res.statusCode ?? 0) < 400);
+      const code = res.statusCode ?? 0;
+      resolve((code >= 200 && code < 400) || code === 307 || code === 308);
     });
     req.on('error', () => resolve(false));
     req.setTimeout(timeoutMs, () => {
@@ -101,19 +99,6 @@ function runNpmInstall(cwd: string, timeoutMs = 10 * 60 * 1000): Promise<void> {
   });
 }
 
-function startDevServer(workspacePath: string, port: number) {
-  const npmPath = getNpmPath();
-  const args = ['run', 'dev', '--', '-H', '0.0.0.0', '-p', String(port)];
-  const child = spawn(npmPath, args, {
-    cwd: workspacePath,
-    stdio: ['ignore', 'pipe', 'pipe'],
-    shell: false,
-    detached: false,
-    env: { ...process.env, NODE_ENV: 'development' },
-  });
-  return child;
-}
-
 async function bootstrapGitlabProject(
   project: IWebsiteProject,
   userId: string
@@ -132,6 +117,8 @@ async function bootstrapGitlabProject(
             'codeWorkspace.workspacePath': getGitWorkspacePath(projectId),
             'codeWorkspace.setupStage': 'ready',
             'codeWorkspace.setupLabel': SETUP_STAGE_LABELS.ready,
+            'preview.previewMode': 'workspace',
+            'codeWorkspace.sandboxWorkspace': false,
           },
         }
       );
@@ -161,6 +148,8 @@ async function bootstrapGitlabProject(
 
   const gitInfo = await ensureGitWorkspace(project, userId);
   const workspacePath = gitInfo.workspacePath;
+
+  await repairPreviewWorkspace(workspacePath);
 
   const nodeModulesPath = join(workspacePath, 'node_modules');
   const needsInstall = !existsSync(nodeModulesPath);
@@ -193,27 +182,8 @@ async function bootstrapGitlabProject(
   });
 
   const port = allocatePort();
-  const devProcess = startDevServer(workspacePath, port);
-
-  let stderrData = '';
-  devProcess.stderr?.on('data', (chunk: Buffer) => {
-    stderrData += chunk.toString();
-  });
-
-  await new Promise((r) => setTimeout(r, 5000));
-
-  if (devProcess.exitCode !== null) {
-    throw new Error(
-      `Preview server exited with code ${devProcess.exitCode}. ${stderrData.slice(-300)}`
-    );
-  }
-
-  devProcess.stdout?.removeAllListeners();
-  devProcess.stderr?.removeAllListeners();
-  devProcess.unref();
-
   const previewUrl = `http://127.0.0.1:${port}`;
-  await waitForPreviewReady(previewUrl, { timeoutMs: 120_000, intervalMs: 1500 });
+  await startWorkspaceDevServer(workspacePath, port, { timeoutMs: 180_000 });
 
   await WebsiteProject.updateOne(
     { _id: projectId },
@@ -223,10 +193,12 @@ async function bootstrapGitlabProject(
         'preview.url': previewUrl,
         'preview.port': port,
         'preview.workspacePath': workspacePath,
+        'preview.previewMode': 'workspace',
         'preview.startedAt': new Date(),
         'codeWorkspace.status': 'ready',
         'codeWorkspace.setupStage': 'ready',
         'codeWorkspace.setupLabel': SETUP_STAGE_LABELS.ready,
+        'codeWorkspace.sandboxWorkspace': false,
       },
     }
   );
@@ -315,6 +287,7 @@ export async function bootstrapProjectPreview(
 
   if (isVercelServerless()) {
     if (isSandboxPreviewEnabled()) {
+      const { bootstrapProjectSandbox } = await import('@/lib/sandbox/bootstrapProjectSandbox');
       await bootstrapProjectSandbox(project, userId);
     } else {
       await bootstrapProjectPreviewHosted(project, userId);
@@ -364,7 +337,46 @@ export async function bootstrapProjectPreview(
   }
 }
 
+function getLocalWorkspaceStatus(project: IWebsiteProject) {
+  const deploymentLiveUrl = project.deployment?.liveUrl || null;
+  const previewPort = project.preview?.port ?? null;
+  let stage = (project.codeWorkspace?.setupStage as WorkspaceSetupStage) || 'idle';
+  const previewReady = project.preview?.status === 'ready' && !!previewPort;
+  const workspaceReady = project.codeWorkspace?.status === 'ready';
+  const ready = previewReady && workspaceReady;
+
+  if (!ready && workspaceReady && (stage === 'cloning' || stage === 'idle')) {
+    stage =
+      project.preview?.status === 'building' || previewPort
+        ? 'starting_server'
+        : stage;
+  }
+
+  return {
+    stage: ready ? ('ready' as const) : stage,
+    label: ready
+      ? SETUP_STAGE_LABELS.ready
+      : SETUP_STAGE_LABELS[stage] || project.codeWorkspace?.setupLabel || SETUP_STAGE_LABELS.idle,
+    previewStatus: project.preview?.status || 'not_started',
+    codeWorkspaceStatus: project.codeWorkspace?.status || 'not_started',
+    ready,
+    error: project.codeWorkspace?.setupError || project.preview?.error || null,
+    previewPort,
+    previewMode: 'workspace' as const,
+    liveUrl: deploymentLiveUrl,
+    previewHealthy: ready,
+  };
+}
+
+/**
+ * Map Mongo project fields to workspace/preview UI status.
+ * Local dev always uses editable workspace preview (next dev + proxy), never production live URL.
+ */
 export function getWorkspaceStatusFromProject(project: IWebsiteProject) {
+  if (!isVercelServerless()) {
+    return getLocalWorkspaceStatus(project);
+  }
+
   const rawMode = (project.preview as { previewMode?: string } | undefined)?.previewMode;
   const previewMode =
     rawMode === 'live' ? ('live' as const) : rawMode === 'sandbox' ? ('sandbox' as const) : ('workspace' as const);
@@ -401,30 +413,5 @@ export function getWorkspaceStatusFromProject(project: IWebsiteProject) {
     };
   }
 
-  let stage = (project.codeWorkspace?.setupStage as WorkspaceSetupStage) || 'idle';
-  const previewReady = project.preview?.status === 'ready' && !!project.preview?.port;
-  const workspaceReady = project.codeWorkspace?.status === 'ready';
-  const ready = previewReady && workspaceReady;
-
-  if (!ready && workspaceReady && (stage === 'cloning' || stage === 'idle')) {
-    stage =
-      project.preview?.status === 'building' || project.preview?.port
-        ? 'starting_server'
-        : stage;
-  }
-
-  return {
-    stage: ready ? ('ready' as const) : stage,
-    label: ready
-      ? SETUP_STAGE_LABELS.ready
-      : SETUP_STAGE_LABELS[stage] || project.codeWorkspace?.setupLabel || SETUP_STAGE_LABELS.idle,
-    previewStatus: project.preview?.status || 'not_started',
-    codeWorkspaceStatus: project.codeWorkspace?.status || 'not_started',
-    ready,
-    error: project.codeWorkspace?.setupError || project.preview?.error || null,
-    previewPort: project.preview?.port || null,
-    previewMode: 'workspace' as const,
-    liveUrl: project.deployment?.liveUrl || null,
-    previewHealthy: ready,
-  };
+  return getLocalWorkspaceStatus(project);
 }

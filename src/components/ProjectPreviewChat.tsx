@@ -15,8 +15,6 @@ import {
 export interface EditCompleteResult {
   ok: boolean;
   jobId?: string;
-  /** When true, open the Changes tab (partial edits or details to review). */
-  showChangesTab?: boolean;
 }
 
 type PendingImage = {
@@ -29,6 +27,8 @@ type ChatMessage = {
   role: 'user' | 'assistant';
   content: string;
   imagePreviews?: string[];
+  /** Assistant message for a failed edit. */
+  isError?: boolean;
 };
 
 interface ProjectPreviewChatProps {
@@ -132,10 +132,45 @@ function StepIcon({ status }: { status: AgentStepStatus }) {
   );
 }
 
-function AgentStepsUI({ steps }: { steps: AgentStep[] }) {
+function markStepsOnEditFailure(steps: AgentStep[]): AgentStep[] {
+  let hitFailure = false;
+  return steps.map((step) => {
+    if (step.status === 'failed') hitFailure = true;
+    if (hitFailure && step.status !== 'completed') {
+      return {
+        ...step,
+        status: 'failed' as const,
+        label: step.id === 'finish' ? 'Preview not updated' : step.label,
+      };
+    }
+    if (step.status === 'active' || step.status === 'pending') {
+      return {
+        ...step,
+        status: 'failed' as const,
+        label: step.id === 'finish' ? 'Preview not updated' : step.label,
+      };
+    }
+    return step;
+  });
+}
+
+function AgentStepsUI({ steps, failed }: { steps: AgentStep[]; failed?: boolean }) {
   return (
-    <div className="rounded-lg border border-zinc-200/80 bg-zinc-50 p-3" aria-live="polite">
-      <div className="text-sm font-medium text-zinc-700 mb-2">Updating your website</div>
+    <div
+      className={cn(
+        'rounded-lg border p-3',
+        failed ? 'border-red-200 bg-red-50' : 'border-zinc-200/80 bg-zinc-50'
+      )}
+      aria-live="polite"
+    >
+      <div
+        className={cn(
+          'text-sm font-medium mb-2',
+          failed ? 'text-red-800' : 'text-zinc-700'
+        )}
+      >
+        {failed ? "Couldn't update your website" : 'Updating your website'}
+      </div>
       <ul className="space-y-1.5">
         {steps.map((step) => (
           <li key={step.id} className="flex items-center gap-2 text-sm">
@@ -270,8 +305,8 @@ export function ProjectPreviewChat({
 
     let jobId: string | undefined;
     let success = false;
-    let showChangesTab = false;
     let finalOwnerMessage = '';
+    let editFailed = false;
     let attachments: WorkspaceAssetAttachment[] = [];
 
     try {
@@ -336,13 +371,13 @@ export function ProjectPreviewChat({
             } else if (event.type === 'done') {
               const result = event.result || {};
               success = result.ok !== false;
+              editFailed = !success;
               jobId = result.jobId || event.jobId;
-              showChangesTab = Boolean(result.showChangesTab);
               finalOwnerMessage =
                 result.ownerMessage ||
                 (success
                   ? 'Your website has been updated.'
-                  : "I couldn't safely apply that change. See the Changes tab for details.");
+                  : "I couldn't apply that change. Please try again or rephrase your request.");
             }
           } catch {
             /* skip malformed SSE */
@@ -353,31 +388,36 @@ export function ProjectPreviewChat({
       if (!finalOwnerMessage) {
         finalOwnerMessage = success
           ? 'Your website has been updated.'
-          : "I couldn't safely apply that change. See the Changes tab for details.";
+          : "I couldn't apply that change. Please try again or rephrase your request.";
       }
 
-      setMessages((prev) => [...prev, { role: 'assistant', content: finalOwnerMessage }]);
-      onEditComplete?.({ ok: success, jobId, showChangesTab });
+      if (editFailed) {
+        setAgentSteps((prev) => markStepsOnEditFailure(prev));
+      }
+
+      setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: finalOwnerMessage, isError: editFailed },
+      ]);
+      onEditComplete?.({ ok: success, jobId });
 
       if (success) {
         onEditSuccess?.();
+        setTimeout(() => {
+          setShowSteps(false);
+          setAgentSteps([]);
+        }, 2000);
       }
-
-      setTimeout(() => {
-        setShowSteps(false);
-        setAgentSteps([]);
-      }, success ? 2000 : 4000);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Something went wrong. Please try again.';
+      setAgentSteps((prev) => markStepsOnEditFailure(prev));
       setMessages((prev) => [
         ...prev,
-        { role: 'assistant', content: message },
+        { role: 'assistant', content: message, isError: true },
       ]);
       setUploadError(message);
       onEditComplete?.({ ok: false, jobId });
-      setShowSteps(false);
-      setAgentSteps([]);
     } finally {
       setSending(false);
     }
@@ -422,7 +462,12 @@ export function ProjectPreviewChat({
             </div>
           )}
 
-          {showSteps && agentSteps.length > 0 && <AgentStepsUI steps={agentSteps} />}
+          {showSteps && agentSteps.length > 0 && (
+            <AgentStepsUI
+              steps={agentSteps}
+              failed={agentSteps.some((s) => s.status === 'failed')}
+            />
+          )}
 
           {messages.map((msg, i) => (
             <div
@@ -434,9 +479,16 @@ export function ProjectPreviewChat({
                   'max-w-[85%] rounded-lg px-3 py-2 text-sm',
                   msg.role === 'user'
                     ? 'bg-zinc-950 text-white'
-                    : 'bg-white border border-zinc-200 text-zinc-800 shadow-sm'
+                    : msg.isError
+                      ? 'bg-red-50 border border-red-200 text-red-900 shadow-sm'
+                      : 'bg-white border border-zinc-200 text-zinc-800 shadow-sm'
                 )}
               >
+                {msg.isError && (
+                  <p className="text-xs font-semibold uppercase tracking-wide text-red-700 mb-1">
+                    Edit failed
+                  </p>
+                )}
                 {msg.content}
                 {msg.imagePreviews && msg.imagePreviews.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1.5">

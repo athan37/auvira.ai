@@ -22,6 +22,8 @@ interface WorkspaceStatus {
 interface Props {
   projectId: string;
   codeWorkspaceVersion?: number;
+  /** Bumped by parent after a successful edit to force iframe reload (Next dev HMR can miss some CSS). */
+  previewRefreshKey?: number;
   onReadyChange?: (ready: boolean) => void;
 }
 
@@ -38,6 +40,7 @@ function stageProgress(stage: string): number {
 export function ProjectPreviewFrame({
   projectId,
   codeWorkspaceVersion = 1,
+  previewRefreshKey = 0,
   onReadyChange,
 }: Props) {
   const onReadyChangeRef = useRef(onReadyChange);
@@ -172,7 +175,7 @@ export function ProjectPreviewFrame({
       cancelled = true;
       if (pollTimer) clearInterval(pollTimer);
     };
-  }, [projectId, pollStatus, codeWorkspaceVersion, applyStatus, startBootstrap]);
+  }, [projectId, pollStatus, applyStatus, startBootstrap]);
 
   useEffect(() => {
     cancelWorkspaceReleaseOnEnter(projectId);
@@ -281,7 +284,7 @@ export function ProjectPreviewFrame({
 
         {previewUrl && (
           <iframe
-            key={`${projectId}-${codeWorkspaceVersion}-${refreshKey}`}
+            key={`${projectId}-${codeWorkspaceVersion}-${refreshKey}-${previewRefreshKey}`}
             src={previewUrl}
             className="w-full h-full border-0"
             onLoad={() => setIframeLoading(false)}

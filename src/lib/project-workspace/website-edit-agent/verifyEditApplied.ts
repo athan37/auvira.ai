@@ -13,6 +13,120 @@ function messageHasKeyword(message: string, keyword: string): boolean {
   return new RegExp(`\\b${escaped}\\b`, 'i').test(message);
 }
 
+function findPageTsxContent(files: Record<string, string>): string | null {
+  for (const [filePath, content] of Object.entries(files)) {
+    if (/src\/app\/page\.tsx$/i.test(filePath.replace(/\\/g, '/'))) {
+      return content;
+    }
+  }
+  return null;
+}
+
+/** Tailwind sites store colors in page.tsx preset — globals.css alone won't update the preview. */
+function verifyVisibleBackgroundOnPage(
+  message: string,
+  beforeFiles: Record<string, string>,
+  afterFiles: Record<string, string>,
+  requestedColors: string[]
+): VerifyResult | null {
+  const lowerMsg = message.toLowerCase();
+  const isBackgroundRequest =
+    messageHasKeyword(lowerMsg, 'background') ||
+    messageHasKeyword(lowerMsg, 'colour') ||
+    messageHasKeyword(lowerMsg, 'color');
+
+  if (!isBackgroundRequest && requestedColors.length === 0) {
+    return null;
+  }
+
+  const pageAfter = findPageTsxContent(afterFiles);
+  if (!pageAfter) {
+    return null;
+  }
+
+  const usesPreset = pageAfter.includes('preset') || /\bbg-[a-z]+/.test(pageAfter);
+  if (!usesPreset) {
+    return null;
+  }
+
+  /** Preset keys that control page/section backgrounds (not buttons or cards). */
+  const presetBgKeys = [
+    'pageBg',
+    'heroBg',
+    'surfaceBg',
+    'mutedBg',
+    'navBg',
+    'contactBg',
+    'footerBg',
+  ];
+  const presetBgBlob = (() => {
+    const m = pageAfter.match(/const preset\s*=\s*(\{[\s\S]*?\});/);
+    if (!m) return pageAfter;
+    const blob: string[] = [];
+    for (const key of presetBgKeys) {
+      const km = m[1].match(new RegExp(`"${key}"\\s*:\\s*"([^"]*)"`, 'i'));
+      if (km) blob.push(km[1]);
+    }
+    return blob.length > 0 ? blob.join(' ') : pageAfter;
+  })();
+
+  const backgroundConflictColors = [
+    'green',
+    'yellow',
+    'red',
+    'orange',
+    'purple',
+    'pink',
+    'brown',
+  ];
+
+  for (const color of requestedColors) {
+    const tailwindBg = new RegExp(`bg-${color}(?:-\\d{2,3})?`, 'i');
+    if (!tailwindBg.test(presetBgBlob)) {
+      continue;
+    }
+
+    const conflicting = backgroundConflictColors.filter(
+      (c) =>
+        c !== color &&
+        new RegExp(`bg-${c}(?:-\\d{2,3})?`, 'i').test(presetBgBlob) &&
+        !messageHasKeyword(lowerMsg, c)
+    );
+
+    if (isBackgroundRequest && conflicting.length > 0) {
+      return {
+        ok: false,
+        reason: `page.tsx preset still uses ${conflicting.map((c) => `bg-${c}`).join(', ')}; set pageBg/heroBg to bg-${color} instead.`,
+        evidence: conflicting.map((c) => `conflicting bg-${c} in preset background keys`),
+      };
+    }
+
+    return {
+      ok: true,
+      reason: `Visible Tailwind background (${color}) found in page.tsx preset.`,
+      evidence: [`bg-${color} present in preset background keys`],
+    };
+  }
+
+  if (requestedColors.length === 0) {
+    return null;
+  }
+
+  const pageBefore = findPageTsxContent(beforeFiles);
+  const pageChanged = pageBefore !== null && pageBefore !== pageAfter;
+  const pagePath = 'src/app/page.tsx';
+
+  return {
+    ok: false,
+    reason: `Background color must be updated in src/app/page.tsx (preset pageBg/heroBg and main classes like bg-${requestedColors[0]}), not only CSS comments.`,
+    evidence: [
+      pageChanged
+        ? `${pagePath} changed but no visible bg-${requestedColors[0]} Tailwind classes`
+        : `${pagePath} was not updated — preview still uses old preset colors`,
+    ],
+  };
+}
+
 /**
  * Deterministic verification that an edit was actually applied.
  * Verifies the workspace reflects the intended edit before publish.
@@ -157,16 +271,24 @@ export function verifyEditApplied(
     const requestedColors = colorNames.filter((c) => messageHasKeyword(lowerMsg, c));
 
     if (requestedColors.length > 0) {
+      const pageCheck = verifyVisibleBackgroundOnPage(
+        message,
+        beforeFiles,
+        afterFiles,
+        requestedColors
+      );
+      if (pageCheck) {
+        return pageCheck;
+      }
+
       let colorFound = false;
       for (const filename of changedFiles) {
         const content = (afterFiles[filename] ?? '').toLowerCase();
         for (const color of requestedColors) {
-          if (content.includes(color) || content.includes(`#`) /* hex may not match name */) {
-            if (content.includes(color)) {
-              colorFound = true;
-              evidence.push(`color '${color}' found in ${filename}`);
-              break;
-            }
+          if (content.includes(color)) {
+            colorFound = true;
+            evidence.push(`color '${color}' found in ${filename}`);
+            break;
           }
         }
         if (colorFound) break;

@@ -4,7 +4,10 @@ import {
   checkPreviewHealthy,
   getWorkspaceStatusFromProject,
 } from '@/lib/project-workspace/bootstrapProjectPreview';
-import { checkPreviewUrlHealthy } from '@/lib/sandbox/bootstrapProjectSandbox';
+import { checkPreviewUrlHealthy } from '@/lib/preview/waitForPreviewReady';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 export async function GET(
   _request: NextRequest,

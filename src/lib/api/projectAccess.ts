@@ -11,14 +11,20 @@ export async function getServerUserId(): Promise<string | null> {
   return session?.user?.id ?? null;
 }
 
+function isDevAuthBypassEnabled(): boolean {
+  return (
+    process.env.NODE_ENV === 'development' &&
+    process.env.SITE_AGENT_DEV_BYPASS_AUTH === '1'
+  );
+}
+
 /**
  * Fetches a WebsiteProject by ID, ensuring it belongs to the current authenticated user.
  * Returns null if not found or not owned by the user.
+ *
+ * Set SITE_AGENT_DEV_BYPASS_AUTH=1 in local .env to load any project by id (dev only).
  */
 export async function getOwnerProject(projectId: string) {
-  const userId = await getServerUserId();
-  if (!userId) return null;
-
   await connectMongoDB();
 
   let oid: mongoose.Types.ObjectId;
@@ -27,6 +33,13 @@ export async function getOwnerProject(projectId: string) {
   } catch {
     return null;
   }
+
+  if (isDevAuthBypassEnabled()) {
+    return WebsiteProject.findById(oid);
+  }
+
+  const userId = await getServerUserId();
+  if (!userId) return null;
 
   const project = await WebsiteProject.findOne({
     _id: oid,

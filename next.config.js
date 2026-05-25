@@ -17,6 +17,8 @@ function resolvePublicAppUrl() {
 const nextConfig = {
   env: {
     NEXT_PUBLIC_APP_URL: resolvePublicAppUrl(),
+    NEXT_PUBLIC_SITE_AGENT_DEV_BYPASS_AUTH:
+      process.env.SITE_AGENT_DEV_BYPASS_AUTH === '1' ? '1' : '',
   },
 };
 

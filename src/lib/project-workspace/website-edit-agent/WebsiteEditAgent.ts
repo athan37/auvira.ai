@@ -275,10 +275,14 @@ export async function runAgentLoop(
   }
 
   emitStep(onStep, 'apply_change', applyLabel, 'failed');
+  const partialHint =
+    changedFiles.length > 0
+      ? ' Some files were updated but the edit did not finish — check the preview and try again.'
+      : '';
   return {
     ok: false,
     strategy: 'agent_loop',
     error: 'Max iterations reached',
-    ownerMessage: 'I ran out of steps to complete your request. Please try a more specific change.',
+    ownerMessage: `I ran out of steps to complete your request.${partialHint} Try a shorter, specific edit (e.g. "change background to blue" or "change hero headline to: Your text here").`,
   };
 }

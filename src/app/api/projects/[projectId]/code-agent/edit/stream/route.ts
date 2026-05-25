@@ -3,7 +3,9 @@
  * Save commits local changes to GitLab. Deploy is handled by /code-agent/deploy.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerUserId } from '@/lib/api/projectAccess';
+import { getOwnerProject, getServerUserId } from '@/lib/api/projectAccess';
+import { repairPreviewWorkspace } from '@/lib/preview/repairPreviewWorkspace';
+import { checkPreviewHealthy } from '@/lib/project-workspace/bootstrapProjectPreview';
 import { connectMongoDB } from '@/lib/mongodb';
 import { WebsiteProject } from '@/models/WebsiteProject';
 import { createProjectWorkspace } from '@/lib/project-workspace/createProjectWorkspace';
@@ -77,17 +79,18 @@ export async function POST(
   request: NextRequest,
   { params }: { params: { projectId: string } }
 ) {
-  const userId = await getServerUserId();
-  if (!userId) {
-    return NextResponse.json({ detail: 'Unauthorized' }, { status: 401 });
-  }
-
   await connectMongoDB();
 
   const projectId = params.projectId;
-  const project = await WebsiteProject.findOne({ _id: projectId, ownerId: userId });
+  const project = await getOwnerProject(projectId);
   if (!project) {
     return NextResponse.json({ detail: 'Project not found' }, { status: 404 });
+  }
+
+  const sessionUserId = await getServerUserId();
+  const userId = sessionUserId ?? project.ownerId?.toString() ?? '';
+  if (!userId) {
+    return NextResponse.json({ detail: 'Unauthorized' }, { status: 401 });
   }
 
   const body = await request.json();
@@ -152,7 +155,7 @@ export async function POST(
       const fail = async (
         ownerMessage: string,
         technicalDetail?: string,
-        options?: { showChangesTab?: boolean }
+        options?: { hasPartialChanges?: boolean }
       ) => {
         if (jobId) {
           await markEditJobStatus(jobId, 'failed', { error: ownerMessage });
@@ -167,7 +170,7 @@ export async function POST(
             ok: false,
             ownerMessage,
             jobId,
-            showChangesTab: options?.showChangesTab ?? false,
+            hasPartialChanges: options?.hasPartialChanges ?? false,
           },
         });
         closeStream();
@@ -326,12 +329,14 @@ export async function POST(
           await appendEditJobLog(jobId, 'agent_finished', 'Agent failed', { error: agentResult.error });
           const kept = await keepPartialChanges(agentResult.summary || 'Partial edit');
           emit('step', { id: 'apply_change', label: 'Applying your requested change', status: 'failed' });
+          emit('step', { id: 'validate', label: 'Checking the preview', status: 'failed' });
+          emit('step', { id: 'finish', label: 'Preview not updated', status: 'failed' });
           await fail(
             kept
-              ? 'Edit did not finish cleanly, but your local preview changes were kept. Use Force sync to GitLab to save them.'
+              ? "That edit didn't finish. Your preview may show unsaved local changes — open the Changes tab when you want to review or sync."
               : agentResult.error || "I couldn't apply that change. Please try again.",
             undefined,
-            { showChangesTab: kept }
+            { hasPartialChanges: kept }
           );
           return;
         }
@@ -342,6 +347,11 @@ export async function POST(
         });
         emit('step', { id: 'apply_change', label: 'Applying your requested change', status: 'completed' });
         emit('step', { id: 'validate', label: 'Checking the preview', status: 'active' });
+
+        if (mode === 'gitlab' && !isSandbox && workspacePath) {
+          await repairPreviewWorkspace(workspacePath);
+          await appendEditJobLog(jobId, 'workspace_repaired', 'Applied preview-safe repairs');
+        }
 
         const afterHashes = await computeHashes(gateway, source);
         const changedPaths = getChangedPathsFromHashes(beforeHashes, afterHashes);
@@ -357,12 +367,14 @@ export async function POST(
             await appendEditJobLog(jobId, 'rollback_done', 'Rollback complete');
           }
           emit('step', { id: 'validate', label: 'Checking the preview', status: 'failed' });
+          emit('step', { id: 'finish', label: 'Preview not updated', status: 'failed' });
           await fail("I couldn't apply that change safely.");
           return;
         }
 
         if (changedPaths.length === 0) {
           emit('step', { id: 'validate', label: 'Checking the preview', status: 'failed' });
+          emit('step', { id: 'finish', label: 'Preview not updated', status: 'failed' });
           await fail("I couldn't detect any changes from that request.");
           return;
         }
@@ -404,13 +416,14 @@ export async function POST(
             buildLog: validation.buildLog,
           });
           emit('step', { id: 'validate', label: 'Checking the preview', status: 'failed' });
+          emit('step', { id: 'finish', label: 'Preview not updated', status: 'failed' });
           const excerpt = validation.buildLog.slice(-1500);
           await fail(
             kept
-              ? 'The change broke the build, but local preview files were kept. Fix the issue or use Force sync to GitLab.'
+              ? "That edit broke the preview build. Unsaved local changes may still be visible — open the Changes tab to review or sync when ready."
               : 'The change broke the build.',
             excerpt,
-            { showChangesTab: kept }
+            { hasPartialChanges: kept }
           );
           return;
         }
@@ -418,6 +431,18 @@ export async function POST(
         await appendEditJobLog(jobId, 'validation_passed', 'Validation passed', {
           warnings: validation.warnings,
         });
+
+        const previewPort = project.preview?.port;
+        if (previewPort && !isSandbox) {
+          await new Promise((r) => setTimeout(r, 1500));
+          const previewHealthy = await checkPreviewHealthy(previewPort, 12_000);
+          await appendEditJobLog(
+            jobId,
+            previewHealthy ? 'preview_health_ok' : 'preview_health_slow',
+            previewHealthy ? 'Preview dev server healthy' : 'Preview may need a manual refresh',
+            { port: previewPort }
+          );
+        }
 
         const newVersion = previewVersionBefore + 1;
         await markEditJobStatus(jobId, 'ready', {
@@ -468,14 +493,17 @@ export async function POST(
           }
         }
         emit('step', { id: 'apply_change', label: 'Applying your requested change', status: 'failed' });
+        emit('step', { id: 'apply_change', label: 'Applying your requested change', status: 'failed' });
+        emit('step', { id: 'validate', label: 'Checking the preview', status: 'failed' });
+        emit('step', { id: 'finish', label: 'Preview not updated', status: 'failed' });
         const ownerMessage =
           errMsg.includes('Controller is already closed') ||
           errMsg.includes('Invalid state')
-            ? 'The edit connection closed early. Your preview may still have the changes — use Force sync on the Changes tab to save them to GitLab.'
+            ? "The edit connection closed early. Your preview may still have local changes — open the Changes tab if you need to review or sync."
             : kept
-              ? 'The edit stopped early, but your local preview changes were kept. Use Force sync on the Changes tab to save them to GitLab.'
+              ? "The edit stopped early. Your preview may still have local changes — open the Changes tab if you need to review or sync."
               : "I couldn't apply that change. Please try again.";
-        await fail(ownerMessage, errMsg, { showChangesTab: kept });
+        await fail(ownerMessage, errMsg, { hasPartialChanges: kept });
         return;
       }
 

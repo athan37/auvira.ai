@@ -7,11 +7,54 @@ describe('verifyEditApplied', () => {
     expect(r.ok).toBe(false);
   });
 
-  it('passes style change with color in css', () => {
+  it('passes style change with color in css when no page.tsx preset', () => {
     const r = verifyEditApplied(
       'make background blue',
       { 'globals.css': 'background: white' },
       { 'globals.css': 'background: blue' }
+    );
+    expect(r.ok).toBe(true);
+  });
+
+  it('fails blue background when page.tsx still uses bg-red', () => {
+    const page = `export default function Page() {
+      const preset = { pageBg: "bg-red-600", heroBg: "bg-red-700" };
+      return <main className={preset.pageBg}>Hero</main>;
+    }`;
+    const r = verifyEditApplied(
+      'change background to blue',
+      { 'src/app/page.tsx': page, 'src/app/globals.css': 'body {}' },
+      {
+        'src/app/page.tsx': page,
+        'src/app/globals.css': '/* blue theme */ body { background: blue; }',
+      }
+    );
+    expect(r.ok).toBe(false);
+    expect(r.reason).toMatch(/page\.tsx/i);
+  });
+
+  it('passes blue background when page.tsx uses bg-blue', () => {
+    const before = `const preset = { pageBg: "bg-red-600" };`;
+    const after = `const preset = { pageBg: "bg-blue-600", heroBg: "bg-blue-700" };
+      return <main className="bg-blue-600">Hero</main>;`;
+    const r = verifyEditApplied(
+      'change background to blue',
+      { 'src/app/page.tsx': before },
+      { 'src/app/page.tsx': after }
+    );
+    expect(r.ok).toBe(true);
+  });
+
+  it('passes blue background when preset is blue but buttons still use bg-white', () => {
+    const after = `const preset = {
+      pageBg: "bg-blue-500",
+      heroBg: "bg-blue-700",
+      primaryButton: "bg-white text-blue-600"
+    };`;
+    const r = verifyEditApplied(
+      'change background to blue',
+      { 'src/app/page.tsx': 'const preset = { pageBg: "bg-green-500" };' },
+      { 'src/app/page.tsx': after }
     );
     expect(r.ok).toBe(true);
   });

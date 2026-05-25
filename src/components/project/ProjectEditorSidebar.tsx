@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { cn } from '@/lib/cn';
 import { ProjectPreviewChat, type EditCompleteResult } from '@/components/ProjectPreviewChat';
 import { ChangedFilesPanel } from '@/components/project/ChangedFilesPanel';
@@ -33,7 +33,6 @@ interface Props {
   editInProgress?: boolean;
   deployment?: Deployment | null;
   lastPublishedAt?: string;
-  changesTabTrigger?: number;
   onEditStart?: () => void;
   onEditSuccess: () => void;
   onEditComplete: (result: EditCompleteResult) => void;
@@ -52,7 +51,6 @@ export function ProjectEditorSidebar({
   editInProgress,
   deployment,
   lastPublishedAt,
-  changesTabTrigger = 0,
   onEditStart,
   onEditSuccess,
   onEditComplete,
@@ -60,10 +58,6 @@ export function ProjectEditorSidebar({
   onDeploySuccess,
 }: Props) {
   const [tab, setTab] = useState<Tab>('chat');
-
-  useEffect(() => {
-    if (changesTabTrigger > 0) setTab('changes');
-  }, [changesTabTrigger]);
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'chat', label: 'Chat' },
