@@ -7,6 +7,7 @@ import { createGitLabProject } from '@/lib/gitlab/createProject';
 import { commitFilesToGitLab } from '@/lib/gitlab/commitFiles';
 import { WebsiteProject, type IWebsiteProject } from '@/models/WebsiteProject';
 import { ProjectAction } from '@/models/ProjectAction';
+import { ensureClonePreviewWorkspace } from '@/lib/clone/ensureClonePreviewWorkspace';
 
 const SKIP_DIRS = ['node_modules', '.next', '.git'];
 
@@ -81,10 +82,7 @@ export async function saveClonePreviewToGitLab(
   job: ICloneJob,
   userId: string
 ): Promise<SaveClonePreviewResult> {
-  const workspacePath = job.technicalBuild?.workspacePath;
-  if (!workspacePath || !existsSync(workspacePath)) {
-    throw new Error('Preview workspace not found. Please rebuild preview.');
-  }
+  const workspacePath = await ensureClonePreviewWorkspace(job);
 
   const files = readWorkspaceFiles(workspacePath);
   if (files.length === 0) {

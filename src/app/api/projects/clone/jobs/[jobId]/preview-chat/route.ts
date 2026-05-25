@@ -4,6 +4,7 @@ import { CloneJob } from '@/lib/db/models/CloneJob';
 import { getLLMClient } from '@/lib/llm/llmClient';
 import { buildApplyEditPrompt } from '@/lib/agent/prompts';
 import { generateDesignBriefAgent, getDefaultDesignBrief } from '@/lib/agent/generateDesignBriefAgent';
+import { ensureClonePreviewWorkspace } from '@/lib/clone/ensureClonePreviewWorkspace';
 import { generateWebsiteFiles } from '@/lib/builder/generateWebsiteFiles';
 import { validateGeneratedFiles } from '@/lib/builder/validateGeneratedFiles';
 import { spawn } from 'child_process';
@@ -70,11 +71,10 @@ export async function POST(
   }
 
   const llmClient = getLLMClient();
-  const { scratchPath } = await import('@/lib/runtime/scratchDir');
-  const workspacePath =
-    job.technicalBuild?.workspacePath || scratchPath('generated-sites', params.jobId);
+  let workspacePath: string;
 
   try {
+    workspacePath = await ensureClonePreviewWorkspace(job);
     // Step 1: Load current previewSiteSpec and generate updated spec
     const currentSpec = job.previewSiteSpec as Record<string, unknown>;
     if (!currentSpec) {

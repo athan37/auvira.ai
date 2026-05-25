@@ -73,10 +73,23 @@ export async function releaseProjectScratch(projectId: string): Promise<{ remove
   return { removed };
 }
 
+async function getActiveClonePreviewJobIds(): Promise<Set<string>> {
+  try {
+    const { connectMongoDB } = await import('@/lib/mongodb');
+    const { CloneJob } = await import('@/lib/db/models/CloneJob');
+    await connectMongoDB();
+    const jobs = await CloneJob.find({ status: 'preview_ready' }).select('_id').lean();
+    return new Set(jobs.map((j) => String(j._id)));
+  } catch {
+    return new Set();
+  }
+}
+
 async function pruneChildrenInDir(
   parentDir: string,
   ttlMs: number,
-  removed: string[]
+  removed: string[],
+  protectedNames?: Set<string>
 ): Promise<void> {
   let entries: string[];
   try {
@@ -86,6 +99,8 @@ async function pruneChildrenInDir(
   }
 
   for (const name of entries) {
+    if (protectedNames?.has(name)) continue;
+
     const child = path.join(parentDir, name);
     if (!isUnderScratchRoot(child)) continue;
 
@@ -128,8 +143,15 @@ export async function pruneExpiredScratch(ttlMs = getScratchTtlMs()): Promise<{ 
   const removed: string[] = [];
   const root = getScratchRoot();
 
-  for (const prefix of [...PROJECT_SCRATCH_PREFIXES, ...EPHEMERAL_PREFIXES]) {
+  const activeCloneJobs = await getActiveClonePreviewJobIds();
+
+  for (const prefix of PROJECT_SCRATCH_PREFIXES) {
     await pruneChildrenInDir(path.join(root, prefix), ttlMs, removed);
+  }
+
+  for (const prefix of EPHEMERAL_PREFIXES) {
+    const protectedNames = prefix === 'generated-sites' ? activeCloneJobs : undefined;
+    await pruneChildrenInDir(path.join(root, prefix), ttlMs, removed, protectedNames);
   }
 
   if (removed.length > 0) {

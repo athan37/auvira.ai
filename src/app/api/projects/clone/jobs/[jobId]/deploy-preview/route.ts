@@ -6,7 +6,7 @@ import {
   generateUniqueProjectName,
   saveClonePreviewToGitLab,
 } from '@/lib/clone/persistClonePreview';
-import { existsSync } from 'fs';
+import { ensureClonePreviewWorkspace } from '@/lib/clone/ensureClonePreviewWorkspace';
 import mongoose from 'mongoose';
 
 export const runtime = 'nodejs';
@@ -71,10 +71,11 @@ export async function POST(
   }
 
   const jobId = job._id;
-  const workspacePath = job.technicalBuild?.workspacePath;
-
-  if (!workspacePath || !existsSync(workspacePath)) {
-    return NextResponse.json({ ok: false, error: 'Preview workspace not found. Please rebuild preview.' }, { status: 400 });
+  try {
+    await ensureClonePreviewWorkspace(job);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Preview workspace not found. Please rebuild preview.';
+    return NextResponse.json({ ok: false, error: msg }, { status: 400 });
   }
 
   // Keep preview server running during deploy — will stop after Vercel is ready
