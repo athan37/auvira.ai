@@ -10,6 +10,7 @@ import { Badge, statusToBadgeTone } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardBody } from '@/components/ui/Card';
 import { Spinner } from '@/components/ui/Spinner';
+import EditErrorTrace from '@/components/project/EditErrorTrace';
 
 interface ChangedFile {
   path: string;
@@ -26,7 +27,12 @@ interface DiffResponse {
   summary: string | null;
   error: string | null;
   buildLog: string | null;
-  logs: Array<{ type: string; message: string; createdAt: string }>;
+  logs: Array<{
+    type: string;
+    message: string;
+    createdAt: string;
+    metadata?: Record<string, unknown>;
+  }>;
 }
 
 interface Props {
@@ -127,6 +133,13 @@ export function ChangedFilesPanel({
   const isFailed = data.status === 'failed';
   const isIncomplete = isFailed && (changedCount > 0 || Boolean(friendlyError));
   const canUndo = data.status === 'ready';
+  const errorTraceLog = data.logs?.find((log) => log.type === 'error_trace');
+  const errorTrace =
+    typeof errorTraceLog?.metadata?.copyText === 'string'
+      ? errorTraceLog.metadata.copyText
+      : null;
+  const errorStage =
+    typeof errorTraceLog?.metadata?.stage === 'string' ? errorTraceLog.metadata.stage : undefined;
 
   const handleRollback = async () => {
     if (!data.jobId || rollingBack) return;
@@ -216,6 +229,10 @@ export function ChangedFilesPanel({
           </div>
         )}
 
+        {isFailed && errorTrace && (
+          <EditErrorTrace trace={errorTrace} jobId={data.jobId ?? undefined} stage={errorStage} />
+        )}
+
         {data.summary && !isFailed && (
           <p className="text-xs text-zinc-600">{data.summary}</p>
         )}
@@ -278,11 +295,16 @@ export function ChangedFilesPanel({
             </button>
             {showAgentLogs && (
               <ul className="mt-2 text-xs space-y-1 max-h-28 overflow-y-auto text-zinc-600">
-                {data.logs.map((log, i) => (
-                  <li key={i}>
-                    <span className="text-zinc-400">{log.type}</span> {log.message}
-                  </li>
-                ))}
+                {data.logs
+                  .filter((log) => log.type !== 'error_trace')
+                  .map((log, i) => (
+                    <li key={i}>
+                      <span className="text-zinc-400">{log.type}</span> {log.message}
+                      {log.type === 'error_detail' && log.metadata?.stage ? (
+                        <span className="text-zinc-400"> ({String(log.metadata.stage)})</span>
+                      ) : null}
+                    </li>
+                  ))}
               </ul>
             )}
           </div>

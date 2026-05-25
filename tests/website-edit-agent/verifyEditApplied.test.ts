@@ -68,6 +68,26 @@ describe('verifyEditApplied', () => {
     expect(r.ok).toBe(false);
   });
 
+  it('passes section with image gallery in siteConfig', () => {
+    const before = `export const siteConfig = { sections: [] };`;
+    const after = `export const siteConfig = { sections: [{
+      type: "generic",
+      title: "Product documentation",
+      body: "Great docs",
+      items: [
+        { title: "A", imageUrl: "/uploads/a.jpg" },
+        { title: "B", imageUrl: "/uploads/b.jpg" }
+      ]
+    }] };`;
+
+    const r = verifyEditApplied(
+      'these are great documentations, make a section for it',
+      { 'src/lib/siteConfig.ts': before },
+      { 'src/lib/siteConfig.ts': after }
+    );
+    expect(r.ok).toBe(true);
+  });
+
   it('passes section request when siteConfig sections grow', () => {
     const before = `export const siteConfig = { sections: [{ type: "about", title: "About", items: [] }] };`;
     const after = `${before.slice(0, -2)}, { type: "faq", title: "FAQ", items: [

@@ -2,7 +2,7 @@ export type WorkspaceMode = 'gitlab' | 'static';
 
 export type EditIntent = 'style' | 'copy' | 'section' | 'contact' | 'general';
 
-export type EditStrategyKind = 'single_shot' | 'agent_loop';
+export type EditStrategyKind = 'single_shot' | 'agent_loop' | 'image_gallery';
 
 export interface AgentStepEvent {
   type: 'step';

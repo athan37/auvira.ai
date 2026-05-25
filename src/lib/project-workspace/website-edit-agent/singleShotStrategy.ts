@@ -2,11 +2,12 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { getLLMClient } from '@/lib/llm/llmClient';
 import { getChangedFilesFromHashes, computeWorkspaceHashes, isSafeWritePath } from '../workspaceEditShared';
-import { discoverContextFiles } from './discoverContextFiles';
+import { discoverContextFiles, PRIORITY_CONTEXT_FILES } from './discoverContextFiles';
+import { loadContextFileContents } from './discoverContextFiles';
 import { buildImageAttachmentGuidance } from './enrichEditPrompt';
 import type { WebsiteEditAgentOptions, WebsiteEditAgentResult, WorkspaceMode } from './types';
 
-const MAX_FILE_BYTES = 80_000;
+const MAX_FILE_BYTES = 12_000;
 
 type FileEdit = { path: string; content: string };
 type LlmEditResponse = { files: FileEdit[]; summary?: string };
@@ -26,24 +27,38 @@ export async function runSingleShotStrategy(
   options: WebsiteEditAgentOptions,
   beforeHashes: Record<string, string>
 ): Promise<WebsiteEditAgentResult | null> {
-  const candidates = await discoverCandidateFiles(
+  const isSectionEdit = /\b(section|add a|add new|make a)\b/.test(
+    options.ownerMessage.toLowerCase()
+  );
+  const hasImages = (options.attachments?.length ?? 0) > 0;
+
+  let candidates = await discoverCandidateFiles(
     options.workspacePath,
     options.mode,
     options.ownerMessage
   );
+  if (isSectionEdit || hasImages) {
+    candidates = [...PRIORITY_CONTEXT_FILES];
+  }
 
   const filePayload: Record<string, string> = {};
-  for (const rel of candidates) {
-    try {
-      const content = options.gateway
-        ? await options.gateway.readFile(rel)
-        : await fs.readFile(path.join(options.workspacePath, rel), 'utf-8');
-      if (content.length < MAX_FILE_BYTES) {
-        filePayload[rel] = content;
+  if (options.gateway) {
+    for (const rel of candidates) {
+      try {
+        const content = await options.gateway.readFile(rel);
+        filePayload[rel] =
+          content.length <= MAX_FILE_BYTES
+            ? content
+            : `${content.slice(0, MAX_FILE_BYTES)}\n/* … truncated … */`;
+      } catch {
+        /* missing */
       }
-    } catch {
-      /* missing */
     }
+  } else {
+    Object.assign(
+      filePayload,
+      await loadContextFileContents(options.workspacePath, candidates)
+    );
   }
 
   if (Object.keys(filePayload).length === 0) {
@@ -55,7 +70,6 @@ export async function runSingleShotStrategy(
     lower.includes('background') ||
     lower.includes('color') ||
     /\b(green|red|blue|yellow|orange|purple|pink)\b/.test(lower);
-  const isSectionEdit = /\b(section|add a|add new|make a)\b/.test(lower);
   const imageGuidance = buildImageAttachmentGuidance(options.attachments ?? []);
 
   const llm = getLLMClient();

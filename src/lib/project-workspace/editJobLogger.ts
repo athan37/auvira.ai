@@ -5,6 +5,7 @@ import {
   type IProjectEditJob,
   type ProjectEditJobStatus,
 } from '@/models/ProjectEditJob';
+import type { EditFailureReport } from './editFailureDetail';
 
 export async function createEditJob(params: {
   projectId: string;
@@ -51,6 +52,32 @@ export async function appendEditJobLog(
       },
     }
   );
+}
+
+/** Persist a full copy/paste trace plus structured metadata on the edit job. */
+export async function logEditFailureTrace(
+  jobId: string,
+  report: EditFailureReport
+): Promise<void> {
+  const shortMsg =
+    (report.metadata.technicalMessage as string | undefined) ||
+    (report.metadata.stage as string | undefined) ||
+    'Edit failed';
+
+  await appendEditJobLog(jobId, 'error_detail', truncateLogMessage(shortMsg), {
+    stage: report.metadata.stage,
+    jobId: report.metadata.jobId,
+    projectId: report.metadata.projectId,
+  });
+
+  await appendEditJobLog(jobId, 'error_trace', 'Full failure trace (copy from metadata.copyText)', {
+    ...report.metadata,
+    copyText: report.copyText,
+  });
+}
+
+function truncateLogMessage(msg: string, max = 500): string {
+  return msg.length <= max ? msg : `${msg.slice(0, max)}…`;
 }
 
 export async function markEditJobStatus(

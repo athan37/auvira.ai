@@ -1,5 +1,6 @@
 import type { EditIntent } from './types';
 import type { WorkspaceAssetAttachment } from '../workspaceAssetTypes';
+import type { WorkspaceGateway } from '../workspaceGateway';
 import {
   discoverContextFiles,
   loadContextFileContents,
@@ -247,15 +248,38 @@ function formatContextBlock(context: Record<string, string>): string {
 /**
  * Combine owner message with a snapshot of relevant site files and explicit task guidance.
  */
+async function loadContextViaGateway(
+  gateway: WorkspaceGateway,
+  paths: string[]
+): Promise<Record<string, string>> {
+  const out: Record<string, string> = {};
+  const maxBytes = 12_000;
+  for (const rel of paths) {
+    try {
+      const content = await gateway.readFile(rel);
+      out[rel] =
+        content.length <= maxBytes
+          ? content
+          : `${content.slice(0, maxBytes)}\n/* … truncated … */`;
+    } catch {
+      /* missing */
+    }
+  }
+  return out;
+}
+
 export async function enrichEditPrompt(
   workspacePath: string,
   mode: 'gitlab' | 'static',
   ownerMessage: string,
   intent: EditIntent,
-  attachments: WorkspaceAssetAttachment[] = []
+  attachments: WorkspaceAssetAttachment[] = [],
+  gateway?: WorkspaceGateway
 ): Promise<EnrichedEditPrompt> {
   const paths = await discoverContextFiles(workspacePath, mode, ownerMessage);
-  const context = await loadContextFileContents(workspacePath, paths);
+  const context = gateway
+    ? await loadContextViaGateway(gateway, paths)
+    : await loadContextFileContents(workspacePath, paths);
   const contextBlock = formatContextBlock(context);
   const guidance = buildIntentGuidance(intent, ownerMessage, context);
   const imageGuidance = buildImageAttachmentGuidance(attachments);

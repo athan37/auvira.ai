@@ -42,7 +42,12 @@ export async function GET(
     summary: job.summary || null,
     error: job.error || null,
     buildLog: job.buildLog || null,
-    logs: job.logs ?? [],
+    logs: (job.logs ?? []).map((log) => ({
+      type: log.type,
+      message: log.message,
+      createdAt: log.createdAt,
+      metadata: log.metadata,
+    })),
     prompt: job.prompt,
   });
 }

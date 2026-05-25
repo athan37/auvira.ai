@@ -223,6 +223,24 @@ function GenericSection({ section }: { section: SiteSection }) {
           <h2 className={"text-3xl font-semibold tracking-tight md:text-5xl " + preset.sectionTitle}>{section.title}</h2>
           {section.body && <p className={"mt-5 text-lg leading-8 " + preset.sectionBody}>{section.body}</p>}
         </div>
+        {section.items?.some((item) => (item as { imageUrl?: string }).imageUrl) && (
+          <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {section.items
+              .filter((item) => (item as { imageUrl?: string }).imageUrl)
+              .map((item, i) => (
+                <figure key={i} className={"overflow-hidden rounded-3xl border " + preset.card}>
+                  <img
+                    src={(item as { imageUrl: string }).imageUrl}
+                    alt={item.title || "Product image"}
+                    className="h-48 w-full object-cover"
+                  />
+                  {item.title ? (
+                    <figcaption className="p-4 text-sm font-semibold text-slate-950">{item.title}</figcaption>
+                  ) : null}
+                </figure>
+              ))}
+          </div>
+        )}
         {section.items && section.items.length > 0 && (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {section.items.slice(0, 6).map((item, i) => (

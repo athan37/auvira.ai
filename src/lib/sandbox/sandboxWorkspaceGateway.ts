@@ -8,9 +8,10 @@ import {
 } from '@/lib/project-workspace/workspaceEditShared';
 import type { WorkspaceGateway } from '@/lib/project-workspace/workspaceGateway';
 import { getProjectSandbox } from './sandboxClient';
+import { writeSandboxFile } from './sandboxFsWrite';
 import { SANDBOX_WORKDIR } from './types';
 
-function absSandboxPath(relPath: string): string {
+export function absSandboxPath(relPath: string): string {
   const normalized = relPath.replace(/^\/+/, '');
   return path.posix.join(SANDBOX_WORKDIR, normalized);
 }
@@ -44,7 +45,7 @@ export class SandboxGateway implements WorkspaceGateway {
     } catch {
       await this.sandbox.runCommand({ cmd: 'mkdir', args: ['-p', dir] });
     }
-    await this.sandbox.fs.writeFile(abs, content, 'utf8');
+    await writeSandboxFile(this.sandbox, abs, content);
   }
 
   async searchFiles(pattern: string): Promise<string[]> {

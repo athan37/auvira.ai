@@ -64,6 +64,10 @@ export function buildAssetPreviewUrl(
   publicUrl: string
 ): string {
   const clean = publicUrl.replace(/^\/+/, '');
+  // Uploaded files live in the workspace repo; serve via app API (works locally + Vercel Sandbox).
+  if (clean.startsWith('uploads/') || clean.startsWith('assets/uploads/')) {
+    return `/api/projects/${projectId}/workspace/asset/${clean}`;
+  }
   if (mode === 'gitlab') {
     return `/api/projects/${projectId}/preview/proxy/${clean}`;
   }

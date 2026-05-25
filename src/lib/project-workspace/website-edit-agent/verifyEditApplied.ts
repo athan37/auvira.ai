@@ -212,9 +212,11 @@ export function verifyEditApplied(
       const growth = after.length - before.length;
       const hasSections = /sections\s*:/.test(after);
       const hasItems = /items\s*:\s*\[|"items"\s*:\s*\[/.test(after);
+      const hasGalleryImages =
+        /imageUrl/i.test(after) || /\/uploads\//i.test(after);
       const meaningfulChange = before !== after && Math.abs(growth) >= 10;
 
-      if (meaningfulChange && hasSections && hasItems) {
+      if (meaningfulChange && hasSections && (hasItems || hasGalleryImages)) {
         evidence.push(`siteConfig sections updated (${growth >= 0 ? '+' : ''}${growth} chars)`);
         return { ok: true, reason: 'Section content added in siteConfig.', evidence };
       }

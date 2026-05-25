@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { cn } from '@/lib/cn';
+import EditErrorTrace from '@/components/project/EditErrorTrace';
 
 import {
   MAX_IMAGES_PER_UPLOAD,
@@ -29,6 +30,10 @@ type ChatMessage = {
   imagePreviews?: string[];
   /** Assistant message for a failed edit. */
   isError?: boolean;
+  /** Copy/paste diagnostic block from the server. */
+  errorTrace?: string;
+  errorStage?: string;
+  errorJobId?: string;
 };
 
 interface ProjectPreviewChatProps {
@@ -307,6 +312,8 @@ export function ProjectPreviewChat({
     let success = false;
     let finalOwnerMessage = '';
     let editFailed = false;
+    let errorTrace = '';
+    let errorStage = '';
     let attachments: WorkspaceAssetAttachment[] = [];
 
     try {
@@ -378,6 +385,10 @@ export function ProjectPreviewChat({
                 (success
                   ? 'Your website has been updated.'
                   : "I couldn't apply that change. Please try again or rephrase your request.");
+              if (!success && typeof result.errorTrace === 'string') {
+                errorTrace = result.errorTrace;
+                errorStage = typeof result.errorStage === 'string' ? result.errorStage : '';
+              }
             }
           } catch {
             /* skip malformed SSE */
@@ -397,7 +408,14 @@ export function ProjectPreviewChat({
 
       setMessages((prev) => [
         ...prev,
-        { role: 'assistant', content: finalOwnerMessage, isError: editFailed },
+        {
+          role: 'assistant',
+          content: finalOwnerMessage,
+          isError: editFailed,
+          errorTrace: editFailed && errorTrace ? errorTrace : undefined,
+          errorStage: editFailed && errorStage ? errorStage : undefined,
+          errorJobId: editFailed && jobId ? jobId : undefined,
+        },
       ]);
       onEditComplete?.({ ok: success, jobId });
 
@@ -411,10 +429,28 @@ export function ProjectPreviewChat({
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Something went wrong. Please try again.';
+      const clientTrace = [
+        '=== Site Agent — Client-side failure ===',
+        `time: ${new Date().toISOString()}`,
+        `projectId: ${projectId}`,
+        jobId ? `jobId: ${jobId}` : 'jobId: (not assigned)',
+        '',
+        '--- Error ---',
+        error instanceof Error ? error.message : String(error),
+        error instanceof Error && error.stack ? `\n--- Stack ---\n${error.stack}` : '',
+        '=== End trace ===',
+      ].join('\n');
       setAgentSteps((prev) => markStepsOnEditFailure(prev));
       setMessages((prev) => [
         ...prev,
-        { role: 'assistant', content: message, isError: true },
+        {
+          role: 'assistant',
+          content: message,
+          isError: true,
+          errorTrace: clientTrace,
+          errorStage: 'client_error',
+          errorJobId: jobId,
+        },
       ]);
       setUploadError(message);
       onEditComplete?.({ ok: false, jobId });
@@ -490,6 +526,13 @@ export function ProjectPreviewChat({
                   </p>
                 )}
                 {msg.content}
+                {msg.isError && msg.errorTrace && (
+                  <EditErrorTrace
+                    trace={msg.errorTrace}
+                    jobId={msg.errorJobId}
+                    stage={msg.errorStage}
+                  />
+                )}
                 {msg.imagePreviews && msg.imagePreviews.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {msg.imagePreviews.map((src) => (

@@ -25,7 +25,12 @@ import {
   appendEditJobLog,
   markEditJobStatus,
   attachChangedFiles,
+  logEditFailureTrace,
 } from '@/lib/project-workspace/editJobLogger';
+import {
+  buildEditFailureReport,
+  type EditFailureStage,
+} from '@/lib/project-workspace/editFailureDetail';
 import { promises as fs } from 'fs';
 import path from 'path';
 import crypto from 'crypto';
@@ -154,17 +159,40 @@ export async function POST(
       let isSandbox = false;
       let beforeHashes: Record<string, string> = {};
 
-      const fail = async (
-        ownerMessage: string,
-        technicalDetail?: string,
-        options?: { hasPartialChanges?: boolean }
-      ) => {
+      type FailOptions = {
+        stage: EditFailureStage;
+        technicalMessage?: string;
+        error?: unknown;
+        hasPartialChanges?: boolean;
+        extra?: Record<string, unknown>;
+      };
+
+      const baseEditContext = (): Record<string, unknown> => ({
+        sandbox: isSandbox,
+        mode,
+        source,
+        workspacePath: workspacePath || null,
+        attachmentCount: attachments.length,
+        promptExcerpt: message.slice(0, 400),
+        previewVersionBefore,
+      });
+
+      const fail = async (ownerMessage: string, options: FailOptions) => {
+        const report = buildEditFailureReport({
+          jobId: jobId || 'unknown',
+          projectId,
+          stage: options.stage,
+          ownerMessage,
+          technicalMessage: options.technicalMessage,
+          error: options.error,
+          context: { ...baseEditContext(), ...options.extra },
+        });
+
         if (jobId) {
           await markEditJobStatus(jobId, 'failed', { error: ownerMessage });
-          if (technicalDetail && technicalDetail !== ownerMessage) {
-            await appendEditJobLog(jobId, 'error_detail', technicalDetail);
-          }
+          await logEditFailureTrace(jobId, report);
         }
+
         emit('done', {
           ok: false,
           jobId,
@@ -172,7 +200,9 @@ export async function POST(
             ok: false,
             ownerMessage,
             jobId,
-            hasPartialChanges: options?.hasPartialChanges ?? false,
+            hasPartialChanges: options.hasPartialChanges ?? false,
+            errorTrace: report.copyText,
+            errorStage: options.stage,
           },
         });
         closeStream();
@@ -328,7 +358,12 @@ export async function POST(
         }
 
         if (!agentResult.ok) {
-          await appendEditJobLog(jobId, 'agent_finished', 'Agent failed', { error: agentResult.error });
+          await appendEditJobLog(jobId, 'agent_finished', 'Agent failed', {
+            error: agentResult.error,
+            strategy: agentResult.strategy,
+            agent: agentResult.agent,
+            changedFiles: agentResult.changedFiles,
+          });
           const kept = await keepPartialChanges(agentResult.summary || 'Partial edit');
           emit('step', { id: 'apply_change', label: 'Applying your requested change', status: 'failed' });
           emit('step', { id: 'validate', label: 'Checking the preview', status: 'failed' });
@@ -336,9 +371,20 @@ export async function POST(
           await fail(
             kept
               ? "That edit didn't finish. Your preview may show unsaved local changes — open the Changes tab when you want to review or sync."
-              : agentResult.error || "I couldn't apply that change. Please try again.",
-            undefined,
-            { hasPartialChanges: kept }
+              : agentResult.ownerMessage ||
+                  agentResult.error ||
+                  "I couldn't apply that change. Please try again.",
+            {
+              stage: 'agent_failed',
+              technicalMessage: agentResult.error,
+              hasPartialChanges: kept,
+              extra: {
+                strategy: agentResult.strategy,
+                agent: agentResult.agent,
+                changedFiles: agentResult.changedFiles,
+                agentOwnerMessage: agentResult.ownerMessage,
+              },
+            }
           );
           return;
         }
@@ -378,14 +424,19 @@ export async function POST(
           }
           emit('step', { id: 'validate', label: 'Checking the preview', status: 'failed' });
           emit('step', { id: 'finish', label: 'Preview not updated', status: 'failed' });
-          await fail("I couldn't apply that change safely.");
+          await fail("I couldn't apply that change safely.", {
+            stage: 'blocked_paths',
+            extra: { blockedPaths: blockedChanged },
+          });
           return;
         }
 
         if (changedPaths.length === 0) {
           emit('step', { id: 'validate', label: 'Checking the preview', status: 'failed' });
           emit('step', { id: 'finish', label: 'Preview not updated', status: 'failed' });
-          await fail("I couldn't detect any changes from that request.");
+          await fail("I couldn't detect any changes from that request.", {
+            stage: 'no_changes',
+          });
           return;
         }
 
@@ -432,8 +483,17 @@ export async function POST(
             kept
               ? "That edit broke the preview build. Unsaved local changes may still be visible — open the Changes tab to review or sync when ready."
               : 'The change broke the build.',
-            excerpt,
-            { hasPartialChanges: kept }
+            {
+              stage: 'validation_failed',
+              technicalMessage: validation.errors.join('; ') || excerpt,
+              hasPartialChanges: kept,
+              extra: {
+                validationErrors: validation.errors,
+                validationWarnings: validation.warnings,
+                buildLogExcerpt: excerpt,
+                changedPaths,
+              },
+            }
           );
           return;
         }
@@ -456,7 +516,11 @@ export async function POST(
             emit('step', { id: 'validate', label: 'Restarting preview server', status: 'failed' });
             await fail(
               'Your changes were saved, but the preview server needs a refresh. Close and reopen the project, or try your edit again.',
-              msg
+              {
+                stage: 'preview_restart_failed',
+                technicalMessage: msg,
+                error: restartErr,
+              }
             );
             return;
           }
@@ -534,14 +598,25 @@ export async function POST(
         emit('step', { id: 'apply_change', label: 'Applying your requested change', status: 'failed' });
         emit('step', { id: 'validate', label: 'Checking the preview', status: 'failed' });
         emit('step', { id: 'finish', label: 'Preview not updated', status: 'failed' });
+        const sandboxWriteFailed = errMsg.includes('Status code 400 is not ok');
         const ownerMessage =
           errMsg.includes('Controller is already closed') ||
           errMsg.includes('Invalid state')
             ? "The edit connection closed early. Your preview may still have local changes — open the Changes tab if you need to review or sync."
-            : kept
-              ? "The edit stopped early. Your preview may still have local changes — open the Changes tab if you need to review or sync."
-              : "I couldn't apply that change. Please try again.";
-        await fail(ownerMessage, errMsg, { hasPartialChanges: kept });
+            : sandboxWriteFailed
+              ? "The preview environment couldn't save your changes (sandbox write error). Please try the edit again; if it keeps failing, refresh the page to restart preview."
+              : kept
+                ? "The edit stopped early. Your preview may still have local changes — open the Changes tab if you need to review or sync."
+                : "I couldn't apply that change. Please try again.";
+        await fail(ownerMessage, {
+          stage: 'unexpected_error',
+          technicalMessage: errMsg,
+          error,
+          hasPartialChanges: kept,
+          extra: {
+            sandboxWriteFailed: errMsg.includes('Status code 400 is not ok'),
+          },
+        });
         return;
       }
 

@@ -5,6 +5,7 @@ import { routeEditRequest } from './intentRouter';
 import { enrichEditPrompt } from './enrichEditPrompt';
 import { runSingleShotStrategy } from './singleShotStrategy';
 import { runSectionConfigStrategy } from './sectionConfigStrategy';
+import { runImageGallerySectionStrategy } from './imageGallerySectionStrategy';
 import { runAgentLoop } from './WebsiteEditAgent';
 import type {
   AgentStepEvent,
@@ -109,6 +110,13 @@ export async function runWebsiteEditAgent(
         const content = await readWorkspaceRel(options, rel);
         if (content) beforeFiles[rel] = content;
       }
+      const gallery = await runImageGallerySectionStrategy(options, beforeHashes);
+      if (gallery?.ok) {
+        return gallery;
+      }
+      if (gallery && !gallery.ok) {
+        return gallery;
+      }
       const fast = await runSingleShotStrategy(options, beforeHashes);
       if (fast?.ok && fast.changedFiles?.length) {
         const capturedAfter = await captureChangedFileContents(options, fast.changedFiles);
@@ -142,7 +150,8 @@ export async function runWebsiteEditAgent(
     options.mode,
     options.ownerMessage,
     decision.intent,
-    options.attachments || []
+    options.attachments || [],
+    options.gateway
   );
 
   return runAgentLoop(

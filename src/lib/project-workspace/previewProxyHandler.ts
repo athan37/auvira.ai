@@ -144,6 +144,29 @@ export async function handlePreviewProxyGet(
     return NextResponse.json({ ok: false, error: 'Project not found' }, { status: 404 });
   }
 
+  const pathSegment = cleanPath === '/' ? '/' : cleanPath;
+  const previewMode = (project.preview as { previewMode?: string } | undefined)?.previewMode;
+  const sandboxPreviewUrl = project.preview?.url?.trim();
+
+  if (
+    previewMode === 'sandbox' &&
+    sandboxPreviewUrl &&
+    /^\/uploads\//i.test(cleanPath)
+  ) {
+    const target = `${sandboxPreviewUrl.replace(/\/$/, '')}${pathSegment}${url.search}`;
+    try {
+      const res = await fetch(target, { cache: 'no-store' });
+      const buffer = Buffer.from(await res.arrayBuffer());
+      const headers = new Headers();
+      const ct = res.headers.get('content-type');
+      if (ct) headers.set('content-type', ct);
+      headers.set('cache-control', 'no-store');
+      return new NextResponse(buffer, { status: res.status, headers });
+    } catch {
+      /* fall through */
+    }
+  }
+
   const port = project.preview?.port;
   if (port && project.preview?.status === 'ready') {
     const healthy = await checkPreviewHealthy(port);
@@ -184,7 +207,6 @@ export async function handlePreviewProxyGet(
     return friendlyHtml(label);
   }
 
-  const pathSegment = cleanPath === '/' ? '/' : cleanPath;
   const target = `http://127.0.0.1:${port}${pathSegment}${url.search}`;
 
   try {
