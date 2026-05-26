@@ -19,6 +19,9 @@ export interface WebsiteEditResult {
   changedFiles?: string[];
   agent?: WebsiteEditAgentMode;
   strategy?: string;
+  tier?: string;
+  confidence?: string;
+  verifyProfile?: string;
 }
 
 import type { WorkspaceGateway } from './workspaceGateway';
@@ -76,5 +79,8 @@ export async function runWebsiteEdit(
     changedFiles: result.changedFiles,
     agent: 'ts',
     strategy: result.strategy,
+    tier: result.tier,
+    confidence: result.confidence,
+    verifyProfile: result.verifyProfile,
   };
 }
