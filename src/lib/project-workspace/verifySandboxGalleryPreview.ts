@@ -1,7 +1,25 @@
+import { parseSiteConfigSource } from '@/lib/site-manager/siteConfigParser';
 import { canRenderUploadedImages } from './website-edit-agent/universalImageRenderer';
-import { validateGalleryInSiteConfigSource } from './website-edit-agent/validateGallerySiteConfig';
+import {
+  sectionItemsHaveImageUrls,
+  validateGalleryInSiteConfigSource,
+} from './website-edit-agent/validateGallerySiteConfig';
 import type { WorkspaceAssetAttachment } from './workspaceAssetTypes';
 import { verifyEditVisibleInPreview } from './verifyEditVisibleInPreview';
+
+/** Section titles from siteConfig that should appear in preview HTML when images render. */
+export function gallerySectionTitlesFromSource(siteConfigSource: string): string[] {
+  const config = parseSiteConfigSource(siteConfigSource);
+  if (!config?.sections?.length) return [];
+  return config.sections
+    .filter(
+      (s) =>
+        String(s.type ?? '').toLowerCase() === 'gallery' ||
+        sectionItemsHaveImageUrls(s.items)
+    )
+    .map((s) => String(s.title ?? '').trim())
+    .filter((t) => t.length > 1);
+}
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -58,11 +76,14 @@ export async function verifyGalleryEditOnSandbox(input: {
 
   await sleep(3000);
 
+  const configTitles = gallerySectionTitlesFromSource(input.siteConfigSource);
+
   const htmlVerify = await verifyEditVisibleInPreview({
     previewUrl: input.previewUrl,
     imagePaths: input.attachments.map((a) => a.publicUrl),
     sectionPhrases: [
       ...(input.sectionPhrases ?? []),
+      ...configTitles,
       'Our products',
       'Our work',
       'Gallery',

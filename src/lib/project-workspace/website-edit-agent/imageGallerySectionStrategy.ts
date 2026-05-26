@@ -74,7 +74,8 @@ export async function runImageGallerySectionStrategy(
     siteConfigContent,
     plan,
     attachments,
-    snapshot
+    snapshot,
+    options.ownerMessage
   );
 
   const beforeFiles: Record<string, string> = {
@@ -103,13 +104,12 @@ export async function runImageGallerySectionStrategy(
     pageAfter = renderPatch.content;
   } else {
     pageAfter = (await readRel(pagePath)) ?? pageBefore;
-    // Force page.tsx to change so sandbox/local dev reloads fresh siteConfig imports.
-    const stamped = stampPageForGalleryPreviewReload(pageAfter);
-    if (stamped !== pageAfter) {
-      await writeRel(pagePath, stamped);
-      pageAfter = stamped;
-    }
   }
+
+  // Always bump page.tsx so sandbox/local dev re-imports siteConfig after gallery edits.
+  const stamped = stampPageForGalleryPreviewReload(pageAfter);
+  await writeRel(pagePath, stamped);
+  pageAfter = stamped;
 
   if (!canRenderUploadedImages(pageAfter, workspace.archetype)) {
     return {

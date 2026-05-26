@@ -9,11 +9,9 @@ import {
   insertGallerySectionInSiteConfig,
   stripExistingGallerySections,
 } from './gallerySiteConfig';
-import {
-  sectionItemsHaveImageUrls,
-  stripPlaceholderPhotoSections,
-} from './validateGallerySiteConfig';
+import { stripPlaceholderPhotoSections } from './validateGallerySiteConfig';
 import type { ImagePlacementPlan } from './imagePlacementPlan';
+import { resolveTargetSectionForImages } from './imageSectionIntent';
 import {
   pickPreferredInsertAnchor,
   type SiteStructureSnapshot,
@@ -41,23 +39,6 @@ function buildItems(attachments: WorkspaceAssetAttachment[], titles?: string[]) 
   }));
 }
 
-function findSectionIndex(
-  snapshot: SiteStructureSnapshot,
-  plan: ImagePlacementPlan
-): number {
-  if (plan.targetSectionIndex != null && snapshot.sections[plan.targetSectionIndex]) {
-    return plan.targetSectionIndex;
-  }
-  if (plan.targetSectionTitle) {
-    const idx = snapshot.sections.findIndex(
-      (s) => s.title.toLowerCase() === plan.targetSectionTitle!.toLowerCase()
-    );
-    if (idx >= 0) return idx;
-  }
-  const imgIdx = snapshot.sections.findIndex((s) => s.hasImageItems);
-  return imgIdx >= 0 ? imgIdx : -1;
-}
-
 /**
  * Apply placement plan to siteConfig source (returns full file content).
  */
@@ -65,7 +46,8 @@ export function applyImagePlacementToSiteConfig(
   siteConfigSource: string,
   plan: ImagePlacementPlan,
   attachments: WorkspaceAssetAttachment[],
-  snapshot: SiteStructureSnapshot
+  snapshot: SiteStructureSnapshot,
+  ownerMessage = ''
 ): string {
   const config = parseSiteConfigSource(siteConfigSource);
   if (!config) {
@@ -78,24 +60,17 @@ export function applyImagePlacementToSiteConfig(
 
   config.sections = stripPlaceholderPhotoSections(config.sections);
 
-  if (plan.action === 'update_section') {
-    const idx = findSectionIndex(snapshot, plan);
-    const existing = idx >= 0 ? config.sections[idx] : null;
-    const canUpdate =
-      existing &&
-      (String(existing.type ?? '').toLowerCase() === 'gallery' ||
-        sectionItemsHaveImageUrls(existing.items));
-
-    if (canUpdate) {
-      config.sections[idx] = {
-        ...existing,
-        type: 'gallery',
-        title: galleryTitle,
-        body: galleryBody,
-        items: newItems,
-      };
-      return rebuildSiteConfigFile(siteConfigSource, config);
-    }
+  const targetIdx = resolveTargetSectionForImages(ownerMessage, plan, snapshot);
+  if (targetIdx >= 0) {
+    const existing = config.sections[targetIdx];
+    config.sections[targetIdx] = {
+      ...existing,
+      type: 'gallery',
+      title: plan.title || existing.title || galleryTitle,
+      body: plan.body ?? existing.body ?? galleryBody,
+      items: newItems,
+    };
+    return rebuildSiteConfigFile(siteConfigSource, config);
   }
 
   let out = stripExistingGallerySections(siteConfigSource);

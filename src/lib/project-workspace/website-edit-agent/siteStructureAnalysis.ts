@@ -137,6 +137,22 @@ export function planImagePlacementFallback(
   let insertAfter: string | null = pickPreferredInsertAnchor(snapshot);
 
   const lower = ownerMessage.toLowerCase();
+  const introSection = snapshot.sections.find(
+    (s) => /\b(introduction|intro)\b/i.test(s.title) || s.type === 'about'
+  );
+  if (/\b(introduction|intro)\b/.test(lower) && introSection) {
+    return {
+      action: 'update_section',
+      sectionType: 'gallery',
+      targetSectionIndex: introSection.index,
+      targetSectionTitle: introSection.title,
+      insertAfterSectionType: null,
+      title: introSection.title || 'Introduction',
+      body: undefined,
+      reasoning: 'Owner asked to add images to the introduction/about section.',
+    };
+  }
+
   if (/\b(hero|top|below hero)\b/.test(lower)) {
     insertAfter = null;
   } else if (/\bafter about\b/.test(lower) && snapshot.sections.some((s) => s.type === 'about')) {

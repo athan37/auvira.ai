@@ -113,6 +113,7 @@ Output a single placement plan (JSON only).
 
 Rules:
 - Prefer UPDATE an existing section that already has imageUrl items if the owner says "these images", "add description", or similar follow-up.
+- When the owner names a section (e.g. "introduction", "intro", "about"), set action to update_section with targetSectionTitle matching that section — do not create a duplicate gallery elsewhere.
 - Prefer CREATE a dedicated "gallery" section when page has or can use gallery/generic rendering and images are new product/project photos.
 - insertAfterSectionType must be a section type that EXISTS in siteConfig (e.g. services, about) — or null only to insert at the start of sections.
 - Do NOT pick contact/faq as insert anchor unless owner asked.
