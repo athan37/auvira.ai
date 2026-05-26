@@ -18,6 +18,10 @@ import { resolveSiteWorkspace } from './resolveSiteWorkspace';
 import { verifyEditApplied } from './verifyEditApplied';
 import { stampSiteConfigForGalleryPreviewReload } from './gallerySiteConfig';
 import { validateGalleryInSiteConfigSource } from './validateGallerySiteConfig';
+import {
+  describeSiteConfigParseFailure,
+  parseSiteConfigSource,
+} from '@/lib/site-manager/siteConfigParser';
 import type { WebsiteEditAgentOptions, WebsiteEditAgentResult } from './types';
 
 /**
@@ -67,6 +71,16 @@ export async function runImageGallerySectionStrategy(
     }
   }
 
+  if (!parseSiteConfigSource(siteConfigContent)) {
+    return {
+      ok: false,
+      strategy: 'image_gallery',
+      error: describeSiteConfigParseFailure(siteConfigContent),
+      ownerMessage:
+        'Your site configuration file could not be read. Please contact support or try a simpler edit.',
+    };
+  }
+
   const { plan, snapshot, usedLlm } = await planImagePlacement({
     ownerMessage: options.ownerMessage,
     attachments,
@@ -74,13 +88,36 @@ export async function runImageGallerySectionStrategy(
     pageContent: pageBefore,
   });
 
-  const updatedSiteConfig = applyImagePlacementToSiteConfig(
-    siteConfigContent,
-    plan,
-    attachments,
-    snapshot,
-    options.ownerMessage
-  );
+  let updatedSiteConfig: string;
+  try {
+    updatedSiteConfig = applyImagePlacementToSiteConfig(
+      siteConfigContent,
+      plan,
+      attachments,
+      snapshot,
+      options.ownerMessage
+    );
+  } catch (placementErr) {
+    const msg =
+      placementErr instanceof Error ? placementErr.message : String(placementErr);
+    return {
+      ok: false,
+      strategy: 'image_gallery',
+      error: msg,
+      ownerMessage:
+        'Images were uploaded but could not be placed in your site configuration. Please try again.',
+    };
+  }
+
+  if (!parseSiteConfigSource(updatedSiteConfig)) {
+    return {
+      ok: false,
+      strategy: 'image_gallery',
+      error: 'siteConfig.ts format not supported after placement',
+      ownerMessage:
+        'Images were uploaded but could not be linked into a gallery section. Please try again.',
+    };
+  }
 
   const beforeFiles: Record<string, string> = {
     [siteConfigPath]: siteConfigContent,
@@ -163,7 +200,16 @@ export async function runImageGallerySectionStrategy(
     return null;
   }
 
-  const ownerMessage = describePlacementForOwner(plan, attachments.length);
+  const hasHardcodedHero =
+    pageBefore.includes('function Hero') || /"hero"\s*:/.test(siteConfigContent);
+  const targetTitle =
+    plan.targetSectionTitle ||
+    snapshot.sections[plan.targetSectionIndex ?? -1]?.title ||
+    plan.title;
+  const ownerMessage = describePlacementForOwner(plan, attachments.length, {
+    hasHardcodedHero,
+    sectionTitle: targetTitle,
+  });
   const summary = usedLlm
     ? `${ownerMessage} (placement chosen from your site layout.)`
     : `${ownerMessage} (placement chosen by site structure rules.)`;

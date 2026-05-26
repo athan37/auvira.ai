@@ -1,4 +1,5 @@
 import { parseSiteConfigSource } from '@/lib/site-manager/siteConfigParser';
+import { getPublicAppUrl } from '@/lib/appUrl';
 import { fetchHtmlFromSandboxLoopback } from '@/lib/sandbox/fetchSandboxPreviewHtml';
 import {
   genericSectionRendersItemImages,
@@ -68,8 +69,26 @@ async function fetchExternalPreviewHtml(previewUrl: string): Promise<string> {
   return res.text();
 }
 
+/** Same URL path the preview iframe uses (rewrites /uploads and /_next). */
+export function buildPreviewProxyVerifyUrl(projectId: string): string {
+  const base = getPublicAppUrl().replace(/\/$/, '');
+  return `${base}/api/projects/${projectId}/preview/proxy/`;
+}
+
+async function fetchProxyPreviewHtml(projectId: string): Promise<string> {
+  const url = `${buildPreviewProxyVerifyUrl(projectId)}?_verify=${Date.now()}`;
+  const res = await fetch(url, {
+    cache: 'no-store',
+    redirect: 'follow',
+    signal: AbortSignal.timeout(25_000),
+  });
+  if (!res.ok) return '';
+  return res.text();
+}
+
 /**
  * Sandbox preview: require uploaded image paths in rendered HTML (not upload URL alone).
+ * Prefers the app preview proxy (same as iframe), then sandbox loopback, then direct sandbox URL.
  */
 export async function verifyGalleryEditOnSandbox(input: {
   previewUrl: string;
@@ -103,7 +122,7 @@ export async function verifyGalleryEditOnSandbox(input: {
 
   let lastHtml = '';
   let lastImagesFound = 0;
-  let usedLoopback = false;
+  let verifySource = 'direct';
 
   await sleep(4000);
 
@@ -114,12 +133,21 @@ export async function verifyGalleryEditOnSandbox(input: {
 
     let html = '';
     if (input.projectId) {
+      try {
+        html = await fetchProxyPreviewHtml(input.projectId);
+        if (html.length > 1500) verifySource = 'proxy';
+      } catch {
+        /* fall through */
+      }
+    }
+    if (html.length < 1500 && input.projectId) {
       html = (await fetchHtmlFromSandboxLoopback(input.projectId)) ?? '';
-      if (html.length > 1500) usedLoopback = true;
+      if (html.length > 1500) verifySource = 'loopback';
     }
     if (html.length < 1500) {
       try {
         html = await fetchExternalPreviewHtml(input.previewUrl);
+        if (html.length > 1500) verifySource = 'direct';
       } catch {
         continue;
       }
@@ -135,11 +163,15 @@ export async function verifyGalleryEditOnSandbox(input: {
       const phraseMatched = [...configTitles, ...(input.sectionPhrases ?? [])].some((phrase) =>
         html.toLowerCase().includes(phrase.toLowerCase())
       );
+      void phraseMatched;
       return {
         ok: true,
-        reason: usedLoopback
-          ? `Sandbox loopback preview shows ${lastImagesFound}/${publicUrls.length} uploaded image(s).`
-          : `Preview shows ${lastImagesFound}/${publicUrls.length} uploaded image(s).`,
+        reason:
+          verifySource === 'proxy'
+            ? `Preview proxy shows ${lastImagesFound}/${publicUrls.length} uploaded image(s).`
+            : verifySource === 'loopback'
+              ? `Sandbox loopback preview shows ${lastImagesFound}/${publicUrls.length} uploaded image(s).`
+              : `Preview shows ${lastImagesFound}/${publicUrls.length} uploaded image(s).`,
         imagesFound: lastImagesFound,
         htmlLength: html.length,
       };
@@ -152,7 +184,7 @@ export async function verifyGalleryEditOnSandbox(input: {
     ok: false,
     reason:
       assetsOk >= input.attachments.length
-        ? `Preview HTML (${lastHtml.length} bytes) does not include uploaded image paths (${lastImagesFound}/${publicUrls.length} found). Files exist on sandbox; the page template may not be rendering gallery items yet.`
+        ? `Preview HTML (${lastHtml.length} bytes, source=${verifySource}) does not include uploaded image paths (${lastImagesFound}/${publicUrls.length} found). Files exist on sandbox; the page template may not be rendering gallery items yet.`
         : `Preview HTML missing images (${lastImagesFound}/${publicUrls.length}); ${assetsOk}/${input.attachments.length} upload URLs reachable.`,
     imagesFound: lastImagesFound,
     htmlLength: lastHtml.length,

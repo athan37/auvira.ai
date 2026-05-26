@@ -1,4 +1,7 @@
-import { parseSiteConfigSource } from '@/lib/site-manager/siteConfigParser';
+import {
+  describeSiteConfigParseFailure,
+  parseSiteConfigSource,
+} from '@/lib/site-manager/siteConfigParser';
 import type { WorkspaceAssetAttachment } from '../workspaceAssetTypes';
 
 export function sectionItemsHaveImageUrls(
@@ -13,7 +16,7 @@ export function sectionItemsHaveImageUrls(
 export function stripPlaceholderPhotoSections(
   sections: Array<{ type?: string; title?: string; items?: Array<{ title?: string; imageUrl?: string }> }>
 ) {
-  return sections.filter((s) => {
+  const filtered = sections.filter((s) => {
     const items = s.items ?? [];
     if (items.length === 0) return true;
     const allPlaceholder =
@@ -28,6 +31,10 @@ export function stripPlaceholderPhotoSections(
     }
     return true;
   });
+  if (filtered.length === 0 && sections.length > 0) {
+    return sections;
+  }
+  return filtered;
 }
 
 /**
@@ -38,7 +45,15 @@ export function validateGalleryInSiteConfigSource(
   attachments: WorkspaceAssetAttachment[]
 ): { ok: boolean; reason: string } {
   const config = parseSiteConfigSource(siteConfigSource);
-  if (!config?.sections?.length) {
+  if (!config) {
+    const hint = describeSiteConfigParseFailure(siteConfigSource);
+    const snippet = siteConfigSource.replace(/\s+/g, ' ').slice(0, 200);
+    return {
+      ok: false,
+      reason: `siteConfig parse failed: ${hint} (snippet: ${snippet})`,
+    };
+  }
+  if (!config.sections?.length) {
     return { ok: false, reason: 'siteConfig has no sections' };
   }
 

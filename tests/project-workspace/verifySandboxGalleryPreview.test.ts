@@ -10,6 +10,7 @@ import {
 } from '../../src/lib/project-workspace/website-edit-agent/siteStructureAnalysis';
 import { validateGalleryInSiteConfigSource } from '../../src/lib/project-workspace/website-edit-agent/validateGallerySiteConfig';
 import {
+  buildPreviewProxyVerifyUrl,
   countReachableUploadAssets,
   verifyGalleryEditOnSandbox,
 } from '../../src/lib/project-workspace/verifySandboxGalleryPreview';
@@ -77,7 +78,41 @@ describe('verifySandboxGalleryPreview', () => {
     ).toBe(true);
   });
 
-  it('passes when loopback HTML includes uploaded image', async () => {
+  it('passes when preview proxy HTML includes uploaded image', async () => {
+    const proxyHtml = `<html>${'x'.repeat(2000)}<img src="/uploads/a.png" /></html>`;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        text: async () => proxyHtml,
+      })
+    );
+    mockedLoopback.mockResolvedValue(`<html>${'short'.repeat(10)}</html>`);
+
+    const promise = verifyGalleryEditOnSandbox({
+      previewUrl: 'https://sandbox.example',
+      projectId: 'proj1',
+      siteConfigSource: gallerySiteConfigSource(),
+      pageSource: galleryPageSource(),
+      attachments: [...attachments],
+    });
+    await vi.advanceTimersByTimeAsync(5000);
+    const result = await promise;
+
+    expect(result.ok).toBe(true);
+    expect(result.imagesFound).toBe(1);
+    expect(result.reason).toContain('proxy');
+    expect(buildPreviewProxyVerifyUrl('proj1')).toContain('/preview/proxy/');
+  });
+
+  it('passes when loopback HTML includes uploaded image if proxy is empty', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        text: async () => '<html>short</html>',
+      })
+    );
     mockedLoopback.mockResolvedValue(
       `<html>${'x'.repeat(2000)}<img src="/uploads/a.png" /></html>`
     );

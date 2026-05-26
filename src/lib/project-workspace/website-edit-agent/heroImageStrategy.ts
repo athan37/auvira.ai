@@ -13,6 +13,9 @@ import type { WebsiteEditAgentOptions, WebsiteEditAgentResult } from './types';
 export function isHeroImageRequest(message: string, attachmentCount: number): boolean {
   if (attachmentCount !== 1) return false;
   const lower = message.toLowerCase();
+  if (/\bfirst\s+section\b/.test(lower)) {
+    return false;
+  }
   return /\b(hero|logo|banner|header image|main photo|top of page|above the fold)\b/.test(lower);
 }
 

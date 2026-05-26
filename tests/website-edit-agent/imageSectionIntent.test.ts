@@ -4,6 +4,8 @@ import { planImagePlacementFallback } from '../../src/lib/project-workspace/webs
 import { analyzeSiteStructureForImages } from '../../src/lib/project-workspace/website-edit-agent/siteStructureAnalysis';
 import { stampSiteConfigForGalleryPreviewReload } from '../../src/lib/project-workspace/website-edit-agent/gallerySiteConfig';
 import { validateGalleryInSiteConfigSource } from '../../src/lib/project-workspace/website-edit-agent/validateGallerySiteConfig';
+import { parseSiteConfigSource } from '../../src/lib/site-manager/siteConfigParser';
+import { isHeroImageRequest } from '../../src/lib/project-workspace/website-edit-agent/heroImageStrategy';
 
 const introSiteConfig = `export const siteConfig: SiteConfig = {
   "sections": [
@@ -77,8 +79,26 @@ describe('imageSectionIntent', () => {
     expect(out.indexOf('"type": "gallery"')).toBeLessThan(out.indexOf('"type": "services"'));
   });
 
-  it('stampSiteConfigForGalleryPreviewReload adds sync marker', () => {
-    const stamped = stampSiteConfigForGalleryPreviewReload('export const x = 1;');
-    expect(stamped).toContain('siteconfig gallery sync');
+  it('stampSiteConfigForGalleryPreviewReload adds parse-safe sync export', () => {
+    const out = applyImagePlacementToSiteConfig(
+      introSiteConfig,
+      planImagePlacementFallback(
+        analyzeSiteStructureForImages(introSiteConfig, ''),
+        'add image'
+      ),
+      attachments,
+      analyzeSiteStructureForImages(introSiteConfig, ''),
+      'add image'
+    );
+    const stamped = stampSiteConfigForGalleryPreviewReload(out);
+    expect(stamped).toContain('__siteAgentGallerySync');
+    expect(parseSiteConfigSource(stamped)?.sections.length).toBeGreaterThan(0);
+    const check = validateGalleryInSiteConfigSource(stamped, attachments);
+    expect(check.ok).toBe(true);
+  });
+
+  it('first section intent is not routed as hero image', () => {
+    expect(isHeroImageRequest('add this image to the first section', 1)).toBe(false);
+    expect(isHeroImageRequest('add this image to the hero', 1)).toBe(true);
   });
 });

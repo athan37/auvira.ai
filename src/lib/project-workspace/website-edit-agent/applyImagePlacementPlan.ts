@@ -1,7 +1,9 @@
 import type { WorkspaceAssetAttachment } from '../workspaceAssetTypes';
 import {
+  describeSiteConfigParseFailure,
   parseSiteConfigSource,
   rebuildSiteConfigFile,
+  replaceSiteConfigSectionsInSource,
 } from '@/lib/site-manager/siteConfigParser';
 import type { GalleryPlacement } from './gallerySiteConfig';
 import {
@@ -51,7 +53,7 @@ export function applyImagePlacementToSiteConfig(
 ): string {
   const config = parseSiteConfigSource(siteConfigSource);
   if (!config) {
-    return siteConfigSource;
+    throw new Error(describeSiteConfigParseFailure(siteConfigSource));
   }
 
   const newItems = buildItems(attachments);
@@ -70,14 +72,18 @@ export function applyImagePlacementToSiteConfig(
       body: plan.body ?? existing.body ?? galleryBody,
       items: newItems,
     };
-    return rebuildSiteConfigFile(siteConfigSource, config);
+    return (
+      replaceSiteConfigSectionsInSource(siteConfigSource, config.sections) ??
+      rebuildSiteConfigFile(siteConfigSource, config)
+    );
   }
 
   let out = stripExistingGallerySections(siteConfigSource);
   const reparsed = parseSiteConfigSource(out);
   if (reparsed?.sections) {
     reparsed.sections = stripPlaceholderPhotoSections(reparsed.sections);
-    out = rebuildSiteConfigFile(siteConfigSource, reparsed);
+    out =
+      replaceSiteConfigSectionsInSource(siteConfigSource, reparsed.sections) ?? siteConfigSource;
   }
 
   const sectionPayload: Record<string, unknown> = {
@@ -96,13 +102,21 @@ export function applyImagePlacementToSiteConfig(
 
 export function describePlacementForOwner(
   plan: ImagePlacementPlan,
-  imageCount: number
+  imageCount: number,
+  options?: { hasHardcodedHero?: boolean; sectionTitle?: string }
 ): string {
+  const title = options?.sectionTitle || plan.title;
   const place =
     plan.action === 'update_section'
-      ? `updated "${plan.title}"`
+      ? `updated "${title}"`
       : plan.insertAfterSectionType
-        ? `added "${plan.title}" after your ${plan.insertAfterSectionType} section`
-        : `added "${plan.title}" to your homepage`;
-  return `${place} with ${imageCount} photo${imageCount === 1 ? '' : 's'}.`;
+        ? `added "${title}" after your ${plan.insertAfterSectionType} section`
+        : `added "${title}" to your homepage`;
+  const heroHint =
+    options?.hasHardcodedHero && plan.action === 'update_section'
+      ? ' Scroll just below the hero to see it.'
+      : options?.hasHardcodedHero && plan.action === 'create_section'
+        ? ' It appears below the hero on your homepage.'
+        : '';
+  return `${place} with ${imageCount} photo${imageCount === 1 ? '' : 's'}.${heroHint}`;
 }

@@ -5,7 +5,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOwnerProject, getServerUserId } from '@/lib/api/projectAccess';
 import { repairPreviewWorkspace } from '@/lib/preview/repairPreviewWorkspace';
-import { repairPreviewSandbox } from '@/lib/sandbox/repairPreviewSandbox';
 import { restartSandboxDevServer } from '@/lib/sandbox/sandboxDevServer';
 import { checkPreviewHealthy } from '@/lib/project-workspace/bootstrapProjectPreview';
 import { connectMongoDB } from '@/lib/mongodb';
@@ -427,15 +426,7 @@ export async function POST(
         emit('step', { id: 'apply_change', label: 'Applying your requested change', status: 'completed' });
         emit('step', { id: 'validate', label: 'Checking the preview', status: 'active' });
 
-        if (mode === 'gitlab' && isSandbox) {
-          try {
-            await repairPreviewSandbox(projectId);
-            await appendEditJobLog(jobId, 'workspace_repaired', 'Applied preview-safe repairs (sandbox)');
-          } catch (repairErr) {
-            const msg = repairErr instanceof Error ? repairErr.message : String(repairErr);
-            await appendEditJobLog(jobId, 'workspace_repair_skipped', msg);
-          }
-        } else if (mode === 'gitlab' && workspacePath) {
+        if (mode === 'gitlab' && workspacePath && !isSandbox) {
           await repairPreviewWorkspace(workspacePath);
           await appendEditJobLog(jobId, 'workspace_repaired', 'Applied preview-safe repairs');
         }

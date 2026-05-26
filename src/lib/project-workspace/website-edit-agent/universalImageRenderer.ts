@@ -1,3 +1,4 @@
+import { appendPageGallerySyncExport } from '@/lib/site-manager/siteConfigAgentMarkers';
 import { ensureSectionLoopInPage } from './ensureSectionLoop';
 import { GALLERY_SECTION_COMPONENT, GENERIC_SECTION_COMPONENT } from './imageRendererBlocks';
 import type { PageArchetype } from './resolveSiteWorkspace';
@@ -353,14 +354,12 @@ export function patchPageForUploadedImages(pageContent: string): {
   return { content: result.content, patched: result.patched };
 }
 
-/** Sync comment appended to page.tsx so the dev server reloads after siteConfig-only gallery edits. */
+/** @deprecated Legacy inline comment marker; parser strips these if present. */
 export const GALLERY_PREVIEW_SYNC_MARKER = '// site-agent: gallery preview sync';
 
-/** Bump a harmless comment so page.tsx changes when only siteConfig was edited. */
+/** Bump a dedicated export so page.tsx changes without breaking TSX parse. */
 export function stampPageForGalleryPreviewReload(pageContent: string): string {
-  const escaped = GALLERY_PREVIEW_SYNC_MARKER.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const without = pageContent.replace(new RegExp(`\\n?${escaped} \\d+`, 'g'), '');
-  return `${without.trimEnd()}\n${GALLERY_PREVIEW_SYNC_MARKER} ${Date.now()}\n`;
+  return appendPageGallerySyncExport(pageContent);
 }
 
 export function canRenderUploadedImages(pageContent: string, archetype?: PageArchetype): boolean {

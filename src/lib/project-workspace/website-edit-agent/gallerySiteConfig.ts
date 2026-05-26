@@ -2,21 +2,23 @@ import type { WorkspaceAssetAttachment } from '../workspaceAssetTypes';
 import {
   parseSiteConfigSource,
   rebuildSiteConfigFile,
+  replaceSiteConfigSectionsInSource,
   type ParsedSiteConfig,
 } from '@/lib/site-manager/siteConfigParser';
+import {
+  appendSiteConfigGallerySyncExport,
+  SITECONFIG_GALLERY_SYNC_MARKER,
+} from '@/lib/site-manager/siteConfigAgentMarkers';
 import { ensureSiteConfigTypesSupportGallery } from '@/lib/builder/siteConfigTypes';
 import { stripPlaceholderPhotoSections } from './validateGallerySiteConfig';
 
 export type GalleryPlacement = 'prepend' | `after:${string}`;
 
-/** Sync comment so Next dev reloads siteConfig after gallery edits (sandbox HMR). */
-export const SITECONFIG_GALLERY_SYNC_MARKER = '// site-agent: siteconfig gallery sync';
+export { SITECONFIG_GALLERY_SYNC_MARKER };
 
-/** Bump a harmless comment so siteConfig.ts changes when only items/sections were edited. */
+/** Bump a dedicated export so siteConfig.ts changes without breaking parse. */
 export function stampSiteConfigForGalleryPreviewReload(siteConfigSource: string): string {
-  const escaped = SITECONFIG_GALLERY_SYNC_MARKER.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const without = siteConfigSource.replace(new RegExp(`\\n?${escaped} \\d+`, 'g'), '');
-  return `${without.trimEnd()}\n${SITECONFIG_GALLERY_SYNC_MARKER} ${Date.now()}\n`;
+  return appendSiteConfigGallerySyncExport(siteConfigSource);
 }
 
 export function inferGallerySectionTitle(message: string): string {
@@ -152,7 +154,10 @@ export function insertGallerySectionInSiteConfig(
     }
 
     config.sections = sections;
-    return rebuildSiteConfigFile(siteConfigSource, config);
+    return (
+      replaceSiteConfigSectionsInSource(siteConfigSource, sections) ??
+      rebuildSiteConfigFile(siteConfigSource, config)
+    );
   }
 
   // Fallback: regex path when parse fails
