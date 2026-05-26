@@ -5,6 +5,8 @@ import {
   applyUniversalImageRenderer,
   canRenderUploadedImages,
   pageHasGalleryRenderer,
+  stampPageForGalleryPreviewReload,
+  GALLERY_PREVIEW_SYNC_MARKER,
 } from '../../src/lib/project-workspace/website-edit-agent/universalImageRenderer';
 
 const FIXTURES = path.join(process.cwd(), 'tests/fixtures/workspaces');
@@ -40,5 +42,17 @@ describe('universalImageRenderer', () => {
       'utf8'
     );
     expect(canRenderUploadedImages(page, 'section_loop')).toBe(true);
+  });
+
+  it('stampPageForGalleryPreviewReload appends sync marker for dev reload', () => {
+    const page = readFileSync(
+      path.join(FIXTURES, 'section-loop-default/src/app/page.tsx'),
+      'utf8'
+    );
+    const stamped = stampPageForGalleryPreviewReload(page);
+    expect(stamped).toContain(GALLERY_PREVIEW_SYNC_MARKER);
+    expect(stamped.length).toBeGreaterThan(page.length);
+    const restamped = stampPageForGalleryPreviewReload(stamped);
+    expect(restamped.match(new RegExp(GALLERY_PREVIEW_SYNC_MARKER.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'))?.length).toBe(1);
   });
 });

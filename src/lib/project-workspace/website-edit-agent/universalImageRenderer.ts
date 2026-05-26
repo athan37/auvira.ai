@@ -353,6 +353,16 @@ export function patchPageForUploadedImages(pageContent: string): {
   return { content: result.content, patched: result.patched };
 }
 
+/** Sync comment appended to page.tsx so the dev server reloads after siteConfig-only gallery edits. */
+export const GALLERY_PREVIEW_SYNC_MARKER = '// site-agent: gallery preview sync';
+
+/** Bump a harmless comment so page.tsx changes when only siteConfig was edited. */
+export function stampPageForGalleryPreviewReload(pageContent: string): string {
+  const escaped = GALLERY_PREVIEW_SYNC_MARKER.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const without = pageContent.replace(new RegExp(`\\n?${escaped} \\d+`, 'g'), '');
+  return `${without.trimEnd()}\n${GALLERY_PREVIEW_SYNC_MARKER} ${Date.now()}\n`;
+}
+
 export function canRenderUploadedImages(pageContent: string, archetype?: PageArchetype): boolean {
   if (pageHasGalleryRenderer(pageContent)) return true;
   if (genericSectionRendersItemImages(pageContent)) return true;

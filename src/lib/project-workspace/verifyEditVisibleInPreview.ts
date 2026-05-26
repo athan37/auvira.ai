@@ -7,6 +7,10 @@ export interface VerifyPreviewInput {
   /** Phrases that should appear when a section was added (any match helps). */
   sectionPhrases?: string[];
   timeoutMs?: number;
+  /** Poll attempts when preview HTML lags after a dev-server restart. */
+  retries?: number;
+  /** Delay between poll attempts (ms). */
+  delayMs?: number;
 }
 
 export interface VerifyPreviewResult {
@@ -35,8 +39,8 @@ export async function verifyEditVisibleInPreview(
 ): Promise<VerifyPreviewResult> {
   const imagePaths = (input.imagePaths ?? []).map((p) => p.replace(/^\//, ''));
   const phrases = input.sectionPhrases ?? ['Our products', 'Product documentation', 'Product images'];
-  const retries = 4;
-  const delayMs = 2500;
+  const retries = input.retries ?? 4;
+  const delayMs = input.delayMs ?? 2500;
 
   let lastStatus = 0;
   let lastHtml = '';

@@ -168,11 +168,13 @@ export async function resolveEditPreviewVerification(
     const pageAfter =
       (snap?.pagePath && (await input.gateway.readFile(snap.pagePath).catch(() => ''))) ||
       '';
+    const hints = extractPreviewVerifyHints(input.ownerMessage);
     const gallery = await verifyGalleryEditOnSandbox({
       previewUrl: input.previewUrl,
       siteConfigSource: siteConfigAfter,
       pageSource: pageAfter,
       attachments: input.attachments,
+      sectionPhrases: hints.phrases,
     });
     return { ...gallery, phraseMatched: gallery.imagesFound > 0 };
   }

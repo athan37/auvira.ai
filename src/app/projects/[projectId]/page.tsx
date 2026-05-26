@@ -168,6 +168,7 @@ export default function ProjectPage() {
           <ProjectPreviewFrame
             projectId={projectId}
             codeWorkspaceVersion={project.codeWorkspace?.version}
+            previewRefreshKey={previewRefreshKey}
             onReadyChange={handlePreviewReadyChange}
           />
         </div>

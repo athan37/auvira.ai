@@ -7,14 +7,37 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** Count how many uploaded files respond on the sandbox dev server (diagnostics only). */
+export async function countReachableUploadAssets(
+  previewUrl: string,
+  attachments: WorkspaceAssetAttachment[]
+): Promise<number> {
+  const base = previewUrl.replace(/\/$/, '');
+  let assetsOk = 0;
+  for (const att of attachments) {
+    try {
+      const res = await fetch(`${base}${att.publicUrl}?t=${Date.now()}`, {
+        cache: 'no-store',
+        signal: AbortSignal.timeout(12_000),
+      });
+      if (res.ok) assetsOk += 1;
+    } catch {
+      /* try next */
+    }
+  }
+  return assetsOk;
+}
+
 /**
- * Sandbox preview: HTML fetch may lag after restart — also verify siteConfig + static assets.
+ * Sandbox preview: require uploaded image paths in rendered HTML (not upload URL alone).
  */
 export async function verifyGalleryEditOnSandbox(input: {
   previewUrl: string;
   siteConfigSource: string;
   pageSource: string;
   attachments: WorkspaceAssetAttachment[];
+  /** Extra section titles/phrases to look for in HTML (optional). */
+  sectionPhrases?: string[];
 }): Promise<{ ok: boolean; reason: string; imagesFound: number; htmlLength: number }> {
   const configCheck = validateGalleryInSiteConfigSource(
     input.siteConfigSource,
@@ -38,8 +61,16 @@ export async function verifyGalleryEditOnSandbox(input: {
   const htmlVerify = await verifyEditVisibleInPreview({
     previewUrl: input.previewUrl,
     imagePaths: input.attachments.map((a) => a.publicUrl),
-    sectionPhrases: ['Our products', 'Our work', 'Gallery', 'Product images'],
+    sectionPhrases: [
+      ...(input.sectionPhrases ?? []),
+      'Our products',
+      'Our work',
+      'Gallery',
+      'Product images',
+    ],
     timeoutMs: 25_000,
+    retries: 6,
+    delayMs: 3000,
   });
 
   if (htmlVerify.ok) {
@@ -51,33 +82,15 @@ export async function verifyGalleryEditOnSandbox(input: {
     };
   }
 
-  const base = input.previewUrl.replace(/\/$/, '');
-  let assetsOk = 0;
-  for (const att of input.attachments) {
-    try {
-      const res = await fetch(`${base}${att.publicUrl}?t=${Date.now()}`, {
-        cache: 'no-store',
-        signal: AbortSignal.timeout(12_000),
-      });
-      if (res.ok) assetsOk += 1;
-    } catch {
-      /* try next */
-    }
-  }
-
-  if (assetsOk >= input.attachments.length) {
-    return {
-      ok: true,
-      reason: `siteConfig gallery OK; ${assetsOk}/${input.attachments.length} images reachable on sandbox (HTML verify: ${htmlVerify.reason})`,
-      imagesFound: assetsOk,
-      htmlLength: htmlVerify.htmlLength,
-    };
-  }
+  const assetsOk = await countReachableUploadAssets(input.previewUrl, input.attachments);
 
   return {
     ok: false,
-    reason: `${htmlVerify.reason}; ${assetsOk}/${input.attachments.length} upload URLs reachable on sandbox`,
-    imagesFound: assetsOk,
+    reason:
+      assetsOk >= input.attachments.length
+        ? `${htmlVerify.reason} Upload files exist (${assetsOk}/${input.attachments.length}) but the preview page did not render them yet — refresh the preview or retry the edit.`
+        : `${htmlVerify.reason}; ${assetsOk}/${input.attachments.length} upload URLs reachable on sandbox`,
+    imagesFound: htmlVerify.imagesFound,
     htmlLength: htmlVerify.htmlLength,
   };
 }

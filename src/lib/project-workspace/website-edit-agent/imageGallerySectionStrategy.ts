@@ -9,6 +9,7 @@ import { planImagePlacement } from './imagePlacementPlan';
 import {
   applyUniversalImageRenderer,
   canRenderUploadedImages,
+  stampPageForGalleryPreviewReload,
 } from './universalImageRenderer';
 import { resolveSiteWorkspace } from './resolveSiteWorkspace';
 import { verifyEditApplied } from './verifyEditApplied';
@@ -102,6 +103,12 @@ export async function runImageGallerySectionStrategy(
     pageAfter = renderPatch.content;
   } else {
     pageAfter = (await readRel(pagePath)) ?? pageBefore;
+    // Force page.tsx to change so sandbox/local dev reloads fresh siteConfig imports.
+    const stamped = stampPageForGalleryPreviewReload(pageAfter);
+    if (stamped !== pageAfter) {
+      await writeRel(pagePath, stamped);
+      pageAfter = stamped;
+    }
   }
 
   if (!canRenderUploadedImages(pageAfter, workspace.archetype)) {
