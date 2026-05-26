@@ -1,6 +1,7 @@
 import { routeAttachmentEdits } from './attachmentRouter';
 import { runSectionConfigStrategy } from './sectionConfigStrategy';
 import { runSingleShotStrategy } from './singleShotStrategy';
+import { runGalleryItemDescriptionStrategy } from './galleryItemDescriptionStrategy';
 import { runPresetThemeStrategy } from './strategies/presetThemeStrategy';
 import { runPresetTextColorStrategy } from './strategies/presetTextColorStrategy';
 import { runCopyFieldStrategy } from './strategies/copyFieldStrategy';
@@ -46,10 +47,13 @@ export async function runStrategyById(
   if (
     strategyId === 'image_gallery' ||
     strategyId === 'hero_image' ||
-    strategyId === 'gallery_captions' ||
     strategyId === 'static_gallery'
   ) {
     return routeAttachmentEdits(options, beforeHashes);
+  }
+
+  if (strategyId === 'gallery_captions') {
+    return runGalleryItemDescriptionStrategy(options, beforeHashes);
   }
 
   const runner = RUNNERS[strategyId];

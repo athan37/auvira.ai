@@ -6,6 +6,7 @@ import {
 } from '../verifyPreviewHints';
 import { extractColorsFromMessage } from './preset/presetUtils';
 import { parseColorSwap, TAILWIND_COLOR_NAMES } from './preset/presetUtils';
+import { isGalleryDescriptionRequest } from './galleryItemDescriptionStrategy';
 import type { EditJobPlan, EditIntent, EditStrategyId, EditTier } from './types';
 import type { SiteWorkspaceSnapshot } from './resolveSiteWorkspace';
 import type { WorkspaceAssetAttachment } from '../workspaceAssetTypes';
@@ -107,6 +108,18 @@ export function classifyEditJob(
       confidence: 'high',
       verifyProfile: 'image',
       applyLabel: legacy.applyLabel,
+    };
+  }
+
+  if (isGalleryDescriptionRequest(ownerMessage)) {
+    return {
+      intents: ['section', 'copy'],
+      tier: 'L1',
+      primaryStrategy: 'gallery_captions',
+      tryOrder: buildTryOrder('gallery_captions', ['section_config']),
+      confidence: 'high',
+      verifyProfile: 'section',
+      applyLabel: 'Updating image descriptions',
     };
   }
 

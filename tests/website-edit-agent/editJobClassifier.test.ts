@@ -31,4 +31,10 @@ describe('editJobClassifier', () => {
     expect(plan.confidence).toBe('low');
     expect(plan.needsClarification).toBe(true);
   });
+
+  it('routes gallery description follow-up to gallery_captions strategy', () => {
+    const plan = classifyEditJob('add some descriptions to these images too');
+    expect(plan.primaryStrategy).toBe('gallery_captions');
+    expect(plan.tier).toBe('L1');
+  });
 });

@@ -110,6 +110,21 @@ describe('verifyEditApplied', () => {
     expect(r.ok).toBe(true);
   });
 
+  it('passes section when siteConfig uses quoted JSON keys', () => {
+    const before = `export const siteConfig = { "sections": [] };`;
+    const after = `export const siteConfig = { "sections": [{
+      "type": "gallery",
+      "title": "Gallery",
+      "items": [{ "title": "A", "imageUrl": "/uploads/a.jpg" }]
+    }] };`;
+    const r = verifyEditApplied(
+      'add a gallery section with images',
+      { 'src/lib/siteConfig.ts': before },
+      { 'src/lib/siteConfig.ts': after }
+    );
+    expect(r.ok).toBe(true);
+  });
+
   it('passes section request when siteConfig sections grow', () => {
     const before = `export const siteConfig = { sections: [{ type: "about", title: "About", items: [] }] };`;
     const after = `${before.slice(0, -2)}, { type: "faq", title: "FAQ", items: [

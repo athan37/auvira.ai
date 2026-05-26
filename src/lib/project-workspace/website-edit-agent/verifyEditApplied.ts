@@ -221,8 +221,8 @@ export function verifyEditApplied(
       if (before === after) continue;
 
       const growth = after.length - before.length;
-      const hasSections = /sections\s*:/.test(after);
-      const hasItems = /items\s*:\s*\[|"items"\s*:\s*\[/.test(after);
+      const hasSections = /(?:^|["'\s])sections["']?\s*:/.test(after);
+      const hasItems = /(?:^|["'\s])items["']?\s*:\s*\[/.test(after);
       const hasGalleryImages =
         /imageUrl/i.test(after) || /\/uploads\//i.test(after);
       const meaningfulChange = before !== after && Math.abs(growth) >= 10;

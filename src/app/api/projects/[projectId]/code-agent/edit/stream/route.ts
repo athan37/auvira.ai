@@ -61,7 +61,7 @@ function isBlockedPath(relativePath: string): boolean {
   const lower = relativePath.toLowerCase();
   return BLOCKED_PATTERNS.some(
     (blocked) =>
-      lower === blocked ||
+    lower === blocked ||
       lower.startsWith(`${blocked}/`) ||
       lower.includes(`/${blocked}/`)
   );
@@ -188,7 +188,7 @@ export async function POST(
       const fail = async (ownerMessage: string, options: FailOptions) => {
         const report = buildEditFailureReport({
           jobId: jobId || 'unknown',
-          projectId,
+    projectId,
           stage: options.stage,
           ownerMessage,
           technicalMessage: options.technicalMessage,
@@ -269,8 +269,8 @@ export async function POST(
 
       try {
         const job = await createEditJob({
-          projectId,
-          userId,
+    projectId,
+    userId,
           prompt: message,
           previewVersionBefore,
         });
@@ -282,7 +282,7 @@ export async function POST(
 
         const hasGitLab = Boolean(project.gitlab?.repoUrl);
 
-        if (hasGitLab) {
+  if (hasGitLab) {
           const resolved = await resolveWorkspaceForEdit(project, userId);
           gateway = resolved.gateway;
           workspacePath = resolved.workspacePath;
@@ -290,26 +290,26 @@ export async function POST(
           source = resolved.source;
           isSandbox = resolved.sandbox;
           await markEditJobStatus(jobId, 'running', { workspacePath });
-        } else {
-          let wp = project.codeWorkspace?.workspacePath;
-          if (!wp || project.codeWorkspace?.status !== 'ready') {
-            const result = await createProjectWorkspace(project);
-            wp = result.workspacePath;
-            await WebsiteProject.updateOne(
-              { _id: projectId },
-              {
-                $set: {
-                  'codeWorkspace.status': 'ready',
-                  'codeWorkspace.workspacePath': wp,
-                  'codeWorkspace.version': result.version,
-                  'codeWorkspace.source': 'generated',
+  } else {
+    let wp = project.codeWorkspace?.workspacePath;
+    if (!wp || project.codeWorkspace?.status !== 'ready') {
+        const result = await createProjectWorkspace(project);
+        wp = result.workspacePath;
+        await WebsiteProject.updateOne(
+          { _id: projectId },
+          {
+            $set: {
+              'codeWorkspace.status': 'ready',
+              'codeWorkspace.workspacePath': wp,
+              'codeWorkspace.version': result.version,
+              'codeWorkspace.source': 'generated',
                 },
               }
             );
-          }
-          workspacePath = wp;
-          mode = 'static';
-          source = 'generated';
+    }
+    workspacePath = wp;
+    mode = 'static';
+    source = 'generated';
           gateway = new LocalFsGateway(workspacePath);
           await markEditJobStatus(jobId, 'running', { workspacePath });
         }
@@ -348,10 +348,10 @@ export async function POST(
 
         const agentResult = await runWebsiteEdit(
           {
-            workspacePath,
-            ownerMessage: message,
-            projectId,
-            mode,
+          workspacePath,
+          ownerMessage: message,
+          projectId,
+          mode,
             attachments,
             gateway,
           },
@@ -754,7 +754,7 @@ export async function POST(
             ownerMessage: successOwnerMessage,
             previewVerified: previewVerify.ok,
             changedFiles: changedPaths,
-            version: newVersion,
+          version: newVersion,
             timing: {
               totalMs: editTimer.totalMs(),
               phases: timingSummary,
