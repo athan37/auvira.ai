@@ -152,22 +152,43 @@ export async function handlePreviewProxyGet(
   const previewMode = (project.preview as { previewMode?: string } | undefined)?.previewMode;
   const sandboxPreviewUrl = project.preview?.url?.trim();
 
-  if (
-    previewMode === 'sandbox' &&
-    sandboxPreviewUrl &&
-    /^\/uploads\//i.test(cleanPath)
-  ) {
+  if (previewMode === 'sandbox' && sandboxPreviewUrl) {
     const target = `${sandboxPreviewUrl.replace(/\/$/, '')}${pathSegment}${url.search}`;
     try {
-      const res = await fetch(target, { cache: 'no-store' });
+      const res = await fetch(target, {
+        cache: 'no-store',
+        redirect: 'follow',
+        signal: AbortSignal.timeout(30_000),
+      });
       const buffer = Buffer.from(await res.arrayBuffer());
+      const ct = res.headers.get('content-type') || '';
+      const isHtml = ct.includes('text/html');
+      const isCss = ct.includes('text/css');
+
+      if ((isHtml || isCss) && buffer.length > 0) {
+        const text = buffer.toString('utf8');
+        const rewritten = rewritePreviewAssetPaths(text, projectId);
+        if (rewritten !== text) {
+          return new NextResponse(rewritten, {
+            status: res.status,
+            headers: {
+              'content-type': isHtml ? 'text/html; charset=utf-8' : 'text/css; charset=utf-8',
+              'cache-control': 'no-store',
+              'x-frame-options': 'SAMEORIGIN',
+            },
+          });
+        }
+      }
+
       const headers = new Headers();
-      const ct = res.headers.get('content-type');
       if (ct) headers.set('content-type', ct);
       headers.set('cache-control', 'no-store');
+      headers.set('x-frame-options', 'SAMEORIGIN');
       return new NextResponse(buffer, { status: res.status, headers });
-    } catch {
-      /* fall through */
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : 'Unknown error';
+      console.log(`[preview-proxy] sandbox projectId=${projectId} failed error=${errMsg}`);
+      return friendlyHtml('Sandbox preview is starting or unavailable. Please retry.');
     }
   }
 

@@ -190,7 +190,7 @@ export function ProjectPreviewFrame({
   };
 
   const previewUrl = previewReady
-    ? (previewMode === 'live' || previewMode === 'sandbox') && livePreviewUrl
+    ? previewMode === 'live' && livePreviewUrl
       ? (() => {
           const sep = livePreviewUrl.includes('?') ? '&' : '?';
           return `${livePreviewUrl}${sep}v=${codeWorkspaceVersion}&_=${refreshKey}&pr=${previewRefreshKey}`;

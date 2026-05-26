@@ -9,6 +9,16 @@ import { stripPlaceholderPhotoSections } from './validateGallerySiteConfig';
 
 export type GalleryPlacement = 'prepend' | `after:${string}`;
 
+/** Sync comment so Next dev reloads siteConfig after gallery edits (sandbox HMR). */
+export const SITECONFIG_GALLERY_SYNC_MARKER = '// site-agent: siteconfig gallery sync';
+
+/** Bump a harmless comment so siteConfig.ts changes when only items/sections were edited. */
+export function stampSiteConfigForGalleryPreviewReload(siteConfigSource: string): string {
+  const escaped = SITECONFIG_GALLERY_SYNC_MARKER.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const without = siteConfigSource.replace(new RegExp(`\\n?${escaped} \\d+`, 'g'), '');
+  return `${without.trimEnd()}\n${SITECONFIG_GALLERY_SYNC_MARKER} ${Date.now()}\n`;
+}
+
 export function inferGallerySectionTitle(message: string): string {
   const lower = message.toLowerCase();
   if (lower.includes('documentation') || lower.includes('document')) {

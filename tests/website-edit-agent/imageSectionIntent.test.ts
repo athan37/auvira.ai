@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { applyImagePlacementToSiteConfig } from '../../src/lib/project-workspace/website-edit-agent/applyImagePlacementPlan';
 import { planImagePlacementFallback } from '../../src/lib/project-workspace/website-edit-agent/siteStructureAnalysis';
 import { analyzeSiteStructureForImages } from '../../src/lib/project-workspace/website-edit-agent/siteStructureAnalysis';
+import { stampSiteConfigForGalleryPreviewReload } from '../../src/lib/project-workspace/website-edit-agent/gallerySiteConfig';
 import { validateGalleryInSiteConfigSource } from '../../src/lib/project-workspace/website-edit-agent/validateGallerySiteConfig';
 
 const introSiteConfig = `export const siteConfig: SiteConfig = {
@@ -74,5 +75,10 @@ describe('imageSectionIntent', () => {
     );
     expect(out).toContain('/uploads/intro.png');
     expect(out.indexOf('"type": "gallery"')).toBeLessThan(out.indexOf('"type": "services"'));
+  });
+
+  it('stampSiteConfigForGalleryPreviewReload adds sync marker', () => {
+    const stamped = stampSiteConfigForGalleryPreviewReload('export const x = 1;');
+    expect(stamped).toContain('siteconfig gallery sync');
   });
 });

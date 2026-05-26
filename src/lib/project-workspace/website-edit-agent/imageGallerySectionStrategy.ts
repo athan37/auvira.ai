@@ -16,6 +16,7 @@ import { repairPageTsxStructure } from '../repairPageTsxStructure';
 import { isValidTsxSource } from '../validateTsxSyntax';
 import { resolveSiteWorkspace } from './resolveSiteWorkspace';
 import { verifyEditApplied } from './verifyEditApplied';
+import { stampSiteConfigForGalleryPreviewReload } from './gallerySiteConfig';
 import { validateGalleryInSiteConfigSource } from './validateGallerySiteConfig';
 import type { WebsiteEditAgentOptions, WebsiteEditAgentResult } from './types';
 
@@ -86,7 +87,8 @@ export async function runImageGallerySectionStrategy(
     [pagePath]: pageBefore,
   };
 
-  await writeRel(siteConfigPath, updatedSiteConfig);
+  const stampedConfig = stampSiteConfigForGalleryPreviewReload(updatedSiteConfig);
+  await writeRel(siteConfigPath, stampedConfig);
 
   const afterWriteConfig = (await readRel(siteConfigPath)) ?? '';
   const galleryCheck = validateGalleryInSiteConfigSource(afterWriteConfig, attachments);
@@ -101,7 +103,7 @@ export async function runImageGallerySectionStrategy(
   }
 
   let pageAfter = pageBefore;
-  const renderPatch = applyUniversalImageRenderer(pageBefore, workspace.archetype);
+  let renderPatch = applyUniversalImageRenderer(pageBefore, workspace.archetype);
   if (renderPatch.patched && isValidTsxSource(renderPatch.content, 'page.tsx')) {
     pageAfter = renderPatch.content;
   } else if (
@@ -109,9 +111,17 @@ export async function runImageGallerySectionStrategy(
     !genericSectionRendersItemImages(pageAfter)
   ) {
     const structural = repairPageTsxStructure(pageAfter);
-    const retry = applyUniversalImageRenderer(structural.content, workspace.archetype);
-    if (retry.patched && isValidTsxSource(retry.content, 'page.tsx')) {
-      pageAfter = retry.content;
+    renderPatch = applyUniversalImageRenderer(structural.content, workspace.archetype);
+    if (renderPatch.patched && isValidTsxSource(renderPatch.content, 'page.tsx')) {
+      pageAfter = renderPatch.content;
+    }
+  } else if (
+    pageHasGalleryRenderer(pageAfter) &&
+    !/case\s*['"]gallery['"]/.test(pageAfter)
+  ) {
+    renderPatch = applyUniversalImageRenderer(pageAfter, workspace.archetype);
+    if (renderPatch.patched && isValidTsxSource(renderPatch.content, 'page.tsx')) {
+      pageAfter = renderPatch.content;
     }
   }
 
