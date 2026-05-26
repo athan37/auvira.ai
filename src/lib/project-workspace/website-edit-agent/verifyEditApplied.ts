@@ -1,3 +1,9 @@
+import { isTextColorEditRequest } from '../verifyPreviewHints';
+import {
+  extractPresetObjectLiteral,
+  PRESET_BACKGROUND_KEYS,
+} from './preset/presetUtils';
+
 export interface VerifyResult {
   ok: boolean;
   reason: string;
@@ -17,26 +23,6 @@ function findPageTsxContent(files: Record<string, string>): string | null {
   for (const [filePath, content] of Object.entries(files)) {
     if (/src\/app\/page\.tsx$/i.test(filePath.replace(/\\/g, '/'))) {
       return content;
-    }
-  }
-  return null;
-}
-
-const PRESET_BACKGROUND_KEYS = ['pageBg', 'heroBg', 'surfaceBg', 'mutedBg'] as const;
-
-/** Extract inline `const preset = { ... }` JSON (single-line or multiline). */
-function extractPresetObjectLiteral(pageContent: string): string | null {
-  const marker = pageContent.indexOf('const preset = ');
-  if (marker < 0) return null;
-  const start = pageContent.indexOf('{', marker);
-  if (start < 0) return null;
-  let depth = 0;
-  for (let i = start; i < pageContent.length; i++) {
-    const ch = pageContent[i];
-    if (ch === '{') depth += 1;
-    else if (ch === '}') {
-      depth -= 1;
-      if (depth === 0) return pageContent.slice(start, i + 1);
     }
   }
   return null;
@@ -74,6 +60,10 @@ function verifyVisibleBackgroundOnPage(
     messageHasKeyword(lowerMsg, 'background') ||
     messageHasKeyword(lowerMsg, 'colour') ||
     messageHasKeyword(lowerMsg, 'color');
+
+  if (isTextColorEditRequest(message)) {
+    return null;
+  }
 
   if (!isBackgroundRequest && requestedColors.length === 0) {
     return null;

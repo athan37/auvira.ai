@@ -2,6 +2,7 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { repairSiteConfigTypesInWorkspace } from '@/lib/preview/repairSiteConfigTypes';
 import { validateChangedSourceSyntax } from './validateTsxSyntax';
 
 const execFileAsync = promisify(execFile);
@@ -30,6 +31,11 @@ export async function validateWorkspace(
   const warnings: string[] = [];
 
   const resolved = path.resolve(workspacePath);
+
+  const siteConfigRepaired = await repairSiteConfigTypesInWorkspace(resolved);
+  if (siteConfigRepaired) {
+    logs.push('Repaired siteConfig.ts types to include gallery/documentation sections');
+  }
 
   let packageJsonPath: string;
   try {

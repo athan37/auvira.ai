@@ -50,7 +50,10 @@ export class MiniMaxApiProvider implements LLMProvider {
 
       let raw: string;
       try {
-        raw = await this.callMessagesApi(input.system, userText);
+        raw = await this.callMessagesApi(input.system, userText, {
+          maxTokens: input.maxTokens,
+          temperature: input.temperature,
+        });
       } catch (err) {
         lastError = err instanceof Error ? err.message : 'MiniMax API call failed';
         continue;
@@ -104,12 +107,17 @@ export class MiniMaxApiProvider implements LLMProvider {
     return this.generateJSON<T>(input);
   }
 
-  private async callMessagesApi(system: string | undefined, userText: string): Promise<string> {
+  private async callMessagesApi(
+    system: string | undefined,
+    userText: string,
+    options?: { maxTokens?: number; temperature?: number }
+  ): Promise<string> {
+    const defaultMax = parseInt(process.env.WEBSITE_EDIT_MAX_TOKENS || '8192', 10);
     const body = {
       model: this.model,
-      max_tokens: 8192,
+      max_tokens: options?.maxTokens ?? defaultMax,
       stream: false,
-      temperature: 1,
+      temperature: options?.temperature ?? 1,
       ...(system ? { system } : {}),
       messages: [
         {

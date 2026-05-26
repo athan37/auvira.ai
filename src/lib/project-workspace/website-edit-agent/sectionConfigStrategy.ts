@@ -142,7 +142,8 @@ Return JSON: { "files": [{ "path": "${SITE_CONFIG}", "content": "..." }], "summa
 
   return {
     ok: true,
-    strategy: 'single_shot',
+    strategy: 'section_config',
+    tier: 'L2',
     summary: result.data.summary || 'Updated your website section.',
     ownerMessage: result.data.summary || 'Updated your website section.',
     changedFiles,

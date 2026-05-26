@@ -1,4 +1,5 @@
 import type { ValidateWorkspaceResult } from '@/lib/project-workspace/validateWorkspace';
+import { repairSiteConfigTypesViaGateway } from '@/lib/preview/repairSiteConfigTypes';
 import { validateChangedSourceSyntax } from '@/lib/project-workspace/validateTsxSyntax';
 import { getProjectSandbox } from './sandboxClient';
 import { getSandboxGateway } from './sandboxWorkspaceGateway';
@@ -23,6 +24,17 @@ export async function validateSandboxWorkspace(
   });
   if (pkgCheck.exitCode !== 0) {
     return { ok: true, buildLog: 'No package.json — skipped build', errors, warnings };
+  }
+
+  try {
+    const gateway = await getSandboxGateway(projectId);
+    if (await repairSiteConfigTypesViaGateway(gateway)) {
+      logs.push('Repaired siteConfig.ts types to include gallery/documentation sections');
+    }
+  } catch (e) {
+    warnings.push(
+      `siteConfig type repair skipped: ${e instanceof Error ? e.message : String(e)}`
+    );
   }
 
   const changed = new Set(changedFiles || []);

@@ -159,40 +159,103 @@ function markStepsOnEditFailure(steps: AgentStep[]): AgentStep[] {
   });
 }
 
-function AgentStepsUI({ steps, failed }: { steps: AgentStep[]; failed?: boolean }) {
+function getPreferredStepIndex(steps: AgentStep[]): number {
+  const failedIdx = steps.findIndex((s) => s.status === 'failed');
+  if (failedIdx >= 0) return failedIdx;
+  const activeIdx = steps.findIndex((s) => s.status === 'active');
+  if (activeIdx >= 0) return activeIdx;
+  for (let i = steps.length - 1; i >= 0; i--) {
+    if (steps[i]?.status === 'completed') return i;
+  }
+  return 0;
+}
+
+function ChevronButton({
+  direction,
+  disabled,
+  onClick,
+  label,
+}: {
+  direction: 'prev' | 'next';
+  disabled: boolean;
+  onClick: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      className={cn(
+        'flex h-7 w-7 shrink-0 items-center justify-center rounded-md border transition-colors',
+        disabled
+          ? 'border-transparent text-zinc-300 cursor-not-allowed'
+          : 'border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900'
+      )}
+    >
+      <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+        {direction === 'prev' ? (
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+        ) : (
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+        )}
+      </svg>
+    </button>
+  );
+}
+
+function AgentStepNavigator({
+  steps,
+  failed,
+  viewIndex,
+  onViewIndexChange,
+}: {
+  steps: AgentStep[];
+  failed?: boolean;
+  viewIndex: number;
+  onViewIndexChange: (index: number) => void;
+}) {
+  const safeIndex = Math.min(Math.max(viewIndex, 0), steps.length - 1);
+  const step = steps[safeIndex];
+  if (!step) return null;
+
   return (
     <div
       className={cn(
-        'rounded-lg border p-3',
-        failed ? 'border-red-200 bg-red-50' : 'border-zinc-200/80 bg-zinc-50'
+        'mt-2 flex items-center gap-2 rounded-lg border px-2 py-1.5',
+        failed ? 'border-red-200 bg-red-50/80' : 'border-zinc-200/80 bg-zinc-50/80'
       )}
       aria-live="polite"
+      aria-atomic="true"
     >
-      <div
+      <ChevronButton
+        direction="prev"
+        disabled={safeIndex <= 0}
+        onClick={() => onViewIndexChange(safeIndex - 1)}
+        label="Previous step"
+      />
+      <StepIcon status={step.status} />
+      <span
         className={cn(
-          'text-sm font-medium mb-2',
-          failed ? 'text-red-800' : 'text-zinc-700'
+          'min-w-0 flex-1 truncate text-sm',
+          step.status === 'pending' && 'text-zinc-400',
+          step.status === 'active' && 'font-medium text-zinc-950',
+          step.status === 'completed' && 'text-zinc-600',
+          step.status === 'failed' && 'text-red-600'
         )}
       >
-        {failed ? "Couldn't update your website" : 'Updating your website'}
-      </div>
-      <ul className="space-y-1.5">
-        {steps.map((step) => (
-          <li key={step.id} className="flex items-center gap-2 text-sm">
-            <StepIcon status={step.status} />
-            <span
-              className={cn(
-                step.status === 'pending' && 'text-zinc-400',
-                step.status === 'active' && 'text-zinc-950 font-medium',
-                step.status === 'completed' && 'text-zinc-600',
-                step.status === 'failed' && 'text-red-600'
-              )}
-            >
-              {step.label}
-            </span>
-          </li>
-        ))}
-      </ul>
+        {step.label}
+      </span>
+      <span className="shrink-0 text-[10px] tabular-nums text-zinc-400">
+        {safeIndex + 1}/{steps.length}
+      </span>
+      <ChevronButton
+        direction="next"
+        disabled={safeIndex >= steps.length - 1}
+        onClick={() => onViewIndexChange(safeIndex + 1)}
+        label="Next step"
+      />
     </div>
   );
 }
@@ -212,6 +275,8 @@ export function ProjectPreviewChat({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [agentSteps, setAgentSteps] = useState<AgentStep[]>([]);
   const [showSteps, setShowSteps] = useState(false);
+  const [stepViewIndex, setStepViewIndex] = useState(0);
+  const manualStepNavRef = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -225,7 +290,12 @@ export function ProjectPreviewChat({
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, showSteps, agentSteps, pendingImages]);
+  }, [messages, showSteps, pendingImages]);
+
+  useEffect(() => {
+    if (!showSteps || agentSteps.length === 0 || manualStepNavRef.current) return;
+    setStepViewIndex(getPreferredStepIndex(agentSteps));
+  }, [agentSteps, showSteps]);
 
   const removePendingImage = (id: string) => {
     setPendingImages((prev) => {
@@ -313,6 +383,8 @@ export function ProjectPreviewChat({
       },
     ]);
     setShowSteps(true);
+    manualStepNavRef.current = false;
+    setStepViewIndex(0);
     setAgentSteps(getInitialSteps(userMsg));
 
     let jobId: string | undefined;
@@ -431,6 +503,7 @@ export function ProjectPreviewChat({
         setTimeout(() => {
           setShowSteps(false);
           setAgentSteps([]);
+          manualStepNavRef.current = false;
         }, 2000);
       }
     } catch (error) {
@@ -470,13 +543,39 @@ export function ProjectPreviewChat({
     setInput(text);
   };
 
+  const stepsFailed = agentSteps.some((s) => s.status === 'failed');
+
   return (
     <Card className="flex flex-col h-full min-h-0 shadow-sm">
       <CardHeader>
-        <h2 className="font-semibold text-zinc-900">Edit your website</h2>
-        <p className="text-xs text-zinc-500">
-          Describe changes or attach photos — preview updates before you publish
-        </p>
+        {showSteps && agentSteps.length > 0 ? (
+          <>
+            <h2
+              className={cn(
+                'font-semibold',
+                stepsFailed ? 'text-red-800' : 'text-zinc-900'
+              )}
+            >
+              {stepsFailed ? "Couldn't update your website" : 'Updating your website'}
+            </h2>
+            <AgentStepNavigator
+              steps={agentSteps}
+              failed={stepsFailed}
+              viewIndex={stepViewIndex}
+              onViewIndexChange={(index) => {
+                manualStepNavRef.current = true;
+                setStepViewIndex(index);
+              }}
+            />
+          </>
+        ) : (
+          <>
+            <h2 className="font-semibold text-zinc-900">Edit your website</h2>
+            <p className="text-xs text-zinc-500">
+              Describe changes or attach photos — preview updates before you publish
+            </p>
+          </>
+        )}
       </CardHeader>
 
       <CardBody className="flex-1 flex flex-col min-h-0 p-0">
@@ -503,13 +602,6 @@ export function ProjectPreviewChat({
                 ))}
               </div>
             </div>
-          )}
-
-          {showSteps && agentSteps.length > 0 && (
-            <AgentStepsUI
-              steps={agentSteps}
-              failed={agentSteps.some((s) => s.status === 'failed')}
-            />
           )}
 
           {messages.map((msg, i) => (

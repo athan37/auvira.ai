@@ -1,97 +1,130 @@
-import { promises as fs } from 'fs';
-import path from 'path';
 import { getLLMClient } from '@/lib/llm/llmClient';
-import { getChangedFilesFromHashes, computeWorkspaceHashes, isSafeWritePath } from '../workspaceEditShared';
-import { discoverContextFiles, PRIORITY_CONTEXT_FILES } from './discoverContextFiles';
-import { loadContextFileContents } from './discoverContextFiles';
+import { getChangedFilesFromHashes, computeWorkspaceHashes } from '../workspaceEditShared';
+import { applyPatchesToWorkspace } from './applyPatchesToWorkspace';
+import { discoverContextFiles } from './discoverContextFiles';
 import { buildImageAttachmentGuidance } from './enrichEditPrompt';
-import type { WebsiteEditAgentOptions, WebsiteEditAgentResult, WorkspaceMode } from './types';
+import {
+  extractPresetObjectLiteral,
+} from './preset/presetUtils';
+import { PAGE_TSX, GLOBALS_CSS, SITE_CONFIG, readWorkspaceRel } from './strategyContext';
+import type { WebsiteEditAgentOptions, WebsiteEditAgentResult } from './types';
 
-const MAX_FILE_BYTES = 12_000;
+const SCOPED_MAX_BYTES = 6000;
+const EDIT_MAX_TOKENS = parseInt(process.env.WEBSITE_EDIT_MAX_TOKENS || '4096', 10);
 
-type FileEdit = { path: string; content: string };
-type LlmEditResponse = { files: FileEdit[]; summary?: string };
+type PatchResponse = {
+  patches?: Array<{ path: string; find?: string; replace?: string; content?: string }>;
+  files?: Array<{ path: string; content: string }>;
+  summary?: string;
+};
 
-async function discoverCandidateFiles(
-  workspacePath: string,
-  mode: WorkspaceMode,
-  ownerMessage: string
-): Promise<string[]> {
-  return discoverContextFiles(workspacePath, mode, ownerMessage);
+async function buildScopedContext(
+  options: WebsiteEditAgentOptions
+): Promise<Record<string, string>> {
+  const lower = options.ownerMessage.toLowerCase();
+  const payload: Record<string, string> = {};
+
+  const page = await readWorkspaceRel(options, PAGE_TSX);
+  if (page) {
+    const preset = extractPresetObjectLiteral(page);
+    if (preset && (lower.includes('color') || lower.includes('background'))) {
+      payload[`${PAGE_TSX} (preset)`] = preset;
+    } else if (page.length <= SCOPED_MAX_BYTES) {
+      payload[PAGE_TSX] = page;
+    } else {
+      payload[PAGE_TSX] = `${page.slice(0, SCOPED_MAX_BYTES)}\n/* … truncated … */`;
+    }
+  }
+
+  if (lower.includes('color') || lower.includes('background') || lower.includes('style')) {
+    const css = await readWorkspaceRel(options, GLOBALS_CSS);
+    if (css) {
+      payload[GLOBALS_CSS] =
+        css.length <= SCOPED_MAX_BYTES
+          ? css
+          : `${css.slice(0, SCOPED_MAX_BYTES)}\n/* … truncated … */`;
+    }
+  }
+
+  if (
+    lower.includes('headline') ||
+    lower.includes('section') ||
+    lower.includes('faq') ||
+    lower.includes('contact')
+  ) {
+    const config = await readWorkspaceRel(options, SITE_CONFIG);
+    if (config) {
+      payload[SITE_CONFIG] =
+        config.length <= SCOPED_MAX_BYTES
+          ? config
+          : `${config.slice(0, SCOPED_MAX_BYTES)}\n/* … truncated … */`;
+    }
+  }
+
+  if (Object.keys(payload).length === 0) {
+    const candidates = await discoverContextFiles(
+      options.workspacePath,
+      options.mode,
+      options.ownerMessage
+    );
+    for (const rel of candidates.slice(0, 3)) {
+      const content = await readWorkspaceRel(options, rel);
+      if (content) {
+        payload[rel] =
+          content.length <= SCOPED_MAX_BYTES
+            ? content
+            : `${content.slice(0, SCOPED_MAX_BYTES)}\n/* … truncated … */`;
+      }
+    }
+  }
+
+  return payload;
 }
 
 /**
- * Enhanced single-shot edit: discover files, one LLM call, write results.
+ * L2 single-shot: scoped context + patch JSON (falls back to full file writes).
  */
 export async function runSingleShotStrategy(
   options: WebsiteEditAgentOptions,
   beforeHashes: Record<string, string>
 ): Promise<WebsiteEditAgentResult | null> {
-  const isSectionEdit = /\b(section|add a|add new|make a)\b/.test(
-    options.ownerMessage.toLowerCase()
-  );
-  const hasImages = (options.attachments?.length ?? 0) > 0;
-
-  let candidates = await discoverCandidateFiles(
-    options.workspacePath,
-    options.mode,
-    options.ownerMessage
-  );
-  if (isSectionEdit || hasImages) {
-    candidates = [...PRIORITY_CONTEXT_FILES];
-  }
-
-  const filePayload: Record<string, string> = {};
-  if (options.gateway) {
-    for (const rel of candidates) {
-      try {
-        const content = await options.gateway.readFile(rel);
-        filePayload[rel] =
-          content.length <= MAX_FILE_BYTES
-            ? content
-            : `${content.slice(0, MAX_FILE_BYTES)}\n/* … truncated … */`;
-      } catch {
-        /* missing */
-      }
-    }
-  } else {
-    Object.assign(
-      filePayload,
-      await loadContextFileContents(options.workspacePath, candidates)
-    );
-  }
-
-  if (Object.keys(filePayload).length === 0) {
-    return null;
-  }
+  const filePayload = await buildScopedContext(options);
+  if (Object.keys(filePayload).length === 0) return null;
 
   const lower = options.ownerMessage.toLowerCase();
-  const isBackgroundEdit =
-    lower.includes('background') ||
-    lower.includes('color') ||
-    /\b(green|red|blue|yellow|orange|purple|pink)\b/.test(lower);
   const imageGuidance = buildImageAttachmentGuidance(options.attachments ?? []);
 
   const llm = getLLMClient();
-  const result = await llm.generateJSON<LlmEditResponse>({
-    system: `You are a website code editor. Apply the owner's request by returning updated file contents.
-Return JSON only. Include every file you change with full new content.
-Do not invent contact info.
-For background/color requests: update src/app/page.tsx — set preset.pageBg, preset.heroBg, preset.surfaceBg and hero/main className to Tailwind bg-{color}-600 (e.g. bg-blue-600). Remove old bg-red-* / other color classes. Optionally update globals.css; page.tsx is required for the preview.
-For headline/copy with a specific new phrase: update src/lib/siteConfig.ts hero.headline and any matching text in src/app/page.tsx.
-For new section + uploaded image: (1) save uses /uploads/... paths from attachments; (2) append to siteConfig.sections with type "generic", title/body about the product; (3) add or update a GenericSection in page.tsx that shows the image with <img src="/uploads/..." /> and wire SectionRenderer case "generic" to render it (generic sections currently return null).`,
+  const result = await llm.generateJSON<PatchResponse>({
+    maxTokens: EDIT_MAX_TOKENS,
+    temperature: 0,
+    system: `You are a website code editor. Prefer small patches over full files.
+Return JSON: { "patches": [{ "path", "find", "replace" } OR { "path", "content" }], "summary": "..." }
+For preset/color edits patch src/app/page.tsx preset keys and globals.css gradients.
+Do not invent contact info.`,
     prompt: `Owner request: ${options.ownerMessage}
-${isBackgroundEdit ? '\nThis is a background/color edit — update globals.css and page.tsx preset colors together when present.' : ''}
-${isSectionEdit ? '\nThis is a new section request — update siteConfig.sections AND page.tsx so the section is visible (including generic type).' : ''}
 ${imageGuidance ? `\n${imageGuidance}\n` : ''}
 
-Current files:
+Context (scoped):
 ${JSON.stringify(filePayload, null, 2)}
 
-Return: { "files": [{ "path": "relative/path", "content": "..." }], "summary": "short owner-facing note" }`,
+Return patches only when possible; use full "content" only if patching is unsafe.`,
     schema: {
       type: 'object',
       properties: {
+        patches: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              path: { type: 'string' },
+              find: { type: 'string' },
+              replace: { type: 'string' },
+              content: { type: 'string' },
+            },
+            required: ['path'],
+          },
+        },
         files: {
           type: 'array',
           items: {
@@ -105,45 +138,39 @@ Return: { "files": [{ "path": "relative/path", "content": "..." }], "summary": "
         },
         summary: { type: 'string' },
       },
-      required: ['files'],
     },
   });
 
-  if (!result.ok || !result.data?.files?.length) {
-    return null;
-  }
+  if (!result.ok) return null;
 
   let wroteAny = false;
-  for (const file of result.data.files) {
-    const normalized = file.path.replace(/^\/+/, '');
-    if (!isSafeWritePath(normalized)) continue;
 
-    if (options.gateway) {
-      await options.gateway.writeFile(normalized, file.content);
-    } else {
-      const dest = path.join(options.workspacePath, normalized);
-      await fs.mkdir(path.dirname(dest), { recursive: true });
-      await fs.writeFile(dest, file.content, 'utf-8');
-    }
-    wroteAny = true;
+  if (result.data?.patches?.length) {
+    const written = await applyPatchesToWorkspace(options, result.data.patches);
+    wroteAny = written.length > 0;
   }
 
-  if (!wroteAny) {
-    return null;
+  if (!wroteAny && result.data?.files?.length) {
+    const written = await applyPatchesToWorkspace(
+      options,
+      result.data.files.map((f) => ({ path: f.path, content: f.content }))
+    );
+    wroteAny = written.length > 0;
   }
+
+  if (!wroteAny) return null;
 
   const afterHashes = options.gateway
     ? await options.gateway.computeHashes()
     : await computeWorkspaceHashes(options.workspacePath);
   const changedFiles = getChangedFilesFromHashes(beforeHashes, afterHashes);
 
-  if (changedFiles.length === 0) {
-    return null;
-  }
+  if (changedFiles.length === 0) return null;
 
   return {
     ok: true,
     strategy: 'single_shot',
+    tier: 'L2',
     summary: result.data.summary || 'Updated your website.',
     ownerMessage: result.data.summary || 'Updated your website.',
     changedFiles,

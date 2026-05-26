@@ -38,6 +38,9 @@ interface DiffResponse {
     totalMs: number | null;
     phases: Array<{ phase: string; durationMs: number }>;
     slowestPhase: string | null;
+    strategy?: string | null;
+    tier?: string | null;
+    confidence?: string | null;
   };
 }
 
@@ -251,6 +254,9 @@ export function ChangedFilesPanel({
                 Total {formatDurationMs(data.timing.totalMs)}
                 {data.timing.slowestPhase
                   ? ` · slowest: ${data.timing.slowestPhase.replace(/_/g, ' ')}`
+                  : ''}
+                {data.timing.strategy
+                  ? ` · ${data.timing.strategy.replace(/_/g, ' ')}${data.timing.tier ? ` (${data.timing.tier})` : ''}`
                   : ''}
               </p>
             )}

@@ -9,6 +9,11 @@ import {
   sandboxHasUncommittedChanges,
 } from '@/lib/sandbox/publishSandboxWorkspace';
 import { isSandboxPreviewEnabled } from '@/lib/runtime/isSandboxPreviewEnabled';
+import {
+  repairSiteConfigTypesInWorkspace,
+  repairSiteConfigTypesViaGateway,
+} from '@/lib/preview/repairSiteConfigTypes';
+import { getSandboxGateway } from '@/lib/sandbox/sandboxWorkspaceGateway';
 
 export type CommitWorkspaceResult = {
   commitSha: string;
@@ -48,6 +53,16 @@ export async function commitWorkspaceToGitLab(
   }
 
   const useSandbox = isSandboxPreviewEnabled() && Boolean(project.gitlab?.projectId);
+  if (useSandbox) {
+    try {
+      const gateway = await getSandboxGateway(projectId);
+      await repairSiteConfigTypesViaGateway(gateway);
+    } catch {
+      /* non-fatal */
+    }
+  } else {
+    await repairSiteConfigTypesInWorkspace(getGitWorkspacePath(projectId)).catch(() => {});
+  }
   const result = useSandbox
     ? await publishSandboxWorkspaceToGitLab({
         project,

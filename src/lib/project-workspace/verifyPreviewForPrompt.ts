@@ -193,9 +193,11 @@ export async function resolveEditPreviewVerification(
   }
 
   const hints = extractPreviewVerifyHints(input.ownerMessage);
+  const strictColorHints =
+    hints.isTextColorRequest || hints.isBackgroundColorRequest;
   return verifyPreviewForPrompt({
     previewUrl: input.previewUrl,
     ownerMessage: input.ownerMessage,
-    strictHints: hints.colors.length > 0 || hints.phrases.length > 0,
+    strictHints: hints.phrases.length > 0 || strictColorHints,
   });
 }

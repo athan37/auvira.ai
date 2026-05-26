@@ -56,6 +56,17 @@ describe('verifyEditApplied', () => {
     expect(r.ok).toBe(true);
   });
 
+  it('passes hero headline text-black without requiring bg-black in preset', () => {
+    const before = `const preset = { heroText: "text-white", heroBg: "bg-blue-900" };`;
+    const after = `const preset = { heroText: "text-black", heroBg: "bg-blue-900" };`;
+    const r = verifyEditApplied(
+      'Change the hero headline to black',
+      { 'src/app/page.tsx': before },
+      { 'src/app/page.tsx': after }
+    );
+    expect(r.ok).toBe(true);
+  });
+
   it('passes blue background when preset is blue but buttons still use bg-white', () => {
     const after = `const preset = {
       pageBg: "bg-blue-500",

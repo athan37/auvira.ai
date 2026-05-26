@@ -4,6 +4,7 @@ import {
   rebuildSiteConfigFile,
   type ParsedSiteConfig,
 } from '@/lib/site-manager/siteConfigParser';
+import { ensureSiteConfigTypesSupportGallery } from '@/lib/builder/siteConfigTypes';
 import { stripPlaceholderPhotoSections } from './validateGallerySiteConfig';
 
 export type GalleryPlacement = 'prepend' | `after:${string}`;
@@ -151,9 +152,9 @@ export function insertGallerySectionInSiteConfig(
     .join('\n');
   let out = stripExistingGallerySections(siteConfigSource);
   if (place === 'prepend') {
-    return out.replace(/"sections"\s*:\s*\[\s*\n?/, `"sections": [\n${sectionBlock},\n`);
+    out = out.replace(/"sections"\s*:\s*\[\s*\n?/, `"sections": [\n${sectionBlock},\n`);
   }
-  return out;
+  return ensureSiteConfigTypesSupportGallery(out);
 }
 
 /** @deprecated Use insertGallerySectionInSiteConfig */

@@ -1,12 +1,11 @@
-import { promises as fs } from 'fs';
-import path from 'path';
 import { isAllowedWorkspacePath } from '../workspaceEditShared';
-import { routeEditRequest } from './intentRouter';
+import { classifyEditJob } from './editJobClassifier';
 import { enrichEditPrompt } from './enrichEditPrompt';
-import { runSingleShotStrategy } from './singleShotStrategy';
-import { runSectionConfigStrategy } from './sectionConfigStrategy';
 import { routeAttachmentEdits } from './attachmentRouter';
 import { runAgentLoop } from './WebsiteEditAgent';
+import { resolveSiteWorkspace } from './resolveSiteWorkspace';
+import { runStrategyPlan } from './strategyRegistry';
+import { routeEditRequest } from './intentRouter';
 import type {
   AgentStepEvent,
   WebsiteEditAgentOptions,
@@ -14,22 +13,13 @@ import type {
 } from './types';
 import { computeWorkspaceHashes } from '../workspaceEditShared';
 import { verifyEditApplied } from './verifyEditApplied';
+import {
+  GLOBALS_CSS,
+  PAGE_TSX,
+  readWorkspaceRel,
+} from './strategyContext';
 
-const STYLE_VERIFY_PATHS = ['src/app/page.tsx', 'src/app/globals.css'] as const;
-
-async function readWorkspaceRel(
-  options: WebsiteEditAgentOptions,
-  rel: string
-): Promise<string | null> {
-  try {
-    if (options.gateway) {
-      return await options.gateway.readFile(rel);
-    }
-    return await fs.readFile(path.join(options.workspacePath, rel), 'utf-8');
-  } catch {
-    return null;
-  }
-}
+const STYLE_VERIFY_PATHS = [PAGE_TSX, GLOBALS_CSS] as const;
 
 async function snapshotStyleTargets(
   options: WebsiteEditAgentOptions
@@ -58,14 +48,34 @@ async function captureChangedFileContents(
   return captured;
 }
 
+function attachPlanMeta(
+  result: WebsiteEditAgentResult,
+  plan: ReturnType<typeof classifyEditJob>
+): WebsiteEditAgentResult {
+  return {
+    ...result,
+    tier: result.tier ?? plan.tier,
+    confidence: result.confidence ?? plan.confidence,
+    verifyProfile: result.verifyProfile ?? plan.verifyProfile,
+  };
+}
+
 export { routeEditRequest, isTrivialStyleEdit, hasImageAttachments } from './intentRouter';
+export { classifyEditJob } from './editJobClassifier';
 export { verifyEditApplied, summarizeActualChanges } from './verifyEditApplied';
 export { resolveSiteWorkspace, detectPageArchetype } from './resolveSiteWorkspace';
 export type { SiteWorkspaceSnapshot, PageArchetype } from './resolveSiteWorkspace';
-export type { WebsiteEditAgentOptions, WebsiteEditAgentResult, AgentStepEvent };
+export type {
+  WebsiteEditAgentOptions,
+  WebsiteEditAgentResult,
+  AgentStepEvent,
+  EditJobPlan,
+  EditStrategyId,
+  EditTier,
+} from './types';
 
 /**
- * Main entry: route request → attachment pipeline, single-shot, or agent loop.
+ * Main entry: classify → strategy registry → agent loop fallback.
  */
 export async function runWebsiteEditAgent(
   options: WebsiteEditAgentOptions,
@@ -75,67 +85,142 @@ export async function runWebsiteEditAgent(
     return { ok: false, error: 'Workspace path is not in an allowed directory.' };
   }
 
-  const decision = routeEditRequest(options.ownerMessage);
   const beforeHashes = options.gateway
     ? await options.gateway.computeHashes()
     : await computeWorkspaceHashes(options.workspacePath);
   const hasAttachments = (options.attachments?.length ?? 0) > 0;
 
+  let workspaceSnap = null;
+  try {
+    if (options.gateway) {
+      workspaceSnap = await resolveSiteWorkspace({
+        workspacePath: options.workspacePath,
+        mode: options.mode,
+        gateway: options.gateway,
+      });
+    } else if (options.mode === 'static') {
+      workspaceSnap = await resolveSiteWorkspace({
+        workspacePath: options.workspacePath,
+        mode: 'static',
+      });
+    } else {
+      workspaceSnap = await resolveSiteWorkspace({
+        workspacePath: options.workspacePath,
+        mode: options.mode,
+      });
+    }
+  } catch {
+    workspaceSnap = null;
+  }
+
+  const plan = classifyEditJob(
+    options.ownerMessage,
+    options.attachments ?? [],
+    workspaceSnap
+  );
+
+  if (
+    plan.needsClarification &&
+    plan.confidence === 'low' &&
+    plan.primaryStrategy === 'agent_loop' &&
+    plan.tryOrder.length === 1
+  ) {
+    return {
+      ok: false,
+      error: plan.clarificationMessage,
+      ownerMessage: plan.clarificationMessage,
+      strategy: 'agent_loop',
+      tier: 'L3',
+      confidence: 'low',
+    };
+  }
+
   if (hasAttachments) {
     const attachmentResult = await routeAttachmentEdits(options, beforeHashes);
     if (attachmentResult?.ok) {
-      return attachmentResult;
+      return attachPlanMeta(attachmentResult, plan);
     }
     if (attachmentResult && !attachmentResult.ok) {
       return attachmentResult;
     }
   }
 
-  if (!hasAttachments && decision.strategy === 'single_shot') {
+  const { result, attempted, fallbackFrom } = await runStrategyPlan(plan, options, beforeHashes);
+
+  if (result?.ok) {
     const beforeFiles = await snapshotStyleTargets(options);
-    const fast = await runSingleShotStrategy(options, beforeHashes);
-    if (fast?.ok && fast.changedFiles?.length) {
-      const capturedAfter = await captureChangedFileContents(options, fast.changedFiles);
+    if (result.changedFiles?.length) {
+      const capturedAfter = await captureChangedFileContents(options, result.changedFiles);
       const verification = verifyEditApplied(options.ownerMessage, beforeFiles, {
         ...beforeFiles,
         ...capturedAfter,
       });
-      if (verification.ok) {
-        return fast;
+      if (!verification.ok && plan.verifyProfile !== 'generic') {
+        // Preview stream will verify; accept L0/L1 file writes
       }
-      // Defer strict file rules — edit stream will confirm via live preview.
-      return {
-        ...fast,
-        ok: true,
-        ownerMessage: fast.ownerMessage || fast.summary || 'Updated your website.',
-      };
     }
-    if (fast?.ok) {
-      return fast;
-    }
+    return attachPlanMeta(
+      {
+        ...result,
+        ...(fallbackFrom ? { summary: result.summary } : {}),
+      },
+      plan
+    );
   }
 
-  if (decision.intent === 'section' && options.mode === 'gitlab' && !hasAttachments) {
-    const sectionFast = await runSectionConfigStrategy(options, beforeHashes);
-    if (sectionFast?.ok) {
-      return sectionFast;
-    }
+  if (plan.tier === 'L3' || plan.primaryStrategy === 'agent_loop') {
+    const legacy = routeEditRequest(options.ownerMessage);
+    const enriched = await enrichEditPrompt(
+      options.workspacePath,
+      options.mode,
+      options.ownerMessage,
+      legacy.intent,
+      options.attachments || [],
+      options.gateway
+    );
+
+    const loopResult = await runAgentLoop(
+      {
+        ...options,
+        agentPrompt: enriched.agentPrompt,
+      },
+      onStep
+    );
+
+    return {
+      ...loopResult,
+      strategy: 'agent_loop',
+      tier: 'L3',
+      confidence: plan.confidence,
+      verifyProfile: plan.verifyProfile,
+    };
   }
 
+  void attempted;
+
+  const legacy = routeEditRequest(options.ownerMessage);
   const enriched = await enrichEditPrompt(
     options.workspacePath,
     options.mode,
     options.ownerMessage,
-    decision.intent,
+    legacy.intent,
     options.attachments || [],
     options.gateway
   );
 
-  return runAgentLoop(
+  const loopResult = await runAgentLoop(
     {
       ...options,
       agentPrompt: enriched.agentPrompt,
     },
     onStep
   );
+
+  return {
+    ...loopResult,
+    strategy: 'agent_loop',
+    tier: 'L3',
+    confidence: 'low',
+    verifyProfile: 'generic',
+  };
 }

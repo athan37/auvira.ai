@@ -3,6 +3,10 @@ export interface GenerateJSONInput {
   prompt: string;
   schema?: object;
   functions?: object[];
+  /** Override default max_tokens for this call (e.g. website edits). */
+  maxTokens?: number;
+  /** Override default temperature (0–1). */
+  temperature?: number;
 }
 
 export interface GenerateJSONResult<T = unknown> {

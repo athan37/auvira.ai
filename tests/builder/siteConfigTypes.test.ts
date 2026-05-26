@@ -25,6 +25,19 @@ describe('siteConfigTypes', () => {
     expect(SITE_SECTION_TYPE_UNION).toContain('gallery');
   });
 
+  it('upgrades SiteSection union when gallery section exists but type omits gallery', () => {
+    const broken = `export type SiteSection = {
+  type: 'services' | 'about' | 'features' | 'faq' | 'testimonials' | 'contact' | 'generic';
+  title: string;
+};
+export const siteConfig: SiteConfig = {
+  sections: [{ type: 'gallery', title: 'Products', items: [] }]
+};`;
+    const out = ensureSiteConfigTypesSupportGallery(broken);
+    expect(out).toContain("'gallery'");
+    expect(out).toMatch(/type:\s*'services'[^;]*'gallery'/);
+  });
+
   it('generateSiteConfig includes gallery in type union', () => {
     const spec: SiteSpec = {
       siteTitle: 'Test',

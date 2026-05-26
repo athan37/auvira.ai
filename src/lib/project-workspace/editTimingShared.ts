@@ -26,12 +26,31 @@ function findLogTime(logs: EditJobLogLike[], type: string): number | null {
   return new Date(entry.createdAt).getTime();
 }
 
+/** Strategy metadata from agent_finished log entry. */
+export function extractEditStrategyFromLogs(logs: EditJobLogLike[]): {
+  strategy: string | null;
+  tier: string | null;
+  confidence: string | null;
+} {
+  const finished = logs.find((l) => l.type === 'agent_finished');
+  const meta = finished?.metadata;
+  return {
+    strategy: typeof meta?.strategy === 'string' ? meta.strategy : null,
+    tier: typeof meta?.tier === 'string' ? meta.tier : null,
+    confidence: typeof meta?.confidence === 'string' ? meta.confidence : null,
+  };
+}
+
 /** Build timing summary from stored job logs (for diff API / UI). */
 export function buildEditTimingFromLogs(logs: EditJobLogLike[]): {
   totalMs: number | null;
   phases: Array<{ phase: string; durationMs: number }>;
   slowestPhase: string | null;
+  strategy: string | null;
+  tier: string | null;
+  confidence: string | null;
 } {
+  const strategyMeta = extractEditStrategyFromLogs(logs);
   const withDuration = logs
     .filter((l) => typeof l.metadata?.durationMs === 'number')
     .map((l) => ({
@@ -46,6 +65,7 @@ export function buildEditTimingFromLogs(logs: EditJobLogLike[]): {
       totalMs: typeof totalFromSummary === 'number' ? totalFromSummary : null,
       phases: sorted,
       slowestPhase: sorted[0]?.phase ?? null,
+      ...strategyMeta,
     };
   }
 
@@ -79,5 +99,6 @@ export function buildEditTimingFromLogs(logs: EditJobLogLike[]): {
     totalMs: created != null && finished != null ? finished - created : null,
     phases,
     slowestPhase: phases[0]?.phase ?? null,
+    ...strategyMeta,
   };
 }

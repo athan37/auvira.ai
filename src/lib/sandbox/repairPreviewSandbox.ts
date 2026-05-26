@@ -1,5 +1,6 @@
 import { getSandboxGateway } from './sandboxWorkspaceGateway';
 import { repairPageTsxStructure } from '@/lib/project-workspace/repairPageTsxStructure';
+import { repairSiteConfigTypesViaGateway } from '@/lib/preview/repairSiteConfigTypes';
 
 type FileOps = {
   read: (rel: string) => Promise<string | null>;
@@ -72,6 +73,7 @@ export async function repairPreviewSandbox(projectId: string): Promise<void> {
     },
   };
 
+  await repairSiteConfigTypesViaGateway(gateway);
   await repairPageToSiteConfigSchema(ops);
   await ensureSiteConfigNavigation(ops);
 

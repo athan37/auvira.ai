@@ -414,7 +414,15 @@ export async function POST(
           'agent_finished',
           'Agent completed',
           editTimer.finish('agent'),
-          { summary: agentResult.summary, agent: agentResult.agent, strategy: agentResult.strategy, phase: 'agent' }
+          {
+            summary: agentResult.summary,
+            agent: agentResult.agent,
+            strategy: agentResult.strategy,
+            tier: agentResult.tier,
+            confidence: agentResult.confidence,
+            verifyProfile: agentResult.verifyProfile,
+            phase: 'agent',
+          }
         );
         emit('step', { id: 'apply_change', label: 'Applying your requested change', status: 'completed' });
         emit('step', { id: 'validate', label: 'Checking the preview', status: 'active' });

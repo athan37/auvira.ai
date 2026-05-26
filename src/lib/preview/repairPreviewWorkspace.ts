@@ -1,11 +1,13 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import { repairPageTsxStructure } from '@/lib/project-workspace/repairPageTsxStructure';
+import { repairSiteConfigTypesInWorkspace } from '@/lib/preview/repairSiteConfigTypes';
 
 /**
  * Fix common template / agent-edit mismatches so `next dev` can render the preview.
  */
 export async function repairPreviewWorkspace(workspacePath: string): Promise<void> {
+  await repairSiteConfigTypesInWorkspace(workspacePath);
   await repairPageToSiteConfigSchema(workspacePath);
   await ensureSiteConfigNavigation(workspacePath);
   await ensureHeroCtasInSiteConfig(workspacePath);

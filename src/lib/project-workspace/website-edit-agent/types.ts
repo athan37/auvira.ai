@@ -1,8 +1,56 @@
 export type WorkspaceMode = 'gitlab' | 'static';
 
-export type EditIntent = 'style' | 'copy' | 'section' | 'contact' | 'general';
+export type EditIntent =
+  | 'style'
+  | 'copy'
+  | 'section'
+  | 'contact'
+  | 'chrome'
+  | 'meta'
+  | 'layout'
+  | 'general';
 
+export type EditTier = 'L0' | 'L1' | 'L2' | 'L3';
+
+export type EditJobConfidence = 'high' | 'medium' | 'low';
+
+export type VerifyProfile = 'color' | 'copy' | 'section' | 'image' | 'contact' | 'generic';
+
+export type EditStrategyId =
+  | 'preset_theme'
+  | 'preset_text_color'
+  | 'copy_field'
+  | 'contact_field'
+  | 'section_remove'
+  | 'section_reorder'
+  | 'section_faq_template'
+  | 'chrome_field'
+  | 'meta_field'
+  | 'static_theme'
+  | 'static_copy'
+  | 'image_gallery'
+  | 'hero_image'
+  | 'gallery_captions'
+  | 'static_gallery'
+  | 'single_shot'
+  | 'section_config'
+  | 'agent_loop';
+
+/** @deprecated Legacy strategy labels; prefer EditStrategyId */
 export type EditStrategyKind = 'single_shot' | 'agent_loop' | 'image_gallery';
+
+export interface EditJobPlan {
+  intents: EditIntent[];
+  tier: EditTier;
+  primaryStrategy: EditStrategyId;
+  tryOrder: EditStrategyId[];
+  confidence: EditJobConfidence;
+  verifyProfile: VerifyProfile;
+  applyLabel: string;
+  /** When true, stream may ask user to clarify before running agent */
+  needsClarification?: boolean;
+  clarificationMessage?: string;
+}
 
 export interface AgentStepEvent {
   type: 'step';
@@ -68,7 +116,10 @@ export interface WebsiteEditAgentResult {
   ownerMessage?: string;
   error?: string;
   changedFiles?: string[];
-  strategy?: EditStrategyKind;
+  strategy?: EditStrategyId;
+  tier?: EditTier;
+  confidence?: EditJobConfidence;
+  verifyProfile?: VerifyProfile;
 }
 
 export interface RouterDecision {

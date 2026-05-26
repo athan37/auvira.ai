@@ -26,4 +26,24 @@ describe('verifyPreviewHints', () => {
   it('detects bg-green solid classes', () => {
     expect(htmlShowsTailwindColor('<motion class="bg-green-600">', 'green')).toBe(true);
   });
+
+  it('detects text-black classes in HTML', () => {
+    const html =
+      '<h1 class="font-serif text-5xl font-semibold tracking-tight text-black md:text-7xl">Hero</h1>';
+    expect(htmlShowsTailwindColor(html, 'black')).toBe(true);
+  });
+
+  it('classifies hero headline black as text-color request', () => {
+    const hints = extractPreviewVerifyHints('Change the hero headline to black');
+    expect(hints.colors).toContain('black');
+    expect(hints.isTextColorRequest).toBe(true);
+    expect(hints.isBackgroundColorRequest).toBe(false);
+    expect(hints.isCopyRequest).toBe(true);
+  });
+
+  it('classifies background green as background-color request', () => {
+    const hints = extractPreviewVerifyHints('change background color of the site to green');
+    expect(hints.isTextColorRequest).toBe(false);
+    expect(hints.isBackgroundColorRequest).toBe(true);
+  });
 });
