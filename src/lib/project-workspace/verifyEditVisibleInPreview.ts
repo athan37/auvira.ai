@@ -1,4 +1,5 @@
 import { checkPreviewUrlHealthy } from '@/lib/preview/waitForPreviewReady';
+import { countUploadedImagesInHtml } from './previewImageHtml';
 
 export interface VerifyPreviewInput {
   previewUrl: string;
@@ -83,13 +84,10 @@ export async function verifyEditVisibleInPreview(
       continue;
     }
 
-    const imagesFound = imagePaths.filter((imagePath) => {
-      if (lastHtml.includes(imagePath) || lastHtml.includes(`/${imagePath}`)) {
-        return true;
-      }
-      const base = imagePath.split('/').pop();
-      return Boolean(base && base.length > 4 && lastHtml.includes(base));
-    }).length;
+    const imagesFound = countUploadedImagesInHtml(
+      lastHtml,
+      imagePaths.map((p) => (p.startsWith('/') ? p : `/${p}`))
+    );
 
     const phraseMatched = phrases.some((phrase) =>
       lastHtml.toLowerCase().includes(phrase.toLowerCase())

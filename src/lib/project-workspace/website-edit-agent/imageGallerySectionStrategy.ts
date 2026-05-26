@@ -8,9 +8,12 @@ import { applyImagePlacementToSiteConfig, describePlacementForOwner } from './ap
 import { planImagePlacement } from './imagePlacementPlan';
 import {
   applyUniversalImageRenderer,
-  canRenderUploadedImages,
+  genericSectionRendersItemImages,
+  pageHasGalleryRenderer,
   stampPageForGalleryPreviewReload,
 } from './universalImageRenderer';
+import { repairPageTsxStructure } from '../repairPageTsxStructure';
+import { isValidTsxSource } from '../validateTsxSyntax';
 import { resolveSiteWorkspace } from './resolveSiteWorkspace';
 import { verifyEditApplied } from './verifyEditApplied';
 import { validateGalleryInSiteConfigSource } from './validateGallerySiteConfig';
@@ -97,21 +100,22 @@ export async function runImageGallerySectionStrategy(
     };
   }
 
-  const renderPatch = applyUniversalImageRenderer(pageBefore, workspace.archetype);
   let pageAfter = pageBefore;
-  if (renderPatch.patched) {
-    await writeRel(pagePath, renderPatch.content);
+  const renderPatch = applyUniversalImageRenderer(pageBefore, workspace.archetype);
+  if (renderPatch.patched && isValidTsxSource(renderPatch.content, 'page.tsx')) {
     pageAfter = renderPatch.content;
-  } else {
-    pageAfter = (await readRel(pagePath)) ?? pageBefore;
+  } else if (
+    !pageHasGalleryRenderer(pageAfter) &&
+    !genericSectionRendersItemImages(pageAfter)
+  ) {
+    const structural = repairPageTsxStructure(pageAfter);
+    const retry = applyUniversalImageRenderer(structural.content, workspace.archetype);
+    if (retry.patched && isValidTsxSource(retry.content, 'page.tsx')) {
+      pageAfter = retry.content;
+    }
   }
 
-  // Always bump page.tsx so sandbox/local dev re-imports siteConfig after gallery edits.
-  const stamped = stampPageForGalleryPreviewReload(pageAfter);
-  await writeRel(pagePath, stamped);
-  pageAfter = stamped;
-
-  if (!canRenderUploadedImages(pageAfter, workspace.archetype)) {
+  if (!pageHasGalleryRenderer(pageAfter) && !genericSectionRendersItemImages(pageAfter)) {
     return {
       ok: false,
       strategy: 'image_gallery',
@@ -120,6 +124,10 @@ export async function runImageGallerySectionStrategy(
         "Your images were saved, but this site's page template still can't display them. Please try again after the latest deploy.",
     };
   }
+
+  const stamped = stampPageForGalleryPreviewReload(pageAfter);
+  await writeRel(pagePath, stamped);
+  pageAfter = stamped;
 
   const afterSiteConfig = (await readRel(siteConfigPath)) ?? updatedSiteConfig;
   const afterFiles: Record<string, string> = {

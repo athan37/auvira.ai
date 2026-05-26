@@ -1,11 +1,16 @@
 import { parseSiteConfigSource } from '@/lib/site-manager/siteConfigParser';
-import { canRenderUploadedImages } from './website-edit-agent/universalImageRenderer';
+import { fetchHtmlFromSandboxLoopback } from '@/lib/sandbox/fetchSandboxPreviewHtml';
+import {
+  genericSectionRendersItemImages,
+  pageHasGalleryRenderer,
+  applyUniversalImageRenderer,
+} from './website-edit-agent/universalImageRenderer';
 import {
   sectionItemsHaveImageUrls,
   validateGalleryInSiteConfigSource,
 } from './website-edit-agent/validateGallerySiteConfig';
 import type { WorkspaceAssetAttachment } from './workspaceAssetTypes';
-import { verifyEditVisibleInPreview } from './verifyEditVisibleInPreview';
+import { countUploadedImagesInHtml } from './previewImageHtml';
 
 /** Section titles from siteConfig that should appear in preview HTML when images render. */
 export function gallerySectionTitlesFromSource(siteConfigSource: string): string[] {
@@ -46,15 +51,32 @@ export async function countReachableUploadAssets(
   return assetsOk;
 }
 
+function pageCanRenderGalleryItems(pageSource: string): boolean {
+  if (pageHasGalleryRenderer(pageSource)) return true;
+  if (genericSectionRendersItemImages(pageSource)) return true;
+  const simulated = applyUniversalImageRenderer(pageSource);
+  return pageHasGalleryRenderer(simulated.content) || genericSectionRendersItemImages(simulated.content);
+}
+
+async function fetchExternalPreviewHtml(previewUrl: string): Promise<string> {
+  const sep = previewUrl.includes('?') ? '&' : '?';
+  const res = await fetch(`${previewUrl}${sep}_verify=${Date.now()}`, {
+    cache: 'no-store',
+    redirect: 'follow',
+    signal: AbortSignal.timeout(25_000),
+  });
+  return res.text();
+}
+
 /**
  * Sandbox preview: require uploaded image paths in rendered HTML (not upload URL alone).
  */
 export async function verifyGalleryEditOnSandbox(input: {
   previewUrl: string;
+  projectId?: string;
   siteConfigSource: string;
   pageSource: string;
   attachments: WorkspaceAssetAttachment[];
-  /** Extra section titles/phrases to look for in HTML (optional). */
   sectionPhrases?: string[];
 }): Promise<{ ok: boolean; reason: string; imagesFound: number; htmlLength: number }> {
   const configCheck = validateGalleryInSiteConfigSource(
@@ -65,7 +87,7 @@ export async function verifyGalleryEditOnSandbox(input: {
     return { ok: false, reason: configCheck.reason, imagesFound: 0, htmlLength: 0 };
   }
 
-  if (!canRenderUploadedImages(input.pageSource)) {
+  if (!pageCanRenderGalleryItems(input.pageSource)) {
     return {
       ok: false,
       reason: 'page.tsx cannot render gallery item images (missing gallery/generic renderer)',
@@ -74,33 +96,54 @@ export async function verifyGalleryEditOnSandbox(input: {
     };
   }
 
-  await sleep(3000);
-
+  const publicUrls = input.attachments.map((a) => a.publicUrl);
   const configTitles = gallerySectionTitlesFromSource(input.siteConfigSource);
+  const retries = 8;
+  const delayMs = 3500;
 
-  const htmlVerify = await verifyEditVisibleInPreview({
-    previewUrl: input.previewUrl,
-    imagePaths: input.attachments.map((a) => a.publicUrl),
-    sectionPhrases: [
-      ...(input.sectionPhrases ?? []),
-      ...configTitles,
-      'Our products',
-      'Our work',
-      'Gallery',
-      'Product images',
-    ],
-    timeoutMs: 25_000,
-    retries: 6,
-    delayMs: 3000,
-  });
+  let lastHtml = '';
+  let lastImagesFound = 0;
+  let usedLoopback = false;
 
-  if (htmlVerify.ok) {
-    return {
-      ok: true,
-      reason: htmlVerify.reason,
-      imagesFound: htmlVerify.imagesFound,
-      htmlLength: htmlVerify.htmlLength,
-    };
+  await sleep(4000);
+
+  for (let attempt = 0; attempt < retries; attempt++) {
+    if (attempt > 0) {
+      await sleep(delayMs);
+    }
+
+    let html = '';
+    if (input.projectId) {
+      html = (await fetchHtmlFromSandboxLoopback(input.projectId)) ?? '';
+      if (html.length > 1500) usedLoopback = true;
+    }
+    if (html.length < 1500) {
+      try {
+        html = await fetchExternalPreviewHtml(input.previewUrl);
+      } catch {
+        continue;
+      }
+    }
+
+    lastHtml = html;
+    if (html.length < 1500) {
+      continue;
+    }
+
+    lastImagesFound = countUploadedImagesInHtml(html, publicUrls);
+    if (lastImagesFound >= publicUrls.length) {
+      const phraseMatched = [...configTitles, ...(input.sectionPhrases ?? [])].some((phrase) =>
+        html.toLowerCase().includes(phrase.toLowerCase())
+      );
+      return {
+        ok: true,
+        reason: usedLoopback
+          ? `Sandbox loopback preview shows ${lastImagesFound}/${publicUrls.length} uploaded image(s).`
+          : `Preview shows ${lastImagesFound}/${publicUrls.length} uploaded image(s).`,
+        imagesFound: lastImagesFound,
+        htmlLength: html.length,
+      };
+    }
   }
 
   const assetsOk = await countReachableUploadAssets(input.previewUrl, input.attachments);
@@ -109,9 +152,9 @@ export async function verifyGalleryEditOnSandbox(input: {
     ok: false,
     reason:
       assetsOk >= input.attachments.length
-        ? `${htmlVerify.reason} Upload files exist (${assetsOk}/${input.attachments.length}) but the preview page did not render them yet — refresh the preview or retry the edit.`
-        : `${htmlVerify.reason}; ${assetsOk}/${input.attachments.length} upload URLs reachable on sandbox`,
-    imagesFound: htmlVerify.imagesFound,
-    htmlLength: htmlVerify.htmlLength,
+        ? `Preview HTML (${lastHtml.length} bytes) does not include uploaded image paths (${lastImagesFound}/${publicUrls.length} found). Files exist on sandbox; the page template may not be rendering gallery items yet.`
+        : `Preview HTML missing images (${lastImagesFound}/${publicUrls.length}); ${assetsOk}/${input.attachments.length} upload URLs reachable.`,
+    imagesFound: lastImagesFound,
+    htmlLength: lastHtml.length,
   };
 }

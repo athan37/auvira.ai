@@ -143,6 +143,7 @@ async function fetchPreviewHtml(previewUrl: string): Promise<string | null> {
 
 export interface ResolveEditPreviewVerificationInput {
   previewUrl: string;
+  projectId?: string;
   ownerMessage: string;
   attachments: WorkspaceAssetAttachment[];
   isSandbox: boolean;
@@ -171,6 +172,7 @@ export async function resolveEditPreviewVerification(
     const hints = extractPreviewVerifyHints(input.ownerMessage);
     const gallery = await verifyGalleryEditOnSandbox({
       previewUrl: input.previewUrl,
+      projectId: input.projectId,
       siteConfigSource: siteConfigAfter,
       pageSource: pageAfter,
       attachments: input.attachments,

@@ -34,6 +34,10 @@ export function resolveTargetSectionForImages(
 
   const lower = ownerMessage.toLowerCase();
 
+  if (/\bfirst\s+section\b/i.test(lower) && snapshot.sections.length > 0) {
+    return 0;
+  }
+
   if (messageHasKeyword(lower, 'introduction') || messageHasKeyword(lower, 'intro')) {
     const byTitle = snapshot.sections.findIndex((s) =>
       /\b(introduction|intro)\b/i.test(s.title)

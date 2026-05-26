@@ -9,18 +9,21 @@ import {
   planImagePlacementFallback,
 } from '../../src/lib/project-workspace/website-edit-agent/siteStructureAnalysis';
 import { validateGalleryInSiteConfigSource } from '../../src/lib/project-workspace/website-edit-agent/validateGallerySiteConfig';
-import { verifyEditVisibleInPreview } from '../../src/lib/project-workspace/verifyEditVisibleInPreview';
 import {
   countReachableUploadAssets,
   verifyGalleryEditOnSandbox,
 } from '../../src/lib/project-workspace/verifySandboxGalleryPreview';
+import { htmlContainsUploadedImage } from '../../src/lib/project-workspace/previewImageHtml';
 
-vi.mock('../../src/lib/project-workspace/verifyEditVisibleInPreview', () => ({
-  verifyEditVisibleInPreview: vi.fn(),
+vi.mock('../../src/lib/sandbox/fetchSandboxPreviewHtml', () => ({
+  fetchHtmlFromSandboxLoopback: vi.fn(),
 }));
 
+import { fetchHtmlFromSandboxLoopback } from '../../src/lib/sandbox/fetchSandboxPreviewHtml';
+
+const mockedLoopback = vi.mocked(fetchHtmlFromSandboxLoopback);
+
 const FIXTURES = path.join(process.cwd(), 'tests/fixtures/workspaces');
-const mockedVerifyHtml = vi.mocked(verifyEditVisibleInPreview);
 
 const siteConfigFixture = `export const siteConfig: SiteConfig = {
   "sections": [
@@ -59,77 +62,65 @@ function galleryPageSource(): string {
 describe('verifySandboxGalleryPreview', () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    mockedVerifyHtml.mockReset();
+    mockedLoopback.mockReset();
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
 
-  it('passes when uploaded image paths appear in preview HTML', async () => {
-    mockedVerifyHtml.mockResolvedValue({
-      ok: true,
-      reason: 'Preview shows 1/1 uploaded image(s).',
-      htmlLength: 8000,
-      imagesFound: 1,
-      phraseMatched: false,
-    });
+  it('htmlContainsUploadedImage matches RSC payloads', () => {
+    expect(
+      htmlContainsUploadedImage('{"imageUrl":"/uploads/a.png"}', '/uploads/a.png')
+    ).toBe(true);
+  });
 
-    const siteConfigSource = gallerySiteConfigSource();
-    expect(validateGalleryInSiteConfigSource(siteConfigSource, [...attachments]).ok).toBe(true);
+  it('passes when loopback HTML includes uploaded image', async () => {
+    mockedLoopback.mockResolvedValue(
+      `<html>${'x'.repeat(2000)}<img src="/uploads/a.png" /></html>`
+    );
 
     const promise = verifyGalleryEditOnSandbox({
       previewUrl: 'https://sandbox.example',
-      siteConfigSource,
+      projectId: 'proj1',
+      siteConfigSource: gallerySiteConfigSource(),
       pageSource: galleryPageSource(),
       attachments: [...attachments],
     });
-    await vi.advanceTimersByTimeAsync(3000);
+    await vi.advanceTimersByTimeAsync(5000);
     const result = await promise;
 
     expect(result.ok).toBe(true);
     expect(result.imagesFound).toBe(1);
-    expect(mockedVerifyHtml).toHaveBeenCalledWith(
-      expect.objectContaining({
-        previewUrl: 'https://sandbox.example',
-        imagePaths: ['/uploads/a.png'],
-        retries: 6,
-        delayMs: 3000,
-      })
-    );
+    expect(mockedLoopback).toHaveBeenCalled();
   });
 
   it('fails when HTML lacks images even if upload URLs are reachable', async () => {
-    mockedVerifyHtml.mockResolvedValue({
-      ok: false,
-      reason:
-        'Preview loaded (12000 bytes) but none of the uploaded image paths appeared in the page HTML.',
-      htmlLength: 12000,
-      imagesFound: 0,
-      phraseMatched: false,
-    });
-
+    mockedLoopback.mockResolvedValue(`<html>${'x'.repeat(5000)}</html>`);
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({
         ok: true,
         status: 200,
+        text: async () => `<html>${'y'.repeat(5000)}</html>`,
       })
     );
 
     const promise = verifyGalleryEditOnSandbox({
       previewUrl: 'https://sandbox.example',
+      projectId: 'proj1',
       siteConfigSource: gallerySiteConfigSource(),
       pageSource: galleryPageSource(),
       attachments: [...attachments],
     });
-    await vi.advanceTimersByTimeAsync(3000);
+    await vi.advanceTimersByTimeAsync(4000);
+    await vi.advanceTimersByTimeAsync(3500 * 8);
     const result = await promise;
 
     expect(result.ok).toBe(false);
-    expect(result.reason).toContain('did not render them yet');
-    expect(result.reason).toContain('Upload files exist (1/1)');
+    expect(result.reason).toContain('does not include uploaded image paths');
   });
 
   it('countReachableUploadAssets reports HTTP 200 uploads', async () => {

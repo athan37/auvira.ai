@@ -660,6 +660,7 @@ export async function POST(
           }
           previewVerify = await resolveEditPreviewVerification({
             previewUrl: previewUrlForVerify,
+            projectId,
             ownerMessage: message,
             attachments,
             isSandbox,

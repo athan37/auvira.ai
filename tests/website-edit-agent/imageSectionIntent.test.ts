@@ -56,4 +56,23 @@ describe('imageSectionIntent', () => {
     const check = validateGalleryInSiteConfigSource(out, attachments);
     expect(check.ok).toBe(true);
   });
+
+  it('updates first section (index 0) when owner asks for first section', () => {
+    const page = `export default function Home() {
+      return siteConfig.sections.map(s => <SectionRenderer section={s} />);
+    }`;
+    const snap = analyzeSiteStructureForImages(introSiteConfig, page);
+    const plan = planImagePlacementFallback(snap, 'add this image to the first section');
+    expect(plan.targetSectionIndex).toBe(0);
+
+    const out = applyImagePlacementToSiteConfig(
+      introSiteConfig,
+      plan,
+      attachments,
+      snap,
+      'add this image to the first section'
+    );
+    expect(out).toContain('/uploads/intro.png');
+    expect(out.indexOf('"type": "gallery"')).toBeLessThan(out.indexOf('"type": "services"'));
+  });
 });
