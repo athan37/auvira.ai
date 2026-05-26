@@ -8,8 +8,8 @@ import { applyImagePlacementToSiteConfig, describePlacementForOwner } from './ap
 import { planImagePlacement } from './imagePlacementPlan';
 import {
   applyUniversalImageRenderer,
+  gallerySectionRendersItemImages,
   genericSectionRendersItemImages,
-  pageHasGalleryRenderer,
   stampPageForGalleryPreviewReload,
 } from './universalImageRenderer';
 import { repairPageTsxStructure } from '../repairPageTsxStructure';
@@ -143,30 +143,24 @@ export async function runImageGallerySectionStrategy(
   let renderPatch = applyUniversalImageRenderer(pageBefore, workspace.archetype);
   if (renderPatch.patched && isValidTsxSource(renderPatch.content, 'page.tsx')) {
     pageAfter = renderPatch.content;
-  } else if (
-    !pageHasGalleryRenderer(pageAfter) &&
-    !genericSectionRendersItemImages(pageAfter)
-  ) {
+  }
+
+  const pageRendersGalleryImages = (page: string) =>
+    gallerySectionRendersItemImages(page) || genericSectionRendersItemImages(page);
+
+  if (!pageRendersGalleryImages(pageAfter)) {
     const structural = repairPageTsxStructure(pageAfter);
     renderPatch = applyUniversalImageRenderer(structural.content, workspace.archetype);
     if (renderPatch.patched && isValidTsxSource(renderPatch.content, 'page.tsx')) {
       pageAfter = renderPatch.content;
     }
-  } else if (
-    pageHasGalleryRenderer(pageAfter) &&
-    !/case\s*['"]gallery['"]/.test(pageAfter)
-  ) {
-    renderPatch = applyUniversalImageRenderer(pageAfter, workspace.archetype);
-    if (renderPatch.patched && isValidTsxSource(renderPatch.content, 'page.tsx')) {
-      pageAfter = renderPatch.content;
-    }
   }
 
-  if (!pageHasGalleryRenderer(pageAfter) && !genericSectionRendersItemImages(pageAfter)) {
+  if (!pageRendersGalleryImages(pageAfter)) {
     return {
       ok: false,
       strategy: 'image_gallery',
-      error: `page does not render gallery images (archetype=${workspace.archetype}, anchors=${renderPatch.anchors.join(',') || 'none'})`,
+      error: `page does not render gallery item images (archetype=${workspace.archetype}, hasGalleryCase=${/case\s*['"]gallery['"]/.test(pageAfter)}, anchors=${renderPatch.anchors.join(',') || 'none'})`,
       ownerMessage:
         "Your images were saved, but this site's page template still can't display them. Please try again after the latest deploy.",
     };

@@ -4,6 +4,7 @@ import path from 'path';
 import {
   applyUniversalImageRenderer,
   canRenderUploadedImages,
+  gallerySectionRendersItemImages,
   pageHasGalleryRenderer,
   stampPageForGalleryPreviewReload,
 } from '../../src/lib/project-workspace/website-edit-agent/universalImageRenderer';
@@ -41,6 +42,34 @@ describe('universalImageRenderer', () => {
       'utf8'
     );
     expect(canRenderUploadedImages(page, 'section_loop')).toBe(true);
+  });
+
+  it('replaces stub GallerySection that does not render imageUrl', () => {
+    const stubPage = `
+function GallerySection({ section }: { section: SiteSection }) {
+  return (
+    <section>
+      <h2>{section.title}</h2>
+      <p>{section.body}</p>
+    </section>
+  );
+}
+function SectionRenderer({ section }: { section: SiteSection }) {
+  switch (section.type) {
+    case 'gallery': return <GallerySection section={section} />;
+    default: return null;
+  }
+}
+export default function Home() {
+  return siteConfig.sections.map((s) => <SectionRenderer key={s.title} section={s} />);
+}
+`;
+    expect(gallerySectionRendersItemImages(stubPage)).toBe(false);
+    const { content, patched, anchors } = applyUniversalImageRenderer(stubPage, 'section_loop');
+    expect(patched).toBe(true);
+    expect(anchors).toContain('replace_gallery_component');
+    expect(gallerySectionRendersItemImages(content)).toBe(true);
+    expect(pageHasGalleryRenderer(content)).toBe(true);
   });
 
   it('stampPageForGalleryPreviewReload appends parse-safe sync export for dev reload', () => {

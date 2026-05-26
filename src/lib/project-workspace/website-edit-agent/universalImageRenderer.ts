@@ -64,16 +64,59 @@ function findSectionRendererAnchor(pageContent: string): number {
   return -1;
 }
 
+export function extractGallerySectionSource(pageContent: string): string | null {
+  const start = pageContent.indexOf('function GallerySection');
+  if (start < 0) return null;
+  const after = pageContent.slice(start);
+  const endMatch = after.match(/\nfunction [A-Z]/);
+  const end = endMatch?.index ?? after.length;
+  return after.slice(0, end);
+}
+
+/** True when GallerySection maps items with imageUrl to <img> tags (not a title-only stub). */
+export function gallerySectionRendersItemImages(pageContent: string): boolean {
+  const body = extractGallerySectionSource(pageContent);
+  if (!body) return false;
+  return (
+    /\.filter\(\(item\)[^)]*imageUrl/.test(body) &&
+    /<img[\s\S]*?imageUrl/.test(body)
+  );
+}
+
 export function pageHasGalleryRenderer(pageContent: string): boolean {
   return (
     pageContent.includes('function GallerySection') &&
-    /case\s*['"]gallery['"]/.test(pageContent)
+    /case\s*['"]gallery['"]/.test(pageContent) &&
+    gallerySectionRendersItemImages(pageContent)
   );
+}
+
+function replaceBrokenGallerySection(pageContent: string): UniversalPatchResult {
+  const start = pageContent.indexOf('function GallerySection');
+  if (start < 0) {
+    return { content: pageContent, patched: false, anchors: [] };
+  }
+  const after = pageContent.slice(start);
+  const endMatch = after.match(/\nfunction [A-Z]/);
+  const end = endMatch?.index ?? after.length;
+  const replacement = `${GALLERY_SECTION_COMPONENT.trim()}\n`;
+  return {
+    content: pageContent.slice(0, start) + replacement + after.slice(end),
+    patched: true,
+    anchors: ['replace_gallery_component'],
+  };
 }
 
 export function patchGallerySectionInPage(pageContent: string): UniversalPatchResult {
   if (pageHasGalleryRenderer(pageContent)) {
     return { content: pageContent, patched: false, anchors: [] };
+  }
+
+  if (
+    pageContent.includes('function GallerySection') &&
+    !gallerySectionRendersItemImages(pageContent)
+  ) {
+    return replaceBrokenGallerySection(pageContent);
   }
 
   let content = pageContent;
@@ -363,11 +406,15 @@ export function stampPageForGalleryPreviewReload(pageContent: string): string {
 }
 
 export function canRenderUploadedImages(pageContent: string, archetype?: PageArchetype): boolean {
-  if (pageHasGalleryRenderer(pageContent)) return true;
+  if (gallerySectionRendersItemImages(pageContent)) return true;
   if (genericSectionRendersItemImages(pageContent)) return true;
   if (documentationSectionRendersItemImages(pageContent)) return true;
   const simulated = applyUniversalImageRenderer(pageContent, archetype);
-  return simulated.patched || pageHasGalleryRenderer(simulated.content);
+  return (
+    gallerySectionRendersItemImages(simulated.content) ||
+    genericSectionRendersItemImages(simulated.content) ||
+    documentationSectionRendersItemImages(simulated.content)
+  );
 }
 
 /** @deprecated Use canRenderUploadedImages */

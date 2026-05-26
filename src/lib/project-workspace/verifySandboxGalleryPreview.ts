@@ -2,9 +2,9 @@ import { parseSiteConfigSource } from '@/lib/site-manager/siteConfigParser';
 import { fetchSandboxPreviewHtmlForVerify } from '@/lib/project-workspace/fetchSandboxPreviewHtmlForVerify';
 import { fetchHtmlFromSandboxLoopback } from '@/lib/sandbox/fetchSandboxPreviewHtml';
 import {
-  genericSectionRendersItemImages,
-  pageHasGalleryRenderer,
   applyUniversalImageRenderer,
+  gallerySectionRendersItemImages,
+  genericSectionRendersItemImages,
 } from './website-edit-agent/universalImageRenderer';
 import {
   sectionItemsHaveImageUrls,
@@ -53,10 +53,13 @@ export async function countReachableUploadAssets(
 }
 
 function pageCanRenderGalleryItems(pageSource: string): boolean {
-  if (pageHasGalleryRenderer(pageSource)) return true;
+  if (gallerySectionRendersItemImages(pageSource)) return true;
   if (genericSectionRendersItemImages(pageSource)) return true;
   const simulated = applyUniversalImageRenderer(pageSource);
-  return pageHasGalleryRenderer(simulated.content) || genericSectionRendersItemImages(simulated.content);
+  return (
+    gallerySectionRendersItemImages(simulated.content) ||
+    genericSectionRendersItemImages(simulated.content)
+  );
 }
 
 async function fetchExternalPreviewHtml(previewUrl: string): Promise<string> {
