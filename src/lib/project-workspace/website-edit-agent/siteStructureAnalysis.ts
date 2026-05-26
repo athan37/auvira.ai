@@ -1,4 +1,5 @@
 import { parseSiteConfigSource } from '@/lib/site-manager/siteConfigParser';
+import { wantsNewImageSection } from './imagePlacementIntent';
 
 export interface SiteSectionSummary {
   index: number;
@@ -114,29 +115,23 @@ export function pickPreferredInsertAnchor(snapshot: SiteStructureSnapshot): stri
   return last?.type ?? null;
 }
 
+/** Insert anchor when owner wants a separate gallery (not updating the existing image block). */
+function pickInsertAnchorForNewGallery(snapshot: SiteStructureSnapshot): string | null {
+  const nonImageSections = snapshot.sections.filter((s) => !s.hasImageItems);
+  if (nonImageSections.length > 0) {
+    return nonImageSections[nonImageSections.length - 1]!.type;
+  }
+  return pickPreferredInsertAnchor(snapshot);
+}
+
 /** Rule-based fallback when LLM planning is unavailable. */
 export function planImagePlacementFallback(
   snapshot: SiteStructureSnapshot,
   ownerMessage: string
 ): import('./imagePlacementPlan').ImagePlacementPlan {
-  const existingGallery = snapshot.sections.find((s) => s.hasImageItems);
-
-  if (existingGallery) {
-    return {
-      action: 'update_section',
-      sectionType: existingGallery.type === 'gallery' ? 'gallery' : 'gallery',
-      targetSectionIndex: existingGallery.index,
-      targetSectionTitle: existingGallery.title,
-      insertAfterSectionType: null,
-      title: existingGallery.title,
-      body: undefined,
-      reasoning: 'Updating existing section that already contains images.',
-    };
-  }
-
-  let insertAfter: string | null = pickPreferredInsertAnchor(snapshot);
-
   const lower = ownerMessage.toLowerCase();
+  const existingGallery = snapshot.sections.find((s) => s.hasImageItems);
+  const forceNewSection = wantsNewImageSection(ownerMessage);
 
   if (/\bfirst\s+section\b/i.test(lower) && snapshot.sections.length > 0) {
     const first = snapshot.sections[0];
@@ -167,6 +162,45 @@ export function planImagePlacementFallback(
       reasoning: 'Owner asked to add images to the introduction/about section.',
     };
   }
+
+  if (forceNewSection) {
+    let insertAfter: string | null = pickInsertAnchorForNewGallery(snapshot);
+    if (/\bafter about\b/.test(lower) && snapshot.sections.some((s) => s.type === 'about')) {
+      insertAfter = 'about';
+    } else if (
+      /\bafter service/.test(lower) &&
+      snapshot.sections.some((s) => s.type === 'services')
+    ) {
+      insertAfter = 'services';
+    }
+    return {
+      action: 'create_section',
+      sectionType: 'gallery',
+      targetSectionIndex: null,
+      targetSectionTitle: null,
+      insertAfterSectionType: insertAfter,
+      title: 'Our work',
+      body: 'Photos from our recent work and products.',
+      reasoning: insertAfter
+        ? `New gallery section after "${insertAfter}" (owner asked for another section).`
+        : 'New gallery section (owner asked for another section).',
+    };
+  }
+
+  if (existingGallery) {
+    return {
+      action: 'update_section',
+      sectionType: 'gallery',
+      targetSectionIndex: existingGallery.index,
+      targetSectionTitle: existingGallery.title,
+      insertAfterSectionType: null,
+      title: existingGallery.title,
+      body: undefined,
+      reasoning: 'Updating existing section that already contains images.',
+    };
+  }
+
+  let insertAfter: string | null = pickPreferredInsertAnchor(snapshot);
 
   if (/\b(hero|top|below hero)\b/.test(lower)) {
     insertAfter = null;

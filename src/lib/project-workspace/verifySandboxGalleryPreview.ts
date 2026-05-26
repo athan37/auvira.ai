@@ -1,5 +1,5 @@
 import { parseSiteConfigSource } from '@/lib/site-manager/siteConfigParser';
-import { getPublicAppUrl } from '@/lib/appUrl';
+import { fetchSandboxPreviewHtmlForVerify } from '@/lib/project-workspace/fetchSandboxPreviewHtmlForVerify';
 import { fetchHtmlFromSandboxLoopback } from '@/lib/sandbox/fetchSandboxPreviewHtml';
 import {
   genericSectionRendersItemImages,
@@ -69,26 +69,45 @@ async function fetchExternalPreviewHtml(previewUrl: string): Promise<string> {
   return res.text();
 }
 
-/** Same URL path the preview iframe uses (rewrites /uploads and /_next). */
+/** @deprecated Use fetchSandboxPreviewHtmlForVerify — kept for tests referencing proxy URL shape */
 export function buildPreviewProxyVerifyUrl(projectId: string): string {
-  const base = getPublicAppUrl().replace(/\/$/, '');
-  return `${base}/api/projects/${projectId}/preview/proxy/`;
+  return `/api/projects/${projectId}/preview/proxy/`;
 }
 
-async function fetchProxyPreviewHtml(projectId: string): Promise<string> {
-  const url = `${buildPreviewProxyVerifyUrl(projectId)}?_verify=${Date.now()}`;
-  const res = await fetch(url, {
-    cache: 'no-store',
-    redirect: 'follow',
-    signal: AbortSignal.timeout(25_000),
-  });
-  if (!res.ok) return '';
-  return res.text();
+async function fetchPreviewHtmlForAttempt(input: {
+  projectId?: string;
+  previewUrl: string;
+}): Promise<{ html: string; source: string }> {
+  if (input.projectId) {
+    try {
+      const internal = await fetchSandboxPreviewHtmlForVerify(input.projectId);
+      if (internal.length >= 500) {
+        return { html: internal, source: 'sandbox_fetch' };
+      }
+    } catch {
+      /* fall through */
+    }
+
+    const loopback = (await fetchHtmlFromSandboxLoopback(input.projectId)) ?? '';
+    if (loopback.length >= 500) {
+      return { html: loopback, source: 'loopback' };
+    }
+  }
+
+  try {
+    const direct = await fetchExternalPreviewHtml(input.previewUrl);
+    if (direct.length >= 500) {
+      return { html: direct, source: 'direct' };
+    }
+    return { html: direct, source: 'direct' };
+  } catch {
+    return { html: '', source: 'none' };
+  }
 }
 
 /**
  * Sandbox preview: require uploaded image paths in rendered HTML (not upload URL alone).
- * Prefers the app preview proxy (same as iframe), then sandbox loopback, then direct sandbox URL.
+ * Polls until all image paths appear or retries are exhausted.
  */
 export async function verifyGalleryEditOnSandbox(input: {
   previewUrl: string;
@@ -116,62 +135,43 @@ export async function verifyGalleryEditOnSandbox(input: {
   }
 
   const publicUrls = input.attachments.map((a) => a.publicUrl);
-  const configTitles = gallerySectionTitlesFromSource(input.siteConfigSource);
-  const retries = 8;
+  const requiredCount = publicUrls.length;
+  const retries = 10;
   const delayMs = 3500;
 
   let lastHtml = '';
   let lastImagesFound = 0;
-  let verifySource = 'direct';
+  let verifySource = 'none';
 
-  await sleep(4000);
+  await sleep(5000);
 
   for (let attempt = 0; attempt < retries; attempt++) {
     if (attempt > 0) {
       await sleep(delayMs);
     }
 
-    let html = '';
-    if (input.projectId) {
-      try {
-        html = await fetchProxyPreviewHtml(input.projectId);
-        if (html.length > 1500) verifySource = 'proxy';
-      } catch {
-        /* fall through */
-      }
-    }
-    if (html.length < 1500 && input.projectId) {
-      html = (await fetchHtmlFromSandboxLoopback(input.projectId)) ?? '';
-      if (html.length > 1500) verifySource = 'loopback';
-    }
-    if (html.length < 1500) {
-      try {
-        html = await fetchExternalPreviewHtml(input.previewUrl);
-        if (html.length > 1500) verifySource = 'direct';
-      } catch {
-        continue;
-      }
-    }
+    const { html, source } = await fetchPreviewHtmlForAttempt({
+      projectId: input.projectId,
+      previewUrl: input.previewUrl,
+    });
 
     lastHtml = html;
-    if (html.length < 1500) {
+    verifySource = source;
+
+    if (html.length < 500) {
       continue;
     }
 
     lastImagesFound = countUploadedImagesInHtml(html, publicUrls);
-    if (lastImagesFound >= publicUrls.length) {
-      const phraseMatched = [...configTitles, ...(input.sectionPhrases ?? [])].some((phrase) =>
-        html.toLowerCase().includes(phrase.toLowerCase())
-      );
-      void phraseMatched;
+    if (lastImagesFound >= requiredCount) {
       return {
         ok: true,
         reason:
-          verifySource === 'proxy'
-            ? `Preview proxy shows ${lastImagesFound}/${publicUrls.length} uploaded image(s).`
+          verifySource === 'sandbox_fetch'
+            ? `Sandbox preview shows ${lastImagesFound}/${requiredCount} uploaded image(s).`
             : verifySource === 'loopback'
-              ? `Sandbox loopback preview shows ${lastImagesFound}/${publicUrls.length} uploaded image(s).`
-              : `Preview shows ${lastImagesFound}/${publicUrls.length} uploaded image(s).`,
+              ? `Sandbox loopback preview shows ${lastImagesFound}/${requiredCount} uploaded image(s).`
+              : `Preview shows ${lastImagesFound}/${requiredCount} uploaded image(s).`,
         imagesFound: lastImagesFound,
         htmlLength: html.length,
       };
@@ -179,13 +179,14 @@ export async function verifyGalleryEditOnSandbox(input: {
   }
 
   const assetsOk = await countReachableUploadAssets(input.previewUrl, input.attachments);
+  const configHasUrls = publicUrls.every((url) => input.siteConfigSource.includes(url));
 
   return {
     ok: false,
     reason:
-      assetsOk >= input.attachments.length
-        ? `Preview HTML (${lastHtml.length} bytes, source=${verifySource}) does not include uploaded image paths (${lastImagesFound}/${publicUrls.length} found). Files exist on sandbox; the page template may not be rendering gallery items yet.`
-        : `Preview HTML missing images (${lastImagesFound}/${publicUrls.length}); ${assetsOk}/${input.attachments.length} upload URLs reachable.`,
+      assetsOk >= requiredCount
+        ? `Preview HTML (${lastHtml.length} bytes, source=${verifySource}) does not include uploaded image paths (${lastImagesFound}/${requiredCount} found). Files exist on sandbox${configHasUrls ? '; siteConfig has URLs' : ''}; the page template may not be rendering gallery items yet.`
+        : `Preview HTML missing images (${lastImagesFound}/${requiredCount}); ${assetsOk}/${requiredCount} upload URLs reachable.`,
     imagesFound: lastImagesFound,
     htmlLength: lastHtml.length,
   };

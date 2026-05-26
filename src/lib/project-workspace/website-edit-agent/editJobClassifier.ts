@@ -7,6 +7,10 @@ import {
 import { extractColorsFromMessage } from './preset/presetUtils';
 import { parseColorSwap, TAILWIND_COLOR_NAMES } from './preset/presetUtils';
 import { isGalleryDescriptionRequest } from './galleryItemDescriptionStrategy';
+import {
+  isImagePlacementRequest,
+  MISSING_IMAGE_ATTACHMENT_MESSAGE,
+} from './imagePlacementIntent';
 import type { EditJobPlan, EditIntent, EditStrategyId, EditTier } from './types';
 import type { SiteWorkspaceSnapshot } from './resolveSiteWorkspace';
 import type { WorkspaceAssetAttachment } from '../workspaceAssetTypes';
@@ -120,6 +124,20 @@ export function classifyEditJob(
       confidence: 'high',
       verifyProfile: 'section',
       applyLabel: 'Updating image descriptions',
+    };
+  }
+
+  if (isImagePlacementRequest(ownerMessage)) {
+    return {
+      intents: ['section'],
+      tier: 'L0',
+      primaryStrategy: 'image_gallery',
+      tryOrder: [],
+      confidence: 'high',
+      verifyProfile: 'image',
+      applyLabel: 'Waiting for image upload',
+      needsClarification: true,
+      clarificationMessage: MISSING_IMAGE_ATTACHMENT_MESSAGE,
     };
   }
 

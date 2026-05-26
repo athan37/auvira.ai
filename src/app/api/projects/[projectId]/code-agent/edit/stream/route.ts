@@ -568,7 +568,9 @@ export async function POST(
           editTimer.start('preview_restart');
           await appendEditJobLog(jobId, 'preview_restart_started', 'Restarting sandbox dev server');
           try {
-            sandboxPreviewUrl = await restartSandboxDevServer(projectId);
+            sandboxPreviewUrl = await restartSandboxDevServer(projectId, {
+              skipRepair: agentResult.strategy === 'image_gallery',
+            });
             await appendTimedEditJobLog(
               jobId,
               'preview_restarted',

@@ -12,6 +12,10 @@ import {
   MAX_IMAGES_PER_UPLOAD,
   type WorkspaceAssetAttachment,
 } from '@/lib/project-workspace/workspaceAssetTypes';
+import {
+  isImagePlacementRequest,
+  MISSING_IMAGE_ATTACHMENT_MESSAGE,
+} from '@/lib/project-workspace/website-edit-agent/imagePlacementIntent';
 
 export interface EditCompleteResult {
   ok: boolean;
@@ -369,6 +373,11 @@ export function ProjectPreviewChat({
       (pendingImages.length === 1
         ? 'Add this image to my website where it fits best.'
         : 'Add these images to my website where they fit best.');
+
+    if (pendingImages.length === 0 && isImagePlacementRequest(userMsg)) {
+      setUploadError(MISSING_IMAGE_ATTACHMENT_MESSAGE);
+      return;
+    }
 
     setInput('');
     setSending(true);

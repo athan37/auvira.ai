@@ -119,19 +119,14 @@ export async function runWebsiteEditAgent(
     workspaceSnap
   );
 
-  if (
-    plan.needsClarification &&
-    plan.confidence === 'low' &&
-    plan.primaryStrategy === 'agent_loop' &&
-    plan.tryOrder.length === 1
-  ) {
+  if (plan.needsClarification && plan.clarificationMessage) {
     return {
       ok: false,
       error: plan.clarificationMessage,
       ownerMessage: plan.clarificationMessage,
-      strategy: 'agent_loop',
-      tier: 'L3',
-      confidence: 'low',
+      strategy: plan.primaryStrategy,
+      tier: plan.tier,
+      confidence: plan.confidence,
     };
   }
 

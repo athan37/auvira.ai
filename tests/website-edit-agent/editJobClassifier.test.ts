@@ -37,4 +37,10 @@ describe('editJobClassifier', () => {
     expect(plan.primaryStrategy).toBe('gallery_captions');
     expect(plan.tier).toBe('L1');
   });
+
+  it('requires attachments when owner asks to place an image', () => {
+    const plan = classifyEditJob('add this image to the first section', []);
+    expect(plan.needsClarification).toBe(true);
+    expect(plan.clarificationMessage).toMatch(/attach the image/i);
+  });
 });

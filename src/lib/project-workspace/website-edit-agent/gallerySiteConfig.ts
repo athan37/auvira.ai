@@ -126,13 +126,16 @@ function stripGallerySectionsParsed(sections: ParsedSiteConfig['sections']) {
 export function insertGallerySectionInSiteConfig(
   siteConfigSource: string,
   section: Record<string, unknown>,
-  placement?: GalleryPlacement
+  placement?: GalleryPlacement,
+  options?: { preserveExistingImageSections?: boolean }
 ): string {
   const place = placement ?? inferGalleryPlacement('', siteConfigSource);
   const config = parseSiteConfigSource(siteConfigSource);
 
   if (config?.sections) {
-    let sections = stripGallerySectionsParsed([...config.sections]);
+    let sections = options?.preserveExistingImageSections
+      ? [...config.sections]
+      : stripGallerySectionsParsed([...config.sections]);
     sections = stripPlaceholderPhotoSections(sections);
     const newSection = {
       ...(section as ParsedSiteConfig['sections'][number]),

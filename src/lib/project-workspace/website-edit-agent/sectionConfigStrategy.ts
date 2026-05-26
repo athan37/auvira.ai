@@ -7,6 +7,7 @@ import {
   isSafeWritePath,
 } from '../workspaceEditShared';
 import { verifyEditApplied } from './verifyEditApplied';
+import { isImagePlacementRequest } from './imagePlacementIntent';
 import type { WebsiteEditAgentOptions, WebsiteEditAgentResult } from './types';
 
 const SITE_CONFIG = 'src/lib/siteConfig.ts';
@@ -23,6 +24,13 @@ export async function runSectionConfigStrategy(
   beforeHashes: Record<string, string>
 ): Promise<WebsiteEditAgentResult | null> {
   if (options.mode !== 'gitlab') {
+    return null;
+  }
+
+  if (
+    (options.attachments ?? []).length === 0 &&
+    isImagePlacementRequest(options.ownerMessage)
+  ) {
     return null;
   }
 
@@ -66,6 +74,7 @@ Rules:
 - If a section type already exists, UPDATE that section (especially its items array) — do not skip because content exists.
 - If the section type is missing, append a new entry to sections.
 - Do not invent phone numbers or street addresses.
+- Do NOT add, move, or copy imageUrl or /uploads/ paths unless the owner attached new images in this request.
 - Return the FULL updated siteConfig.ts file content.`,
     prompt: `Owner request: ${options.ownerMessage}
 

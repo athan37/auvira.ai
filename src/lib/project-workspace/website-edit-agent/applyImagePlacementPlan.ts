@@ -13,6 +13,7 @@ import {
 } from './gallerySiteConfig';
 import { stripPlaceholderPhotoSections } from './validateGallerySiteConfig';
 import type { ImagePlacementPlan } from './imagePlacementPlan';
+import { wantsNewImageSection } from './imagePlacementIntent';
 import { resolveTargetSectionForImages } from './imageSectionIntent';
 import {
   pickPreferredInsertAnchor,
@@ -78,9 +79,14 @@ export function applyImagePlacementToSiteConfig(
     );
   }
 
-  let out = stripExistingGallerySections(siteConfigSource);
+  const preserveExistingGalleries =
+    plan.action === 'create_section' && wantsNewImageSection(ownerMessage);
+
+  let out = preserveExistingGalleries
+    ? siteConfigSource
+    : stripExistingGallerySections(siteConfigSource);
   const reparsed = parseSiteConfigSource(out);
-  if (reparsed?.sections) {
+  if (reparsed?.sections && !preserveExistingGalleries) {
     reparsed.sections = stripPlaceholderPhotoSections(reparsed.sections);
     out =
       replaceSiteConfigSectionsInSource(siteConfigSource, reparsed.sections) ?? siteConfigSource;
@@ -96,7 +102,8 @@ export function applyImagePlacementToSiteConfig(
   return insertGallerySectionInSiteConfig(
     out,
     sectionPayload,
-    placementFromPlan(plan, snapshot)
+    placementFromPlan(plan, snapshot),
+    { preserveExistingImageSections: preserveExistingGalleries }
   );
 }
 

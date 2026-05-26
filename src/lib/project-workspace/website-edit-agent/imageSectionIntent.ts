@@ -1,4 +1,5 @@
 import type { ImagePlacementPlan } from './imagePlacementPlan';
+import { wantsNewImageSection } from './imagePlacementIntent';
 import type { SiteStructureSnapshot } from './siteStructureAnalysis';
 
 function messageHasKeyword(message: string, keyword: string): boolean {
@@ -21,6 +22,10 @@ export function resolveTargetSectionForImages(
   plan: ImagePlacementPlan,
   snapshot: SiteStructureSnapshot
 ): number {
+  if (plan.action === 'create_section' || wantsNewImageSection(ownerMessage)) {
+    return -1;
+  }
+
   if (plan.targetSectionIndex != null && snapshot.sections[plan.targetSectionIndex]) {
     return plan.targetSectionIndex;
   }

@@ -27,10 +27,15 @@ export async function startSandboxDevServerDetached(sandbox: Sandbox): Promise<v
 /**
  * Fresh `next dev` after edits — production build artifacts in .next break the dev bundler.
  */
-export async function restartSandboxDevServer(projectId: string): Promise<string> {
+export async function restartSandboxDevServer(
+  projectId: string,
+  options?: { skipRepair?: boolean }
+): Promise<string> {
   const sandbox = await getProjectSandbox(projectId);
-  const { repairPreviewSandbox } = await import('./repairPreviewSandbox');
-  await repairPreviewSandbox(projectId).catch(() => {});
+  if (!options?.skipRepair) {
+    const { repairPreviewSandbox } = await import('./repairPreviewSandbox');
+    await repairPreviewSandbox(projectId).catch(() => {});
+  }
   await clearSandboxDevArtifacts(sandbox);
   await startSandboxDevServerDetached(sandbox);
   const previewUrl = sandbox.domain(3000);

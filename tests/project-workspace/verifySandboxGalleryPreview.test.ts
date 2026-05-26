@@ -8,9 +8,7 @@ import {
   analyzeSiteStructureForImages,
   planImagePlacementFallback,
 } from '../../src/lib/project-workspace/website-edit-agent/siteStructureAnalysis';
-import { validateGalleryInSiteConfigSource } from '../../src/lib/project-workspace/website-edit-agent/validateGallerySiteConfig';
 import {
-  buildPreviewProxyVerifyUrl,
   countReachableUploadAssets,
   verifyGalleryEditOnSandbox,
 } from '../../src/lib/project-workspace/verifySandboxGalleryPreview';
@@ -20,9 +18,15 @@ vi.mock('../../src/lib/sandbox/fetchSandboxPreviewHtml', () => ({
   fetchHtmlFromSandboxLoopback: vi.fn(),
 }));
 
+vi.mock('../../src/lib/project-workspace/fetchSandboxPreviewHtmlForVerify', () => ({
+  fetchSandboxPreviewHtmlForVerify: vi.fn(),
+}));
+
 import { fetchHtmlFromSandboxLoopback } from '../../src/lib/sandbox/fetchSandboxPreviewHtml';
+import { fetchSandboxPreviewHtmlForVerify } from '../../src/lib/project-workspace/fetchSandboxPreviewHtmlForVerify';
 
 const mockedLoopback = vi.mocked(fetchHtmlFromSandboxLoopback);
+const mockedSandboxFetch = vi.mocked(fetchSandboxPreviewHtmlForVerify);
 
 const FIXTURES = path.join(process.cwd(), 'tests/fixtures/workspaces');
 
@@ -64,6 +68,7 @@ describe('verifySandboxGalleryPreview', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     mockedLoopback.mockReset();
+    mockedSandboxFetch.mockReset();
   });
 
   afterEach(() => {
@@ -78,16 +83,11 @@ describe('verifySandboxGalleryPreview', () => {
     ).toBe(true);
   });
 
-  it('passes when preview proxy HTML includes uploaded image', async () => {
-    const proxyHtml = `<html>${'x'.repeat(2000)}<img src="/uploads/a.png" /></html>`;
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        text: async () => proxyHtml,
-      })
+  it('passes when internal sandbox fetch HTML includes uploaded image', async () => {
+    mockedSandboxFetch.mockResolvedValue(
+      `<html>${'x'.repeat(2000)}<img src="/uploads/a.png" /></html>`
     );
-    mockedLoopback.mockResolvedValue(`<html>${'short'.repeat(10)}</html>`);
+    mockedLoopback.mockResolvedValue('');
 
     const promise = verifyGalleryEditOnSandbox({
       previewUrl: 'https://sandbox.example',
@@ -101,18 +101,12 @@ describe('verifySandboxGalleryPreview', () => {
 
     expect(result.ok).toBe(true);
     expect(result.imagesFound).toBe(1);
-    expect(result.reason).toContain('proxy');
-    expect(buildPreviewProxyVerifyUrl('proj1')).toContain('/preview/proxy/');
+    expect(result.reason).toContain('Sandbox preview');
+    expect(mockedSandboxFetch).toHaveBeenCalledWith('proj1');
   });
 
-  it('passes when loopback HTML includes uploaded image if proxy is empty', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        text: async () => '<html>short</html>',
-      })
-    );
+  it('passes when loopback HTML includes uploaded image if sandbox fetch is empty', async () => {
+    mockedSandboxFetch.mockResolvedValue('');
     mockedLoopback.mockResolvedValue(
       `<html>${'x'.repeat(2000)}<img src="/uploads/a.png" /></html>`
     );
@@ -133,13 +127,14 @@ describe('verifySandboxGalleryPreview', () => {
   });
 
   it('fails when HTML lacks images even if upload URLs are reachable', async () => {
-    mockedLoopback.mockResolvedValue(`<html>${'x'.repeat(5000)}</html>`);
+    mockedSandboxFetch.mockResolvedValue(`<html>${'x'.repeat(5000)}</html>`);
+    mockedLoopback.mockResolvedValue(`<html>${'y'.repeat(5000)}</html>`);
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({
         ok: true,
         status: 200,
-        text: async () => `<html>${'y'.repeat(5000)}</html>`,
+        text: async () => `<html>${'z'.repeat(5000)}</html>`,
       })
     );
 
@@ -150,8 +145,8 @@ describe('verifySandboxGalleryPreview', () => {
       pageSource: galleryPageSource(),
       attachments: [...attachments],
     });
-    await vi.advanceTimersByTimeAsync(4000);
-    await vi.advanceTimersByTimeAsync(3500 * 8);
+    await vi.advanceTimersByTimeAsync(5000);
+    await vi.advanceTimersByTimeAsync(3500 * 10);
     const result = await promise;
 
     expect(result.ok).toBe(false);
