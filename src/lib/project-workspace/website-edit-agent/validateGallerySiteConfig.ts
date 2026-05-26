@@ -57,15 +57,24 @@ export function validateGalleryInSiteConfigSource(
     return { ok: false, reason: 'siteConfig has no sections' };
   }
 
-  const gallerySection = config.sections.find(
+  const galleryCandidates = config.sections.filter(
     (s) =>
       String(s.type ?? '').toLowerCase() === 'gallery' ||
       sectionItemsHaveImageUrls(s.items)
   );
 
-  if (!gallerySection) {
+  if (galleryCandidates.length === 0) {
     return { ok: false, reason: 'No gallery section with imageUrl items in siteConfig' };
   }
+
+  /** When multiple galleries exist, validate the one that contains this upload batch. */
+  const gallerySection =
+    galleryCandidates.find((s) => {
+      const missing = attachments.filter(
+        (a) => !(s.items ?? []).some((i) => i.imageUrl === a.publicUrl)
+      );
+      return missing.length === 0;
+    }) ?? galleryCandidates[galleryCandidates.length - 1];
 
   if (String(gallerySection.type ?? '').toLowerCase() !== 'gallery') {
     return {
