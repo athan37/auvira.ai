@@ -8,6 +8,7 @@ import {
   analyzeSiteStructureForImages,
   planImagePlacementFallback,
 } from '../../src/lib/project-workspace/website-edit-agent/siteStructureAnalysis';
+import { applyUniversalImageRenderer } from '../../src/lib/project-workspace/website-edit-agent/universalImageRenderer';
 import {
   countReachableUploadAssets,
   verifyGalleryEditOnSandbox,
@@ -57,11 +58,13 @@ function gallerySiteConfigSource(): string {
   return applyImagePlacementToSiteConfig(siteConfigFixture, plan, [...attachments], snap);
 }
 
+/** Page as the agent would leave it after universal renderer (can show gallery item images). */
 function galleryPageSource(): string {
-  return readFileSync(
+  const base = readFileSync(
     path.join(FIXTURES, 'section-loop-default/src/app/page.tsx'),
     'utf8'
   );
+  return applyUniversalImageRenderer(base, 'section_loop').content;
 }
 
 describe('verifySandboxGalleryPreview', () => {
@@ -151,6 +154,33 @@ describe('verifySandboxGalleryPreview', () => {
 
     expect(result.ok).toBe(false);
     expect(result.reason).toContain('does not include uploaded image paths');
+  });
+
+  it('fails fast when page has gallery case return null despite GallerySection component', async () => {
+    vi.useRealTimers();
+    const brokenPage = `
+function GallerySection({ section }: { section: SiteSection }) {
+  return section.items?.filter((item) => (item as { imageUrl?: string }).imageUrl).map((item, i) => (
+    <img key={i} src={(item as { imageUrl: string }).imageUrl} alt="" />
+  ));
+}
+function SectionRenderer({ section }: { section: SiteSection }) {
+  switch (section.type) {
+    case "gallery": return null;
+    default: return null;
+  }
+}`;
+    const result = await verifyGalleryEditOnSandbox({
+      previewUrl: 'http://127.0.0.1:9',
+      siteConfigSource: gallerySiteConfigSource(),
+      pageSource: brokenPage,
+      attachments: [...attachments],
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.reason).toContain('cannot render gallery');
+    expect(mockedSandboxFetch).not.toHaveBeenCalled();
+    vi.useFakeTimers();
   });
 
   it('countReachableUploadAssets reports HTTP 200 uploads', async () => {

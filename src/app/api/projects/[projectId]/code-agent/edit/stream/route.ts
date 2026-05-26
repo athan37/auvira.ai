@@ -639,11 +639,11 @@ export async function POST(
           editTimer.start('preview_verify');
           await appendEditJobLog(jobId, 'preview_verify_started', 'Verifying preview content');
           let workspaceSnap;
-          if (activeGateway && workspacePath) {
+          if (workspacePath && mode === 'gitlab') {
             workspaceSnap = await resolveSiteWorkspace({
               workspacePath,
               mode,
-              gateway: activeGateway,
+              gateway: activeGateway ?? undefined,
             });
           } else if (workspacePath && mode === 'static') {
             workspaceSnap = await resolveSiteWorkspace({

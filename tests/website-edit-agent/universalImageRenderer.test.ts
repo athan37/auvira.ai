@@ -6,6 +6,8 @@ import {
   canRenderUploadedImages,
   gallerySectionRendersItemImages,
   pageHasGalleryRenderer,
+  patchSectionRendererDisabledCases,
+  sectionRendererRoutesGallery,
   stampPageForGalleryPreviewReload,
 } from '../../src/lib/project-workspace/website-edit-agent/universalImageRenderer';
 
@@ -42,6 +44,39 @@ describe('universalImageRenderer', () => {
       'utf8'
     );
     expect(canRenderUploadedImages(page, 'section_loop')).toBe(true);
+  });
+
+  it('enables gallery switch case when it returns null despite GallerySection existing', () => {
+    const brokenPage = `
+function GallerySection({ section }: { section: SiteSection }) {
+  return (
+    <section>
+      {section.items
+        ?.filter((item) => (item as { imageUrl?: string }).imageUrl)
+        .map((item, i) => (
+        <img key={i} src={(item as { imageUrl: string }).imageUrl} alt="" />
+      ))}
+    </section>
+  );
+}
+function SectionRenderer({ section }: { section: SiteSection }) {
+  switch (section.type) {
+    case "gallery": return null;
+    case "generic": return null;
+    default: return null;
+  }
+}
+`;
+    expect(gallerySectionRendersItemImages(brokenPage)).toBe(true);
+    expect(sectionRendererRoutesGallery(brokenPage)).toBe(false);
+    expect(pageHasGalleryRenderer(brokenPage)).toBe(false);
+
+    const { content, patched, anchors } = patchSectionRendererDisabledCases(brokenPage);
+    expect(patched).toBe(true);
+    expect(anchors).toContain('gallery_case_enabled');
+    expect(sectionRendererRoutesGallery(content)).toBe(true);
+    expect(pageHasGalleryRenderer(content)).toBe(true);
+    expect(content).not.toMatch(/case\s*['"]gallery['"]\s*:\s*return\s*null/);
   });
 
   it('replaces stub GallerySection that does not render imageUrl', () => {

@@ -83,12 +83,58 @@ export function gallerySectionRendersItemImages(pageContent: string): boolean {
   );
 }
 
+/** True when the gallery switch case actually renders (not `return null`). */
+export function sectionRendererRoutesGallery(pageContent: string): boolean {
+  if (/case\s*['"]gallery['"]\s*:\s*return\s*null/.test(pageContent)) {
+    return false;
+  }
+  return /case\s*['"]gallery['"]\s*:\s*return\s*</.test(pageContent);
+}
+
 export function pageHasGalleryRenderer(pageContent: string): boolean {
   return (
     pageContent.includes('function GallerySection') &&
-    /case\s*['"]gallery['"]/.test(pageContent) &&
+    sectionRendererRoutesGallery(pageContent) &&
     gallerySectionRendersItemImages(pageContent)
   );
+}
+
+/** Fix switches that explicitly return null for gallery/generic despite components existing. */
+export function patchSectionRendererDisabledCases(pageContent: string): UniversalPatchResult {
+  let content = pageContent;
+  const anchors: string[] = [];
+  let patched = false;
+
+  const rules: Array<{ pattern: RegExp; replacement: string; anchor: string }> = [
+    {
+      pattern: /case\s*['"]gallery['"]\s*:\s*return\s*null\s*;?/g,
+      replacement: "case 'gallery': return <GallerySection section={section} />;",
+      anchor: 'gallery_case_enabled',
+    },
+    {
+      pattern: /case\s*['"]generic['"]\s*:\s*return\s*null\s*;?/g,
+      replacement: "case 'generic': return <GenericSection section={section} />;",
+      anchor: 'generic_case_enabled',
+    },
+  ];
+
+  if (content.includes('function DocumentationSection')) {
+    rules.push({
+      pattern: /case\s*['"]documentation['"]\s*:\s*return\s*null\s*;?/g,
+      replacement: 'case "documentation": return <DocumentationSection section={section} />;',
+      anchor: 'documentation_case_enabled',
+    });
+  }
+
+  for (const { pattern, replacement, anchor } of rules) {
+    if (pattern.test(content)) {
+      content = content.replace(pattern, replacement);
+      patched = true;
+      anchors.push(anchor);
+    }
+  }
+
+  return { content, patched, anchors };
 }
 
 function replaceBrokenGallerySection(pageContent: string): UniversalPatchResult {
@@ -358,6 +404,7 @@ export function applyUniversalImageRenderer(
   }
 
   const steps = [
+    () => patchSectionRendererDisabledCases(content),
     () => patchGallerySectionInPage(content),
     () => patchEnsureGenericSectionRouting(content),
     () => patchDocumentationSectionForImages(content),
@@ -406,12 +453,12 @@ export function stampPageForGalleryPreviewReload(pageContent: string): string {
 }
 
 export function canRenderUploadedImages(pageContent: string, archetype?: PageArchetype): boolean {
-  if (gallerySectionRendersItemImages(pageContent)) return true;
+  if (pageHasGalleryRenderer(pageContent)) return true;
   if (genericSectionRendersItemImages(pageContent)) return true;
   if (documentationSectionRendersItemImages(pageContent)) return true;
   const simulated = applyUniversalImageRenderer(pageContent, archetype);
   return (
-    gallerySectionRendersItemImages(simulated.content) ||
+    pageHasGalleryRenderer(simulated.content) ||
     genericSectionRendersItemImages(simulated.content) ||
     documentationSectionRendersItemImages(simulated.content)
   );

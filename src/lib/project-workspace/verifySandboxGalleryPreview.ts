@@ -2,9 +2,8 @@ import { parseSiteConfigSource } from '@/lib/site-manager/siteConfigParser';
 import { fetchSandboxPreviewHtmlForVerify } from '@/lib/project-workspace/fetchSandboxPreviewHtmlForVerify';
 import { fetchHtmlFromSandboxLoopback } from '@/lib/sandbox/fetchSandboxPreviewHtml';
 import {
-  applyUniversalImageRenderer,
-  gallerySectionRendersItemImages,
   genericSectionRendersItemImages,
+  pageHasGalleryRenderer,
 } from './website-edit-agent/universalImageRenderer';
 import {
   sectionItemsHaveImageUrls,
@@ -52,14 +51,9 @@ export async function countReachableUploadAssets(
   return assetsOk;
 }
 
+/** Uses on-disk page source only — do not simulate patches (would hide `case gallery: return null`). */
 function pageCanRenderGalleryItems(pageSource: string): boolean {
-  if (gallerySectionRendersItemImages(pageSource)) return true;
-  if (genericSectionRendersItemImages(pageSource)) return true;
-  const simulated = applyUniversalImageRenderer(pageSource);
-  return (
-    gallerySectionRendersItemImages(simulated.content) ||
-    genericSectionRendersItemImages(simulated.content)
-  );
+  return pageHasGalleryRenderer(pageSource) || genericSectionRendersItemImages(pageSource);
 }
 
 async function fetchExternalPreviewHtml(previewUrl: string): Promise<string> {

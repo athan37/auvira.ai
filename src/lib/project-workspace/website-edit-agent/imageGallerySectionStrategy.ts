@@ -10,6 +10,7 @@ import {
   applyUniversalImageRenderer,
   gallerySectionRendersItemImages,
   genericSectionRendersItemImages,
+  pageHasGalleryRenderer,
   stampPageForGalleryPreviewReload,
 } from './universalImageRenderer';
 import { repairPageTsxStructure } from '../repairPageTsxStructure';
@@ -146,7 +147,9 @@ export async function runImageGallerySectionStrategy(
   }
 
   const pageRendersGalleryImages = (page: string) =>
-    gallerySectionRendersItemImages(page) || genericSectionRendersItemImages(page);
+    pageHasGalleryRenderer(page) ||
+    gallerySectionRendersItemImages(page) ||
+    genericSectionRendersItemImages(page);
 
   if (!pageRendersGalleryImages(pageAfter)) {
     const structural = repairPageTsxStructure(pageAfter);

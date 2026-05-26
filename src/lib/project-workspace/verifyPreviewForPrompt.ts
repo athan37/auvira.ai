@@ -160,25 +160,33 @@ export async function resolveEditPreviewVerification(
 ): Promise<VerifyPreviewResult> {
   const imagePaths = input.attachments.map((a) => a.publicUrl);
 
-  if (imagePaths.length > 0 && input.isSandbox && input.gateway && input.mode === 'gitlab') {
+  if (imagePaths.length > 0 && input.mode === 'gitlab') {
     const snap = input.workspaceSnap;
-    const siteConfigAfter =
-      (snap?.siteConfigPath &&
-        (await input.gateway.readFile(snap.siteConfigPath).catch(() => ''))) ||
-      '';
-    const pageAfter =
-      (snap?.pagePath && (await input.gateway.readFile(snap.pagePath).catch(() => ''))) ||
-      '';
-    const hints = extractPreviewVerifyHints(input.ownerMessage);
-    const gallery = await verifyGalleryEditOnSandbox({
-      previewUrl: input.previewUrl,
-      projectId: input.projectId,
-      siteConfigSource: siteConfigAfter,
-      pageSource: pageAfter,
-      attachments: input.attachments,
-      sectionPhrases: hints.phrases,
-    });
-    return { ...gallery, phraseMatched: gallery.imagesFound > 0 };
+    let siteConfigAfter = snap?.siteConfigContent ?? '';
+    let pageAfter = snap?.pageContent ?? '';
+
+    if ((!siteConfigAfter || !pageAfter) && input.gateway && snap) {
+      if (!siteConfigAfter && snap.siteConfigPath) {
+        siteConfigAfter =
+          (await input.gateway.readFile(snap.siteConfigPath).catch(() => '')) || '';
+      }
+      if (!pageAfter && snap.pagePath) {
+        pageAfter = (await input.gateway.readFile(snap.pagePath).catch(() => '')) || '';
+      }
+    }
+
+    if (siteConfigAfter && pageAfter) {
+      const hints = extractPreviewVerifyHints(input.ownerMessage);
+      const gallery = await verifyGalleryEditOnSandbox({
+        previewUrl: input.previewUrl,
+        projectId: input.isSandbox ? input.projectId : undefined,
+        siteConfigSource: siteConfigAfter,
+        pageSource: pageAfter,
+        attachments: input.attachments,
+        sectionPhrases: hints.phrases,
+      });
+      return { ...gallery, phraseMatched: gallery.imagesFound > 0 };
+    }
   }
 
   if (imagePaths.length > 0) {
