@@ -69,7 +69,9 @@ export default function PreviewChatCard({ jobId, previewUrl }: Props) {
       <div className="p-4 space-y-3">
         {/* Messages */}
         {messages.length === 0 && (
-          <p className="text-xs text-gray-400 italic">Example: "Make the hero more premium", "Add emergency service CTA", "Use warmer colors"</p>
+          <p className="text-xs text-gray-400 italic">
+            Example: &ldquo;Make the hero more premium&rdquo;, &ldquo;Add emergency service CTA&rdquo;, &ldquo;Use warmer colors&rdquo;
+          </p>
         )}
         <div className="space-y-2 max-h-48 overflow-y-auto">
           {messages.map((msg, i) => (

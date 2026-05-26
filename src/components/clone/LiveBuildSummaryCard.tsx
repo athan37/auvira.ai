@@ -53,7 +53,7 @@ export default function LiveBuildSummaryCard({ buildSummary, status }: Props) {
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
       <div className="px-4 py-3 border-b border-gray-200 bg-indigo-50">
         <h2 className="font-medium text-indigo-800 text-sm">Website draft being created</h2>
-        <p className="text-xs text-indigo-600 mt-0.5">We're turning the approved plan into a preview you can review and edit.</p>
+        <p className="text-xs text-indigo-600 mt-0.5">We&apos;re turning the approved plan into a preview you can review and edit.</p>
       </div>
       <div className="p-4 space-y-2">
         {items.map((item) => (

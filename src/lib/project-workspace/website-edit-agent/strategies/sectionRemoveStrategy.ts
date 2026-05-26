@@ -43,7 +43,7 @@ export async function runSectionRemoveStrategy(
   const content = await readWorkspaceRel(options, SITE_CONFIG);
   if (!content || !/sections\s*:\s*\[/.test(content)) return null;
 
-  const sectionBlocks = [...content.matchAll(/\{\s*type\s*:\s*['"]([^'"]+)['"][^}]*\}/gs)];
+  const sectionBlocks = [...content.matchAll(/\{\s*type\s*:\s*['"]([^'"]+)['"][^}]*\}/g)];
   if (sectionBlocks.length === 0) return null;
 
   const filtered = sectionBlocks.filter((block) => {

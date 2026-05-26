@@ -33,7 +33,7 @@ export async function runSectionReorderStrategy(
   const content = await readWorkspaceRel(options, SITE_CONFIG);
   if (!content) return null;
 
-  const blocks = [...content.matchAll(/\{\s*type\s*:\s*['"]([^'"]+)['"][^}]*\}/gs)].map(
+  const blocks = [...content.matchAll(/\{\s*type\s*:\s*['"]([^'"]+)['"][^}]*\}/g)].map(
     (m) => m[0]
   );
   const types = [...content.matchAll(/\{\s*type\s*:\s*['"]([^'"]+)['"]/g)].map((m) =>

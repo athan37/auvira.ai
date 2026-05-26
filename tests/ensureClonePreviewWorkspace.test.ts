@@ -47,7 +47,7 @@ describe('ensureClonePreviewWorkspace', () => {
         designDirection: { colors: ['#0ea5e9'], style: 'modern' },
       },
       technicalBuild: { workspacePath },
-    } as import('@/lib/db/models/CloneJob').ICloneJob;
+    } as unknown as import('@/lib/db/models/CloneJob').ICloneJob;
 
     const result = await ensureClonePreviewWorkspace(job);
 

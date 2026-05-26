@@ -1,4 +1,5 @@
-import { extractColorsFromMessage, isTextColorEditRequest } from '../../verifyPreviewHints';
+import { isTextColorEditRequest } from '../../verifyPreviewHints';
+import { extractColorsFromMessage } from '../preset/presetUtils';
 import {
   extractPresetObjectLiteral,
   replacePresetInPageContent,
