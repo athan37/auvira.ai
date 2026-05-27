@@ -1,6 +1,7 @@
 import {
   extractColorsFromMessage,
 } from './preset/presetUtils';
+import type { EditTargetPlan } from './types';
 
 export interface ConversationTurn {
   role: 'user' | 'assistant';
@@ -63,6 +64,7 @@ export function detectScopedStyleRequest(message: string): boolean {
   const hasSectionAnchor =
     SECTION_ANCHORS.some((a) => lower.includes(a)) ||
     /["'][^"']{3,60}["']/.test(message) ||
+    /:\s*[^:\n]{3,60}\s*$/.test(message) ||
     /\bwhat our customers say\b/.test(lower);
   if (!hasSectionAnchor) return false;
 
@@ -75,6 +77,9 @@ export function detectScopedStyleRequest(message: string): boolean {
 function extractSectionTitle(message: string): string | null {
   const quoted = message.match(/["']([^"']{3,60})["']/);
   if (quoted?.[1]) return quoted[1].trim();
+
+  const colon = message.match(/:\s*([^:\n]{3,60})\s*$/);
+  if (colon?.[1]) return colon[1].trim();
 
   if (/\bwhat our customers say\b/i.test(message)) return 'What Our Customers Say';
   if (/\btestimonial/i.test(message)) return 'testimonials';
@@ -137,30 +142,77 @@ function resolveClarificationReply(
  */
 export function detectAmbiguousEditRequest(
   message: string,
-  history: ConversationTurn[] = []
+  history: ConversationTurn[] = [],
+  editTargetPlan?: EditTargetPlan
 ): AmbiguityResult {
+  if (
+    editTargetPlan?.where.confidence === 'low' &&
+    editTargetPlan.where.clarificationMessage
+  ) {
+    return {
+      ambiguous: true,
+      confidence: 'low',
+      clarificationMessage: editTargetPlan.where.clarificationMessage,
+      suggestedReplies: editTargetPlan.where.suggestedReplies,
+    };
+  }
+
+  if (
+    editTargetPlan?.what === 'copy' &&
+    editTargetPlan.where.kind === 'section' &&
+    !editTargetPlan.valueExplicit
+  ) {
+    return {
+      ambiguous: true,
+      confidence: 'medium',
+      clarificationMessage: 'What should the new text be? Paste the exact wording you want.',
+    };
+  }
+
   const recent = history.slice(-6);
 
   const resolved = resolveClarificationReply(message, recent);
   if (resolved) return resolved;
 
   const lower = message.toLowerCase();
+  const sectionTitle = extractSectionTitle(message);
+  const hasDeictic = DEICTIC_WORDS.some((w) => messageHasKeyword(lower, w));
   const hasColor = extractColorsFromMessage(message).length > 0;
   const hasCard = messageHasKeyword(lower, 'card');
-  const hasSection =
-    SECTION_ANCHORS.some((a) => lower.includes(a)) || Boolean(extractSectionTitle(message));
+  const hasSection = SECTION_ANCHORS.some((a) => lower.includes(a)) || Boolean(sectionTitle);
+
+  if (hasDeictic && /\b(background|color|colour)\b/.test(lower) && !sectionTitle) {
+    return {
+      ambiguous: true,
+      confidence: 'low',
+      clarificationMessage:
+        'Which section do you mean? Reply with the section title in quotes, or say "first section" / "second section".',
+      suggestedReplies: ['First section', 'Second section', 'Use section title in quotes'],
+    };
+  }
+
+  if (
+    hasDeictic &&
+    sectionTitle &&
+    /\bbackground\b/.test(lower) &&
+    !hasCard &&
+    !messageHasKeyword(lower, 'text')
+  ) {
+    return { ambiguous: false, confidence: 'high' };
+  }
 
   if (hasColor && hasCard && hasSection && detectScopedStyleRequest(message)) {
     const sectionTitle = extractSectionTitle(message) || 'that section';
     return buildCardSectionClarification(sectionTitle);
   }
 
-  if (
-    DEICTIC_WORDS.some((w) => messageHasKeyword(lower, w)) &&
-    detectScopedStyleRequest(message)
-  ) {
-    const sectionTitle = extractSectionTitle(message) || 'that section';
-    return buildCardSectionClarification(sectionTitle);
+  if (hasDeictic && detectScopedStyleRequest(message)) {
+    if (hasCard && sectionTitle) {
+      return buildCardSectionClarification(sectionTitle);
+    }
+    if (hasCard) {
+      return buildCardSectionClarification(sectionTitle || 'that section');
+    }
   }
 
   if (detectScopedStyleRequest(message) && messageHasKeyword(lower, 'section')) {

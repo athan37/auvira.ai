@@ -19,7 +19,7 @@ import {
   isImagePlacementRequest,
   MISSING_IMAGE_ATTACHMENT_MESSAGE,
 } from './imagePlacementIntent';
-import type { EditJobPlan, EditIntent, EditStrategyId, EditTier } from './types';
+import type { EditJobPlan, EditIntent, EditStrategyId, EditTier, EditTargetPlan } from './types';
 import type { SiteWorkspaceSnapshot } from './resolveSiteWorkspace';
 import type { WorkspaceAssetAttachment } from '../workspaceAssetTypes';
 
@@ -98,6 +98,103 @@ function buildTryOrder(primary: EditStrategyId, fallbacks: EditStrategyId[]): Ed
   return order;
 }
 
+function routeFromGroundedPlan(
+  plan: EditTargetPlan,
+  legacyApplyLabel: string
+): EditJobPlan | null {
+  const { where, what, valueExplicit } = plan;
+
+  if (where.confidence === 'low') {
+    return {
+      intents: ['section'],
+      tier: 'L3',
+      primaryStrategy: 'agent_loop',
+      tryOrder: ['agent_loop'],
+      confidence: 'low',
+      verifyProfile: 'generic',
+      applyLabel: legacyApplyLabel,
+      needsClarification: true,
+      clarificationMessage: where.clarificationMessage,
+      suggestedReplies: where.suggestedReplies,
+    };
+  }
+
+  if (what === 'copy' && where.kind === 'section' && where.sectionIndex != null) {
+    if (!valueExplicit) {
+      return {
+        intents: ['copy', 'section'],
+        tier: 'L2',
+        primaryStrategy: 'section_config',
+        tryOrder: buildTryOrder('section_config', ['section_copy_field']),
+        confidence: 'medium',
+        verifyProfile: 'copy',
+        applyLabel: 'Updating section text',
+        needsClarification: true,
+        clarificationMessage: 'What should the new text be? Paste the exact wording you want.',
+      };
+    }
+    return {
+      intents: ['copy', 'section'],
+      tier: 'L0',
+      primaryStrategy: 'section_copy_field',
+      tryOrder: buildTryOrder('section_copy_field', ['section_config']),
+      confidence: where.confidence,
+      verifyProfile: 'copy',
+      applyLabel: 'Updating section text',
+    };
+  }
+
+  if (what === 'style_background' && where.kind === 'section' && where.sectionIndex != null) {
+    return {
+      intents: ['style', 'section'],
+      tier: 'L0',
+      primaryStrategy: 'section_style',
+      tryOrder: buildTryOrder('section_style', ['preset_theme']),
+      confidence: where.confidence,
+      verifyProfile: 'color',
+      applyLabel: 'Updating section background',
+    };
+  }
+
+  if (what === 'style_card' && where.sectionType === 'testimonials') {
+    return {
+      intents: ['style', 'section'],
+      tier: 'L0',
+      primaryStrategy: 'preset_card_color',
+      tryOrder: buildTryOrder('preset_card_color', []),
+      confidence: where.confidence,
+      verifyProfile: 'color',
+      applyLabel: 'Updating testimonial card colors',
+    };
+  }
+
+  if (what === 'style_text' && where.kind === 'section') {
+    return {
+      intents: ['style', 'copy'],
+      tier: 'L0',
+      primaryStrategy: 'preset_text_color',
+      tryOrder: buildTryOrder('preset_text_color', ['section_style']),
+      confidence: where.confidence,
+      verifyProfile: 'color',
+      applyLabel: 'Updating section text color',
+    };
+  }
+
+  if (what === 'structure' && where.kind === 'section' && where.sectionIndex != null) {
+    return {
+      intents: ['section'],
+      tier: 'L2',
+      primaryStrategy: 'section_config',
+      tryOrder: buildTryOrder('section_config', []),
+      confidence: where.confidence,
+      verifyProfile: 'section',
+      applyLabel: legacyApplyLabel,
+    };
+  }
+
+  return null;
+}
+
 /**
  * Classify an owner edit message into tier, strategy, and verification profile.
  */
@@ -105,7 +202,8 @@ export function classifyEditJob(
   ownerMessage: string,
   attachments: WorkspaceAssetAttachment[] = [],
   snap?: SiteWorkspaceSnapshot | null,
-  conversationHistory: ConversationTurn[] = []
+  conversationHistory: ConversationTurn[] = [],
+  editTargetPlan?: EditTargetPlan | null
 ): EditJobPlan {
   const effectiveMessage = resolveEffectiveEditMessage(ownerMessage, conversationHistory);
   const legacy = routeEditRequest(effectiveMessage);
@@ -123,6 +221,16 @@ export function classifyEditJob(
       verifyProfile: 'image',
       applyLabel: legacy.applyLabel,
     };
+  }
+
+  if (editTargetPlan && snap?.mode === 'gitlab') {
+    const groundedRoute = routeFromGroundedPlan(editTargetPlan, legacy.applyLabel);
+    if (groundedRoute && !groundedRoute.needsClarification) {
+      return groundedRoute;
+    }
+    if (groundedRoute?.needsClarification) {
+      return groundedRoute;
+    }
   }
 
   if (isGalleryDescriptionRequest(effectiveMessage)) {
@@ -166,7 +274,11 @@ export function classifyEditJob(
     };
   }
 
-  const ambiguity = detectAmbiguousEditRequest(ownerMessage, conversationHistory);
+  const ambiguity = detectAmbiguousEditRequest(
+    ownerMessage,
+    conversationHistory,
+    editTargetPlan ?? undefined
+  );
   if (ambiguity.ambiguous && ambiguity.confidence !== 'high') {
     return {
       intents: ['style', 'section'],
@@ -298,7 +410,11 @@ export function classifyEditJob(
     isBackgroundColorEditRequest(effectiveMessage) ||
     (colorSwap && /\b(throughout|everywhere|site|whole)\b/.test(lower));
 
-  if (colorSwap && (siteWideColor || messageHasKeyword(lower, 'background'))) {
+  if (
+    colorSwap &&
+    (siteWideColor || messageHasKeyword(lower, 'background')) &&
+    !/\bfirst\s+section\b|\bsecond\s+section\b|\blast\s+section\b/.test(lower)
+  ) {
     return {
       intents: ['style'],
       tier: 'L0',

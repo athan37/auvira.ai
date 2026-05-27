@@ -1,5 +1,7 @@
 import { isAllowedWorkspacePath } from '../workspaceEditShared';
+import { detectAmbiguousEditRequest } from './editAmbiguity';
 import { classifyEditJob } from './editJobClassifier';
+import { buildGroundedEditContext } from './buildGroundedEditContext';
 import { enrichEditPrompt } from './enrichEditPrompt';
 import { routeAttachmentEdits } from './attachmentRouter';
 import { runAgentLoop } from './WebsiteEditAgent';
@@ -8,6 +10,8 @@ import { runStrategyPlan } from './strategyRegistry';
 import { routeEditRequest } from './intentRouter';
 import type {
   AgentStepEvent,
+  EditJobPlan,
+  EditTargetPlan,
   WebsiteEditAgentOptions,
   WebsiteEditAgentResult,
 } from './types';
@@ -48,6 +52,33 @@ async function captureChangedFileContents(
   return captured;
 }
 
+function clarificationForUnresolvedStyle(
+  editTargetPlan: EditTargetPlan | null | undefined,
+  plan: EditJobPlan
+): WebsiteEditAgentResult | null {
+  const what = editTargetPlan?.what;
+  if (!what || !['style_background', 'style_text', 'style_card'].includes(what)) {
+    return null;
+  }
+  const where = editTargetPlan.where;
+  if (where.kind !== 'section' || where.sectionIndex != null) {
+    return null;
+  }
+  const ownerMessage =
+    where.clarificationMessage ??
+    'Which section should I update? Reply with the section title in quotes, or say "first section".';
+  return {
+    ok: false,
+    needsClarification: true,
+    error: ownerMessage,
+    ownerMessage,
+    suggestedReplies: where.suggestedReplies,
+    strategy: plan.primaryStrategy,
+    tier: plan.tier,
+    confidence: 'low',
+  };
+}
+
 function attachPlanMeta(
   result: WebsiteEditAgentResult,
   plan: ReturnType<typeof classifyEditJob>
@@ -64,6 +95,16 @@ export { routeEditRequest, isTrivialStyleEdit, hasImageAttachments } from './int
 export { classifyEditJob } from './editJobClassifier';
 export { verifyEditApplied, summarizeActualChanges } from './verifyEditApplied';
 export { resolveSiteWorkspace, detectPageArchetype } from './resolveSiteWorkspace';
+export {
+  buildGroundedEditContext,
+  classifyEditWhat,
+  formatEditTargetPlanForPrompt,
+} from './buildGroundedEditContext';
+export {
+  buildEnrichedSiteStructure,
+  resolveSectionTarget,
+  formatStructureMap,
+} from './resolveSectionTarget';
 export type { SiteWorkspaceSnapshot, PageArchetype } from './resolveSiteWorkspace';
 export type {
   WebsiteEditAgentOptions,
@@ -72,6 +113,9 @@ export type {
   EditJobPlan,
   EditStrategyId,
   EditTier,
+  EditTargetPlan,
+  CodeContextBlock,
+  SectionTargetResult,
 } from './types';
 
 /**
@@ -113,11 +157,41 @@ export async function runWebsiteEditAgent(
     workspaceSnap = null;
   }
 
+  const grounded = await buildGroundedEditContext(
+    workspaceSnap,
+    options.ownerMessage,
+    options.conversationHistory ?? [],
+    options.workspacePath
+  );
+
+  if (
+    grounded.needsClarification &&
+    grounded.clarificationMessage &&
+    !hasAttachments
+  ) {
+    return {
+      ok: false,
+      needsClarification: true,
+      error: grounded.clarificationMessage,
+      ownerMessage: grounded.clarificationMessage,
+      suggestedReplies: grounded.suggestedReplies,
+      tier: 'L3',
+      confidence: 'low',
+    };
+  }
+
+  const editTargetPlan = grounded.plan;
+  const agentOptions: WebsiteEditAgentOptions = {
+    ...options,
+    editTargetPlan,
+  };
+
   const plan = classifyEditJob(
     options.ownerMessage,
     options.attachments ?? [],
     workspaceSnap,
-    options.conversationHistory ?? []
+    options.conversationHistory ?? [],
+    editTargetPlan
   );
 
   if (plan.needsClarification && plan.clarificationMessage) {
@@ -134,7 +208,7 @@ export async function runWebsiteEditAgent(
   }
 
   if (hasAttachments) {
-    const attachmentResult = await routeAttachmentEdits(options, beforeHashes);
+    const attachmentResult = await routeAttachmentEdits(agentOptions, beforeHashes);
     if (attachmentResult?.ok) {
       return attachPlanMeta(attachmentResult, plan);
     }
@@ -143,12 +217,12 @@ export async function runWebsiteEditAgent(
     }
   }
 
-  const { result, attempted, fallbackFrom } = await runStrategyPlan(plan, options, beforeHashes);
+  const { result, attempted, fallbackFrom } = await runStrategyPlan(plan, agentOptions, beforeHashes);
 
   if (result?.ok) {
-    const beforeFiles = await snapshotStyleTargets(options);
+    const beforeFiles = await snapshotStyleTargets(agentOptions);
     if (result.changedFiles?.length) {
-      const capturedAfter = await captureChangedFileContents(options, result.changedFiles);
+      const capturedAfter = await captureChangedFileContents(agentOptions, result.changedFiles);
       const verification = verifyEditApplied(options.ownerMessage, beforeFiles, {
         ...beforeFiles,
         ...capturedAfter,
@@ -166,8 +240,34 @@ export async function runWebsiteEditAgent(
     );
   }
 
-  if (plan.tier === 'L3' || plan.primaryStrategy === 'agent_loop') {
-    const legacy = routeEditRequest(options.ownerMessage);
+  const unresolvedStyle = clarificationForUnresolvedStyle(editTargetPlan, plan);
+  if (unresolvedStyle) {
+    return unresolvedStyle;
+  }
+
+  const ambiguity = detectAmbiguousEditRequest(
+    options.ownerMessage,
+    options.conversationHistory ?? [],
+    editTargetPlan ?? undefined
+  );
+  if (ambiguity.ambiguous && ambiguity.clarificationMessage) {
+    return {
+      ok: false,
+      needsClarification: true,
+      error: ambiguity.clarificationMessage,
+      ownerMessage: ambiguity.clarificationMessage,
+      suggestedReplies: ambiguity.suggestedReplies,
+      strategy: plan.primaryStrategy,
+      tier: plan.tier,
+      confidence: ambiguity.confidence,
+    };
+  }
+
+  const legacy = routeEditRequest(options.ownerMessage);
+  const shouldRunAgentLoop =
+    plan.primaryStrategy === 'agent_loop' || legacy.strategy === 'agent_loop';
+
+  if (shouldRunAgentLoop) {
     const enriched = await enrichEditPrompt(
       options.workspacePath,
       options.mode,
@@ -175,12 +275,13 @@ export async function runWebsiteEditAgent(
       legacy.intent,
       options.attachments || [],
       options.gateway,
-      options.conversationHistory
+      options.conversationHistory,
+      editTargetPlan
     );
 
     const loopResult = await runAgentLoop(
       {
-        ...options,
+        ...agentOptions,
         agentPrompt: enriched.agentPrompt,
       },
       onStep
@@ -189,7 +290,7 @@ export async function runWebsiteEditAgent(
     return {
       ...loopResult,
       strategy: 'agent_loop',
-      tier: 'L3',
+      tier: plan.tier === 'L3' ? 'L3' : loopResult.tier,
       confidence: plan.confidence,
       verifyProfile: plan.verifyProfile,
     };
@@ -197,30 +298,14 @@ export async function runWebsiteEditAgent(
 
   void attempted;
 
-  const legacy = routeEditRequest(options.ownerMessage);
-  const enriched = await enrichEditPrompt(
-    options.workspacePath,
-    options.mode,
-    options.ownerMessage,
-    legacy.intent,
-    options.attachments || [],
-    options.gateway,
-    options.conversationHistory
-  );
-
-  const loopResult = await runAgentLoop(
-    {
-      ...options,
-      agentPrompt: enriched.agentPrompt,
-    },
-    onStep
-  );
-
   return {
-    ...loopResult,
-    strategy: 'agent_loop',
-    tier: 'L3',
-    confidence: 'low',
-    verifyProfile: 'generic',
+    ok: false,
+    needsClarification: true,
+    error: 'Could not apply edit with a quick path.',
+    ownerMessage:
+      'I could not apply that change automatically. Try one specific edit (for example: "change the background of the section titled \\"Your Section\\" to red", or "change the first section background to red").',
+    strategy: plan.primaryStrategy,
+    tier: plan.tier,
+    confidence: plan.confidence,
   };
 }

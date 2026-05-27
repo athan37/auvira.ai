@@ -1,5 +1,6 @@
 import { formatConversationForPrompt, type ConversationTurn } from './editAmbiguity';
-import type { EditIntent } from './types';
+import { formatEditTargetPlanForPrompt } from './buildGroundedEditContext';
+import type { EditIntent, EditTargetPlan } from './types';
 import type { WorkspaceAssetAttachment } from '../workspaceAssetTypes';
 import type { WorkspaceGateway } from '../workspaceGateway';
 import {
@@ -276,7 +277,8 @@ export async function enrichEditPrompt(
   intent: EditIntent,
   attachments: WorkspaceAssetAttachment[] = [],
   gateway?: WorkspaceGateway,
-  conversationHistory?: ConversationTurn[]
+  conversationHistory?: ConversationTurn[],
+  editTargetPlan?: EditTargetPlan
 ): Promise<EnrichedEditPrompt> {
   const paths = await discoverContextFiles(workspacePath, mode, ownerMessage);
   const context = gateway
@@ -287,8 +289,12 @@ export async function enrichEditPrompt(
   const imageGuidance = buildImageAttachmentGuidance(attachments);
 
   const historyBlock = formatConversationForPrompt(conversationHistory);
+  const groundedBlock =
+    editTargetPlan && editTargetPlan.where.confidence !== 'low'
+      ? `${formatEditTargetPlanForPrompt(editTargetPlan)}\n\n`
+      : '';
 
-  const agentPrompt = `${historyBlock}OWNER REQUEST (exact words from customer):
+  const agentPrompt = `${historyBlock}${groundedBlock}OWNER REQUEST (exact words from customer):
 "${ownerMessage.trim()}"
 ${imageGuidance ? `\n${imageGuidance}\n` : ''}
 CURRENT WEBSITE FILES (snapshot — use read_file to confirm before writing):
@@ -296,6 +302,7 @@ ${contextBlock || '(no context files found — use search_files and read_file fi
 
 TASK:
 ${guidance}
+${editTargetPlan ? 'Prefer editing the EXTRACTED CODE regions above — they are the resolved edit targets.' : ''}
 ${imageGuidance ? '\nYou MUST reference the uploaded image URL(s) in the updated site files.' : ''}
 
 Apply the owner request by editing the real source files above. Do not call finish until at least one file is written.`;

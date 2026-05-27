@@ -77,6 +77,9 @@ export function extractGallerySectionSource(pageContent: string): string | null 
 export function gallerySectionRendersItemImages(pageContent: string): boolean {
   const body = extractGallerySectionSource(pageContent);
   if (!body) return false;
+  if (/No Image/i.test(body)) {
+    return false;
+  }
   return (
     /\.filter\(\(item\)[^)]*imageUrl/.test(body) &&
     /<img[\s\S]*?imageUrl/.test(body)

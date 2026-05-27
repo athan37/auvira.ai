@@ -6,6 +6,35 @@ import {
   tryResolveScopedStyleFromHistory,
   formatConversationForPrompt,
 } from '../../src/lib/project-workspace/website-edit-agent/editAmbiguity';
+import { buildGroundedEditContext } from '../../src/lib/project-workspace/website-edit-agent/buildGroundedEditContext';
+import type { SiteWorkspaceSnapshot } from '../../src/lib/project-workspace/website-edit-agent/resolveSiteWorkspace';
+
+const snap: SiteWorkspaceSnapshot = {
+  mode: 'gitlab',
+  archetype: 'section_loop',
+  siteConfigPath: 'src/lib/siteConfig.ts',
+  pagePath: 'src/app/page.tsx',
+  siteConfigContent: `export const siteConfig = {
+    sections: [
+      { type: "services", title: "Our Products", items: [] },
+      { type: "testimonials", title: "What Our Customers Say", items: [] },
+    ],
+  };`,
+  pageContent: `
+function ServicesSection() { return null; }
+function TestimonialsSection() { return null; }
+function SectionRenderer({ section }) {
+  switch (section.type) {
+    case "services": return <ServicesSection />;
+    case "testimonials": return <TestimonialsSection />;
+  }
+}`,
+  indexHtmlPath: null,
+  siteJsonPath: null,
+  stylesPath: null,
+  indexHtmlContent: null,
+  siteJsonContent: null,
+};
 
 describe('editAmbiguity', () => {
   const examplePrompt =
@@ -25,6 +54,19 @@ describe('editAmbiguity', () => {
   it('detects deictic "below" as ambiguous with scoped style', () => {
     const result = detectAmbiguousEditRequest('change the card below to blue in testimonials');
     expect(result.ambiguous).toBe(true);
+  });
+
+  it('flags deictic "this" without section title as ambiguous', () => {
+    const result = detectAmbiguousEditRequest('change the background color of this to red');
+    expect(result.ambiguous).toBe(true);
+    expect(result.clarificationMessage).toMatch(/which section/i);
+  });
+
+  it('does not treat colon section title as ambiguous when target is clear', () => {
+    const result = detectAmbiguousEditRequest(
+      'change the background color of this to red: Everything You Need to Grow Your Business'
+    );
+    expect(result.ambiguous).toBe(false);
   });
 
   it('resolves follow-up "1" when history contains clarification', () => {
@@ -69,5 +111,22 @@ describe('editAmbiguity', () => {
     expect(block).toContain('RECENT CONVERSATION');
     expect(block).toContain('User: hello');
     expect(block).toContain('Assistant: hi there');
+  });
+
+  it('uses EditTargetPlan WHERE clarification for multiple section matches', () => {
+    const result = detectAmbiguousEditRequest('change this section', [], {
+      where: {
+        confidence: 'low',
+        kind: 'section',
+        clarificationMessage: 'I found two sections that could match. Reply with the number:\n\n1. [0] services',
+        suggestedReplies: ['1 — Our Products'],
+      },
+      what: 'style_background',
+      valueExplicit: false,
+      codeBlocks: [],
+      structureBrief: '',
+    });
+    expect(result.ambiguous).toBe(true);
+    expect(result.clarificationMessage).toMatch(/Reply with the number/i);
   });
 });

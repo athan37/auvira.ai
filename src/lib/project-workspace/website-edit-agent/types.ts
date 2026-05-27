@@ -21,6 +21,8 @@ export type EditStrategyId =
   | 'preset_card_color'
   | 'preset_text_color'
   | 'copy_field'
+  | 'section_copy_field'
+  | 'section_style'
   | 'contact_field'
   | 'section_remove'
   | 'section_reorder'
@@ -36,6 +38,66 @@ export type EditStrategyId =
   | 'single_shot'
   | 'section_config'
   | 'agent_loop';
+
+export type SectionTargetKind = 'section' | 'hero' | 'nav' | 'footer';
+
+export type EditWhatKind =
+  | 'copy'
+  | 'style_background'
+  | 'style_text'
+  | 'style_card'
+  | 'structure'
+  | 'images';
+
+export interface LineRange {
+  startLine: number;
+  endLine: number;
+}
+
+export interface SectionMatchCandidate {
+  index: number;
+  type: string;
+  title: string;
+  rendererComponent?: string;
+}
+
+export interface SectionTargetResult {
+  confidence: 'high' | 'medium' | 'low';
+  kind: SectionTargetKind;
+  sectionIndex?: number;
+  sectionType?: string;
+  title?: string;
+  rendererComponent?: string;
+  configLineRange?: LineRange;
+  pageComponentRange?: LineRange;
+  matches?: SectionMatchCandidate[];
+  clarificationMessage?: string;
+  suggestedReplies?: string[];
+  reason?: string;
+}
+
+export interface CodeContextBlock {
+  path: string;
+  startLine: number;
+  endLine: number;
+  label: string;
+  content: string;
+}
+
+export interface EditTargetPlan {
+  where: SectionTargetResult;
+  what: EditWhatKind;
+  valueExplicit: boolean;
+  codeBlocks: CodeContextBlock[];
+  structureBrief: string;
+}
+
+export interface GroundedEditContextResult {
+  needsClarification?: boolean;
+  clarificationMessage?: string;
+  suggestedReplies?: string[];
+  plan?: EditTargetPlan;
+}
 
 /** @deprecated Legacy strategy labels; prefer EditStrategyId */
 export type EditStrategyKind = 'single_shot' | 'agent_loop' | 'image_gallery';
@@ -114,6 +176,8 @@ export interface WebsiteEditAgentOptions {
   gateway?: WorkspaceGateway;
   /** Recent chat turns for disambiguation (latest user message is ownerMessage). */
   conversationHistory?: ConversationTurn[];
+  /** Pre-resolved WHERE/WHAT from buildGroundedEditContext. */
+  editTargetPlan?: EditTargetPlan;
 }
 
 export interface WebsiteEditAgentResult {

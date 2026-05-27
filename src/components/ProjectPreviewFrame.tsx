@@ -67,10 +67,9 @@ export function ProjectPreviewFrame({
       setPreviewMode('workspace');
       setLivePreviewUrl(null);
     }
-    if (status.ready) {
-      setPreviewReady(true);
-      onReadyChangeRef.current?.(true);
-    }
+    const isReady = Boolean(status.ready);
+    setPreviewReady(isReady);
+    onReadyChangeRef.current?.(isReady);
   }, []);
   const bootstrapStarted = useRef(false);
   const pollCountRef = useRef(0);
@@ -134,13 +133,8 @@ export function ProjectPreviewFrame({
         const status = await pollStatus();
         if (cancelled || !status) return;
         pollCountRef.current += 1;
-        if (status.ready) {
-          applyStatus(status);
-          if (pollTimer) clearInterval(pollTimer);
-        } else {
-          setSetupStage(status.stage);
-          setSetupLabel(status.label);
-        }
+        applyStatus(status);
+        if (status.ready && pollTimer) clearInterval(pollTimer);
         if (status.stage === 'failed' && status.error) {
           setSetupError(status.error);
           if (pollTimer) clearInterval(pollTimer);

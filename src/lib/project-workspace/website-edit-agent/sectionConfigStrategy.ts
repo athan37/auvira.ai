@@ -10,6 +10,7 @@ import { parseSiteConfigSource } from '@/lib/site-manager/siteConfigParser';
 import { verifyEditApplied } from './verifyEditApplied';
 import { isImagePlacementRequest } from './imagePlacementIntent';
 import { formatConversationForPrompt } from './editAmbiguity';
+import { formatEditTargetPlanForPrompt } from './buildGroundedEditContext';
 import type { WebsiteEditAgentOptions, WebsiteEditAgentResult } from './types';
 
 const SITE_CONFIG = 'src/lib/siteConfig.ts';
@@ -66,6 +67,13 @@ export async function runSectionConfigStrategy(
 
   const lower = options.ownerMessage.toLowerCase();
   const historyBlock = formatConversationForPrompt(options.conversationHistory);
+  const groundedBlock = options.editTargetPlan
+    ? `${formatEditTargetPlanForPrompt(options.editTargetPlan)}\n\n`
+    : '';
+  const resolvedIndex =
+    options.editTargetPlan?.where.sectionIndex != null
+      ? `Pre-resolved target: siteConfig.sections[${options.editTargetPlan.where.sectionIndex}] (${options.editTargetPlan.where.sectionType ?? 'unknown'} — "${options.editTargetPlan.where.title ?? ''}"). Do NOT guess a different section index.\n`
+      : '';
   const llm = getLLMClient();
   const result = await llm.generateJSON<LlmEditResponse>({
     system: `You are a website content editor. Update src/lib/siteConfig.ts to fulfill the owner's section request.
@@ -79,7 +87,7 @@ Rules:
 - Do not invent phone numbers or street addresses.
 - Do NOT add, move, or copy imageUrl or /uploads/ paths unless the owner attached new images in this request.
 - Return the FULL updated siteConfig.ts file content.`,
-    prompt: `${historyBlock}Owner request: ${options.ownerMessage}
+    prompt: `${historyBlock}${groundedBlock}${resolvedIndex}Owner request: ${options.ownerMessage}
 
 ${lower.includes('faq') ? 'Add or update an FAQ section with the requested number of Q&A pairs in siteConfig.sections.' : ''}
 ${lower.includes('testimonial') ? 'Add or update the testimonials section with the requested number of short quotes in siteConfig.sections. Replace items when updating an existing testimonials section.' : ''}

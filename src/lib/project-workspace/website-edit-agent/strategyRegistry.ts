@@ -13,6 +13,8 @@ import { runStaticThemeStrategy } from './strategies/staticThemeStrategy';
 import { runStaticCopyStrategy } from './strategies/staticCopyStrategy';
 import { runChromeFieldStrategy } from './strategies/chromeFieldStrategy';
 import { runMetaFieldStrategy } from './strategies/metaFieldStrategy';
+import { runSectionCopyFieldStrategy } from './strategies/sectionCopyFieldStrategy';
+import { runSectionStyleStrategy } from './strategies/sectionStyleStrategy';
 import { runSectionFaqTemplateStrategy } from './strategies/sectionFaqTemplateStrategy';
 import type { EditJobPlan, EditStrategyId, WebsiteEditAgentOptions, WebsiteEditAgentResult } from './types';
 
@@ -26,6 +28,8 @@ const RUNNERS: Partial<Record<EditStrategyId, StrategyRunner>> = {
   preset_card_color: runPresetCardColorStrategy,
   preset_text_color: runPresetTextColorStrategy,
   copy_field: runCopyFieldStrategy,
+  section_copy_field: runSectionCopyFieldStrategy,
+  section_style: runSectionStyleStrategy,
   contact_field: runContactFieldStrategy,
   section_remove: runSectionRemoveStrategy,
   section_reorder: runSectionReorderStrategy,

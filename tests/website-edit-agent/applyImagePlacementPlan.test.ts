@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import path from 'path';
-import { applyImagePlacementToSiteConfig } from '../../src/lib/project-workspace/website-edit-agent/applyImagePlacementPlan';
+import {
+  applyImagePlacementToSiteConfig,
+  mergeGallerySectionItems,
+} from '../../src/lib/project-workspace/website-edit-agent/applyImagePlacementPlan';
 import { planImagePlacementFallback } from '../../src/lib/project-workspace/website-edit-agent/siteStructureAnalysis';
 import { analyzeSiteStructureForImages } from '../../src/lib/project-workspace/website-edit-agent/siteStructureAnalysis';
 import {
@@ -69,6 +72,17 @@ const attachments: WorkspaceAssetAttachment[] = [
 ];
 
 describe('applyImagePlacementPlan', () => {
+  it('fills empty gallery placeholder slots with uploaded images', () => {
+    const placeholders = Array.from({ length: 3 }, (_, i) => ({
+      title: `Gallery Image ${i + 1}`,
+      imageUrl: '',
+    }));
+    const merged = mergeGallerySectionItems(placeholders, attachments.slice(0, 2));
+    expect(merged).toHaveLength(2);
+    expect(merged[0].imageUrl).toBe('/uploads/a.png');
+    expect(merged[1].imageUrl).toBe('/uploads/b.png');
+  });
+
   it('creates gallery after services and preserves navigation', () => {
     const snap = analyzeSiteStructureForImages(HVAC_CONFIG, MIN_PAGE);
     const plan = planImagePlacementFallback(snap, 'make a section for product images');

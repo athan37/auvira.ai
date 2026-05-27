@@ -42,6 +42,48 @@ function buildItems(attachments: WorkspaceAssetAttachment[], titles?: string[]) 
   }));
 }
 
+function itemHasUploadedImage(item: { imageUrl?: string }): boolean {
+  return typeof item.imageUrl === 'string' && item.imageUrl.includes('/uploads/');
+}
+
+/** Merge uploads into a gallery section, replacing empty placeholder slots when present. */
+export function mergeGallerySectionItems(
+  existing: Array<{ title?: string; description?: string; imageUrl?: string }> | undefined,
+  attachments: WorkspaceAssetAttachment[],
+  titles?: string[]
+): Array<{ title: string; imageUrl: string; description?: string }> {
+  const incoming = buildItems(attachments, titles);
+  if (!existing?.length) return incoming;
+
+  const onlyPlaceholders = existing.every((item) => !itemHasUploadedImage(item));
+  if (onlyPlaceholders) {
+    const merged: Array<{ title: string; imageUrl: string; description?: string }> = [];
+    let attachIdx = 0;
+    for (const slot of existing) {
+      if (attachIdx < incoming.length) {
+        merged.push({
+          title: incoming[attachIdx].title,
+          imageUrl: incoming[attachIdx].imageUrl,
+          description: slot.description,
+        });
+        attachIdx += 1;
+      }
+    }
+    while (attachIdx < incoming.length) {
+      merged.push(incoming[attachIdx]);
+      attachIdx += 1;
+    }
+    return merged.length > 0 ? merged : incoming;
+  }
+
+  const kept = existing.filter((item) => itemHasUploadedImage(item)) as Array<{
+    title: string;
+    imageUrl: string;
+    description?: string;
+  }>;
+  return [...kept, ...incoming];
+}
+
 /**
  * Apply placement plan to siteConfig source (returns full file content).
  */
@@ -57,7 +99,6 @@ export function applyImagePlacementToSiteConfig(
     throw new Error(describeSiteConfigParseFailure(siteConfigSource));
   }
 
-  const newItems = buildItems(attachments);
   const galleryTitle = plan.title || 'Our products';
   const galleryBody = plan.body ?? 'Photos from our recent work and products.';
 
@@ -66,12 +107,13 @@ export function applyImagePlacementToSiteConfig(
   const targetIdx = resolveTargetSectionForImages(ownerMessage, plan, snapshot);
   if (targetIdx >= 0) {
     const existing = config.sections[targetIdx];
+    const mergedItems = mergeGallerySectionItems(existing.items, attachments);
     config.sections[targetIdx] = {
       ...existing,
       type: 'gallery',
       title: plan.title || existing.title || galleryTitle,
       body: plan.body ?? existing.body ?? galleryBody,
-      items: newItems,
+      items: mergedItems,
     };
     return (
       replaceSiteConfigSectionsInSource(siteConfigSource, config.sections) ??
@@ -96,7 +138,7 @@ export function applyImagePlacementToSiteConfig(
     type: 'gallery',
     title: galleryTitle,
     body: galleryBody,
-    items: newItems,
+    items: buildItems(attachments),
   };
 
   return insertGallerySectionInSiteConfig(

@@ -1,5 +1,44 @@
 import { describe, it, expect } from 'vitest';
 import { classifyEditJob } from '../../src/lib/project-workspace/website-edit-agent/editJobClassifier';
+import { buildGroundedEditContext } from '../../src/lib/project-workspace/website-edit-agent/buildGroundedEditContext';
+import type { SiteWorkspaceSnapshot } from '../../src/lib/project-workspace/website-edit-agent/resolveSiteWorkspace';
+
+const siteConfig = `export const siteConfig = {
+  sections: [
+    { type: "services", title: "Our Products", items: [] },
+    { type: "testimonials", title: "What Our Customers Say", items: [] },
+  ],
+};`;
+
+const page = `
+function ServicesSection({ section }) {
+  return <section className={"py-20 " + preset.surfaceBg}>{section.title}</section>;
+}
+function TestimonialsSection({ section }) {
+  return <section className={"py-20 " + preset.surfaceBg}>{section.title}</section>;
+}
+function SectionRenderer({ section }) {
+  switch (section.type) {
+    case "services": return <ServicesSection section={section} />;
+    case "testimonials": return <TestimonialsSection section={section} />;
+    default: return null;
+  }
+}
+`;
+
+const snap: SiteWorkspaceSnapshot = {
+  mode: 'gitlab',
+  archetype: 'section_loop',
+  siteConfigPath: 'src/lib/siteConfig.ts',
+  pagePath: 'src/app/page.tsx',
+  siteConfigContent: siteConfig,
+  pageContent: page,
+  indexHtmlPath: null,
+  siteJsonPath: null,
+  stylesPath: null,
+  indexHtmlContent: null,
+  siteJsonContent: null,
+};
 
 describe('editJobClassifier', () => {
   it('routes site-wide color swap to preset_theme L0', () => {
@@ -75,5 +114,48 @@ describe('editJobClassifier', () => {
     const plan = classifyEditJob('1', [], { mode: 'gitlab' } as never, history);
     expect(plan.needsClarification).toBeFalsy();
     expect(plan.primaryStrategy).toBe('preset_card_color');
+  });
+
+  it('routes grounded first-section background via buildGroundedEditContext', async () => {
+    const grounded = await buildGroundedEditContext(
+      snap,
+      'change background of first section to blue',
+      []
+    );
+    const plan = classifyEditJob(
+      'change background of first section to blue',
+      [],
+      snap,
+      [],
+      grounded.plan
+    );
+    expect(plan.primaryStrategy).toBe('section_style');
+    expect(plan.tier).toBe('L0');
+    expect(plan.primaryStrategy).not.toBe('preset_theme');
+  });
+
+  it('routes grounded section copy with value to section_copy_field', () => {
+    const editTargetPlan = {
+      where: {
+        confidence: 'high' as const,
+        kind: 'section' as const,
+        sectionIndex: 1,
+        sectionType: 'testimonials',
+        title: 'What Our Customers Say',
+        rendererComponent: 'TestimonialsSection',
+      },
+      what: 'copy' as const,
+      valueExplicit: true,
+      codeBlocks: [],
+      structureBrief: '',
+    };
+    const plan = classifyEditJob(
+      'change testimonials section title to: Happy Clients',
+      [],
+      { mode: 'gitlab' } as never,
+      [],
+      editTargetPlan
+    );
+    expect(plan.primaryStrategy).toBe('section_copy_field');
   });
 });

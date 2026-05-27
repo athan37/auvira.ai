@@ -35,7 +35,9 @@ export function wantsNewImageSection(message: string): boolean {
     /\bcreate\s+(a\s+)?new\s+section\b/i.test(lower) ||
     /\b(another|new|different|separate|second)\s+(section|gallery|block)\b/i.test(lower) ||
     /\bnew\s+section\s+for\b/i.test(lower) ||
-    /\badd\s+(these|those)\s+images?\s+to\s+another\b/i.test(lower)
+    /\binto\s+(a\s+)?new\s+section\b/i.test(lower) ||
+    /\badd\s+(these|those)\s+images?\s+to\s+another\b/i.test(lower) ||
+    /\badd\s+(these|those)\s+images?\s+into\s+(a\s+)?new\s+section\b/i.test(lower)
   );
 }
 

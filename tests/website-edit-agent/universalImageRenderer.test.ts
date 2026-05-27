@@ -79,6 +79,23 @@ function SectionRenderer({ section }: { section: SiteSection }) {
     expect(content).not.toMatch(/case\s*['"]gallery['"]\s*:\s*return\s*null/);
   });
 
+  it('treats GallerySection with "No Image" placeholders as broken', () => {
+    const placeholderPage = `
+function GallerySection({ section }: { section: SiteSection }) {
+  return (
+    <section>
+      {section.items?.map((item, i) => (
+        <div key={i}>
+          {item.imageUrl ? <img src={item.imageUrl} alt="" /> : <div>No Image</div>}
+        </div>
+      ))}
+    </section>
+  );
+}
+`;
+    expect(gallerySectionRendersItemImages(placeholderPage)).toBe(false);
+  });
+
   it('replaces stub GallerySection that does not render imageUrl', () => {
     const stubPage = `
 function GallerySection({ section }: { section: SiteSection }) {

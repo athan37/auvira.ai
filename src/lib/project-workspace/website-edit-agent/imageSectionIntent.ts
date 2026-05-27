@@ -78,5 +78,24 @@ export function resolveTargetSectionForImages(
     if (withImages >= 0) return withImages;
   }
 
+  if (messageHasKeyword(lower, 'gallery')) {
+    const galleryIdx = snapshot.sections.findIndex((s) => s.type === 'gallery');
+    if (galleryIdx >= 0) return galleryIdx;
+  }
+
+  const galleryWithSlots = snapshot.sections.findIndex(
+    (s) => s.type === 'gallery' || (s.itemCount > 0 && !s.hasImageItems)
+  );
+  if (galleryWithSlots >= 0 && attachmentsMentionedInMessage(lower)) {
+    return galleryWithSlots;
+  }
+
   return -1;
+}
+
+function attachmentsMentionedInMessage(lower: string): boolean {
+  return (
+    /\b(image|images|photo|photos|picture|pictures|upload|these|those)\b/.test(lower) ||
+    /\badd\b/.test(lower)
+  );
 }

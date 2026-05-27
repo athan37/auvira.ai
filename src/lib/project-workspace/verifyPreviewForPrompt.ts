@@ -179,7 +179,7 @@ export async function resolveEditPreviewVerification(
       const hints = extractPreviewVerifyHints(input.ownerMessage);
       const gallery = await verifyGalleryEditOnSandbox({
         previewUrl: input.previewUrl,
-        projectId: input.isSandbox ? input.projectId : undefined,
+        projectId: input.projectId,
         siteConfigSource: siteConfigAfter,
         pageSource: pageAfter,
         attachments: input.attachments,

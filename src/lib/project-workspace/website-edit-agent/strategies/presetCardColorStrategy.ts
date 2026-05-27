@@ -121,6 +121,6 @@ export async function runPresetCardColorStrategy(
     'preset_card_color',
     'L0',
     `Updated testimonial card styling to ${toColor}.`,
-    { confidence: 'high', verifyProfile: 'color' }
+    { confidence: 'high' }
   );
 }

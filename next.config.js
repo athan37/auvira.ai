@@ -20,6 +20,13 @@ const nextConfig = {
     NEXT_PUBLIC_SITE_AGENT_DEV_BYPASS_AUTH:
       process.env.SITE_AGENT_DEV_BYPASS_AUTH === '1' ? '1' : '',
   },
+  webpack: (config, { dev }) => {
+    // Prevent persistent cache corruption causing missing runtime/vendor chunks in dev.
+    if (dev) {
+      config.cache = false;
+    }
+    return config;
+  },
 };
 
 module.exports = nextConfig;

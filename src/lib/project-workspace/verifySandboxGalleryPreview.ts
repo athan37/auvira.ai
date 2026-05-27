@@ -30,16 +30,34 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function localAppOrigin(): string {
+  return (
+    process.env.SITE_AGENT_APP_URL?.trim() ||
+    process.env.NEXTAUTH_URL?.trim() ||
+    'http://127.0.0.1:3000'
+  ).replace(/\/$/, '');
+}
+
+function isLoopbackPreviewUrl(previewUrl: string): boolean {
+  return /127\.0\.0\.1|localhost/.test(previewUrl);
+}
+
 /** Count how many uploaded files respond on the sandbox dev server (diagnostics only). */
 export async function countReachableUploadAssets(
   previewUrl: string,
-  attachments: WorkspaceAssetAttachment[]
+  attachments: WorkspaceAssetAttachment[],
+  projectId?: string
 ): Promise<number> {
   const base = previewUrl.replace(/\/$/, '');
+  const useProxy = Boolean(projectId) && isLoopbackPreviewUrl(previewUrl);
+  const proxyBase = useProxy
+    ? `${localAppOrigin()}/api/projects/${projectId}/preview/proxy`
+    : base;
   let assetsOk = 0;
   for (const att of attachments) {
     try {
-      const res = await fetch(`${base}${att.publicUrl}?t=${Date.now()}`, {
+      const assetUrl = useProxy ? `${proxyBase}${att.publicUrl}` : `${base}${att.publicUrl}`;
+      const res = await fetch(`${assetUrl}?t=${Date.now()}`, {
         cache: 'no-store',
         signal: AbortSignal.timeout(12_000),
       });
@@ -75,6 +93,25 @@ async function fetchPreviewHtmlForAttempt(input: {
   projectId?: string;
   previewUrl: string;
 }): Promise<{ html: string; source: string }> {
+  if (input.projectId && isLoopbackPreviewUrl(input.previewUrl)) {
+    try {
+      const proxyUrl = `${localAppOrigin()}/api/projects/${input.projectId}/preview/proxy/?_sa_verify=${Date.now()}`;
+      const res = await fetch(proxyUrl, {
+        cache: 'no-store',
+        redirect: 'follow',
+        signal: AbortSignal.timeout(25_000),
+      });
+      if (res.ok) {
+        const text = await res.text();
+        if (text.length >= 500) {
+          return { html: text, source: 'app_proxy' };
+        }
+      }
+    } catch {
+      /* fall through */
+    }
+  }
+
   if (input.projectId) {
     try {
       const internal = await fetchSandboxPreviewHtmlForVerify(input.projectId);
@@ -175,7 +212,11 @@ export async function verifyGalleryEditOnSandbox(input: {
     }
   }
 
-  const assetsOk = await countReachableUploadAssets(input.previewUrl, input.attachments);
+  const assetsOk = await countReachableUploadAssets(
+    input.previewUrl,
+    input.attachments,
+    input.projectId
+  );
   const configHasUrls = publicUrls.every((url) => input.siteConfigSource.includes(url));
 
   return {

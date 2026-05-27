@@ -50,6 +50,7 @@ describe('imagePlacementIntent', () => {
   it('detects image placement language', () => {
     expect(isImagePlacementRequest('add this image to the first section')).toBe(true);
     expect(wantsNewImageSection('add these images to another section')).toBe(true);
+    expect(wantsNewImageSection('add these images into a new section')).toBe(true);
     expect(isImagePlacementRequest('add some descriptions to these images')).toBe(false);
   });
 
