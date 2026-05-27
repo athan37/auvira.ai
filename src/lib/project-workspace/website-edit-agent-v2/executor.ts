@@ -1,5 +1,6 @@
 import { computeWorkspaceHashes, getChangedFilesFromHashes } from '../workspaceEditShared';
 import { runWebsiteEditAgent } from '../website-edit-agent';
+import { runStrategyById } from '../website-edit-agent/strategyRegistry';
 import {
   SITE_CONFIG,
   readWorkspaceRel,
@@ -45,6 +46,20 @@ async function executeLegacyWrapper(
   step: EditPlanStep,
   options: WebsiteEditAgentOptions
 ): Promise<ExecuteSkillResult> {
+  if (step.skill === 'update_theme') {
+    const beforeHashes = options.gateway
+      ? await options.gateway.computeHashes()
+      : await computeWorkspaceHashes(options.workspacePath);
+    const result = await runStrategyById('preset_theme', options, beforeHashes);
+    return {
+      ok: result?.ok ?? false,
+      skill: step.skill,
+      changed: result?.ok ?? false,
+      summary: result?.summary ?? result?.ownerMessage,
+      error: result?.error ?? 'Legacy theme strategy did not apply.',
+    };
+  }
+
   const result = await runWebsiteEditAgent(options);
   return {
     ok: result.ok,
