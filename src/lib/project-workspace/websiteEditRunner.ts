@@ -5,10 +5,11 @@
 
 import { promises as fs } from 'fs';
 import { runWebsiteEditAgent } from './website-edit-agent';
+import { runWebsiteEditAgentV2 } from './website-edit-agent-v2';
 import type { AgentStepEvent } from './website-edit-agent/types';
 import { isAllowedWorkspacePath } from './workspaceEditShared';
 
-export type WebsiteEditAgentMode = 'ts';
+export type WebsiteEditAgentMode = 'ts' | 'ts-v2';
 
 export interface WebsiteEditResult {
   ok: boolean;
@@ -62,7 +63,8 @@ export async function runWebsiteEdit(
     }
   }
 
-  const result = await runWebsiteEditAgent(
+  const useV2 = process.env.WEBSITE_AGENT_V2 === 'true';
+  const result = await (useV2 ? runWebsiteEditAgentV2 : runWebsiteEditAgent)(
     {
       workspacePath: options.workspacePath,
       ownerMessage: options.ownerMessage,
@@ -81,7 +83,7 @@ export async function runWebsiteEdit(
     ownerMessage: result.ownerMessage,
     error: result.error,
     changedFiles: result.changedFiles,
-    agent: 'ts',
+    agent: useV2 ? 'ts-v2' : 'ts',
     strategy: result.strategy,
     tier: result.tier,
     confidence: result.confidence,
