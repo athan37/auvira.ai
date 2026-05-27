@@ -31,11 +31,14 @@ export function isImagePlacementRequest(message: string): boolean {
 /** Owner asked for a separate gallery block, not updating the existing image section. */
 export function wantsNewImageSection(message: string): boolean {
   const lower = message.toLowerCase();
+  const mentionsImage = IMAGE_NOUN.test(lower);
   return (
-    /\bcreate\s+(a\s+)?new\s+section\b/i.test(lower) ||
-    /\b(another|new|different|separate|second)\s+(section|gallery|block)\b/i.test(lower) ||
-    /\bnew\s+section\s+for\b/i.test(lower) ||
-    /\binto\s+(a\s+)?new\s+section\b/i.test(lower) ||
+    (/\bcreate\s+(a\s+)?new\s+section\b/i.test(lower) && mentionsImage) ||
+    /\b(another|new|different|separate|second)\s+gallery\b/i.test(lower) ||
+    (/\b(another|new|different|separate|second)\s+(section|block)\b/i.test(lower) &&
+      mentionsImage) ||
+    (/\bnew\s+section\s+for\b/i.test(lower) && mentionsImage) ||
+    (/\binto\s+(a\s+)?new\s+section\b/i.test(lower) && mentionsImage) ||
     /\badd\s+(these|those)\s+images?\s+to\s+another\b/i.test(lower) ||
     /\badd\s+(these|those)\s+images?\s+into\s+(a\s+)?new\s+section\b/i.test(lower)
   );
