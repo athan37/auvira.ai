@@ -5,6 +5,8 @@ import os from 'os';
 import { runWebsiteEditAgentV2 } from '../../src/lib/project-workspace/website-edit-agent-v2';
 import { llmDescribe } from './llmIntegrationHarness';
 
+const LLM_TEST_TIMEOUT_MS = 120_000;
+
 async function createWorkspace(): Promise<string> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ws-v2-llm-e2e-'));
   await fs.mkdir(path.join(dir, 'src/lib'), { recursive: true });
@@ -32,7 +34,9 @@ export default function Home() {
 }
 
 llmDescribe('Website Agent V2 live E2E', () => {
-  it('adds a service through the live planner and config executor', async () => {
+  it(
+    'adds a service through the live planner and config executor',
+    async () => {
     const dir = await createWorkspace();
 
     const result = await runWebsiteEditAgentV2({
@@ -47,9 +51,13 @@ llmDescribe('Website Agent V2 live E2E', () => {
     expect(siteConfig).toContain('Emergency Repairs');
 
     await fs.rm(dir, { recursive: true, force: true });
-  });
+    },
+    LLM_TEST_TIMEOUT_MS
+  );
 
-  it('updates a phone number through the live planner and config executor', async () => {
+  it(
+    'updates a phone number through the live planner and config executor',
+    async () => {
     const dir = await createWorkspace();
 
     const result = await runWebsiteEditAgentV2({
@@ -64,9 +72,13 @@ llmDescribe('Website Agent V2 live E2E', () => {
     expect(siteConfig).toContain('555-0199');
 
     await fs.rm(dir, { recursive: true, force: true });
-  });
+    },
+    LLM_TEST_TIMEOUT_MS
+  );
 
-  it('routes a theme/style request through V2 or its legacy wrapper', async () => {
+  it(
+    'routes a theme/style request through V2 or its legacy wrapper',
+    async () => {
     const dir = await createWorkspace();
 
     const result = await runWebsiteEditAgentV2({
@@ -95,9 +107,13 @@ llmDescribe('Website Agent V2 live E2E', () => {
     }
 
     await fs.rm(dir, { recursive: true, force: true });
-  });
+    },
+    LLM_TEST_TIMEOUT_MS
+  );
 
-  it('updates the hero title/headline through the live planner and config executor', async () => {
+  it(
+    'updates the hero title/headline through the live planner and config executor',
+    async () => {
     const dir = await createWorkspace();
 
     const result = await runWebsiteEditAgentV2({
@@ -112,9 +128,13 @@ llmDescribe('Website Agent V2 live E2E', () => {
     expect(siteConfig).toContain('Built for Growth');
 
     await fs.rm(dir, { recursive: true, force: true });
-  });
+    },
+    LLM_TEST_TIMEOUT_MS
+  );
 
-  it('adds a new section with image items through the live planner and config executor', async () => {
+  it(
+    'adds a new section with image items through the live planner and config executor',
+    async () => {
     const dir = await createWorkspace();
 
     const result = await runWebsiteEditAgentV2({
@@ -141,9 +161,13 @@ llmDescribe('Website Agent V2 live E2E', () => {
     }
 
     await fs.rm(dir, { recursive: true, force: true });
-  });
+    },
+    LLM_TEST_TIMEOUT_MS
+  );
 
-  it('handles multi-step requests with coordinated content changes', async () => {
+  it(
+    'handles multi-step requests with coordinated content changes',
+    async () => {
     const dir = await createWorkspace();
 
     const result = await runWebsiteEditAgentV2({
@@ -162,9 +186,13 @@ llmDescribe('Website Agent V2 live E2E', () => {
     expect(siteConfig).toContain('Preventive seasonal maintenance');
 
     await fs.rm(dir, { recursive: true, force: true });
-  });
+    },
+    LLM_TEST_TIMEOUT_MS
+  );
 
-  it('returns clarification instead of unsafe edits for ambiguous prompts', async () => {
+  it(
+    'returns clarification instead of unsafe edits for ambiguous prompts',
+    async () => {
     const dir = await createWorkspace();
 
     const result = await runWebsiteEditAgentV2({
@@ -183,6 +211,8 @@ llmDescribe('Website Agent V2 live E2E', () => {
     expect(siteConfig).toContain('555-0100');
 
     await fs.rm(dir, { recursive: true, force: true });
-  });
+    },
+    LLM_TEST_TIMEOUT_MS
+  );
 });
 
