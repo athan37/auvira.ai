@@ -416,7 +416,7 @@ export function resolveSectionTarget(
     }
   }
 
-  const quoted = extractQuotedTitle(message);
+  const quoted = /\bto\s*["'][^"']+["']/i.test(message) ? null : extractQuotedTitle(message);
   if (quoted) {
     return resolveTitleIntent(quoted, snapshot, `Title match: "${quoted}"`);
   }

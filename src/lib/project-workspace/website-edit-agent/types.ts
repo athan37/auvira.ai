@@ -193,6 +193,22 @@ export interface WebsiteEditAgentResult {
   /** Ask-back only — no files changed; UI should not treat as hard failure. */
   needsClarification?: boolean;
   suggestedReplies?: string[];
+  v2Meta?: {
+    planIntent?: string;
+    planRoute?: string;
+    skills?: string[];
+    usedLegacyWrapper?: boolean;
+    verification?: {
+      ok: boolean;
+      reason: string;
+    };
+    repair?: {
+      ok: boolean;
+      action: string;
+      reason?: string;
+    };
+    rolledBack?: boolean;
+  };
 }
 
 export interface RouterDecision {
