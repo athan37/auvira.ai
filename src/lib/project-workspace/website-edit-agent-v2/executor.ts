@@ -210,7 +210,7 @@ export async function executePlan(
     };
   }
 
-  const summary = plan.summary ?? summaries.join(' ') || 'Updated your website.';
+  const summary = plan.summary ?? (summaries.join(' ') || 'Updated your website.');
   return {
     ok: true,
     summary,
