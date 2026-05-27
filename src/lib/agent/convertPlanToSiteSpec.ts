@@ -33,7 +33,10 @@ export function convertPlanToSiteSpec(
   websitePlan: WebsitePlan,
   intake: ScratchIntake
 ): SiteSpec {
-  const cta = goalToCTA(websitePlan.primaryGoal);
+  const planHero = websitePlan.contentPlan?.hero;
+  const cta = planHero?.primaryCTA && planHero?.secondaryCTA
+    ? { primary: planHero.primaryCTA, secondary: planHero.secondaryCTA }
+    : goalToCTA(websitePlan.primaryGoal);
   const rawTemplate = websitePlan.suggestedTemplate?.category
     ? { category: websitePlan.suggestedTemplate.category, variant: websitePlan.suggestedTemplate.variant }
     : industryToTemplate(websitePlan.industry);
@@ -41,11 +44,13 @@ export function convertPlanToSiteSpec(
 
   const sections: SiteSection[] = [];
 
-  // Build hero section from contentPlan
+  const heroHeadline = planHero?.headline?.trim() || '';
+  const heroSubheadline = planHero?.subheadline?.trim() || '';
+
   sections.push({
     type: 'hero',
-    title: '',
-    body: '',
+    title: heroHeadline,
+    body: heroSubheadline,
     items: [],
   });
 
@@ -106,8 +111,11 @@ export function convertPlanToSiteSpec(
   }
 
   return {
-    siteTitle: websitePlan.businessName,
-    tagline: websitePlan.positioning?.split('.')[0] || `${websitePlan.businessName} — ${websitePlan.industry}`,
+    siteTitle: heroHeadline || websitePlan.businessName,
+    tagline:
+      heroSubheadline ||
+      websitePlan.positioning?.split('.')[0] ||
+      `${websitePlan.businessName} — ${websitePlan.industry}`,
     primaryCTA: cta.primary,
     secondaryCTA: cta.secondary,
     sections,

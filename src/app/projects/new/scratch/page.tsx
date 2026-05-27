@@ -83,10 +83,29 @@ export default function NewScratchPage() {
         body: JSON.stringify({
           websitePlan: plan,
           projectName: businessName.trim(),
+          intake: {
+            businessName: businessName.trim(),
+            industry: industry.trim(),
+            location: location.trim(),
+            services: services.trim(),
+            mainGoal,
+            phone: phone.trim(),
+            email: email.trim(),
+            targetCustomers: '',
+            address: '',
+            desiredStyle: selectedTemplate?.category || 'professional',
+            notes: '',
+          },
         }),
       });
       const buildData = await buildRes.json();
       if (buildData.ok && buildData.projectId) {
+        if (buildData.warning) {
+          sessionStorage.setItem(
+            `project-warning-${buildData.projectId}`,
+            String(buildData.warning)
+          );
+        }
         router.push(`/projects/${buildData.projectId}`);
       } else {
         setError(buildData.error || 'Failed to build website');

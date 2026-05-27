@@ -1,218 +1,77 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getLLMClient } from '@/lib/llm/llmClient';
-import { type BusinessProfile, siteSpecSchema, type SiteSpec, type DesignBrief, type WebsitePlan, type ScratchIntake } from '@/lib/agent/schemas';
-import { buildGenerateSiteSpecPrompt } from '@/lib/agent/prompts';
-import { generateDesignBriefAgent, getDefaultDesignBrief } from '@/lib/agent/generateDesignBriefAgent';
-import { generateWebsiteFiles } from '@/lib/builder/generateWebsiteFiles';
-import { validateGeneratedSite } from '@/lib/builder/validateGeneratedSite';
-import { validateScratchContent } from '@/lib/agent/validateScratchContent';
-import { convertPlanToSiteSpec } from '@/lib/agent/convertPlanToSiteSpec';
+import type { WebsitePlan, ScratchIntake } from '@/lib/agent/schemas';
+import {
+  buildWebsiteFromPlan,
+  resolveScratchIntake,
+} from '@/lib/agent/buildWebsiteFromPlan';
 import { createGitLabProject } from '@/lib/gitlab/createProject';
 import { commitFilesToGitLab } from '@/lib/gitlab/commitFiles';
 import { createVercelProject } from '@/lib/vercel/createVercelProject';
-import { type TemplateVariant } from '@/lib/builder/themePresets';
-import type { TemplateSelection } from '@/lib/agent/selectTemplateAgent';
 
 export const runtime = 'nodejs';
 
-interface StageLog {
-  stage: string;
-  timestamp: string;
-  duration_ms?: number;
-}
-
-function logStage(stage: string, duration_ms?: number): StageLog {
-  const entry: StageLog = { stage, timestamp: new Date().toISOString() };
-  if (duration_ms !== undefined) entry.duration_ms = duration_ms;
-  console.log(`[BUILD-FROM-PLAN] Stage: ${stage}${duration_ms !== undefined ? ` (${duration_ms}ms)` : ''}`);
-  return entry;
-}
-
-function generateUniqueProjectName(baseName: string): string {
-  const timestamp = Date.now().toString(36).slice(-6);
-  const suffix = Math.random().toString(36).slice(2, 6);
-  const sanitized = baseName.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
-  return `${sanitized}-${timestamp}-${suffix}`;
-}
-
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
-  let stageLogs: StageLog[] = [];
 
   try {
     const body = await request.json();
-    const { websitePlan, projectName, validateBuild = true } = body as {
+    const { websitePlan, projectName, validateBuild = true, intake: intakeBody } = body as {
       websitePlan: WebsitePlan;
       projectName: string;
       validateBuild?: boolean;
+      intake?: Partial<ScratchIntake>;
     };
 
     if (!websitePlan) {
       return NextResponse.json({ ok: false, error: 'websitePlan is required' }, { status: 400 });
     }
 
-    stageLogs.push(logStage('scratch_intake_received'));
+    const intake = resolveScratchIntake(websitePlan, intakeBody);
 
-    // Build intake from plan for validation
-    const intake: ScratchIntake = {
-      businessName: websitePlan.businessName,
-      industry: websitePlan.industry,
-      location: '',
-      services: '',
-      targetCustomers: websitePlan.targetCustomers?.join(', ') || '',
-      mainGoal: websitePlan.primaryGoal,
-      phone: '',
-      email: '',
-      address: '',
-      desiredStyle: websitePlan.suggestedTemplate?.category || 'professional',
-      notes: '',
-    };
+    const buildResult = await buildWebsiteFromPlan({
+      websitePlan,
+      intake,
+      projectName,
+      validateBuild,
+      logPrefix: 'BUILD-FROM-PLAN',
+    });
 
-    // Validate scratch content - no fake facts allowed
-    stageLogs.push(logStage('scratch_content_validation_start'));
-    const scratchValidation = validateScratchContent(websitePlan, intake);
-    stageLogs.push(logStage('scratch_content_validation_done', Date.now() - startTime));
-
-    if (!scratchValidation.ok) {
-      return NextResponse.json({
-        ok: false,
-        error: `Content validation failed: ${scratchValidation.issues.join('; ')}`,
-        stage: 'scratch_content_validation_failed',
-        stageLogs,
-        duration_ms: Date.now() - startTime,
-        scratchValidation,
-      }, { status: 500 });
-    }
-
-    // Convert plan to siteSpec
-    stageLogs.push(logStage('plan_to_sitespec_start'));
-    let siteSpec: SiteSpec;
-    try {
-      siteSpec = convertPlanToSiteSpec(websitePlan, intake);
-    } catch (error) {
-      stageLogs.push(logStage('plan_to_sitespec_failed'));
-      return NextResponse.json({
-        ok: false,
-        error: `Failed to convert plan to siteSpec: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        stage: 'plan_to_sitespec_failed',
-        stageLogs,
-        duration_ms: Date.now() - startTime,
-      }, { status: 500 });
-    }
-    stageLogs.push(logStage('plan_to_sitespec_done', Date.now() - startTime));
-
-    // Generate design brief
-    stageLogs.push(logStage('design_brief_start'));
-    let designBrief: DesignBrief;
-    try {
-      designBrief = await generateDesignBriefAgent(
+    if (!buildResult.ok || !buildResult.generated || !buildResult.siteSpec || !buildResult.uniqueName) {
+      return NextResponse.json(
         {
-          businessName: websitePlan.businessName,
-          industry: websitePlan.industry,
-          description: websitePlan.positioning,
-          services: websitePlan.contentPlan?.sections?.find(s => s.type === 'services')?.contentNotes || [],
-          location: '',
-          phone: '',
-          email: '',
-          brandTone: websitePlan.suggestedTemplate?.category || 'professional',
-          targetCustomers: websitePlan.targetCustomers,
-        } as Record<string, unknown>,
-        siteSpec as unknown as Record<string, unknown>,
-        ''
-      );
-    } catch (error) {
-      stageLogs.push(logStage('design_brief_failed'));
-      designBrief = getDefaultDesignBrief(websitePlan.suggestedTemplate?.category as 'legal' | 'healthcare' | 'home-services' | 'restaurant' | 'general-service' || 'general-service');
-      console.error(`[BUILD-FROM-PLAN] Design brief failed, using default: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-    stageLogs.push(logStage('design_brief_done', Date.now() - startTime));
-
-    // Build template selection from website plan
-    const template: TemplateSelection = websitePlan.suggestedTemplate?.category ? {
-      category: websitePlan.suggestedTemplate.category as any,
-      variant: (websitePlan.suggestedTemplate.variant as TemplateVariant) || 'modern-clean',
-      reason: websitePlan.suggestedTemplate.reason || 'From website plan template selection.',
-    } : {
-      category: 'general-service',
-      variant: 'modern-clean',
-      reason: 'Default template selected.',
-    };
-
-    const name = projectName || websitePlan.businessName || 'generated-website';
-    const uniqueName = generateUniqueProjectName(name);
-
-    stageLogs.push(logStage('build_files_start'));
-
-    let generated;
-    try {
-      generated = generateWebsiteFiles(siteSpec, uniqueName, designBrief, template);
-    } catch (error) {
-      stageLogs.push(logStage('build_files_failed'));
-      return NextResponse.json({
-        ok: false,
-        error: `File generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        stage: 'build_files_failed',
-        stageLogs,
-        duration_ms: Date.now() - startTime,
-      }, { status: 500 });
-    }
-    stageLogs.push(logStage('build_files_done', Date.now() - startTime));
-
-    // BUILD GATE - same as rebuild route
-    let buildValidation: { ok: boolean; tempDir: string; logs: string; errors: string[]; durationMs: number } | null = null;
-
-    if (validateBuild) {
-      stageLogs.push(logStage('build_gate_start'));
-
-      const buildResult = await validateGeneratedSite({
-        files: generated.files,
-        projectName: uniqueName,
-      });
-
-      buildValidation = {
-        ok: buildResult.ok,
-        tempDir: buildResult.tempDir,
-        logs: buildResult.logs,
-        errors: buildResult.errors,
-        durationMs: buildResult.durationMs,
-      };
-
-      if (!buildResult.ok) {
-        stageLogs.push(logStage('build_gate_failed'));
-        return NextResponse.json({
           ok: false,
-          error: `Build validation failed: ${buildResult.errors.join('; ')}`,
-          stage: 'generated_site_validation_failed',
-          stageLogs,
-          duration_ms: Date.now() - startTime,
-          siteSpec,
-          generatedSiteValidation: buildValidation,
-        }, { status: 500 });
-      }
-      stageLogs.push(logStage('build_gate_done', Date.now() - startTime));
+          error: buildResult.error,
+          stage: buildResult.stage,
+          stageLogs: buildResult.stageLogs,
+          duration_ms: buildResult.duration_ms,
+          siteSpec: buildResult.siteSpec,
+          scratchValidation: buildResult.scratchValidation,
+          fidelityValidation: buildResult.fidelityValidation,
+          generatedSiteValidation: buildResult.generatedSiteValidation,
+        },
+        { status: 500 }
+      );
     }
 
-    // Create GitLab project
-    stageLogs.push(logStage('gitlab_project_start'));
+    const { generated, siteSpec, uniqueName, stageLogs } = buildResult;
+    const buildValidation = buildResult.generatedSiteValidation ?? null;
 
     let gitlabResult;
     try {
       gitlabResult = await createGitLabProject({ name: uniqueName });
     } catch (error) {
-      stageLogs.push(logStage('gitlab_project_failed'));
-      return NextResponse.json({
-        ok: false,
-        error: `GitLab project creation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        stage: 'gitlab_project_creation_failed',
-        stageLogs,
-        duration_ms: Date.now() - startTime,
-        siteSpec,
-      }, { status: 500 });
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `GitLab project creation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          stage: 'gitlab_project_creation_failed',
+          stageLogs,
+          duration_ms: Date.now() - startTime,
+          siteSpec,
+        },
+        { status: 500 }
+      );
     }
-    stageLogs.push(logStage('gitlab_project_created', Date.now() - startTime));
-
-    // Commit files
-    stageLogs.push(logStage('gitlab_commit_start'));
 
     try {
       await commitFilesToGitLab({
@@ -221,24 +80,22 @@ export async function POST(request: NextRequest) {
         files: generated.files,
       });
     } catch (error) {
-      stageLogs.push(logStage('gitlab_commit_failed'));
-      return NextResponse.json({
-        ok: false,
-        error: `GitLab commit failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        stage: 'gitlab_commit_failed',
-        stageLogs,
-        duration_ms: Date.now() - startTime,
-        gitlab: { projectId: gitlabResult.id, repoUrl: gitlabResult.web_url },
-      }, { status: 500 });
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `GitLab commit failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          stage: 'gitlab_commit_failed',
+          stageLogs,
+          duration_ms: Date.now() - startTime,
+          gitlab: { projectId: gitlabResult.id, repoUrl: gitlabResult.web_url },
+        },
+        { status: 500 }
+      );
     }
-    stageLogs.push(logStage('gitlab_commit_done', Date.now() - startTime));
 
-    // Vercel deployment
     let vercelResult = null;
     let deploymentStatus: 'triggered' | 'trigger_failed' | 'failed' | 'pending' = 'pending';
     let vercelNote = 'Deployment may take 1-3 minutes.';
-
-    stageLogs.push(logStage('vercel_deploy_start'));
 
     try {
       vercelResult = await createVercelProject({
@@ -249,17 +106,21 @@ export async function POST(request: NextRequest) {
       });
       deploymentStatus = vercelResult.status;
       vercelNote = vercelResult.note;
-      stageLogs.push(logStage('vercel_deploy_done', Date.now() - startTime));
     } catch (error) {
       deploymentStatus = 'failed';
       vercelNote = `Vercel project creation failed: ${error instanceof Error ? error.message : 'Unknown error'}`;
-      stageLogs.push(logStage('vercel_deploy_failed'));
     }
+
+    const deploymentFailed = deploymentStatus !== 'triggered';
 
     return NextResponse.json({
       ok: true,
+      deploymentFailed,
+      warning: deploymentFailed
+        ? `Website files were saved, but deployment did not start: ${vercelNote}`
+        : undefined,
       mode: 'scratch',
-      stage: deploymentStatus === 'triggered' ? 'repo_and_deployment_triggered' : 'repo_created_vercel_trigger_failed',
+      stage: deploymentFailed ? 'repo_created_vercel_trigger_failed' : 'repo_and_deployment_triggered',
       stageLogs,
       duration_ms: Date.now() - startTime,
       siteSpec,
@@ -271,40 +132,43 @@ export async function POST(request: NextRequest) {
         repoUrl: gitlabResult.web_url,
         httpUrlToRepo: gitlabResult.http_url_to_repo,
       },
-      deployment: vercelResult ? {
-        provider: vercelResult.provider,
-        status: vercelResult.status,
-        ready: false, // Always false initially - Vercel needs time to build
-        projectId: vercelResult.projectId,
-        projectUrl: vercelResult.projectUrl,
-        vercelProjectName: vercelResult.vercelProjectName,
-        deployHookCreated: vercelResult.deployHookCreated,
-        deployTriggered: vercelResult.deployTriggered,
-        deployHookId: vercelResult.deployHookId,
-        deployHookUrl: vercelResult.deployHookUrl,
-        triggeredAt: vercelResult.triggeredAt,
-        expectedProductionUrl: vercelResult.expectedProductionUrl,
-        liveUrl: null, // Set only after Vercel returns READY
-        deploymentUrl: null,
-        inspectorUrl: null,
-        note: vercelResult.note,
-        error: vercelResult.error,
-      } : {
-        provider: 'vercel',
-        status: deploymentStatus,
-        ready: false,
-        note: vercelNote,
-      },
+      deployment: vercelResult
+        ? {
+            provider: vercelResult.provider,
+            status: vercelResult.status,
+            ready: false,
+            projectId: vercelResult.projectId,
+            projectUrl: vercelResult.projectUrl,
+            vercelProjectName: vercelResult.vercelProjectName,
+            deployHookCreated: vercelResult.deployHookCreated,
+            deployTriggered: vercelResult.deployTriggered,
+            deployHookId: vercelResult.deployHookId,
+            deployHookUrl: vercelResult.deployHookUrl,
+            triggeredAt: vercelResult.triggeredAt,
+            expectedProductionUrl: vercelResult.expectedProductionUrl,
+            liveUrl: null,
+            deploymentUrl: null,
+            inspectorUrl: null,
+            note: vercelResult.note,
+            error: vercelResult.error,
+          }
+        : {
+            provider: 'vercel',
+            status: deploymentStatus,
+            ready: false,
+            note: vercelNote,
+          },
     });
   } catch (error) {
-    stageLogs.push(logStage('unknown_error'));
     const message = error instanceof Error ? error.message : 'Unknown error';
-    return NextResponse.json({
-      ok: false,
-      error: message,
-      stage: 'unknown_error',
-      stageLogs,
-      duration_ms: Date.now() - startTime,
-    }, { status: 500 });
+    return NextResponse.json(
+      {
+        ok: false,
+        error: message,
+        stage: 'unknown_error',
+        duration_ms: Date.now() - startTime,
+      },
+      { status: 500 }
+    );
   }
 }
