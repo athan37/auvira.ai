@@ -3,7 +3,8 @@ import type { EditPlan, SiteModel } from '../../src/lib/project-workspace/websit
 import { planEdit } from '../../src/lib/project-workspace/website-edit-agent-v2';
 
 export const runLlmIntegrationTests = process.env.RUN_LLM_INTEGRATION_TESTS === 'true';
-export const llmDescribe = runLlmIntegrationTests ? describe : describe.skip;
+const hasMiniMaxKey = Boolean(process.env.MINIMAX_API_KEY?.trim());
+export const llmDescribe = runLlmIntegrationTests && hasMiniMaxKey ? describe : describe.skip;
 
 export const BASE_SITE_MODEL: SiteModel = {
   mode: 'gitlab',

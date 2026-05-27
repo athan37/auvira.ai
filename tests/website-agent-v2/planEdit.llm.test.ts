@@ -25,5 +25,29 @@ llmDescribe('Website Agent V2 planEdit LLM integration', () => {
     expect(plan.needsClarification).not.toBe(true);
     expect(plan.steps.some((step) => step.skill === 'update_contact')).toBe(true);
   });
+
+  it('plans multiple coordinated edits in one request', async () => {
+    const plan = await planWithLiveLlm(
+      'Refresh the homepage: change hero headline to "Built for Growth", update phone to 555-0111, and add a service called "Maintenance Plans"'
+    );
+
+    if (plan.needsClarification) {
+      expect(plan.route).toBe('clarify');
+      expect(plan.clarificationQuestion || plan.summary).toBeTruthy();
+    } else {
+      expect(plan.steps.length).toBeGreaterThanOrEqual(2);
+      const skills = new Set(plan.steps.map((step) => step.skill));
+      expect(skills.has('update_hero')).toBe(true);
+      expect(skills.has('update_contact') || skills.has('add_service')).toBe(true);
+    }
+  });
+
+  it('asks for clarification on ambiguous, non-specific prompts', async () => {
+    const plan = await planWithLiveLlm('Make that section better');
+
+    expect(plan.needsClarification).toBe(true);
+    expect(plan.route).toBe('clarify');
+    expect(plan.clarificationQuestion || plan.summary).toBeTruthy();
+  });
 });
 
