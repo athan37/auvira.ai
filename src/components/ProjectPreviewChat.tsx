@@ -34,6 +34,9 @@ type ChatMessage = {
   imagePreviews?: string[];
   /** Assistant message for a failed edit. */
   isError?: boolean;
+  /** Ask-back only — not a hard failure. */
+  isClarification?: boolean;
+  suggestedReplies?: string[];
   /** Copy/paste diagnostic block from the server. */
   errorTrace?: string;
   errorStage?: string;
@@ -400,6 +403,8 @@ export function ProjectPreviewChat({
     let success = false;
     let finalOwnerMessage = '';
     let editFailed = false;
+    let needsClarification = false;
+    let suggestedReplies: string[] | undefined;
     let errorTrace = '';
     let errorStage = '';
     let attachments: WorkspaceAssetAttachment[] = [];
@@ -422,10 +427,14 @@ export function ProjectPreviewChat({
         });
       }
 
+      const conversationHistory = messages
+        .slice(-6)
+        .map((m) => ({ role: m.role, content: m.content }));
+
       const response = await fetch(`/api/projects/${projectId}/code-agent/edit/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMsg, attachments }),
+        body: JSON.stringify({ message: userMsg, attachments, conversationHistory }),
         signal: AbortSignal.timeout(300000),
       });
 
@@ -465,17 +474,26 @@ export function ProjectPreviewChat({
               );
             } else if (event.type === 'done') {
               const result = event.result || {};
+              needsClarification = Boolean(result.needsClarification);
               success = result.ok !== false;
-              editFailed = !success;
+              editFailed = !success && !needsClarification;
               jobId = result.jobId || event.jobId;
+              suggestedReplies = Array.isArray(result.suggestedReplies)
+                ? (result.suggestedReplies as string[])
+                : undefined;
               finalOwnerMessage =
                 result.ownerMessage ||
                 (success
                   ? 'Your website has been updated.'
-                  : "I couldn't apply that change. Please try again or rephrase your request.");
-              if (!success && typeof result.errorTrace === 'string') {
+                  : needsClarification
+                    ? 'I need one more detail before I can apply that change.'
+                    : "I couldn't apply that change. Please try again or rephrase your request.");
+              if (!success && !needsClarification && typeof result.errorTrace === 'string') {
                 errorTrace = result.errorTrace;
                 errorStage = typeof result.errorStage === 'string' ? result.errorStage : '';
+              }
+              if (needsClarification && typeof result.errorStage === 'string') {
+                errorStage = result.errorStage;
               }
             }
           } catch {
@@ -500,12 +518,14 @@ export function ProjectPreviewChat({
           role: 'assistant',
           content: finalOwnerMessage,
           isError: editFailed,
+          isClarification: needsClarification,
+          suggestedReplies: needsClarification ? suggestedReplies : undefined,
           errorTrace: editFailed && errorTrace ? errorTrace : undefined,
           errorStage: editFailed && errorStage ? errorStage : undefined,
           errorJobId: editFailed && jobId ? jobId : undefined,
         },
       ]);
-      onEditComplete?.({ ok: success, jobId });
+      onEditComplete?.({ ok: success || needsClarification, jobId });
 
       if (success) {
         onEditSuccess?.();
@@ -623,17 +643,39 @@ export function ProjectPreviewChat({
                   'max-w-[85%] rounded-lg px-3 py-2 text-sm',
                   msg.role === 'user'
                     ? 'bg-zinc-950 text-white'
-                    : msg.isError
-                      ? 'bg-red-50 border border-red-200 text-red-900 shadow-sm'
-                      : 'bg-white border border-zinc-200 text-zinc-800 shadow-sm'
+                    : msg.isClarification
+                      ? 'bg-sky-50 border border-sky-200 text-sky-950 shadow-sm'
+                      : msg.isError
+                        ? 'bg-red-50 border border-red-200 text-red-900 shadow-sm'
+                        : 'bg-white border border-zinc-200 text-zinc-800 shadow-sm'
                 )}
               >
-                {msg.isError && (
+                {msg.isClarification && (
+                  <p className="text-xs font-semibold uppercase tracking-wide text-sky-800 mb-1">
+                    Quick question
+                  </p>
+                )}
+                {msg.isError && !msg.isClarification && (
                   <p className="text-xs font-semibold uppercase tracking-wide text-red-700 mb-1">
                     Edit failed
                   </p>
                 )}
-                {msg.content}
+                <p className="whitespace-pre-wrap">{msg.content}</p>
+                {msg.isClarification && msg.suggestedReplies && msg.suggestedReplies.length > 0 && (
+                  <div className="mt-2 flex flex-col gap-1.5">
+                    {msg.suggestedReplies.map((reply) => (
+                      <button
+                        key={reply}
+                        type="button"
+                        disabled={sending || !previewReady}
+                        onClick={() => applyPrompt(reply)}
+                        className="text-left text-xs px-2.5 py-1.5 rounded-md border border-sky-200 bg-white text-sky-900 hover:bg-sky-100/80 transition-colors disabled:opacity-50"
+                      >
+                        {reply}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {msg.isError && msg.errorTrace && (
                   <EditErrorTrace
                     trace={msg.errorTrace}

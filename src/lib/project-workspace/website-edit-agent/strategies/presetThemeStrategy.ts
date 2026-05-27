@@ -1,7 +1,9 @@
 import {
   extractPresetObjectLiteral,
+  extractColorsFromMessage,
   parseColorSwap,
   replacePresetInPageContent,
+  setPresetCardBackground,
   swapColorsInPresetJson,
   swapTailwindColorInText,
   type PresetScope,
@@ -17,6 +19,13 @@ import type { WebsiteEditAgentOptions, WebsiteEditAgentResult } from '../types';
 
 function resolveScope(message: string): PresetScope {
   const lower = message.toLowerCase();
+  if (
+    (/\btestimonial|\bcustomers say|\ball testimonial\b/.test(lower) ||
+      /\bcard background/.test(lower)) &&
+    /\bcard\b/.test(lower)
+  ) {
+    return 'testimonialsCard';
+  }
   if (/\bhero\b/.test(lower) && !/\b(throughout|everywhere|site|whole)\b/.test(lower)) {
     return 'hero';
   }
@@ -35,8 +44,9 @@ export async function runPresetThemeStrategy(
 ): Promise<WebsiteEditAgentResult | null> {
   if (options.mode !== 'gitlab') return null;
 
+  const scope = resolveScope(options.ownerMessage);
   const swap = parseColorSwap(options.ownerMessage);
-  if (!swap) return null;
+  const targetColors = extractColorsFromMessage(options.ownerMessage);
 
   const pageContent = await readWorkspaceRel(options, PAGE_TSX);
   if (!pageContent) return null;
@@ -44,20 +54,36 @@ export async function runPresetThemeStrategy(
   const presetJson = extractPresetObjectLiteral(pageContent);
   if (!presetJson) return null;
 
-  const scope = resolveScope(options.ownerMessage);
-  const newPresetJson = swapColorsInPresetJson(presetJson, swap.fromColor, swap.toColor, scope);
+  let newPresetJson: string | null = null;
+  let summary: string;
+
+  if (scope === 'testimonialsCard' && targetColors.length > 0 && !swap) {
+    const toColor = targetColors[targetColors.length - 1];
+    newPresetJson = setPresetCardBackground(presetJson, toColor);
+    summary = `Changed testimonial card backgrounds to ${toColor}.`;
+  } else if (swap) {
+    newPresetJson = swapColorsInPresetJson(presetJson, swap.fromColor, swap.toColor, scope);
+    summary = `Changed site colors from ${swap.fromColor} to ${swap.toColor}.`;
+  } else {
+    return null;
+  }
+
   let newPage = replacePresetInPageContent(pageContent, newPresetJson);
   if (!newPage) return null;
 
-  newPage = swapTailwindColorInText(newPage, swap.fromColor, swap.toColor);
+  if (swap) {
+    newPage = swapTailwindColorInText(newPage, swap.fromColor, swap.toColor);
+  }
 
   await writeWorkspaceRel(options, PAGE_TSX, newPage);
 
-  const globals = await readWorkspaceRel(options, GLOBALS_CSS);
-  if (globals) {
-    const newGlobals = swapTailwindColorInText(globals, swap.fromColor, swap.toColor);
-    if (newGlobals !== globals) {
-      await writeWorkspaceRel(options, GLOBALS_CSS, newGlobals);
+  if (swap && scope !== 'testimonialsCard') {
+    const globals = await readWorkspaceRel(options, GLOBALS_CSS);
+    if (globals) {
+      const newGlobals = swapTailwindColorInText(globals, swap.fromColor, swap.toColor);
+      if (newGlobals !== globals) {
+        await writeWorkspaceRel(options, GLOBALS_CSS, newGlobals);
+      }
     }
   }
 
@@ -66,7 +92,7 @@ export async function runPresetThemeStrategy(
     beforeHashes,
     'preset_theme',
     'L0',
-    `Changed site colors from ${swap.fromColor} to ${swap.toColor}.`,
+    summary,
     { confidence: 'high' }
   );
 }

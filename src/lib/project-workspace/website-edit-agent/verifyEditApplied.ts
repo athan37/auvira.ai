@@ -1,4 +1,6 @@
+import { parseSiteConfigSource } from '@/lib/site-manager/siteConfigParser';
 import { isTextColorEditRequest } from '../verifyPreviewHints';
+import { detectScopedStyleRequest } from './editAmbiguity';
 import {
   extractPresetObjectLiteral,
   PRESET_BACKGROUND_KEYS,
@@ -226,6 +228,27 @@ export function verifyEditApplied(
       const hasGalleryImages =
         /imageUrl/i.test(after) || /\/uploads\//i.test(after);
       const meaningfulChange = before !== after && Math.abs(growth) >= 10;
+
+      if (!parseSiteConfigSource(after)) {
+        return {
+          ok: false,
+          reason: 'siteConfig.ts is not valid after the edit (parse failed).',
+          evidence: [`${filename} failed parseSiteConfigSource`],
+        };
+      }
+
+      const styleOnlySiteConfig =
+        detectScopedStyleRequest(message) &&
+        !changedFiles.some((f) => /page\.tsx$/i.test(f.replace(/\\/g, '/')));
+
+      if (styleOnlySiteConfig && meaningfulChange) {
+        return {
+          ok: false,
+          reason:
+            'Color or card styling must be updated in src/app/page.tsx (preset/card classes), not siteConfig.ts.',
+          evidence: ['siteConfig changed but page.tsx was not updated for scoped style request'],
+        };
+      }
 
       if (meaningfulChange && hasSections && (hasItems || hasGalleryImages)) {
         evidence.push(`siteConfig sections updated (${growth >= 0 ? '+' : ''}${growth} chars)`);

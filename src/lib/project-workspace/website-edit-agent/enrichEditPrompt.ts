@@ -1,3 +1,4 @@
+import { formatConversationForPrompt, type ConversationTurn } from './editAmbiguity';
 import type { EditIntent } from './types';
 import type { WorkspaceAssetAttachment } from '../workspaceAssetTypes';
 import type { WorkspaceGateway } from '../workspaceGateway';
@@ -274,7 +275,8 @@ export async function enrichEditPrompt(
   ownerMessage: string,
   intent: EditIntent,
   attachments: WorkspaceAssetAttachment[] = [],
-  gateway?: WorkspaceGateway
+  gateway?: WorkspaceGateway,
+  conversationHistory?: ConversationTurn[]
 ): Promise<EnrichedEditPrompt> {
   const paths = await discoverContextFiles(workspacePath, mode, ownerMessage);
   const context = gateway
@@ -284,7 +286,9 @@ export async function enrichEditPrompt(
   const guidance = buildIntentGuidance(intent, ownerMessage, context);
   const imageGuidance = buildImageAttachmentGuidance(attachments);
 
-  const agentPrompt = `OWNER REQUEST (exact words from customer):
+  const historyBlock = formatConversationForPrompt(conversationHistory);
+
+  const agentPrompt = `${historyBlock}OWNER REQUEST (exact words from customer):
 "${ownerMessage.trim()}"
 ${imageGuidance ? `\n${imageGuidance}\n` : ''}
 CURRENT WEBSITE FILES (snapshot — use read_file to confirm before writing):

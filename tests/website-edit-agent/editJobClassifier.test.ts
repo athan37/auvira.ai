@@ -43,4 +43,37 @@ describe('editJobClassifier', () => {
     expect(plan.needsClarification).toBe(true);
     expect(plan.clarificationMessage).toMatch(/attach the image/i);
   });
+
+  it('asks for clarification on ambiguous card+section+color prompt (not section_config)', () => {
+    const prompt =
+      'change the card below to red in the section what our customers say to red';
+    const plan = classifyEditJob(prompt, [], { mode: 'gitlab' } as never);
+    expect(plan.needsClarification).toBe(true);
+    expect(plan.primaryStrategy).not.toBe('section_config');
+    expect(plan.clarificationMessage).toMatch(/testimonial cards|Reply with 1, 2, or 3/i);
+    expect(plan.suggestedReplies?.length).toBeGreaterThan(0);
+  });
+
+  it('routes hero background color to preset_theme', () => {
+    const plan = classifyEditJob('change hero background from blue to green');
+    expect(plan.primaryStrategy).toBe('preset_theme');
+    expect(plan.needsClarification).toBeFalsy();
+  });
+
+  it('routes clarification follow-up "1" to preset_card_color with history', () => {
+    const history = [
+      {
+        role: 'user' as const,
+        content: 'change the card below to red in the section what our customers say to red',
+      },
+      {
+        role: 'assistant' as const,
+        content:
+          'Reply with 1, 2, or 3 — Background of all testimonial cards, one card, or text color.',
+      },
+    ];
+    const plan = classifyEditJob('1', [], { mode: 'gitlab' } as never, history);
+    expect(plan.needsClarification).toBeFalsy();
+    expect(plan.primaryStrategy).toBe('preset_card_color');
+  });
 });

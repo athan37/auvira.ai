@@ -3,6 +3,7 @@ import { runSectionConfigStrategy } from './sectionConfigStrategy';
 import { runSingleShotStrategy } from './singleShotStrategy';
 import { runGalleryItemDescriptionStrategy } from './galleryItemDescriptionStrategy';
 import { runPresetThemeStrategy } from './strategies/presetThemeStrategy';
+import { runPresetCardColorStrategy } from './strategies/presetCardColorStrategy';
 import { runPresetTextColorStrategy } from './strategies/presetTextColorStrategy';
 import { runCopyFieldStrategy } from './strategies/copyFieldStrategy';
 import { runContactFieldStrategy } from './strategies/contactFieldStrategy';
@@ -22,6 +23,7 @@ type StrategyRunner = (
 
 const RUNNERS: Partial<Record<EditStrategyId, StrategyRunner>> = {
   preset_theme: runPresetThemeStrategy,
+  preset_card_color: runPresetCardColorStrategy,
   preset_text_color: runPresetTextColorStrategy,
   copy_field: runCopyFieldStrategy,
   contact_field: runContactFieldStrategy,

@@ -6,8 +6,10 @@ import {
   getChangedFilesFromHashes,
   isSafeWritePath,
 } from '../workspaceEditShared';
+import { parseSiteConfigSource } from '@/lib/site-manager/siteConfigParser';
 import { verifyEditApplied } from './verifyEditApplied';
 import { isImagePlacementRequest } from './imagePlacementIntent';
+import { formatConversationForPrompt } from './editAmbiguity';
 import type { WebsiteEditAgentOptions, WebsiteEditAgentResult } from './types';
 
 const SITE_CONFIG = 'src/lib/siteConfig.ts';
@@ -63,6 +65,7 @@ export async function runSectionConfigStrategy(
   }
 
   const lower = options.ownerMessage.toLowerCase();
+  const historyBlock = formatConversationForPrompt(options.conversationHistory);
   const llm = getLLMClient();
   const result = await llm.generateJSON<LlmEditResponse>({
     system: `You are a website content editor. Update src/lib/siteConfig.ts to fulfill the owner's section request.
@@ -76,7 +79,7 @@ Rules:
 - Do not invent phone numbers or street addresses.
 - Do NOT add, move, or copy imageUrl or /uploads/ paths unless the owner attached new images in this request.
 - Return the FULL updated siteConfig.ts file content.`,
-    prompt: `Owner request: ${options.ownerMessage}
+    prompt: `${historyBlock}Owner request: ${options.ownerMessage}
 
 ${lower.includes('faq') ? 'Add or update an FAQ section with the requested number of Q&A pairs in siteConfig.sections.' : ''}
 ${lower.includes('testimonial') ? 'Add or update the testimonials section with the requested number of short quotes in siteConfig.sections. Replace items when updating an existing testimonials section.' : ''}
@@ -117,6 +120,10 @@ Return JSON: { "files": [{ "path": "${SITE_CONFIG}", "content": "..." }], "summa
   for (const file of result.data.files) {
     const normalized = file.path.replace(/^\/+/, '');
     if (normalized !== SITE_CONFIG || !isSafeWritePath(normalized)) continue;
+
+    if (!parseSiteConfigSource(file.content)) {
+      continue;
+    }
 
     if (options.gateway) {
       await options.gateway.writeFile(normalized, file.content);

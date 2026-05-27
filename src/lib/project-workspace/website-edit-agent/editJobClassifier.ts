@@ -1,4 +1,12 @@
 import { hasExplicitEditTarget } from './enrichEditPrompt';
+import {
+  detectAmbiguousEditRequest,
+  detectScopedStyleRequest,
+  isTestimonialsCardColorRequest,
+  isTestimonialsTextColorRequest,
+  resolveEffectiveEditMessage,
+  type ConversationTurn,
+} from './editAmbiguity';
 import { routeEditRequest } from './intentRouter';
 import {
   isTextColorEditRequest,
@@ -96,11 +104,13 @@ function buildTryOrder(primary: EditStrategyId, fallbacks: EditStrategyId[]): Ed
 export function classifyEditJob(
   ownerMessage: string,
   attachments: WorkspaceAssetAttachment[] = [],
-  snap?: SiteWorkspaceSnapshot | null
+  snap?: SiteWorkspaceSnapshot | null,
+  conversationHistory: ConversationTurn[] = []
 ): EditJobPlan {
-  const legacy = routeEditRequest(ownerMessage);
+  const effectiveMessage = resolveEffectiveEditMessage(ownerMessage, conversationHistory);
+  const legacy = routeEditRequest(effectiveMessage);
   const intents: EditIntent[] = [legacy.intent];
-  const lower = ownerMessage.toLowerCase();
+  const lower = effectiveMessage.toLowerCase();
   const hasAttachments = attachments.length > 0;
 
   if (hasAttachments) {
@@ -115,7 +125,7 @@ export function classifyEditJob(
     };
   }
 
-  if (isGalleryDescriptionRequest(ownerMessage)) {
+  if (isGalleryDescriptionRequest(effectiveMessage)) {
     return {
       intents: ['section', 'copy'],
       tier: 'L1',
@@ -127,7 +137,7 @@ export function classifyEditJob(
     };
   }
 
-  if (isImagePlacementRequest(ownerMessage)) {
+  if (isImagePlacementRequest(effectiveMessage)) {
     return {
       intents: ['section'],
       tier: 'L0',
@@ -141,7 +151,7 @@ export function classifyEditJob(
     };
   }
 
-  if (detectCompoundIntent(ownerMessage)) {
+  if (detectCompoundIntent(effectiveMessage)) {
     return {
       intents: ['general', legacy.intent],
       tier: 'L3',
@@ -156,9 +166,25 @@ export function classifyEditJob(
     };
   }
 
+  const ambiguity = detectAmbiguousEditRequest(ownerMessage, conversationHistory);
+  if (ambiguity.ambiguous && ambiguity.confidence !== 'high') {
+    return {
+      intents: ['style', 'section'],
+      tier: 'L3',
+      primaryStrategy: 'agent_loop',
+      tryOrder: ['agent_loop'],
+      confidence: 'low',
+      verifyProfile: 'generic',
+      applyLabel: legacy.applyLabel,
+      needsClarification: true,
+      clarificationMessage: ambiguity.clarificationMessage,
+      suggestedReplies: ambiguity.suggestedReplies,
+    };
+  }
+
   if (snap?.mode === 'static') {
-    const swap = parseColorSwap(ownerMessage);
-    if (swap || isBackgroundColorEditRequest(ownerMessage)) {
+    const swap = parseColorSwap(effectiveMessage);
+    if (swap || isBackgroundColorEditRequest(effectiveMessage)) {
       return {
         intents: ['style'],
         tier: 'L0',
@@ -169,7 +195,7 @@ export function classifyEditJob(
         applyLabel: 'Updating the design colors',
       };
     }
-    if (hasExplicitEditTarget(ownerMessage)) {
+    if (hasExplicitEditTarget(effectiveMessage)) {
       return {
         intents: ['copy'],
         tier: 'L0',
@@ -182,7 +208,7 @@ export function classifyEditJob(
     }
   }
 
-  const sectionRemove = parseSectionRemoveTarget(ownerMessage);
+  const sectionRemove = parseSectionRemoveTarget(effectiveMessage);
   if (sectionRemove) {
     return {
       intents: ['section'],
@@ -195,7 +221,7 @@ export function classifyEditJob(
     };
   }
 
-  const reorder = parseSectionReorder(ownerMessage);
+  const reorder = parseSectionReorder(effectiveMessage);
   if (reorder) {
     return {
       intents: ['section'],
@@ -208,8 +234,8 @@ export function classifyEditJob(
     };
   }
 
-  const contactField = parseContactField(ownerMessage);
-  if (contactField && hasExplicitEditTarget(ownerMessage)) {
+  const contactField = parseContactField(effectiveMessage);
+  if (contactField && hasExplicitEditTarget(effectiveMessage)) {
     return {
       intents: ['contact'],
       tier: 'L0',
@@ -221,8 +247,38 @@ export function classifyEditJob(
     };
   }
 
-  if (isTextColorEditRequest(ownerMessage)) {
-    const colors = extractColorsFromMessage(ownerMessage);
+  if (isTestimonialsTextColorRequest(effectiveMessage)) {
+    const colors = extractColorsFromMessage(effectiveMessage);
+    if (colors.length > 0) {
+      return {
+        intents: ['style', 'copy'],
+        tier: 'L0',
+        primaryStrategy: 'preset_text_color',
+        tryOrder: buildTryOrder('preset_text_color', []),
+        confidence: 'high',
+        verifyProfile: 'color',
+        applyLabel: 'Updating the design colors',
+      };
+    }
+  }
+
+  if (isTestimonialsCardColorRequest(effectiveMessage)) {
+    const colors = extractColorsFromMessage(effectiveMessage);
+    if (colors.length > 0) {
+      return {
+        intents: ['style'],
+        tier: 'L0',
+        primaryStrategy: 'preset_card_color',
+        tryOrder: buildTryOrder('preset_card_color', []),
+        confidence: 'high',
+        verifyProfile: 'color',
+        applyLabel: 'Updating testimonial card colors',
+      };
+    }
+  }
+
+  if (isTextColorEditRequest(effectiveMessage)) {
+    const colors = extractColorsFromMessage(effectiveMessage);
     const toColor = colors[colors.length - 1];
     if (toColor) {
       return {
@@ -237,9 +293,9 @@ export function classifyEditJob(
     }
   }
 
-  const colorSwap = parseColorSwap(ownerMessage);
+  const colorSwap = parseColorSwap(effectiveMessage);
   const siteWideColor =
-    isBackgroundColorEditRequest(ownerMessage) ||
+    isBackgroundColorEditRequest(effectiveMessage) ||
     (colorSwap && /\b(throughout|everywhere|site|whole)\b/.test(lower));
 
   if (colorSwap && (siteWideColor || messageHasKeyword(lower, 'background'))) {
@@ -267,7 +323,7 @@ export function classifyEditJob(
   }
 
   if (
-    hasExplicitEditTarget(ownerMessage) &&
+    hasExplicitEditTarget(effectiveMessage) &&
     (legacy.intent === 'copy' ||
       messageHasKeyword(lower, 'headline') ||
       messageHasKeyword(lower, 'tagline'))
@@ -283,7 +339,7 @@ export function classifyEditJob(
     };
   }
 
-  if (/\b(nav|menu|footer|copyright|cta|button)\b/.test(lower) && hasExplicitEditTarget(ownerMessage)) {
+  if (/\b(nav|menu|footer|copyright|cta|button)\b/.test(lower) && hasExplicitEditTarget(effectiveMessage)) {
     intents.push('chrome');
     return {
       intents,
@@ -296,7 +352,7 @@ export function classifyEditJob(
     };
   }
 
-  if (/\b(seo|meta title|page title|description)\b/.test(lower) && hasExplicitEditTarget(ownerMessage)) {
+  if (/\b(seo|meta title|page title|description)\b/.test(lower) && hasExplicitEditTarget(effectiveMessage)) {
     intents.push('meta');
     return {
       intents,
@@ -312,7 +368,7 @@ export function classifyEditJob(
   if (
     legacy.intent === 'section' &&
     /\bfaq\b/.test(lower) &&
-    (/\badd\b/.test(lower) || /\d+/.test(ownerMessage))
+    (/\badd\b/.test(lower) || /\d+/.test(effectiveMessage))
   ) {
     return {
       intents: ['section'],
@@ -325,7 +381,11 @@ export function classifyEditJob(
     };
   }
 
-  if (legacy.intent === 'section' && snap?.mode === 'gitlab') {
+  if (
+    legacy.intent === 'section' &&
+    snap?.mode === 'gitlab' &&
+    !detectScopedStyleRequest(effectiveMessage)
+  ) {
     return {
       intents: ['section'],
       tier: 'L2',
@@ -337,7 +397,7 @@ export function classifyEditJob(
     };
   }
 
-  const legacyDecision = routeEditRequest(ownerMessage);
+  const legacyDecision = routeEditRequest(effectiveMessage);
   if (legacyDecision.strategy === 'single_shot') {
     return {
       intents: [legacy.intent],
@@ -360,5 +420,3 @@ export function classifyEditJob(
     applyLabel: legacy.applyLabel,
   };
 }
-
-// Fix the typo block - I accidentally left broken code. Let me fix editJobClassifier.ts

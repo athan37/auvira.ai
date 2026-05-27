@@ -127,11 +127,14 @@ describe('verifyEditApplied', () => {
 
   it('passes section request when siteConfig sections grow', () => {
     const before = `export const siteConfig = { sections: [{ type: "about", title: "About", items: [] }] };`;
-    const after = `${before.slice(0, -2)}, { type: "faq", title: "FAQ", items: [
-      { title: "What services do you offer?", description: "We offer HVAC and plumbing." },
-      { title: "Do you offer same-day service?", description: "Yes, when available." },
-      { title: "How do I book?", description: "Call or use our online form." }
-    }] }; };`;
+    const after = `export const siteConfig = { sections: [
+      { type: "about", title: "About", items: [] },
+      { type: "faq", title: "FAQ", items: [
+        { title: "What services do you offer?", description: "We offer HVAC and plumbing." },
+        { title: "Do you offer same-day service?", description: "Yes, when available." },
+        { title: "How do I book?", description: "Call or use our online form." }
+      ]}
+    ] };`;
 
     const r = verifyEditApplied(
       'add an FAQ section with 3 questions',
@@ -157,5 +160,32 @@ describe('verifyEditApplied', () => {
       { 'src/lib/siteConfig.ts': after }
     );
     expect(r.ok).toBe(true);
+  });
+
+  it('fails when siteConfig does not parse after edit', () => {
+    const before = `export const siteConfig = { sections: [{ type: "testimonials", title: "Reviews", items: [] }] };`;
+    const after = `export const siteConfig = { sections: [{ title: "bad " unclosed" }] };`;
+
+    const r = verifyEditApplied(
+      'add testimonials',
+      { 'src/lib/siteConfig.ts': before },
+      { 'src/lib/siteConfig.ts': after }
+    );
+    expect(r.ok).toBe(false);
+    expect(r.reason).toMatch(/parse failed/i);
+  });
+
+  it('fails scoped card color when only siteConfig changed', () => {
+    const before = `export const siteConfig = { sections: [{ type: "testimonials", items: [] }] };`;
+    const after = `export const siteConfig = { sections: [{ type: "testimonials", items: [{ title: "x", imageUrl: "#ff0000" }] }] };`;
+    const page = `const preset = { card: "border-slate-200" }; export default function Home() { return null; }`;
+
+    const r = verifyEditApplied(
+      'change the card below to red in the section what our customers say to red',
+      { 'src/lib/siteConfig.ts': before, 'src/app/page.tsx': page },
+      { 'src/lib/siteConfig.ts': after, 'src/app/page.tsx': page }
+    );
+    expect(r.ok).toBe(false);
+    expect(r.reason).toMatch(/page\.tsx/i);
   });
 });

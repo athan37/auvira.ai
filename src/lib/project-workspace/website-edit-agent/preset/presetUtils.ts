@@ -41,7 +41,7 @@ export const PRESET_TEXT_KEYS = [
   'footerAccent',
 ] as const;
 
-export type PresetScope = 'site' | 'hero' | 'background';
+export type PresetScope = 'site' | 'hero' | 'background' | 'testimonialsCard';
 
 /** Extract inline `const preset = { ... }` JSON (single-line or multiline). */
 export function extractPresetObjectLiteral(pageContent: string): string | null {
@@ -112,7 +112,9 @@ export function swapColorsInPresetJson(
       ? ['heroBg', 'heroOverlay']
       : scope === 'background'
         ? ['pageBg', 'heroBg', 'surfaceBg', 'mutedBg']
-        : [...PRESET_BACKGROUND_KEYS];
+        : scope === 'testimonialsCard'
+          ? ['card']
+          : [...PRESET_BACKGROUND_KEYS];
 
   for (const key of bgKeys) {
     const re = new RegExp(`("${key}"\\s*:\\s*")([^"]*)(")`, 'gi');
@@ -131,6 +133,19 @@ export function swapColorsInPresetJson(
   }
 
   return out;
+}
+
+/** Set the preset card background to a target Tailwind color. */
+export function setPresetCardBackground(presetJson: string, toColor: string): string {
+  const bgClass = `bg-${toColor}-500`;
+  const re = /("card"\s*:\s*")([^"]*)(")/gi;
+  return presetJson.replace(re, (_m, p1: string, val: string, p3: string) => {
+    let newVal = val.replace(/\bbg-\w+(?:-\d+)?\b/gi, bgClass);
+    if (!/\bbg-/.test(newVal)) {
+      newVal = `${bgClass} ${newVal}`.trim();
+    }
+    return `${p1}${newVal}${p3}`;
+  });
 }
 
 /** Set text-* preset keys to a target text color class. */

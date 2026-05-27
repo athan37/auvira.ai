@@ -116,14 +116,17 @@ export async function runWebsiteEditAgent(
   const plan = classifyEditJob(
     options.ownerMessage,
     options.attachments ?? [],
-    workspaceSnap
+    workspaceSnap,
+    options.conversationHistory ?? []
   );
 
   if (plan.needsClarification && plan.clarificationMessage) {
     return {
       ok: false,
+      needsClarification: true,
       error: plan.clarificationMessage,
       ownerMessage: plan.clarificationMessage,
+      suggestedReplies: plan.suggestedReplies,
       strategy: plan.primaryStrategy,
       tier: plan.tier,
       confidence: plan.confidence,
@@ -171,7 +174,8 @@ export async function runWebsiteEditAgent(
       options.ownerMessage,
       legacy.intent,
       options.attachments || [],
-      options.gateway
+      options.gateway,
+      options.conversationHistory
     );
 
     const loopResult = await runAgentLoop(
@@ -200,7 +204,8 @@ export async function runWebsiteEditAgent(
     options.ownerMessage,
     legacy.intent,
     options.attachments || [],
-    options.gateway
+    options.gateway,
+    options.conversationHistory
   );
 
   const loopResult = await runAgentLoop(

@@ -107,7 +107,7 @@ export async function POST(
   }
 
   const body = await request.json();
-  const { message, attachments: rawAttachments } = body;
+  const { message, attachments: rawAttachments, conversationHistory: rawHistory } = body;
   if (!message || typeof message !== 'string') {
     return NextResponse.json({ detail: 'message is required' }, { status: 400 });
   }
@@ -128,6 +128,22 @@ export async function POST(
           size: Number(item.size) || 0,
         }))
         .filter((item) => item.path && item.publicUrl)
+    : [];
+
+  const conversationHistory = Array.isArray(rawHistory)
+    ? rawHistory
+        .filter(
+          (t: unknown): t is { role: string; content: string } =>
+            Boolean(t) &&
+            typeof t === 'object' &&
+            typeof (t as { role?: string }).role === 'string' &&
+            typeof (t as { content?: string }).content === 'string'
+        )
+        .slice(-6)
+        .map((t) => ({
+          role: t.role === 'assistant' ? ('assistant' as const) : ('user' as const),
+          content: String(t.content).slice(0, 2000),
+        }))
     : [];
 
   const previewVersionBefore = project.codeWorkspace?.version || 1;
@@ -353,6 +369,7 @@ export async function POST(
           mode,
             attachments,
             gateway,
+            conversationHistory,
           },
           (stepEvent) => {
             emit('step', {
@@ -370,6 +387,39 @@ export async function POST(
         }
 
         if (!agentResult.ok) {
+          if (agentResult.needsClarification) {
+            await appendTimedEditJobLog(
+              jobId,
+              'needs_clarification',
+              'Awaiting owner clarification',
+              editTimer.finish('agent'),
+              {
+                strategy: agentResult.strategy,
+                phase: 'agent',
+              }
+            );
+            await markEditJobStatus(jobId, 'ready', {
+              error: agentResult.ownerMessage || agentResult.error,
+            });
+            emit('step', { id: 'apply_change', label: 'Applying your requested change', status: 'completed' });
+            emit('step', { id: 'validate', label: 'Checking the preview', status: 'completed' });
+            emit('step', { id: 'finish', label: 'Need a quick detail', status: 'completed' });
+            emit('done', {
+              ok: false,
+              jobId,
+              result: {
+                ok: false,
+                jobId,
+                needsClarification: true,
+                ownerMessage: agentResult.ownerMessage || agentResult.error,
+                suggestedReplies: agentResult.suggestedReplies,
+                errorStage: 'needs_clarification',
+              },
+            });
+            closeStream();
+            return;
+          }
+
           await appendTimedEditJobLog(
             jobId,
             'agent_finished',

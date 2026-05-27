@@ -18,6 +18,7 @@ export type VerifyProfile = 'color' | 'copy' | 'section' | 'image' | 'contact' |
 
 export type EditStrategyId =
   | 'preset_theme'
+  | 'preset_card_color'
   | 'preset_text_color'
   | 'copy_field'
   | 'contact_field'
@@ -50,6 +51,7 @@ export interface EditJobPlan {
   /** When true, stream may ask user to clarify before running agent */
   needsClarification?: boolean;
   clarificationMessage?: string;
+  suggestedReplies?: string[];
 }
 
 export interface AgentStepEvent {
@@ -99,6 +101,8 @@ export interface WorkspaceProfile {
   maxIterations: number;
 }
 
+export type ConversationTurn = { role: 'user' | 'assistant'; content: string };
+
 export interface WebsiteEditAgentOptions {
   workspacePath: string;
   ownerMessage: string;
@@ -108,6 +112,8 @@ export interface WebsiteEditAgentOptions {
   mode: WorkspaceMode;
   attachments?: import('../workspaceAssetTypes').WorkspaceAssetAttachment[];
   gateway?: WorkspaceGateway;
+  /** Recent chat turns for disambiguation (latest user message is ownerMessage). */
+  conversationHistory?: ConversationTurn[];
 }
 
 export interface WebsiteEditAgentResult {
@@ -120,6 +126,9 @@ export interface WebsiteEditAgentResult {
   tier?: EditTier;
   confidence?: EditJobConfidence;
   verifyProfile?: VerifyProfile;
+  /** Ask-back only — no files changed; UI should not treat as hard failure. */
+  needsClarification?: boolean;
+  suggestedReplies?: string[];
 }
 
 export interface RouterDecision {

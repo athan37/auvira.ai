@@ -22,6 +22,8 @@ export interface WebsiteEditResult {
   tier?: string;
   confidence?: string;
   verifyProfile?: string;
+  needsClarification?: boolean;
+  suggestedReplies?: string[];
 }
 
 import type { WorkspaceGateway } from './workspaceGateway';
@@ -33,6 +35,7 @@ export interface WebsiteEditOptions {
   mode: 'gitlab' | 'static';
   attachments?: import('./workspaceAssetTypes').WorkspaceAssetAttachment[];
   gateway?: WorkspaceGateway;
+  conversationHistory?: import('./website-edit-agent/types').ConversationTurn[];
 }
 
 export { routeEditRequest, isTrivialStyleEdit } from './website-edit-agent/intentRouter';
@@ -67,6 +70,7 @@ export async function runWebsiteEdit(
       mode: options.mode,
       attachments: options.attachments,
       gateway: options.gateway,
+      conversationHistory: options.conversationHistory,
     },
     onStep
   );
@@ -82,5 +86,7 @@ export async function runWebsiteEdit(
     tier: result.tier,
     confidence: result.confidence,
     verifyProfile: result.verifyProfile,
+    needsClarification: result.needsClarification,
+    suggestedReplies: result.suggestedReplies,
   };
 }
