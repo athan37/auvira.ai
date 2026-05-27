@@ -25,6 +25,7 @@ export interface WebsiteEditResult {
   verifyProfile?: string;
   needsClarification?: boolean;
   suggestedReplies?: string[];
+  v2Meta?: import('./website-edit-agent/types').WebsiteEditAgentResult['v2Meta'];
 }
 
 import type { WorkspaceGateway } from './workspaceGateway';
@@ -90,5 +91,6 @@ export async function runWebsiteEdit(
     verifyProfile: result.verifyProfile,
     needsClarification: result.needsClarification,
     suggestedReplies: result.suggestedReplies,
+    v2Meta: result.v2Meta,
   };
 }

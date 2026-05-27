@@ -22,6 +22,7 @@ export type { ExecuteSkillResult } from './executor';
 
 import { computeWorkspaceHashes } from '../workspaceEditShared';
 import type { AgentStepEvent, WebsiteEditAgentOptions, WebsiteEditAgentResult } from '../website-edit-agent/types';
+import type { EditPlan } from './editPlanSchema';
 import { executePlan } from './executor';
 import { planEdit } from './planner';
 
@@ -41,12 +42,28 @@ export async function runWebsiteEditAgentV2(
   options: WebsiteEditAgentOptions,
   onStep?: (event: AgentStepEvent) => void
 ): Promise<WebsiteEditAgentResult> {
-  emitStep(onStep, 'v2_plan', 'Planning the website edit', 'active');
-  const beforeHashes = options.gateway
-    ? await options.gateway.computeHashes()
-    : await computeWorkspaceHashes(options.workspacePath);
-  const plan = await planEdit(options);
-  emitStep(onStep, 'v2_plan', 'Planning the website edit', 'completed');
+  let plan: EditPlan;
+  let beforeHashes: Record<string, string>;
+  try {
+    emitStep(onStep, 'v2_plan', 'Planning the website edit', 'active');
+    beforeHashes = options.gateway
+      ? await options.gateway.computeHashes()
+      : await computeWorkspaceHashes(options.workspacePath);
+    plan = await planEdit(options);
+    emitStep(onStep, 'v2_plan', 'Planning the website edit', 'completed');
+  } catch (error) {
+    emitStep(onStep, 'v2_plan', 'Planning the website edit', 'failed');
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Website Agent V2 planner failed.',
+      ownerMessage: 'I could not create a safe edit plan. Please try a more specific request.',
+      strategy: 'agent_loop',
+      tier: 'L3',
+      confidence: 'low',
+      verifyProfile: 'generic',
+      v2Meta: { rolledBack: false },
+    };
+  }
 
   emitStep(onStep, 'v2_execute', 'Applying the website edit', 'active');
   const result = await executePlan(plan, options, beforeHashes);

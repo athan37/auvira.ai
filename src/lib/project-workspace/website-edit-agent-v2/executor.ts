@@ -1,4 +1,5 @@
 import { computeWorkspaceHashes, getChangedFilesFromHashes } from '../workspaceEditShared';
+import { runWebsiteEditAgent } from '../website-edit-agent';
 import {
   SITE_CONFIG,
   readWorkspaceRel,
@@ -6,6 +7,12 @@ import {
 } from '../website-edit-agent/strategyContext';
 import type { WebsiteEditAgentOptions, WebsiteEditAgentResult } from '../website-edit-agent/types';
 import type { EditPlan, EditPlanStep, V2SkillName } from './editPlanSchema';
+import {
+  captureEditRunSnapshot,
+  repairEditRun,
+  rollbackEditRun,
+  verifyEditRun,
+} from './lifecycle';
 import {
   addSectionToSource,
   addServiceToSource,
@@ -31,6 +38,20 @@ function unsupportedSkill(step: EditPlanStep): ExecuteSkillResult {
     ok: false,
     skill: step.skill,
     error: `Website Agent V2 does not support ${step.skill} yet.`,
+  };
+}
+
+async function executeLegacyWrapper(
+  step: EditPlanStep,
+  options: WebsiteEditAgentOptions
+): Promise<ExecuteSkillResult> {
+  const result = await runWebsiteEditAgent(options);
+  return {
+    ok: result.ok,
+    skill: step.skill,
+    changed: result.ok,
+    summary: result.summary ?? result.ownerMessage,
+    error: result.error,
   };
 }
 
@@ -141,6 +162,14 @@ export async function executeSkill(
     };
   }
 
+  if (
+    step.skill === 'legacy_strategy' ||
+    step.skill === 'update_theme' ||
+    step.skill === 'update_image'
+  ) {
+    return executeLegacyWrapper(step, options);
+  }
+
   return unsupportedSkill(step);
 }
 
@@ -174,9 +203,16 @@ export async function executePlan(
     beforeHashes ??
     (options.gateway ? await options.gateway.computeHashes() : await computeWorkspaceHashes(options.workspacePath));
   const summaries: string[] = [];
+  const snapshot = await captureEditRunSnapshot(options);
+  let usedLegacyWrapper = false;
 
   for (const step of plan.steps) {
     const result = await executeSkill(step, options);
+    usedLegacyWrapper =
+      usedLegacyWrapper ||
+      step.skill === 'legacy_strategy' ||
+      step.skill === 'update_theme' ||
+      step.skill === 'update_image';
     if (!result.ok) {
       return {
         ok: false,
@@ -188,6 +224,12 @@ export async function executePlan(
         tier: 'L3',
         confidence: plan.confidence,
         verifyProfile: 'generic',
+        v2Meta: {
+          planIntent: plan.intent,
+          planRoute: plan.route,
+          skills: plan.steps.map((s) => s.skill),
+          usedLegacyWrapper,
+        },
       };
     }
     if (result.summary) summaries.push(result.summary);
@@ -207,6 +249,58 @@ export async function executePlan(
       tier: 'L3',
       confidence: plan.confidence,
       verifyProfile: 'generic',
+      v2Meta: {
+        planIntent: plan.intent,
+        planRoute: plan.route,
+        skills: plan.steps.map((step) => step.skill),
+        usedLegacyWrapper,
+      },
+    };
+  }
+
+  const repair = await repairEditRun(options, changedFiles);
+  if (!repair.ok) {
+    const restored = await rollbackEditRun(options, snapshot, changedFiles);
+    return {
+      ok: false,
+      error: repair.reason,
+      ownerMessage:
+        'Website Agent V2 could not safely repair the edit, so the changed files were rolled back.',
+      strategy: 'agent_loop',
+      tier: 'L3',
+      confidence: plan.confidence,
+      verifyProfile: 'generic',
+      changedFiles: restored,
+      v2Meta: {
+        planIntent: plan.intent,
+        planRoute: plan.route,
+        skills: plan.steps.map((step) => step.skill),
+        usedLegacyWrapper,
+        repair: { ok: false, action: repair.action, reason: repair.reason },
+        rolledBack: true,
+      },
+    };
+  }
+
+  const verification = await verifyEditRun(plan, options, snapshot, changedFiles);
+  if (!verification.ok) {
+    return {
+      ok: false,
+      error: verification.reason,
+      ownerMessage: 'Website Agent V2 could not verify that the requested edit was applied.',
+      strategy: 'agent_loop',
+      tier: 'L3',
+      confidence: plan.confidence,
+      verifyProfile: 'generic',
+      changedFiles,
+      v2Meta: {
+        planIntent: plan.intent,
+        planRoute: plan.route,
+        skills: plan.steps.map((step) => step.skill),
+        usedLegacyWrapper,
+        verification: { ok: false, reason: verification.reason },
+        repair: { ok: true, action: repair.action, reason: repair.reason },
+      },
     };
   }
 
@@ -220,6 +314,15 @@ export async function executePlan(
     tier: 'L1',
     confidence: plan.confidence,
     verifyProfile: plan.route === 'contact' ? 'contact' : plan.route === 'sections' ? 'section' : 'copy',
+    v2Meta: {
+      planIntent: plan.intent,
+      planRoute: plan.route,
+      skills: plan.steps.map((step) => step.skill),
+      usedLegacyWrapper,
+      verification: { ok: true, reason: verification.reason },
+      repair: { ok: true, action: repair.action, reason: repair.reason },
+      rolledBack: false,
+    },
   };
 }
 
