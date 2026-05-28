@@ -175,6 +175,27 @@ describe('verifyEditApplied', () => {
     expect(r.reason).toMatch(/parse failed/i);
   });
 
+  it('passes scoped section background when siteConfig presentation is set', () => {
+    const before = `export const siteConfig = { sections: [{ type: "gallery", title: "Hello" }] };`;
+    const after = `export const siteConfig = { sections: [{
+      type: "gallery",
+      title: "Hello",
+      presentation: { backgroundClass: "bg-yellow-200" }
+    }] };`;
+    const page = `const preset = { mutedBg: "bg-slate-100" };
+      function resolveSectionBackground(section, preset) {
+        return section.presentation?.backgroundClass ?? preset.mutedBg;
+      }`;
+
+    const r = verifyEditApplied(
+      'change the hello gallery section background to yellow',
+      { 'src/lib/siteConfig.ts': before, 'src/app/page.tsx': page },
+      { 'src/lib/siteConfig.ts': after, 'src/app/page.tsx': page }
+    );
+    expect(r.ok).toBe(true);
+    expect(r.reason).toMatch(/presentation/i);
+  });
+
   it('fails scoped card color when only siteConfig changed', () => {
     const before = `export const siteConfig = { sections: [{ type: "testimonials", items: [] }] };`;
     const after = `export const siteConfig = { sections: [{ type: "testimonials", items: [{ title: "x", imageUrl: "#ff0000" }] }] };`;

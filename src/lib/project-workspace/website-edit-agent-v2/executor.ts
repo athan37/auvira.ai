@@ -14,12 +14,21 @@ import {
   rollbackEditRun,
   verifyEditRun,
 } from './lifecycle';
+import { extractColorsFromMessage } from '../website-edit-agent/preset/presetUtils';
 import {
   addSectionToSource,
   addServiceToSource,
   updateContactFieldInSource,
   updateHeroFieldInSource,
+  updateSectionBackgroundColorInSource,
+  updateSectionPresentationInSource,
 } from './siteConfigMutations';
+import {
+  colorNameToCardClass,
+  type SiteSectionPresentation,
+} from '@/lib/builder/sectionPresentation';
+import { buildSiteModel } from './siteModel';
+import { normalizeSectionStyleStep } from './normalizeSectionStyleStep';
 
 export interface ExecuteSkillResult {
   ok: boolean;
@@ -32,6 +41,11 @@ export interface ExecuteSkillResult {
 function getStringArg(step: EditPlanStep, key: string): string | null {
   const value = step.args[key];
   return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function getNumberArg(step: EditPlanStep, key: string): number | null {
+  const value = step.args[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
 function unsupportedSkill(step: EditPlanStep): ExecuteSkillResult {
@@ -157,6 +171,89 @@ export async function executeSkill(
     };
   }
 
+  if (step.skill === 'update_section_style') {
+    const siteModel = await buildSiteModel(options);
+    const normalizedStep = normalizeSectionStyleStep(
+      step,
+      options.ownerMessage,
+      siteModel
+    );
+
+    const sectionIndex = getNumberArg(normalizedStep, 'sectionIndex');
+    if (sectionIndex == null || sectionIndex < 0) {
+      return {
+        ok: false,
+        skill: step.skill,
+        error: 'update_section_style requires sectionIndex.',
+      };
+    }
+
+    const backgroundColor =
+      getStringArg(normalizedStep, 'backgroundColor') ?? getStringArg(normalizedStep, 'color');
+    const presentationArg = normalizedStep.args.presentation;
+    const presentation: Partial<SiteSectionPresentation> =
+      presentationArg && typeof presentationArg === 'object' && !Array.isArray(presentationArg)
+        ? (presentationArg as Partial<SiteSectionPresentation>)
+        : {};
+
+    const cardColor = getStringArg(normalizedStep, 'cardColor');
+    if (cardColor && !presentation.cardClass) {
+      presentation.cardClass = colorNameToCardClass(cardColor);
+    }
+
+    if (backgroundColor) {
+      const changed = await updateSiteConfig(options, (content) =>
+        updateSectionBackgroundColorInSource(content, sectionIndex, backgroundColor)
+      );
+      return {
+        ok: changed,
+        skill: step.skill,
+        changed,
+        summary: changed
+          ? `Set section ${sectionIndex} background to ${backgroundColor}.`
+          : undefined,
+        error: changed ? undefined : 'No section presentation change was applied.',
+      };
+    }
+
+    if (Object.keys(presentation).length === 0) {
+      const colors = extractColorsFromMessage(options.ownerMessage);
+      const fallbackColor = colors.at(-1);
+      if (fallbackColor && /\bcard/.test(options.ownerMessage.toLowerCase())) {
+        presentation.cardClass = colorNameToCardClass(fallbackColor);
+      } else if (fallbackColor) {
+        const changed = await updateSiteConfig(options, (content) =>
+          updateSectionBackgroundColorInSource(content, sectionIndex, fallbackColor)
+        );
+        return {
+          ok: changed,
+          skill: step.skill,
+          changed,
+          summary: changed
+            ? `Set section ${sectionIndex} background to ${fallbackColor}.`
+            : undefined,
+          error: changed ? undefined : 'No section presentation change was applied.',
+        };
+      }
+      return {
+        ok: false,
+        skill: step.skill,
+        error: 'update_section_style requires backgroundColor or presentation object.',
+      };
+    }
+
+    const changed = await updateSiteConfig(options, (content) =>
+      updateSectionPresentationInSource(content, sectionIndex, presentation)
+    );
+    return {
+      ok: changed,
+      skill: step.skill,
+      changed,
+      summary: changed ? `Updated presentation for section ${sectionIndex}.` : undefined,
+      error: changed ? undefined : 'No section presentation change was applied.',
+    };
+  }
+
   if (step.skill === 'add_section') {
     const title = getStringArg(step, 'title');
     if (!title) {
@@ -273,7 +370,7 @@ export async function executePlan(
     };
   }
 
-  const repair = await repairEditRun(options, changedFiles);
+  const repair = await repairEditRun(options, changedFiles, plan);
   if (!repair.ok) {
     const restored = await rollbackEditRun(options, snapshot, changedFiles);
     return {

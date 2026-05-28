@@ -1,6 +1,8 @@
 // Fixed data-driven page renderer - NO HTML string injection
 // This template is used as-is with only preset JSON substitution
 
+import { SECTION_PRESENTATION_RUNTIME } from './sectionPresentationRuntime';
+
 export const PAGE_TSX_TEMPLATE = `// @ts-nocheck
 import { siteConfig } from "@/lib/siteConfig";
 import type { SiteSection } from "@/lib/siteConfig";
@@ -11,6 +13,8 @@ const preset = __PRESET_JSON__;
 function slugify(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 }
+
+${SECTION_PRESENTATION_RUNTIME}
 
 // Navigation component
 function Nav() {
@@ -67,16 +71,16 @@ function Hero() {
 // Services section renderer
 function ServicesSection({ section }: { section: SiteSection }) {
   return (
-    <section id="services" className={"px-4 py-20 sm:px-6 lg:px-8 " + preset.surfaceBg}>
+    <section id="services" className={"px-4 py-20 sm:px-6 lg:px-8 " + resolveSectionBackground(section, preset)}>
       <div className="mx-auto max-w-7xl">
         <div className="mx-auto max-w-3xl text-center mb-14">
-          <p className={"mb-3 text-xs font-bold uppercase tracking-[0.28em] " + preset.sectionEyebrow}>Services</p>
-          <h2 className={"text-3xl font-semibold tracking-tight md:text-5xl " + preset.sectionTitle}>{section.title}</h2>
-          {section.body && <p className={"mt-5 text-lg leading-8 " + preset.sectionBody}>{section.body}</p>}
+          <p className={"mb-3 text-xs font-bold uppercase tracking-[0.28em] " + resolveSectionEyebrowClass(section, preset)}>Services</p>
+          <h2 className={"text-3xl font-semibold tracking-tight md:text-5xl " + resolveSectionTitleClass(section, preset)}>{section.title}</h2>
+          {section.body && <p className={"mt-5 text-lg leading-8 " + resolveSectionBodyClass(section, preset)}>{section.body}</p>}
         </div>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {section.items?.slice(0, 6).map((item, i) => (
-            <div key={i} className={"rounded-3xl border p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-xl " + preset.card}>
+            <div key={i} className={"rounded-3xl border p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-xl " + resolveSectionCardClass(section, preset)}>
               <div className={"mb-5 flex h-12 w-12 items-center justify-center rounded-2xl text-lg font-bold text-white " + preset.iconBadge}>{i + 1}</div>
               <h3 className="text-lg font-bold text-slate-950">{item.title}</h3>
               {item.description && <p className="mt-3 text-sm leading-6 text-slate-600">{item.description}</p>}
@@ -91,16 +95,16 @@ function ServicesSection({ section }: { section: SiteSection }) {
 // About section renderer
 function AboutSection({ section }: { section: SiteSection }) {
   return (
-    <section id="about" className={"px-4 py-20 sm:px-6 lg:px-8 " + preset.mutedBg}>
+    <section id="about" className={"px-4 py-20 sm:px-6 lg:px-8 " + resolveSectionBackground(section, preset)}>
       <div className="mx-auto max-w-7xl">
         <div className="mx-auto max-w-3xl text-center mb-14">
-          <p className={"mb-3 text-xs font-bold uppercase tracking-[0.28em] " + preset.sectionEyebrow}>About</p>
-          <h2 className={"text-3xl font-semibold tracking-tight md:text-5xl " + preset.sectionTitle}>{section.title}</h2>
-          {section.body && <p className={"mt-5 text-lg leading-8 " + preset.sectionBody}>{section.body}</p>}
+          <p className={"mb-3 text-xs font-bold uppercase tracking-[0.28em] " + resolveSectionEyebrowClass(section, preset)}>About</p>
+          <h2 className={"text-3xl font-semibold tracking-tight md:text-5xl " + resolveSectionTitleClass(section, preset)}>{section.title}</h2>
+          {section.body && <p className={"mt-5 text-lg leading-8 " + resolveSectionBodyClass(section, preset)}>{section.body}</p>}
         </div>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {section.items?.slice(0, 6).map((item, i) => (
-            <div key={i} className={"rounded-3xl border p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-xl " + preset.card}>
+            <div key={i} className={"rounded-3xl border p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-xl " + resolveSectionCardClass(section, preset)}>
               <h3 className="text-lg font-bold text-slate-950">{item.title}</h3>
               {item.description && <p className="mt-3 text-sm leading-6 text-slate-600">{item.description}</p>}
             </div>
@@ -114,16 +118,16 @@ function AboutSection({ section }: { section: SiteSection }) {
 // Features section renderer
 function FeaturesSection({ section }: { section: SiteSection }) {
   return (
-    <section id="features" className={"px-4 py-20 sm:px-6 lg:px-8 " + preset.surfaceBg}>
+    <section id="features" className={"px-4 py-20 sm:px-6 lg:px-8 " + resolveSectionBackground(section, preset)}>
       <div className="mx-auto max-w-7xl">
         <div className="mx-auto max-w-3xl text-center mb-14">
-          <p className={"mb-3 text-xs font-bold uppercase tracking-[0.28em] " + preset.sectionEyebrow}>Features</p>
-          <h2 className={"text-3xl font-semibold tracking-tight md:text-5xl " + preset.sectionTitle}>{section.title}</h2>
-          {section.body && <p className={"mt-5 text-lg leading-8 " + preset.sectionBody}>{section.body}</p>}
+          <p className={"mb-3 text-xs font-bold uppercase tracking-[0.28em] " + resolveSectionEyebrowClass(section, preset)}>Features</p>
+          <h2 className={"text-3xl font-semibold tracking-tight md:text-5xl " + resolveSectionTitleClass(section, preset)}>{section.title}</h2>
+          {section.body && <p className={"mt-5 text-lg leading-8 " + resolveSectionBodyClass(section, preset)}>{section.body}</p>}
         </div>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {section.items?.slice(0, 6).map((item, i) => (
-            <div key={i} className={"rounded-3xl border p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-xl " + preset.card}>
+            <div key={i} className={"rounded-3xl border p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-xl " + resolveSectionCardClass(section, preset)}>
               <h3 className="text-lg font-bold text-slate-950">{item.title}</h3>
               {item.description && <p className="mt-3 text-sm leading-6 text-slate-600">{item.description}</p>}
             </div>
@@ -137,16 +141,16 @@ function FeaturesSection({ section }: { section: SiteSection }) {
 // FAQ section renderer
 function FaqSection({ section }: { section: SiteSection }) {
   return (
-    <section id="faq" className={"px-4 py-20 sm:px-6 lg:px-8 " + preset.mutedBg}>
+    <section id="faq" className={"px-4 py-20 sm:px-6 lg:px-8 " + resolveSectionBackground(section, preset)}>
       <div className="mx-auto max-w-7xl">
         <div className="mx-auto max-w-3xl text-center mb-14">
-          <p className={"mb-3 text-xs font-bold uppercase tracking-[0.28em] " + preset.sectionEyebrow}>FAQ</p>
-          <h2 className={"text-3xl font-semibold tracking-tight md:text-5xl " + preset.sectionTitle}>{section.title}</h2>
-          {section.body && <p className={"mt-5 text-lg leading-8 " + preset.sectionBody}>{section.body}</p>}
+          <p className={"mb-3 text-xs font-bold uppercase tracking-[0.28em] " + resolveSectionEyebrowClass(section, preset)}>FAQ</p>
+          <h2 className={"text-3xl font-semibold tracking-tight md:text-5xl " + resolveSectionTitleClass(section, preset)}>{section.title}</h2>
+          {section.body && <p className={"mt-5 text-lg leading-8 " + resolveSectionBodyClass(section, preset)}>{section.body}</p>}
         </div>
         <div className="space-y-4 max-w-3xl mx-auto">
           {section.items?.slice(0, 8).map((item, i) => (
-            <div key={i} className={"rounded-2xl border p-6 " + preset.card}>
+            <div key={i} className={"rounded-2xl border p-6 " + resolveSectionCardClass(section, preset)}>
               <h3 className="text-lg font-bold text-slate-950">{item.title}</h3>
               {item.description && <p className="mt-2 text-sm leading-6 text-slate-600">{item.description}</p>}
             </div>
@@ -160,16 +164,16 @@ function FaqSection({ section }: { section: SiteSection }) {
 // Testimonials section renderer
 function TestimonialsSection({ section }: { section: SiteSection }) {
   return (
-    <section id="testimonials" className={"px-4 py-20 sm:px-6 lg:px-8 " + preset.surfaceBg}>
+    <section id="testimonials" className={"px-4 py-20 sm:px-6 lg:px-8 " + resolveSectionBackground(section, preset)}>
       <div className="mx-auto max-w-7xl">
         <div className="mx-auto max-w-3xl text-center mb-14">
-          <p className={"mb-3 text-xs font-bold uppercase tracking-[0.28em] " + preset.sectionEyebrow}>Testimonials</p>
-          <h2 className={"text-3xl font-semibold tracking-tight md:text-5xl " + preset.sectionTitle}>{section.title}</h2>
-          {section.body && <p className={"mt-5 text-lg leading-8 " + preset.sectionBody}>{section.body}</p>}
+          <p className={"mb-3 text-xs font-bold uppercase tracking-[0.28em] " + resolveSectionEyebrowClass(section, preset)}>Testimonials</p>
+          <h2 className={"text-3xl font-semibold tracking-tight md:text-5xl " + resolveSectionTitleClass(section, preset)}>{section.title}</h2>
+          {section.body && <p className={"mt-5 text-lg leading-8 " + resolveSectionBodyClass(section, preset)}>{section.body}</p>}
         </div>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {section.items?.slice(0, 6).map((item, i) => (
-            <div key={i} className={"rounded-3xl border p-7 shadow-sm " + preset.card}>
+            <div key={i} className={"rounded-3xl border p-7 shadow-sm " + resolveSectionCardClass(section, preset)}>
               <p className="text-slate-600 italic">"{item.description || "Great service!"}"</p>
               <p className="mt-4 font-semibold text-slate-950">- {item.title}</p>
             </div>
@@ -184,7 +188,7 @@ function TestimonialsSection({ section }: { section: SiteSection }) {
 function ContactSection({ section }: { section: SiteSection }) {
   const { contact } = siteConfig;
   return (
-    <section id="contact" className={"px-4 py-20 sm:px-6 lg:px-8 " + preset.contactBg + " text-white"}>
+    <section id="contact" className={"px-4 py-20 sm:px-6 lg:px-8 " + resolveSectionBackground(section, preset) + " text-white"}>
       <div className="mx-auto max-w-7xl">
         <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
           <div>
@@ -228,12 +232,12 @@ function GallerySection({ section }: { section: SiteSection }) {
           : "grid gap-6 sm:grid-cols-2 lg:grid-cols-3";
 
   return (
-    <section id="gallery" className={"px-4 py-20 sm:px-6 lg:px-8 " + preset.mutedBg}>
+    <section id="gallery" className={"px-4 py-20 sm:px-6 lg:px-8 " + resolveSectionBackground(section, preset)}>
       <div className="mx-auto max-w-7xl">
         <div className="mx-auto max-w-3xl text-center mb-12">
-          <p className={"mb-3 text-xs font-bold uppercase tracking-[0.28em] " + preset.sectionEyebrow}>Gallery</p>
-          <h2 className={"text-3xl font-semibold tracking-tight md:text-5xl " + preset.sectionTitle}>{section.title}</h2>
-          {section.body && <p className={"mt-5 text-lg leading-8 " + preset.sectionBody}>{section.body}</p>}
+          <p className={"mb-3 text-xs font-bold uppercase tracking-[0.28em] " + resolveSectionEyebrowClass(section, preset)}>Gallery</p>
+          <h2 className={"text-3xl font-semibold tracking-tight md:text-5xl " + resolveSectionTitleClass(section, preset)}>{section.title}</h2>
+          {section.body && <p className={"mt-5 text-lg leading-8 " + resolveSectionBodyClass(section, preset)}>{section.body}</p>}
         </div>
         {count > 0 && (
           <div className={gridClass}>
@@ -242,8 +246,8 @@ function GallerySection({ section }: { section: SiteSection }) {
                 key={i}
                 className={
                   count === 1
-                    ? "overflow-hidden rounded-[2rem] border shadow-xl " + preset.card
-                    : "overflow-hidden rounded-3xl border shadow-md " + preset.card
+                    ? "overflow-hidden rounded-[2rem] border shadow-xl " + resolveSectionCardClass(section, preset)
+                    : "overflow-hidden rounded-3xl border shadow-md " + resolveSectionCardClass(section, preset)
                 }
               >
                 <img
@@ -272,18 +276,18 @@ function GallerySection({ section }: { section: SiteSection }) {
 // Generic section renderer (fallback)
 function GenericSection({ section }: { section: SiteSection }) {
   return (
-    <section id={slugify(section.title)} className={"px-4 py-20 sm:px-6 lg:px-8 " + preset.surfaceBg}>
+    <section id={slugify(section.title)} className={"px-4 py-20 sm:px-6 lg:px-8 " + resolveSectionBackground(section, preset)}>
       <div className="mx-auto max-w-7xl">
         <div className="mx-auto max-w-3xl text-center mb-14">
-          <h2 className={"text-3xl font-semibold tracking-tight md:text-5xl " + preset.sectionTitle}>{section.title}</h2>
-          {section.body && <p className={"mt-5 text-lg leading-8 " + preset.sectionBody}>{section.body}</p>}
+          <h2 className={"text-3xl font-semibold tracking-tight md:text-5xl " + resolveSectionTitleClass(section, preset)}>{section.title}</h2>
+          {section.body && <p className={"mt-5 text-lg leading-8 " + resolveSectionBodyClass(section, preset)}>{section.body}</p>}
         </div>
         {section.items?.some((item) => (item as { imageUrl?: string }).imageUrl) && (
           <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {section.items
               .filter((item) => (item as { imageUrl?: string }).imageUrl)
               .map((item, i) => (
-                <figure key={i} className={"overflow-hidden rounded-3xl border " + preset.card}>
+                <figure key={i} className={"overflow-hidden rounded-3xl border " + resolveSectionCardClass(section, preset)}>
                   <img
                     src={(item as { imageUrl: string }).imageUrl}
                     alt={item.title || "Product image"}
@@ -299,7 +303,7 @@ function GenericSection({ section }: { section: SiteSection }) {
         {section.items && section.items.length > 0 && (
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {section.items.slice(0, 6).map((item, i) => (
-              <div key={i} className={"rounded-3xl border p-7 shadow-sm " + preset.card}>
+              <div key={i} className={"rounded-3xl border p-7 shadow-sm " + resolveSectionCardClass(section, preset)}>
                 <h3 className="text-lg font-bold text-slate-950">{item.title}</h3>
                 {item.description && <p className="mt-3 text-sm leading-6 text-slate-600">{item.description}</p>}
               </div>

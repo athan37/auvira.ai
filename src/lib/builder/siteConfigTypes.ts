@@ -5,13 +5,26 @@ export const SITE_SECTION_TYPE_UNION =
 export const SITE_SECTION_ITEMS_TYPE =
   'Array<{ title: string; description?: string; imageUrl?: string }>';
 
+export const SITE_SECTION_PRESENTATION_TYPE = `export type SiteSectionPresentation = {
+  backgroundClass?: string;
+  cardClass?: string;
+  eyebrowClass?: string;
+  titleClass?: string;
+  bodyClass?: string;
+};`;
+
 export const SITE_SECTION_TYPE_BLOCK = `export type SiteSection = {
   type: ${SITE_SECTION_TYPE_UNION};
   title: string;
   subtitle?: string;
   body?: string;
   items?: ${SITE_SECTION_ITEMS_TYPE};
+  presentation?: SiteSectionPresentation;
 };`;
+
+export const SITE_SECTION_TYPES_WITH_PRESENTATION = `${SITE_SECTION_PRESENTATION_TYPE}
+
+${SITE_SECTION_TYPE_BLOCK}`;
 
 export const SITE_CONFIG_ONLY_TYPE_BLOCK = `export type SiteConfig = {
   businessName: string;
@@ -34,7 +47,7 @@ export const SITE_CONFIG_ONLY_TYPE_BLOCK = `export type SiteConfig = {
   sections: SiteSection[];
 };`;
 
-export const SITE_CONFIG_TYPE_BLOCK = `${SITE_SECTION_TYPE_BLOCK}
+export const SITE_CONFIG_TYPE_BLOCK = `${SITE_SECTION_TYPES_WITH_PRESENTATION}
 
 ${SITE_CONFIG_ONLY_TYPE_BLOCK}
 `;
@@ -106,6 +119,37 @@ export function ensureSiteConfigTypesSupportGallery(content: string): string {
       LEGACY_ITEMS_TYPE_PATTERN,
       `items?: ${SITE_SECTION_ITEMS_TYPE}`
     );
+  }
+
+  return ensureSiteConfigTypesSupportPresentation(out);
+}
+
+/** True when siteConfig data uses presentation but types omit SiteSectionPresentation. */
+export function siteConfigNeedsPresentationTypeUpgrade(content: string): boolean {
+  if (!/presentation\s*:/.test(content)) {
+    const block = content.match(SITE_SECTION_BLOCK_PATTERN)?.[0];
+    return Boolean(block && !block.includes('presentation?:'));
+  }
+  return !content.includes('SiteSectionPresentation');
+}
+
+/**
+ * Ensure SiteSection includes optional presentation tokens in generated types.
+ */
+export function ensureSiteConfigTypesSupportPresentation(content: string): string {
+  let out = content;
+
+  if (!out.includes('SiteSectionPresentation') && SITE_SECTION_BLOCK_PATTERN.test(out)) {
+    const block = out.match(SITE_SECTION_BLOCK_PATTERN)?.[0] ?? '';
+    if (!block.includes('presentation?:')) {
+      const sectionStart = out.indexOf('export type SiteSection');
+      if (sectionStart >= 0) {
+        out =
+          out.slice(0, sectionStart) +
+          `${SITE_SECTION_PRESENTATION_TYPE}\n\n` +
+          out.slice(sectionStart).replace(SITE_SECTION_BLOCK_PATTERN, SITE_SECTION_TYPE_BLOCK);
+      }
+    }
   }
 
   return out;

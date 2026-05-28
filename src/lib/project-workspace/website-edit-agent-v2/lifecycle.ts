@@ -1,3 +1,6 @@
+import {
+  colorNameToCardClass,
+} from '@/lib/builder/sectionPresentation';
 import { parseSiteConfigSource } from '@/lib/site-manager/siteConfigParser';
 import {
   GLOBALS_CSS,
@@ -6,9 +9,17 @@ import {
   readWorkspaceRel,
   writeWorkspaceRel,
 } from '../website-edit-agent/strategyContext';
+import { detectScopedStyleRequest } from '../website-edit-agent/editAmbiguity';
+import { extractColorsFromMessage } from '../website-edit-agent/preset/presetUtils';
 import type { WebsiteEditAgentOptions } from '../website-edit-agent/types';
 import { verifyEditApplied } from '../website-edit-agent/verifyEditApplied';
 import type { EditPlan } from './editPlanSchema';
+import { buildSiteModel } from './siteModel';
+import { resolveSectionIndexFromMessage } from './normalizeSectionStyleStep';
+import {
+  updateSectionBackgroundColorInSource,
+  updateSectionPresentationInSource,
+} from './siteConfigMutations';
 
 const SNAPSHOT_PATHS = [SITE_CONFIG, PAGE_TSX, GLOBALS_CSS] as const;
 
@@ -57,12 +68,53 @@ export async function captureEditRunSnapshot(
   return { files: await captureFiles(options, SNAPSHOT_PATHS) };
 }
 
+async function repairMissingSectionPresentation(
+  options: WebsiteEditAgentOptions,
+  plan: EditPlan | undefined,
+  content: string
+): Promise<RepairEditRunResult | null> {
+  const stylePlanned = plan?.steps.some((step) => step.skill === 'update_section_style');
+  if (!stylePlanned && !detectScopedStyleRequest(options.ownerMessage)) {
+    return null;
+  }
+  if (/presentation\s*:\s*\{/.test(content)) {
+    return null;
+  }
+
+  const siteModel = await buildSiteModel(options);
+  const sectionIndex = resolveSectionIndexFromMessage(options.ownerMessage, siteModel.sections);
+  const colors = extractColorsFromMessage(options.ownerMessage);
+  const color = colors.at(-1);
+  if (sectionIndex == null || !color) {
+    return null;
+  }
+
+  const wantsCard = /\bcard(s)?\b/i.test(options.ownerMessage);
+  const updated = wantsCard
+    ? updateSectionPresentationInSource(content, sectionIndex, {
+        cardClass: colorNameToCardClass(color),
+      })
+    : updateSectionBackgroundColorInSource(content, sectionIndex, color);
+
+  if (!updated || updated === content) {
+    return null;
+  }
+
+  await writeWorkspaceRel(options, SITE_CONFIG, updated);
+  return {
+    ok: true,
+    action: 'repaired',
+    reason: 'Applied section.presentation tokens after style edit.',
+  };
+}
+
 /**
  * Validate and repair common V2 edit output issues before verification.
  */
 export async function repairEditRun(
   options: WebsiteEditAgentOptions,
-  changedFiles: string[]
+  changedFiles: string[],
+  plan?: EditPlan
 ): Promise<RepairEditRunResult> {
   if (!changedFiles.includes(SITE_CONFIG)) {
     return { ok: true, action: 'not_needed' };
@@ -71,6 +123,11 @@ export async function repairEditRun(
   const content = await readWorkspaceRel(options, SITE_CONFIG);
   if (!content) {
     return { ok: false, action: 'failed', reason: 'siteConfig.ts is missing after edit.' };
+  }
+
+  const presentationRepair = await repairMissingSectionPresentation(options, plan, content);
+  if (presentationRepair) {
+    return presentationRepair;
   }
 
   if (parseSiteConfigSource(content)) {
@@ -135,6 +192,16 @@ export async function verifyEditRun(
     ...snapshot.files,
     ...afterFiles,
   });
+
+  const siteConfigAfter = afterFiles[SITE_CONFIG] ?? '';
+  const stylePlanned = plan.steps.some((step) => step.skill === 'update_section_style');
+  if (!deterministic.ok && stylePlanned && /presentation/.test(siteConfigAfter)) {
+    return {
+      ok: true,
+      reason: 'Section presentation updated in siteConfig.',
+      evidence: ['presentation tokens present after update_section_style'],
+    };
+  }
 
   if (deterministic.ok || plan.route === 'contact' || plan.route === 'hero') {
     return {

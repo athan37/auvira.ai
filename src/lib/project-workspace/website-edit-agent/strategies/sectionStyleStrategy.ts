@@ -6,46 +6,45 @@ import {
 import {
   buildStrategyResult,
   PAGE_TSX,
+  SITE_CONFIG,
   readWorkspaceRel,
   writeWorkspaceRel,
 } from '../strategyContext';
 import { extractSectionComponentSource } from '../resolveSectionTarget';
+import { updateSectionBackgroundColorInSource } from '../../website-edit-agent-v2/siteConfigMutations';
 import type { WebsiteEditAgentOptions, WebsiteEditAgentResult } from '../types';
 
 function tailwindBgClass(color: string): string {
   return `bg-${color}-100`;
 }
 
-/**
- * L0: patch section component className for section-scoped background (not global preset).
- */
-export async function runSectionStyleStrategy(
+async function tryConfigPresentationUpdate(
   options: WebsiteEditAgentOptions,
-  beforeHashes: Record<string, string>
-): Promise<WebsiteEditAgentResult | null> {
-  const plan = options.editTargetPlan;
-  if (
-    options.mode !== 'gitlab' ||
-    !plan ||
-    plan.what !== 'style_background' ||
-    plan.where.kind !== 'section' ||
-    plan.where.sectionIndex == null ||
-    !plan.where.rendererComponent
-  ) {
-    return null;
-  }
+  sectionIndex: number,
+  toColor: string
+): Promise<boolean> {
+  const siteConfigContent = await readWorkspaceRel(options, SITE_CONFIG);
+  if (!siteConfigContent) return false;
 
+  const updated = updateSectionBackgroundColorInSource(siteConfigContent, sectionIndex, toColor);
+  if (!updated || updated === siteConfigContent) return false;
+
+  await writeWorkspaceRel(options, SITE_CONFIG, updated);
+  return true;
+}
+
+async function tryPageComponentPatch(
+  options: WebsiteEditAgentOptions,
+  beforeHashes: Record<string, string>,
+  componentName: string,
+  toColor: string,
+  swap: ReturnType<typeof parseColorSwap>
+): Promise<WebsiteEditAgentResult | null> {
   const pageContent = await readWorkspaceRel(options, PAGE_TSX);
   if (!pageContent) return null;
 
-  const componentName = plan.where.rendererComponent;
   const extracted = extractSectionComponentSource(pageContent, componentName);
   if (!extracted) return null;
-
-  const swap = parseColorSwap(options.ownerMessage);
-  const colors = extractColorsFromMessage(options.ownerMessage);
-  const toColor = swap?.toColor ?? colors[colors.length - 1];
-  if (!toColor) return null;
 
   let componentBody = extracted.content;
   let patched = false;
@@ -62,7 +61,11 @@ export async function runSectionStyleStrategy(
         if (inner.includes(bgClass)) return _match;
         patched = true;
         const stripped = inner.replace(/\+\s*preset\.(?:surfaceBg|mutedBg|pageBg|contactBg)/g, '');
-        return `${pre}${stripped} + "${bgClass}"${post}`;
+        const strippedResolvers = stripped.replace(
+          /\+\s*resolveSectionBackground\([^)]+\)/g,
+          ''
+        );
+        return `${pre}${strippedResolvers} + "${bgClass}"${post}`;
       }
     );
     componentBody = next;
@@ -78,17 +81,54 @@ export async function runSectionStyleStrategy(
 
   await writeWorkspaceRel(options, PAGE_TSX, newPage);
 
-  const sectionLabel = plan.where.title ?? `section ${plan.where.sectionIndex}`;
-  const summary = swap
-    ? `Changed background of "${sectionLabel}" from ${swap.fromColor} to ${swap.toColor}.`
-    : `Changed background of "${sectionLabel}" to ${toColor}.`;
-
   return buildStrategyResult(
     options,
     beforeHashes,
     'section_style',
     'L0',
-    summary,
-    { confidence: 'high' }
+    `Updated ${componentName} background in page.tsx (legacy path).`,
+    { confidence: 'medium' }
   );
+}
+
+/**
+ * L0: section-scoped background via siteConfig.presentation first, page.tsx patch as fallback.
+ */
+export async function runSectionStyleStrategy(
+  options: WebsiteEditAgentOptions,
+  beforeHashes: Record<string, string>
+): Promise<WebsiteEditAgentResult | null> {
+  const plan = options.editTargetPlan;
+  if (
+    options.mode !== 'gitlab' ||
+    !plan ||
+    plan.what !== 'style_background' ||
+    plan.where.kind !== 'section' ||
+    plan.where.sectionIndex == null
+  ) {
+    return null;
+  }
+
+  const swap = parseColorSwap(options.ownerMessage);
+  const colors = extractColorsFromMessage(options.ownerMessage);
+  const toColor = swap?.toColor ?? colors[colors.length - 1];
+  if (!toColor) return null;
+
+  const sectionIndex = plan.where.sectionIndex;
+  const sectionLabel = plan.where.title ?? `section ${sectionIndex}`;
+
+  const configUpdated = await tryConfigPresentationUpdate(options, sectionIndex, toColor);
+  if (configUpdated) {
+    const summary = swap
+      ? `Changed background of "${sectionLabel}" from ${swap.fromColor} to ${swap.toColor}.`
+      : `Changed background of "${sectionLabel}" to ${toColor}.`;
+    return buildStrategyResult(options, beforeHashes, 'section_style', 'L0', summary, {
+      confidence: 'high',
+    });
+  }
+
+  const componentName = plan.where.rendererComponent;
+  if (!componentName) return null;
+
+  return tryPageComponentPatch(options, beforeHashes, componentName, toColor, swap);
 }

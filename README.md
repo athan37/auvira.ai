@@ -68,7 +68,19 @@ Verifies GitLab commit visibility, SHA-pinned Vercel deploy, and production HTML
 
 ## CI/CD (GitHub + Vercel)
 
-**GitHub** runs CI on every push/PR to `main` (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)): `typecheck` → `test` → `build`.
+**GitHub** runs CI on every push/PR to `main` (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)): `typecheck` → `test` (unit only, no live LLM) → `build`.
+
+### Testing
+
+| Command | What runs | Typical time |
+| -------- | ---------- | ------------- |
+| `npm test` | Unit + integration tests (**excludes** `*.llm.test.ts` and live LLM integration files) | ~5–15s |
+| `npm run test:llm` | Live MiniMax planner/E2E tests (requires `MINIMAX_API_KEY` in `.env`) | ~100s |
+| `npm run test:llm:presentation` | Section presentation token LLM suite only | ~80s |
+| `npm run test:all` | `npm test` then `npm run test:llm` | ~2 min |
+| `npm run test:integration` | SiteModel fixture integration (no LLM) | &lt;5s |
+
+LLM suites use a **120s** per-test timeout (`tests/llmTestGate.ts`). Default unit tests use **5s** so hung tests fail fast.
 
 **Vercel** deploys the app when you connect the GitHub repo (do not also run `vercel deploy` from Actions or you will double-deploy).
 

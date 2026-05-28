@@ -1,3 +1,4 @@
+import { colorNameToBackgroundClass } from '@/lib/builder/sectionPresentation';
 import { parseSiteConfigSource } from '@/lib/site-manager/siteConfigParser';
 import { isTextColorEditRequest } from '../verifyPreviewHints';
 import { detectScopedStyleRequest } from './editAmbiguity';
@@ -42,6 +43,38 @@ function extractPresetBackgroundClasses(pageContent: string): string {
 }
 
 /** Match Tailwind bg/from/to/via classes and gradient stops (e.g. from-green-800). */
+const PRESENTATION_FIELD_PATTERN =
+  /presentation\s*:\s*\{[\s\S]*?(backgroundClass|cardClass|eyebrowClass|titleClass|bodyClass)\s*:/;
+
+function findSiteConfigContent(files: Record<string, string>): string | null {
+  for (const [filePath, content] of Object.entries(files)) {
+    if (/siteconfig\.ts$/i.test(filePath.replace(/\\/g, '/'))) {
+      return content;
+    }
+  }
+  return null;
+}
+
+function siteConfigHasPresentationStyleChange(
+  beforeFiles: Record<string, string>,
+  afterFiles: Record<string, string>
+): boolean {
+  const before = findSiteConfigContent(beforeFiles) ?? '';
+  const after = findSiteConfigContent(afterFiles) ?? '';
+  if (!after || before === after) return false;
+  if (!PRESENTATION_FIELD_PATTERN.test(after)) return false;
+  return !PRESENTATION_FIELD_PATTERN.test(before) || after !== before;
+}
+
+function siteConfigPresentationUsesColors(siteConfigContent: string, colors: string[]): boolean {
+  if (!PRESENTATION_FIELD_PATTERN.test(siteConfigContent)) return false;
+  const lower = siteConfigContent.toLowerCase();
+  return colors.some((color) => {
+    const bgClass = colorNameToBackgroundClass(color).toLowerCase();
+    return lower.includes(bgClass) || tailwindBackgroundUsesColor(lower, color);
+  });
+}
+
 function tailwindBackgroundUsesColor(text: string, color: string): boolean {
   const escaped = color.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return (
@@ -69,6 +102,15 @@ function verifyVisibleBackgroundOnPage(
 
   if (!isBackgroundRequest && requestedColors.length === 0) {
     return null;
+  }
+
+  const siteConfigAfter = findSiteConfigContent(afterFiles);
+  if (siteConfigAfter && siteConfigPresentationUsesColors(siteConfigAfter, requestedColors)) {
+    return {
+      ok: true,
+      reason: 'Section background updated via siteConfig.presentation.',
+      evidence: ['presentation.backgroundClass set in siteConfig.ts'],
+    };
   }
 
   const pageAfter = findPageTsxContent(afterFiles);
@@ -242,10 +284,18 @@ export function verifyEditApplied(
         !changedFiles.some((f) => /page\.tsx$/i.test(f.replace(/\\/g, '/')));
 
       if (styleOnlySiteConfig && meaningfulChange) {
+        if (siteConfigHasPresentationStyleChange(beforeFiles, afterFiles)) {
+          evidence.push('section.presentation updated in siteConfig.ts');
+          return {
+            ok: true,
+            reason: 'Section presentation updated in siteConfig.',
+            evidence,
+          };
+        }
         return {
           ok: false,
           reason:
-            'Color or card styling must be updated in src/app/page.tsx (preset/card classes), not siteConfig.ts.',
+            'Color or card styling must use siteConfig.sections[].presentation (e.g. backgroundClass) or page.tsx preset/classes — not subtitle markers.',
           evidence: ['siteConfig changed but page.tsx was not updated for scoped style request'],
         };
       }
@@ -279,6 +329,14 @@ export function verifyEditApplied(
   const isStyleRequest = styleKeywords.some((kw) => messageHasKeyword(lowerMsg, kw));
 
   if (isStyleRequest) {
+    if (siteConfigHasPresentationStyleChange(beforeFiles, afterFiles)) {
+      return {
+        ok: true,
+        reason: 'Section presentation updated in siteConfig.',
+        evidence: ['presentation tokens in siteConfig.ts'],
+      };
+    }
+
     const cssChanged = changedFiles.some((f) => /\.(css|scss|sass|less)$/i.test(f));
     if (!cssChanged) {
       const htmlChanged = changedFiles.some((f) => /\.(html?|tsx|jsx)$/i.test(f));

@@ -1,4 +1,8 @@
 import { parseSiteConfigSource } from '@/lib/site-manager/siteConfigParser';
+import {
+  colorNameToBackgroundClass,
+  type SiteSectionPresentation,
+} from '@/lib/builder/sectionPresentation';
 
 const SITE_CONFIG_EXPORT = /export const siteConfig(?::\s*SiteConfig)?\s*=\s*/;
 
@@ -204,5 +208,59 @@ export function addSectionToSource(
     config.sections = sections;
     return true;
   });
+}
+
+/**
+ * Update presentation tokens on a section by index in siteConfig.ts source.
+ */
+export function updateSectionPresentationInSource(
+  content: string,
+  sectionIndex: number,
+  presentation: Partial<SiteSectionPresentation>
+): string | null {
+  if (sectionIndex < 0) return null;
+
+  return mutateSiteConfigSource(content, (config) => {
+    const sections = Array.isArray(config.sections)
+      ? (config.sections as Array<Record<string, unknown>>)
+      : [];
+    const section = sections[sectionIndex];
+    if (!section) return false;
+
+    const current = asMutableRecord(section.presentation);
+    let changed = false;
+
+    for (const [key, value] of Object.entries(presentation)) {
+      if (value === undefined) continue;
+      const normalized =
+        typeof value === 'string' && value.trim() ? value.trim() : undefined;
+      if (normalized) {
+        if (current[key] !== normalized) {
+          current[key] = normalized;
+          changed = true;
+        }
+      } else if (key in current) {
+        delete current[key];
+        changed = true;
+      }
+    }
+
+    if (!changed) return false;
+
+    section.presentation = Object.keys(current).length > 0 ? current : undefined;
+    return true;
+  });
+}
+
+/**
+ * Set a section background from a color name (e.g. "yellow" -> bg-yellow-200).
+ */
+export function updateSectionBackgroundColorInSource(
+  content: string,
+  sectionIndex: number,
+  colorName: string
+): string | null {
+  const backgroundClass = colorNameToBackgroundClass(colorName);
+  return updateSectionPresentationInSource(content, sectionIndex, { backgroundClass });
 }
 

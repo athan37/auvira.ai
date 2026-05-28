@@ -25,6 +25,7 @@ export type V2SkillName =
   | 'update_contact'
   | 'add_service'
   | 'add_section'
+  | 'update_section_style'
   | 'update_theme'
   | 'update_image'
   | 'legacy_strategy'
@@ -83,6 +84,7 @@ export const EDIT_PLAN_SCHEMA: JSONSchemaType<EditPlan> = {
               'update_contact',
               'add_service',
               'add_section',
+              'update_section_style',
               'update_theme',
               'update_image',
               'legacy_strategy',

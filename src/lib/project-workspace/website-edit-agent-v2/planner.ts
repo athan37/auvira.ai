@@ -3,6 +3,7 @@ import { getLLMClient } from '@/lib/llm/llmClient';
 import type { LLMProvider } from '@/lib/llm/types';
 import type { ConversationTurn, WebsiteEditAgentOptions } from '../website-edit-agent/types';
 import { EDIT_PLAN_SCHEMA, type EditPlan } from './editPlanSchema';
+import { normalizeEditPlanSectionStyles } from './normalizeSectionStyleStep';
 import { buildSiteModel, summarizeSiteModel, type SiteModel } from './siteModel';
 
 const ajv = new Ajv({ allErrors: true });
@@ -61,6 +62,9 @@ Rules:
 - Route hero headline/subheadline/tagline copy to update_hero.
 - Route phone/email/address changes to update_contact.
 - Route requests to add a service offering to add_service.
+- Route one-section background/card/text styling to update_section_style (siteConfig presentation tokens), not subtitle hacks.
+- update_section_style MUST include sectionIndex (number) AND either backgroundColor (color name) or presentation.{backgroundClass|cardClass}.
+- For testimonial/service card colors use presentation.cardClass (e.g. border-red-300 bg-red-50), not subtitle.
 - Ask for clarification when the user does not provide the new value or the target is ambiguous.
 - Do not invent phone numbers, addresses, emails, business facts, testimonials, or prices.
 - Use legacy_strategy only for edits not covered by V2 skills, such as broad layout code changes.`,
@@ -78,6 +82,8 @@ Return an EditPlan. Keep args explicit and minimal. Examples:
 - update_contact args: { "field": "phone", "value": "..." }
 - add_service args: { "title": "...", "description": "..." }
 - add_section args: { "type": "generic", "title": "...", "body": "..." }
+- update_section_style args: { "sectionIndex": 2, "backgroundColor": "yellow" }
+- update_section_style card args: { "sectionIndex": 3, "presentation": { "cardClass": "border-red-300 bg-red-50" } }
 - update_theme args: { "scope": "site|hero|section", "color": "blue" }
 - legacy_strategy args: { "reason": "..." }`,
     schema: EDIT_PLAN_SCHEMA,
@@ -89,6 +95,7 @@ Return an EditPlan. Keep args explicit and minimal. Examples:
     throw new Error(`Website Agent V2 planner returned an invalid plan: ${describeValidationErrors() || 'invalid JSON'}`);
   }
 
-  return normalizePlan(result.data);
+  const normalized = normalizePlan(result.data);
+  return normalizeEditPlanSectionStyles(normalized, options.ownerMessage, siteModel);
 }
 

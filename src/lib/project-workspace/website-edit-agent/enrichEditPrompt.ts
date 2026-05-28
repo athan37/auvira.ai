@@ -76,7 +76,7 @@ function buildSectionGuidance(
     'IMPORTANT: If similar content already exists, you must STILL write_file updated files — existing content does not fulfill a new owner request.'
   );
   lines.push(
-    '1. Homepage content lives in src/lib/siteConfig.ts under siteConfig.sections (array of { type, title, subtitle?, body?, items? }).'
+    '1. Homepage content lives in src/lib/siteConfig.ts under siteConfig.sections (array of { type, title, subtitle?, body?, items?, presentation? }).'
   );
   lines.push(
     '2. src/app/page.tsx maps siteConfig.sections to React section components (faq, testimonials, etc.).'
@@ -99,6 +99,9 @@ function buildSectionGuidance(
     '5. Testimonial items: use item.title for the customer name and item.description for the quote text.'
   );
   lines.push('6. Do not invent phone numbers or street addresses.');
+  lines.push(
+    '7. Per-section colors/cards: set siteConfig.sections[i].presentation (backgroundClass, cardClass, titleClass, etc.). Example: presentation: { backgroundClass: "bg-yellow-200" }. Never use subtitle for style markers (no YELLOW_BG). page.tsx usually does not need changes when presentation is set.'
+  );
 
   if (lower.includes('faq')) {
     const countMatch = originalMessage.match(/\b(\d+)\b/);
@@ -193,7 +196,9 @@ function buildIntentGuidance(
   }
 
   if (intent === 'style') {
-    lines.push('Update globals.css and matching preset colors in page.tsx when changing background/theme colors.');
+    lines.push(
+      'Site-wide theme: update preset colors in src/app/page.tsx and globals.css. One section only: set siteConfig.sections[i].presentation.backgroundClass (Tailwind class, e.g. bg-yellow-200) — do not patch GallerySection JSX or put colors in subtitle.'
+    );
   }
 
   return lines.join('\n');

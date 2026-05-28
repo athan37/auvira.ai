@@ -1,6 +1,9 @@
 import { promises as fs } from 'fs';
 import path from 'path';
-import { ensureSiteConfigTypesSupportGallery } from '@/lib/builder/siteConfigTypes';
+import {
+  ensureSiteConfigTypesSupportGallery,
+  ensureSiteConfigTypesSupportPresentation,
+} from '@/lib/builder/siteConfigTypes';
 import { stripAgentSyncMarkers } from './siteConfigAgentMarkers';
 
 export interface ParsedSiteConfig {

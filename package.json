@@ -11,7 +11,11 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "node --env-file=.env ./node_modules/vitest/vitest.mjs run",
+    "test:all": "npm run test && npm run test:llm",
+    "test:integration": "node --env-file=.env ./node_modules/vitest/vitest.mjs run tests/integration/website-agent-v2/websiteAgentV2.siteModel.integration.test.ts",
+    "test:llm": "VITEST_LLM_SUITE=1 node --env-file=.env ./node_modules/vitest/vitest.mjs run tests/website-agent-v2/planEdit.llm.test.ts tests/website-agent-v2/e2e.llm.test.ts tests/website-agent-v2/sectionPresentation.llm.test.ts tests/integration/website-agent-v2/websiteAgentV2.plan.integration.test.ts tests/integration/website-agent-v2/websiteAgentV2.clarification.integration.test.ts",
+    "test:llm:presentation": "VITEST_LLM_SUITE=1 node --env-file=.env ./node_modules/vitest/vitest.mjs run tests/website-agent-v2/sectionPresentation.llm.test.ts",
     "test:scratch-live": "tsx scripts/test-scratch-workflow-live.ts",
     "test:diff-local": "node --env-file=.env -e \"require('child_process').execSync('npx --yes tsx scripts/test-diff-api-local.ts', {stdio:'inherit'})\"",
     "test:build-gate-local": "node --env-file=.env -e \"require('child_process').execSync('npx --yes tsx scripts/test-build-gate-local.ts', {stdio:'inherit'})\"",
@@ -32,7 +36,8 @@
     "next-auth": "^5.0.0-beta.31",
     "puppeteer": "^24.43.1",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "zod": "^3.24.2"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

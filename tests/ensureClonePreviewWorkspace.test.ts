@@ -3,6 +3,17 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 vi.mock('@/lib/db/models/CloneJob', () => ({
   CloneJob: { updateOne: vi.fn().mockResolvedValue({}) },
 }));
+
+vi.mock('@/lib/agent/generateDesignBriefAgent', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/agent/generateDesignBriefAgent')>();
+  return {
+    ...actual,
+    generateDesignBriefAgent: vi.fn(async (_bp, _spec, _url) =>
+      actual.getDefaultDesignBrief('home-services')
+    ),
+  };
+});
+
 import { promises as fs } from 'fs';
 import path from 'path';
 import { ensureClonePreviewWorkspace } from '../src/lib/clone/ensureClonePreviewWorkspace';

@@ -1,11 +1,10 @@
+import '../llmTestGate';
 import { expect, it } from 'vitest';
 import path from 'path';
 import { promises as fs } from 'fs';
 import os from 'os';
 import { runWebsiteEditAgentV2 } from '../../src/lib/project-workspace/website-edit-agent-v2';
 import { llmDescribe } from './llmIntegrationHarness';
-
-const LLM_TEST_TIMEOUT_MS = 120_000;
 
 async function createWorkspace(): Promise<string> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ws-v2-llm-e2e-'));
@@ -52,7 +51,6 @@ llmDescribe('Website Agent V2 live E2E', () => {
 
     await fs.rm(dir, { recursive: true, force: true });
     },
-    LLM_TEST_TIMEOUT_MS
   );
 
   it(
@@ -73,7 +71,6 @@ llmDescribe('Website Agent V2 live E2E', () => {
 
     await fs.rm(dir, { recursive: true, force: true });
     },
-    LLM_TEST_TIMEOUT_MS
   );
 
   it(
@@ -108,7 +105,6 @@ llmDescribe('Website Agent V2 live E2E', () => {
 
     await fs.rm(dir, { recursive: true, force: true });
     },
-    LLM_TEST_TIMEOUT_MS
   );
 
   it(
@@ -129,7 +125,6 @@ llmDescribe('Website Agent V2 live E2E', () => {
 
     await fs.rm(dir, { recursive: true, force: true });
     },
-    LLM_TEST_TIMEOUT_MS
   );
 
   it(
@@ -162,7 +157,6 @@ llmDescribe('Website Agent V2 live E2E', () => {
 
     await fs.rm(dir, { recursive: true, force: true });
     },
-    LLM_TEST_TIMEOUT_MS
   );
 
   it(
@@ -187,7 +181,6 @@ llmDescribe('Website Agent V2 live E2E', () => {
 
     await fs.rm(dir, { recursive: true, force: true });
     },
-    LLM_TEST_TIMEOUT_MS
   );
 
   it(
@@ -212,7 +205,6 @@ llmDescribe('Website Agent V2 live E2E', () => {
 
     await fs.rm(dir, { recursive: true, force: true });
     },
-    LLM_TEST_TIMEOUT_MS
   );
 });
 

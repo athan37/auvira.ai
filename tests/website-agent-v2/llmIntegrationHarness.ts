@@ -1,10 +1,9 @@
-import { describe } from 'vitest';
 import type { EditPlan, SiteModel } from '../../src/lib/project-workspace/website-edit-agent-v2';
 import { planEdit } from '../../src/lib/project-workspace/website-edit-agent-v2';
+import { hasLlmApiKey, llmDescribe } from '../llmTestGate';
 
-export const runLlmIntegrationTests = process.env.RUN_LLM_INTEGRATION_TESTS === 'true';
-const hasMiniMaxKey = Boolean(process.env.MINIMAX_API_KEY?.trim());
-export const llmDescribe = runLlmIntegrationTests && hasMiniMaxKey ? describe : describe.skip;
+export { hasLlmApiKey, llmDescribe };
+export const runLlmIntegrationTests = hasLlmApiKey();
 
 export const BASE_SITE_MODEL: SiteModel = {
   mode: 'gitlab',
@@ -33,6 +32,24 @@ export const BASE_SITE_MODEL: SiteModel = {
       itemCount: 0,
       items: [],
     },
+    {
+      index: 2,
+      type: 'gallery',
+      title: 'Hello',
+      body: 'Project photos',
+      itemCount: 1,
+      items: [{ title: 'Project A', imageUrl: '/uploads/a.jpg' }],
+    },
+    {
+      index: 3,
+      type: 'testimonials',
+      title: 'What Our Customers Say',
+      itemCount: 2,
+      items: [
+        { title: 'Jordan Lee', description: 'Great service.' },
+        { title: 'Maria Santos', description: 'Professional team.' },
+      ],
+    },
   ],
   files: [],
   capabilities: {
@@ -46,7 +63,10 @@ export const BASE_SITE_MODEL: SiteModel = {
 /**
  * Run the real V2 planner against the configured LLM provider.
  */
-export async function planWithLiveLlm(ownerMessage: string): Promise<EditPlan> {
+export async function planWithLiveLlm(
+  ownerMessage: string,
+  siteModel: SiteModel = BASE_SITE_MODEL
+): Promise<EditPlan> {
   return planEdit(
     {
       workspacePath: '/tmp/not-read',
@@ -54,7 +74,6 @@ export async function planWithLiveLlm(ownerMessage: string): Promise<EditPlan> {
       projectId: 'llm-integration',
       mode: 'gitlab',
     },
-    { siteModel: BASE_SITE_MODEL }
+    { siteModel }
   );
 }
-
