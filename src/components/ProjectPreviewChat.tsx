@@ -43,6 +43,11 @@ type ChatMessage = {
   errorJobId?: string;
 };
 
+type ChatHistoryResponse = {
+  ok: boolean;
+  messages?: ChatMessage[];
+};
+
 interface ProjectPreviewChatProps {
   projectId: string;
   disabled?: boolean;
@@ -278,6 +283,7 @@ export function ProjectPreviewChat({
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(true);
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [agentSteps, setAgentSteps] = useState<AgentStep[]>([]);
@@ -294,6 +300,33 @@ export function ProjectPreviewChat({
       pendingImages.forEach((img) => URL.revokeObjectURL(img.previewUrl));
     };
   }, [pendingImages]);
+
+  useEffect(() => {
+    let active = true;
+    const controller = new AbortController();
+    async function loadHistory() {
+      setHistoryLoading(true);
+      try {
+        const res = await fetch(`/api/projects/${projectId}/messages?limit=100`, {
+          signal: controller.signal,
+        });
+        if (!res.ok) throw new Error('Failed to load chat history');
+        const data = (await res.json()) as ChatHistoryResponse;
+        if (!active) return;
+        setMessages(Array.isArray(data.messages) ? data.messages : []);
+      } catch {
+        if (!active) return;
+        setMessages([]);
+      } finally {
+        if (active) setHistoryLoading(false);
+      }
+    }
+    loadHistory();
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [projectId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -427,14 +460,12 @@ export function ProjectPreviewChat({
         });
       }
 
-      const conversationHistory = messages
-        .slice(-6)
-        .map((m) => ({ role: m.role, content: m.content }));
+      const requestClientMessageId = crypto.randomUUID();
 
       const response = await fetch(`/api/projects/${projectId}/code-agent/edit/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMsg, attachments, conversationHistory }),
+        body: JSON.stringify({ message: userMsg, attachments, clientMessageId: requestClientMessageId }),
         signal: AbortSignal.timeout(300000),
       });
 
@@ -613,7 +644,11 @@ export function ProjectPreviewChat({
             <Alert variant="info">Starting your preview… You can edit once it is ready.</Alert>
           )}
 
-          {messages.length === 0 && !showSteps && previewReady && (
+          {historyLoading && !showSteps && (
+            <p className="text-sm text-zinc-500 text-center py-4">Loading chat history…</p>
+          )}
+
+          {!historyLoading && messages.length === 0 && !showSteps && previewReady && (
             <div className="space-y-3">
               <p className="text-sm text-zinc-500 text-center py-4">
                 Try a quick change, attach photos, or describe what you want.

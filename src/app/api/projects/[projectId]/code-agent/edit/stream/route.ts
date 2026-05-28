@@ -33,6 +33,11 @@ import {
 import { resolveEditPreviewVerification } from '@/lib/project-workspace/verifyPreviewForPrompt';
 import { resolveSiteWorkspace } from '@/lib/project-workspace/website-edit-agent/resolveSiteWorkspace';
 import {
+  appendAssistantMessage,
+  appendUserMessage,
+  buildConversationHistory,
+} from '@/lib/chat/projectChatService';
+import {
   EditStepTimer,
   appendTimedEditJobLog,
   logEditTimingSummary,
@@ -107,7 +112,7 @@ export async function POST(
   }
 
   const body = await request.json();
-  const { message, attachments: rawAttachments, conversationHistory: rawHistory } = body;
+  const { message, attachments: rawAttachments, clientMessageId } = body;
   if (!message || typeof message !== 'string') {
     return NextResponse.json({ detail: 'message is required' }, { status: 400 });
   }
@@ -128,22 +133,6 @@ export async function POST(
           size: Number(item.size) || 0,
         }))
         .filter((item) => item.path && item.publicUrl)
-    : [];
-
-  const conversationHistory = Array.isArray(rawHistory)
-    ? rawHistory
-        .filter(
-          (t: unknown): t is { role: string; content: string } =>
-            Boolean(t) &&
-            typeof t === 'object' &&
-            typeof (t as { role?: string }).role === 'string' &&
-            typeof (t as { content?: string }).content === 'string'
-        )
-        .slice(-6)
-        .map((t) => ({
-          role: t.role === 'assistant' ? ('assistant' as const) : ('user' as const),
-          content: String(t.content).slice(0, 2000),
-        }))
     : [];
 
   const previewVersionBefore = project.codeWorkspace?.version || 1;
@@ -181,6 +170,7 @@ export async function POST(
       let isSandbox = false;
       let beforeHashes: Record<string, string> = {};
       const editTimer = new EditStepTimer();
+      let conversationHistory: { role: 'user' | 'assistant'; content: string }[] = [];
 
       type FailOptions = {
         stage: EditFailureStage;
@@ -216,6 +206,25 @@ export async function POST(
           await logEditFailureTrace(jobId, report);
           await logEditTimingSummary(jobId, editTimer).catch(() => {});
         }
+        await appendAssistantMessage({
+          projectId: project._id,
+          content: ownerMessage,
+          metadata: {
+            editJobId: jobId || undefined,
+            outcome: 'failure',
+            errorStage: options.stage,
+            errorTraceExcerpt: report.copyText.slice(0, 8000),
+            changedFiles: Array.isArray(options.extra?.changedPaths)
+              ? options.extra.changedPaths.map(String)
+              : undefined,
+            timing: {
+              totalMs: editTimer.totalMs(),
+              phases: editTimer.summary(),
+              slowestPhase: editTimer.slowest()?.phase,
+              slowestMs: editTimer.slowest()?.durationMs,
+            },
+          },
+        }).catch(() => {});
 
         emit('done', {
           ok: false,
@@ -290,6 +299,16 @@ export async function POST(
           previewVersionBefore,
         });
         jobId = job._id.toString();
+        await appendUserMessage({
+          projectId: project._id,
+          content: message,
+          attachments,
+          clientMessageId: typeof clientMessageId === 'string' ? clientMessageId : undefined,
+        });
+        conversationHistory = await buildConversationHistory({
+          projectId: project._id,
+          maxTurns: 6,
+        });
         emit('step', { id: 'loading', label: 'Loading your website draft', status: 'active', jobId });
 
         await appendEditJobLog(jobId, 'workspace_prepare_started', 'Preparing workspace');
@@ -404,6 +423,23 @@ export async function POST(
             emit('step', { id: 'apply_change', label: 'Applying your requested change', status: 'completed' });
             emit('step', { id: 'validate', label: 'Checking the preview', status: 'completed' });
             emit('step', { id: 'finish', label: 'Need a quick detail', status: 'completed' });
+            await appendAssistantMessage({
+              projectId: project._id,
+              content: agentResult.ownerMessage || agentResult.error || 'Need one more detail.',
+              metadata: {
+                editJobId: jobId,
+                outcome: 'clarification',
+                suggestedReplies: agentResult.suggestedReplies,
+                errorStage: 'needs_clarification',
+                strategy: agentResult.strategy,
+                timing: {
+                  totalMs: editTimer.totalMs(),
+                  phases: editTimer.summary(),
+                  slowestPhase: editTimer.slowest()?.phase,
+                  slowestMs: editTimer.slowest()?.durationMs,
+                },
+              },
+            }).catch(() => {});
             emit('done', {
               ok: false,
               jobId,
@@ -786,6 +822,23 @@ export async function POST(
         await logEditTimingSummary(jobId, editTimer);
         const timingSummary = editTimer.summary();
         const slowest = editTimer.slowest();
+        await appendAssistantMessage({
+          projectId: project._id,
+          content: successOwnerMessage,
+          metadata: {
+            editJobId: jobId,
+            outcome: 'success',
+            changedFiles: changedPaths,
+            previewVersion: newVersion,
+            timing: {
+              totalMs: editTimer.totalMs(),
+              phases: timingSummary,
+              slowestPhase: slowest?.phase,
+              slowestMs: slowest?.durationMs,
+            },
+            strategy: agentResult.strategy,
+          },
+        });
 
         emit('step', { id: 'validate', label: 'Checking the preview', status: 'completed' });
         emit('step', { id: 'finish', label: 'Preview updated', status: 'completed' });
