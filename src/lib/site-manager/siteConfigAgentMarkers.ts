@@ -37,12 +37,20 @@ export function stripAgentSyncMarkers(content: string): string {
   return out.replace(/\n{3,}/g, '\n\n').trimEnd();
 }
 
+const INVALID_NEXT_PAGE_EXPORT = /^export const __site[A-Za-z0-9_]+ = \d+;\s*$/gm;
+
 /** Next.js pages reject unknown exports like __siteAgentPageGallerySync (legacy agent stamps). */
 export function stripInvalidNextJsPageExports(content: string): string {
   return content
-    .replace(/^export const __site[A-Za-z0-9_]+ = \d+;\s*$/gm, '')
+    .replace(INVALID_NEXT_PAGE_EXPORT, '')
     .replace(/\n{3,}/g, '\n\n')
     .trimEnd();
+}
+
+/** True when page.tsx still has legacy agent export stamps that break `next build`. */
+export function hasInvalidNextJsPageExports(content: string): boolean {
+  INVALID_NEXT_PAGE_EXPORT.lastIndex = 0;
+  return INVALID_NEXT_PAGE_EXPORT.test(content);
 }
 
 /** Bump sync version export so siteConfig.ts changes reload in the workspace dev server. */

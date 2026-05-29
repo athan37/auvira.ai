@@ -1,6 +1,8 @@
 import type { ValidateWorkspaceResult } from '@/lib/project-workspace/validateWorkspace';
+import { isPreviewSafeEdit } from '@/lib/project-workspace/previewSafeValidation';
 import { repairSiteConfigTypesViaGateway } from '@/lib/preview/repairSiteConfigTypes';
 import { validateChangedSourceSyntax } from '@/lib/project-workspace/validateTsxSyntax';
+import { sanitizeAgentMarkerFilesInWorkspace } from '@/lib/site-manager/siteConfigAgentMarkers';
 import { getProjectSandbox } from './sandboxClient';
 import { getSandboxGateway } from './sandboxWorkspaceGateway';
 import { SANDBOX_WORKDIR } from './types';
@@ -26,10 +28,27 @@ export async function validateSandboxWorkspace(
     return { ok: true, buildLog: 'No package.json — skipped build', errors, warnings };
   }
 
+  let gateway: Awaited<ReturnType<typeof getSandboxGateway>> | null = null;
   try {
-    const gateway = await getSandboxGateway(projectId);
+    gateway = await getSandboxGateway(projectId);
     if (await repairSiteConfigTypesViaGateway(gateway)) {
       logs.push('Repaired siteConfig.ts types to include gallery/documentation sections');
+    }
+
+    const sanitizedMarkers = await sanitizeAgentMarkerFilesInWorkspace('', {
+      read: async (rel) => {
+        try {
+          return await gateway!.readFile(rel);
+        } catch {
+          return null;
+        }
+      },
+      write: async (rel, content) => {
+        await gateway!.writeFile(rel, content);
+      },
+    });
+    if (sanitizedMarkers.length > 0) {
+      logs.push(`Removed dev-only agent sync markers from: ${sanitizedMarkers.join(', ')}`);
     }
   } catch (e) {
     warnings.push(
@@ -37,36 +56,24 @@ export async function validateSandboxWorkspace(
     );
   }
 
-  const changed = new Set(changedFiles || []);
-  const lockChanged =
-    changed.has('package.json') ||
-    changed.has('package-lock.json') ||
-    changed.has('yarn.lock') ||
-    changed.has('pnpm-lock.yaml');
-  const previewSafeEdit =
-    changed.size > 0 &&
-    !lockChanged &&
-    [...changed].every(
-      (f) =>
-        f.startsWith('src/') &&
-        /\.(css|scss|sass|less|tsx|jsx|ts|js|json)$/i.test(f)
-    );
+  const changedList = [...(changedFiles || [])];
+  const previewSafeEdit = isPreviewSafeEdit(changedList);
 
   if (previewSafeEdit) {
     logs.push(
       'Source-only edit: skipping npm run build (sandbox preview uses next dev; production .next breaks dev chunks)'
     );
     try {
-      const gateway = await getSandboxGateway(projectId);
+      const gw = gateway ?? (await getSandboxGateway(projectId));
       const syntax = await validateChangedSourceSyntax(
         async (rel) => {
           try {
-            return await gateway.readFile(rel);
+            return await gw.readFile(rel);
           } catch {
             return null;
           }
         },
-        [...changed]
+        changedList
       );
       if (!syntax.ok) {
         errors.push(...syntax.errors.slice(0, 5));

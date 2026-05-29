@@ -1,6 +1,7 @@
 import { SECTION_PRESENTATION_RUNTIME } from '@/lib/builder/sectionPresentationRuntime';
 import { extractSectionComponentSource } from './resolveSectionTarget';
 import { normalizeCustomerSiteTailwindConfig, repairTailwindConfigInWorkspace } from '@/lib/builder/tailwindPresentationSupport';
+import { sanitizeSourceForPublish } from '@/lib/site-manager/siteConfigAgentMarkers';
 import {
   PAGE_TSX,
   TAILWIND_CONFIG,
@@ -117,7 +118,11 @@ export async function ensureLegacyPageReadsPresentation(
   const upgraded = upgradeSectionComponentToPresentationResolver(pageContent, componentName);
   if (!upgraded.patched) return changed;
 
-  await writeWorkspaceRel(options, PAGE_TSX, upgraded.content);
+  await writeWorkspaceRel(
+    options,
+    PAGE_TSX,
+    sanitizeSourceForPublish(PAGE_TSX, upgraded.content)
+  );
   return true;
 }
 
@@ -171,7 +176,11 @@ export async function repairSectionPresentationWiringInWorkspace(
   }
 
   if (pageChanged) {
-    await fs.writeFile(pagePath, nextPage, 'utf-8');
+    await fs.writeFile(
+      pagePath,
+      sanitizeSourceForPublish('src/app/page.tsx', nextPage),
+      'utf-8'
+    );
     repaired.push('src/app/page.tsx');
   }
 
