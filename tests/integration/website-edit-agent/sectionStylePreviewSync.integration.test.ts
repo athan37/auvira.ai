@@ -52,13 +52,13 @@ describeRunLlmIntegration(
         return;
       }
 
-      expect(result.ok || result.changedFiles?.length).toBeTruthy();
-
-      if (result.ok) {
-        expect(result.changedFiles ?? []).toContain('src/lib/siteConfig.ts');
-        expect(siteConfig).toContain(`backgroundClass: "${EXPECTED_CLASS}"`);
-        expect(siteConfig).toContain(SITECONFIG_PRESENTATION_SYNC_EXPORT);
-      }
+      expect(result.ok, result.error ?? result.ownerMessage ?? JSON.stringify(result)).toBe(
+        true
+      );
+      expect(result.strategy).toBe('section_style');
+      expect(result.changedFiles ?? []).toContain('src/lib/siteConfig.ts');
+      expect(siteConfig).toContain(`"backgroundClass": "${EXPECTED_CLASS}"`);
+      expect(siteConfig).toContain(SITECONFIG_PRESENTATION_SYNC_EXPORT);
 
       const htmlNoise = [
         '<button class="bg-red-600">x</button>',

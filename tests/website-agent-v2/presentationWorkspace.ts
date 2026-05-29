@@ -1,7 +1,8 @@
 import path from 'path';
 import { promises as fs } from 'fs';
-import os from 'os';
+import { randomUUID } from 'crypto';
 import { SECTION_PRESENTATION_RUNTIME } from '@/lib/builder/sectionPresentationRuntime';
+import { scratchPath } from '@/lib/runtime/scratchDir';
 
 export const SITE_CONFIG_SOURCE = `export type SiteSectionPresentation = {
   backgroundClass?: string;
@@ -121,7 +122,9 @@ export default function Home() {
 
 /** Scratch workspace with gallery, about, testimonials, and presentation resolvers. */
 export async function createPresentationTestWorkspace(): Promise<string> {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ws-presentation-llm-'));
+  const id = randomUUID().slice(0, 8);
+  const dir = scratchPath('project-workspaces', `presentation-llm-${id}`);
+  await fs.mkdir(dir, { recursive: true });
   await fs.mkdir(path.join(dir, 'src/lib'), { recursive: true });
   await fs.mkdir(path.join(dir, 'src/app'), { recursive: true });
 
