@@ -14,6 +14,8 @@ export const SITE_SECTION_PRESENTATION_TYPE = `export type SiteSectionPresentati
 };`;
 
 export const SITE_SECTION_TYPE_BLOCK = `export type SiteSection = {
+  id?: string;
+  analyticsId?: string;
   type: ${SITE_SECTION_TYPE_UNION};
   title: string;
   subtitle?: string;

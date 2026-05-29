@@ -46,6 +46,9 @@ const REQUIRED_FILES = [
   'src/app/page.tsx',
   'src/app/globals.css',
   'src/lib/siteConfig.ts',
+  'src/lib/analyticsConfig.ts',
+  'src/lib/analyticsAttrs.ts',
+  'src/components/analytics/WebsiteAnalytics.tsx',
   'README.md',
 ];
 

@@ -2,6 +2,7 @@ import type { SiteSpec, DesignBrief } from '../agent/schemas';
 import type { GeneratedFile } from './types';
 import { pickBackgroundColor, extractCssColor } from './cssColor';
 import { SITE_CONFIG_TYPE_BLOCK } from './siteConfigTypes';
+import { instrumentGeneratedFiles } from '@/lib/analytics/generated-sites/instrumentGeneratedSite';
 
 // Hardcoded premium theme presets by industry
 // These are SAFE, PREDEFINED themes - no LLM arbitrary classes
@@ -705,7 +706,7 @@ export function generateSafeFallbackWebsiteFiles(
   siteSpec: SiteSpec,
   projectName: string
 ): GeneratedFile[] {
-  return [
+  const files: GeneratedFile[] = [
     {
       filePath: 'package.json',
       content: generatePackageJson(projectName),
@@ -747,4 +748,5 @@ export function generateSafeFallbackWebsiteFiles(
       content: generateReadme(projectName, siteSpec),
     },
   ];
+  return instrumentGeneratedFiles(files).files;
 }

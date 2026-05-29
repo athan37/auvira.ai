@@ -94,8 +94,11 @@ describeRunLlmIntegration('chat history edit (hard LLM integration)', () => {
     const styleStep = plan.steps.find((step) => step.skill === 'update_section_style');
     expect(styleStep, JSON.stringify(plan.steps)).toBeTruthy();
     expect(styleStep?.args?.sectionIndex).toBe(GALLERY_INDEX);
+    const presentation = styleStep?.args?.presentation as
+      | { backgroundClass?: unknown }
+      | undefined;
     expect(
-      String(styleStep?.args?.backgroundColor ?? styleStep?.args?.presentation?.backgroundClass ?? '')
+      String(styleStep?.args?.backgroundColor ?? presentation?.backgroundClass ?? '')
     ).toMatch(/blue/i);
   });
 

@@ -10,6 +10,7 @@ import {
 import { createGitLabProject } from '@/lib/gitlab/createProject';
 import { commitFilesToGitLab } from '@/lib/gitlab/commitFiles';
 import { createVercelProject } from '@/lib/vercel/createVercelProject';
+import { createWebsiteAnalyticsConfigForProject } from '@/lib/analytics/config/websiteAnalyticsConfigService';
 import mongoose from 'mongoose';
 
 export const runtime = 'nodejs';
@@ -185,6 +186,20 @@ export async function POST(request: NextRequest) {
     });
 
     await project.save();
+
+    try {
+      await createWebsiteAnalyticsConfigForProject({
+        projectId: project._id,
+        ownerId: project.ownerId,
+        publicSiteKey: generated.analytics?.publicSiteKey,
+        allowedOrigins: [
+          vercelResult?.expectedProductionUrl ?? '',
+          vercelResult?.projectUrl ?? '',
+        ].filter(Boolean),
+      });
+    } catch (analyticsError) {
+      console.warn('[scratch/build] Analytics config creation failed:', analyticsError);
+    }
 
     const action = new ProjectAction({
       projectId: project._id,

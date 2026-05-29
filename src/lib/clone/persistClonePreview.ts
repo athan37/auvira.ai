@@ -8,6 +8,12 @@ import { commitFilesToGitLab } from '@/lib/gitlab/commitFiles';
 import { WebsiteProject, type IWebsiteProject } from '@/models/WebsiteProject';
 import { ProjectAction } from '@/models/ProjectAction';
 import { ensureClonePreviewWorkspace } from '@/lib/clone/ensureClonePreviewWorkspace';
+import { instrumentGeneratedFiles } from '@/lib/analytics/generated-sites/instrumentGeneratedSite';
+import {
+  createWebsiteAnalyticsConfigForProject,
+  deploymentOrigins,
+  ensureWebsiteAnalyticsConfig,
+} from '@/lib/analytics/config/websiteAnalyticsConfigService';
 
 const SKIP_DIRS = ['node_modules', '.next', '.git'];
 
@@ -84,10 +90,11 @@ export async function saveClonePreviewToGitLab(
 ): Promise<SaveClonePreviewResult> {
   const workspacePath = await ensureClonePreviewWorkspace(job);
 
-  const files = readWorkspaceFiles(workspacePath);
+  let files = readWorkspaceFiles(workspacePath);
   if (files.length === 0) {
     throw new Error('No files found in preview workspace');
   }
+  let analyticsPublicSiteKey = '';
 
   const jobId = job._id;
   const ownerId = new mongoose.Types.ObjectId(userId);
@@ -106,6 +113,19 @@ export async function saveClonePreviewToGitLab(
     }
 
     await appendJobLog(jobId, 'save', 'Updating GitLab with latest preview files');
+    try {
+      const analyticsConfig = await ensureWebsiteAnalyticsConfig({
+        project,
+        allowedOrigins: deploymentOrigins(project),
+      });
+      const instrumented = instrumentGeneratedFiles(files, {
+        publicSiteKey: analyticsConfig.publicSiteKey,
+      });
+      files = instrumented.files;
+      analyticsPublicSiteKey = instrumented.publicSiteKey;
+    } catch (analyticsError) {
+      console.warn('[clone/save] Analytics instrumentation failed:', analyticsError);
+    }
 
     const commit = await commitFilesToGitLab({
       projectId: project.gitlab.projectId,
@@ -142,6 +162,9 @@ export async function saveClonePreviewToGitLab(
 
   const uniqueName = generateUniqueProjectName(businessName);
   await appendJobLog(jobId, 'save', 'Creating GitLab repository');
+  const instrumented = instrumentGeneratedFiles(files);
+  files = instrumented.files;
+  analyticsPublicSiteKey = instrumented.publicSiteKey;
 
   const gitlabResult = await createGitLabProject({ name: uniqueName });
   await appendJobLog(jobId, 'save', `GitLab project created: ${gitlabResult.id}`);
@@ -183,6 +206,17 @@ export async function saveClonePreviewToGitLab(
     editingMode: 'code',
   });
   await project.save();
+
+  try {
+    await createWebsiteAnalyticsConfigForProject({
+      projectId: project._id,
+      ownerId,
+      publicSiteKey: analyticsPublicSiteKey,
+      allowedOrigins: deploymentOrigins(project),
+    });
+  } catch (analyticsError) {
+    console.warn('[clone/save] Analytics config creation failed:', analyticsError);
+  }
 
   await ProjectAction.create({
     projectId: project._id,

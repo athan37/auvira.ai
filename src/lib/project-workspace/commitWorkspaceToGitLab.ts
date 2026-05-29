@@ -15,6 +15,11 @@ import {
 } from '@/lib/preview/repairSiteConfigTypes';
 import { getSandboxGateway } from '@/lib/sandbox/sandboxWorkspaceGateway';
 import { sanitizeAgentMarkerFilesInWorkspace } from '@/lib/site-manager/siteConfigAgentMarkers';
+import { instrumentGeneratedSite } from '@/lib/analytics/generated-sites/instrumentGeneratedSite';
+import {
+  deploymentOrigins,
+  ensureWebsiteAnalyticsConfig,
+} from '@/lib/analytics/config/websiteAnalyticsConfigService';
 
 export type CommitWorkspaceResult = {
   commitSha: string;
@@ -30,6 +35,33 @@ export type SaveWorkspaceResult = CommitWorkspaceResult & {
   /** How the save was applied — surfaced in UI copy only. */
   mode: 'incremental' | 'force';
 };
+
+async function instrumentAnalyticsBeforePublish(
+  project: IWebsiteProject,
+  projectId: string,
+  options: {
+    workspacePath: string;
+    gateway?: import('@/lib/project-workspace/workspaceGateway').WorkspaceGateway;
+  }
+): Promise<void> {
+  try {
+    const config = await ensureWebsiteAnalyticsConfig({
+      project,
+      allowedOrigins: deploymentOrigins(project),
+    });
+    await instrumentGeneratedSite({
+      workspacePath: options.workspacePath,
+      gateway: options.gateway,
+      publicSiteKey: config.publicSiteKey,
+    });
+  } catch (error) {
+    console.warn(
+      `[analytics] Passive instrumentation skipped before publish: ${
+        error instanceof Error ? error.message : 'unknown error'
+      }`
+    );
+  }
+}
 
 /**
  * Commit local workspace changes to the linked GitLab repository.
@@ -62,6 +94,10 @@ export async function commitWorkspaceToGitLab(
         read: (rel) => gateway.readFile(rel).catch(() => null),
         write: (rel, content) => gateway.writeFile(rel, content),
       });
+      await instrumentAnalyticsBeforePublish(project, projectId, {
+        workspacePath: gateway.getWorkspacePath(),
+        gateway,
+      });
     } catch {
       /* non-fatal */
     }
@@ -69,6 +105,7 @@ export async function commitWorkspaceToGitLab(
     const workspacePath = getGitWorkspacePath(projectId);
     await repairSiteConfigTypesInWorkspace(workspacePath).catch(() => {});
     await sanitizeAgentMarkerFilesInWorkspace(workspacePath).catch(() => {});
+    await instrumentAnalyticsBeforePublish(project, projectId, { workspacePath });
   }
   const result = useSandbox
     ? await publishSandboxWorkspaceToGitLab({
@@ -146,6 +183,15 @@ export async function forceSyncWorkspaceToGitLab(
   }
 
   if (isSandboxPreviewEnabled() && project.gitlab?.projectId) {
+    try {
+      const gateway = await getSandboxGateway(projectId);
+      await instrumentAnalyticsBeforePublish(project, projectId, {
+        workspacePath: gateway.getWorkspacePath(),
+        gateway,
+      });
+    } catch {
+      /* non-fatal */
+    }
     const result = await publishSandboxWorkspaceToGitLab({
       project,
       projectId,
@@ -160,6 +206,7 @@ export async function forceSyncWorkspaceToGitLab(
   }
 
   const workspacePath = getGitWorkspacePath(projectId);
+  await instrumentAnalyticsBeforePublish(project, projectId, { workspacePath });
   const result = await forcePublishWorkspaceToGitLab({
     workspacePath,
     gitlabProjectId: project.gitlab.projectId,
