@@ -71,5 +71,36 @@ export function repairPageTsxStructure(pageContent: string): {
     notes.push('split smashed switch cases');
   }
 
+  const quoteFix = repairUnescapedJsxQuoteEntities(content);
+  if (quoteFix.repaired) {
+    content = quoteFix.content;
+    repaired = true;
+    notes.push('escaped testimonial quote entities for ESLint');
+  }
+
   return { content, repaired, notes };
+}
+
+/**
+ * Fix common react/no-unescaped-entities patterns in generated page.tsx (testimonials).
+ */
+export function repairUnescapedJsxQuoteEntities(pageContent: string): {
+  content: string;
+  repaired: boolean;
+} {
+  let content = pageContent;
+  let repaired = false;
+
+  const testimonialLine =
+    /<p className="text-slate-600 italic">"\{item\.description \|\| "([^"]*)"\}"<\/p>/g;
+  const next = content.replace(
+    testimonialLine,
+    "<p className=\"text-slate-600 italic\">&ldquo;{item.description || '$1'}&rdquo;</p>"
+  );
+  if (next !== content) {
+    content = next;
+    repaired = true;
+  }
+
+  return { content, repaired };
 }

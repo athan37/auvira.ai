@@ -2,8 +2,11 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { repairTailwindConfigInWorkspace } from '@/lib/builder/tailwindPresentationSupport';
 import { repairSiteConfigTypesInWorkspace } from '@/lib/preview/repairSiteConfigTypes';
+import { sanitizeSourceForPublish } from '@/lib/site-manager/siteConfigAgentMarkers';
 import { validateChangedSourceSyntax } from './validateTsxSyntax';
+import { repairPageTsxStructure } from './repairPageTsxStructure';
 
 const execFileAsync = promisify(execFile);
 
@@ -16,6 +19,45 @@ export interface ValidateWorkspaceResult {
 
 export interface ValidateWorkspaceOptions {
   changedFiles?: string[];
+}
+
+const MARKER_SANITIZE_PATHS = ['src/app/page.tsx', 'src/lib/siteConfig.ts'] as const;
+
+/** Auto-fix known ESLint/structure issues in page.tsx before build. */
+async function repairPageTsxInWorkspace(workspacePath: string): Promise<string[]> {
+  const rel = 'src/app/page.tsx';
+  const abs = path.join(workspacePath, rel);
+  let before: string;
+  try {
+    before = await fs.readFile(abs, 'utf-8');
+  } catch {
+    return [];
+  }
+  const { content, repaired } = repairPageTsxStructure(before);
+  if (!repaired || content === before) {
+    return [];
+  }
+  await fs.writeFile(abs, content, 'utf-8');
+  return [rel];
+}
+
+async function sanitizeMarkerFilesInWorkspace(workspacePath: string): Promise<string[]> {
+  const sanitized: string[] = [];
+  for (const rel of MARKER_SANITIZE_PATHS) {
+    const abs = path.join(workspacePath, rel);
+    let before: string;
+    try {
+      before = await fs.readFile(abs, 'utf-8');
+    } catch {
+      continue;
+    }
+    const after = sanitizeSourceForPublish(rel, before);
+    if (after !== before) {
+      await fs.writeFile(abs, after, 'utf-8');
+      sanitized.push(rel);
+    }
+  }
+  return sanitized;
 }
 
 /**
@@ -37,6 +79,13 @@ export async function validateWorkspace(
     logs.push('Repaired siteConfig.ts types to include gallery/documentation sections');
   }
 
+  const tailwindRepaired = await repairTailwindConfigInWorkspace(resolved);
+  if (tailwindRepaired) {
+    logs.push(
+      'Repaired tailwind.config.js: full src/** content scan + safelist for section presentation classes'
+    );
+  }
+
   let packageJsonPath: string;
   try {
     packageJsonPath = path.join(resolved, 'package.json');
@@ -56,6 +105,15 @@ export async function validateWorkspace(
   const scripts = pkg.scripts || {};
   const changed = new Set(options.changedFiles || []);
   const changedList = [...changed];
+  const sanitizedMarkers = await sanitizeMarkerFilesInWorkspace(resolved);
+  if (sanitizedMarkers.length > 0) {
+    logs.push(`Removed dev-only agent sync markers from: ${sanitizedMarkers.join(', ')}`);
+  }
+
+  const repairedPage = await repairPageTsxInWorkspace(resolved);
+  if (repairedPage.length > 0) {
+    logs.push(`Repaired page.tsx structure/ESLint issues before validation`);
+  }
 
   const lockChanged =
     changed.has('package.json') ||
@@ -63,15 +121,17 @@ export async function validateWorkspace(
     changed.has('yarn.lock') ||
     changed.has('pnpm-lock.yaml');
 
-  /** Preview uses `next dev` — skip slow/flaky production build for src-only edits. */
+  /** Preview uses `next dev` — skip slow/flaky production build for presentation/style edits. */
+  const isPreviewSafePath = (f: string): boolean => {
+    if (f === 'tailwind.config.js' || f === 'tailwind.config.ts') return true;
+    return (
+      f.startsWith('src/') && /\.(css|scss|sass|less|tsx|jsx|ts|js|json)$/i.test(f)
+    );
+  };
   const previewSafeEdit =
     changedList.length > 0 &&
     !lockChanged &&
-    changedList.every(
-      (f) =>
-        f.startsWith('src/') &&
-        /\.(css|scss|sass|less|tsx|jsx|ts|js|json)$/i.test(f)
-    );
+    changedList.every(isPreviewSafePath);
 
   if (previewSafeEdit) {
     logs.push(
