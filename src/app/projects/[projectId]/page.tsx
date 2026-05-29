@@ -3,10 +3,13 @@
 import { useSession } from 'next-auth/react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { AppShell } from '@/components/layout/AppShell';
 import { ProjectPreviewFrame } from '@/components/ProjectPreviewFrame';
-import { schedulePreviewIframeReloads } from '@/lib/project-workspace/previewReloadAfterEdit';
+import {
+  schedulePreviewIframeReloads,
+  workspaceEditNeedsPreviewReload,
+} from '@/lib/project-workspace/previewReloadAfterEdit';
 import { ProjectEditorSidebar } from '@/components/project/ProjectEditorSidebar';
 import { UnpublishedChangesBadge } from '@/components/UnpublishedChangesBadge';
 import { ownerProjectStatusLabel } from '@/lib/owner/ownerCopy';
@@ -65,6 +68,13 @@ export default function ProjectPage() {
   const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
   const [previewReady, setPreviewReady] = useState(false);
   const [editInProgress, setEditInProgress] = useState(false);
+  const previewReloadCancelRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    return () => {
+      previewReloadCancelRef.current?.();
+    };
+  }, []);
 
   const fetchProject = useCallback(async () => {
     try {
@@ -187,20 +197,27 @@ export default function ProjectPage() {
             deployment={project.deployment}
             lastPublishedAt={project.lastPublishedAt}
             onEditStart={() => setEditInProgress(true)}
-            onEditSuccess={() => fetchProject()}
             onEditComplete={({ jobId, ok, previewSynced, changedFiles }) => {
               setEditInProgress(false);
               if (jobId) setLatestJobId(jobId);
               setDiffRefreshKey((k) => k + 1);
-              if (ok) {
-                schedulePreviewIframeReloads(
-                  () => setPreviewRefreshKey((k) => k + 1),
-                  { changedPaths: changedFiles, previewSynced }
-                );
-                void fetchProject().then(() => {
-                  setPreviewRefreshKey((k) => k + 1);
-                });
-              }
+              if (!ok) return;
+
+              previewReloadCancelRef.current?.();
+              previewReloadCancelRef.current = null;
+
+              void fetchProject().then(() => {
+                const affectsPreview = workspaceEditNeedsPreviewReload(changedFiles ?? []);
+                if (!affectsPreview) return;
+
+                if (previewSynced === false) {
+                  const schedule = schedulePreviewIframeReloads(
+                    () => setPreviewRefreshKey((k) => k + 1),
+                    { changedPaths: changedFiles, previewSynced: false }
+                  );
+                  previewReloadCancelRef.current = schedule.cancel;
+                }
+              });
             }}
             onRollbackSuccess={handleDeploySuccess}
             onDeploySuccess={handleDeploySuccess}

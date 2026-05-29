@@ -286,7 +286,7 @@ export function ProjectPreviewFrame({
 
         {previewUrl && (
           <iframe
-            key={`${projectId}-${codeWorkspaceVersion}-${refreshKey}-${previewRefreshKey}`}
+            key={`${projectId}-${codeWorkspaceVersion}-${refreshKey}`}
             src={previewUrl}
             className="w-full h-full border-0"
             onLoad={() => setIframeLoading(false)}

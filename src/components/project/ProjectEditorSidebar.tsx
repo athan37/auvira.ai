@@ -34,7 +34,8 @@ interface Props {
   deployment?: Deployment | null;
   lastPublishedAt?: string;
   onEditStart?: () => void;
-  onEditSuccess: () => void;
+  /** @deprecated Prefer onEditComplete — avoids duplicate project refetch. */
+  onEditSuccess?: () => void;
   onEditComplete: (result: EditCompleteResult) => void;
   onRollbackSuccess: () => void;
   onDeploySuccess: () => void;

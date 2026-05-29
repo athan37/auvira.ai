@@ -1,6 +1,6 @@
 /**
  * Customer workspace Next.js dev server often lags behind saved file edits.
- * Iframe reload timing helpers keep the UI in sync with server-side preview verify.
+ * Iframe reload timing helpers keep the UI in sync without redundant React remounts.
  */
 
 const PREVIEW_RELOAD_PATHS = [
@@ -8,6 +8,13 @@ const PREVIEW_RELOAD_PATHS = [
   'src/app/page.tsx',
   'tailwind.config.js',
 ] as const;
+
+/** Delays after edit when server says preview is still syncing (dev compile lag). */
+const SYNC_SETTLE_DELAYS_MS = [2_500, 7_000] as const;
+
+export type PreviewReloadSchedule = {
+  cancel: () => void;
+};
 
 /** True when changed files affect the editable preview bundle (not just copy in JSON). */
 export function workspaceEditNeedsPreviewReload(changedPaths: string[]): boolean {
@@ -18,25 +25,32 @@ export function workspaceEditNeedsPreviewReload(changedPaths: string[]): boolean
 }
 
 /**
- * Schedule iframe reload bumps so preview catches up after siteConfig/page edits.
- * Immediate bump + delayed bumps when compile/HMR may still be in flight.
+ * Schedule light cache-bust bumps while preview HTML may still be compiling.
+ * When previewSynced is true, skip — parent reload via codeWorkspace.version is enough.
  */
 export function schedulePreviewIframeReloads(
   bump: () => void,
   options: { changedPaths?: string[]; previewSynced?: boolean }
-): void {
-  bump();
+): PreviewReloadSchedule {
+  const timers: ReturnType<typeof setTimeout>[] = [];
+  const cancel = () => {
+    for (const id of timers) {
+      clearTimeout(id);
+    }
+    timers.length = 0;
+  };
 
-  const needsSettle =
-    options.previewSynced === false ||
-    workspaceEditNeedsPreviewReload(options.changedPaths ?? []);
-
-  if (!needsSettle) {
-    return;
+  if (options.previewSynced !== false) {
+    return { cancel };
   }
 
-  window.setTimeout(bump, 1_000);
-  window.setTimeout(bump, 3_000);
-  window.setTimeout(bump, 6_000);
-  window.setTimeout(bump, 10_000);
+  if (!workspaceEditNeedsPreviewReload(options.changedPaths ?? [])) {
+    return { cancel };
+  }
+
+  for (const delayMs of SYNC_SETTLE_DELAYS_MS) {
+    timers.push(setTimeout(() => bump(), delayMs));
+  }
+
+  return { cancel };
 }
