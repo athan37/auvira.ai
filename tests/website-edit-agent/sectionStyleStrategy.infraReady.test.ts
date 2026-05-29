@@ -60,7 +60,7 @@ describe('runSectionStyleStrategy with infra baseline ready', () => {
     vi.spyOn(legacyPresentation, 'ensureLegacyPageReadsPresentation');
   });
 
-  it('only mutates siteConfig when infra baseline is ready', async () => {
+  it('updates siteConfig and wires legacy page even when infra baseline is ready', async () => {
     const options: WebsiteEditAgentOptions = {
       workspacePath: '/tmp/ws',
       ownerMessage: 'change background of first section to yellow',
@@ -73,15 +73,17 @@ describe('runSectionStyleStrategy with infra baseline ready', () => {
 
     const result = await runSectionStyleStrategy(options, {});
     expect(result?.ok).toBe(true);
-    expect(legacyPresentation.ensureTailwindPresentationSupport).not.toHaveBeenCalled();
-    expect(legacyPresentation.ensureLegacyPageReadsPresentation).not.toHaveBeenCalled();
+    expect(legacyPresentation.ensureLegacyPageReadsPresentation).toHaveBeenCalledWith(
+      options,
+      'GallerySection'
+    );
 
     expect(files.get('src/lib/siteConfig.ts')).toContain('bg-yellow-200');
     expect(files.get('src/lib/siteConfig.ts')).toContain(SITECONFIG_PRESENTATION_SYNC_EXPORT);
-    expect(files.get('src/app/page.tsx')).toBe(LEGACY_PAGE);
-    expect(files.get('tailwind.config.js')).toBe(TAILWIND);
+    expect(files.get('src/app/page.tsx')).toContain('resolveSectionBackground(section, preset)');
 
     const writtenPaths = gateway.writeFile.mock.calls.map((c) => c[0]);
-    expect(writtenPaths).toEqual(['src/lib/siteConfig.ts']);
+    expect(writtenPaths).toContain('src/lib/siteConfig.ts');
+    expect(writtenPaths).toContain('src/app/page.tsx');
   });
 });

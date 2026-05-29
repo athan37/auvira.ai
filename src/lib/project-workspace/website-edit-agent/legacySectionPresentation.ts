@@ -1,6 +1,6 @@
 import { SECTION_PRESENTATION_RUNTIME } from '@/lib/builder/sectionPresentationRuntime';
 import { extractSectionComponentSource } from './resolveSectionTarget';
-import { normalizeCustomerSiteTailwindConfig } from '@/lib/builder/tailwindPresentationSupport';
+import { normalizeCustomerSiteTailwindConfig, repairTailwindConfigInWorkspace } from '@/lib/builder/tailwindPresentationSupport';
 import {
   PAGE_TSX,
   TAILWIND_CONFIG,
@@ -119,4 +119,61 @@ export async function ensureLegacyPageReadsPresentation(
 
   await writeWorkspaceRel(options, PAGE_TSX, upgraded.content);
   return true;
+}
+
+/**
+ * Wire all section renderers in page.tsx that still use preset backgrounds,
+ * and repair tailwind.config.js safelist. Used on preview bootstrap and after style edits.
+ */
+export async function repairSectionPresentationWiringInWorkspace(
+  workspacePath: string
+): Promise<string[]> {
+  const { promises: fs } = await import('fs');
+  const path = await import('path');
+  const { parseSiteConfigSource } = await import('@/lib/site-manager/siteConfigParser');
+  const repaired: string[] = [];
+
+  const tailwindChanged = await repairTailwindConfigInWorkspace(workspacePath);
+  if (tailwindChanged) repaired.push('tailwind.config.js');
+
+  const pagePath = path.join(workspacePath, 'src/app/page.tsx');
+  const siteConfigPath = path.join(workspacePath, 'src/lib/siteConfig.ts');
+  let pageContent: string;
+  let siteConfig: string;
+  try {
+    pageContent = await fs.readFile(pagePath, 'utf-8');
+    siteConfig = await fs.readFile(siteConfigPath, 'utf-8');
+  } catch {
+    return repaired;
+  }
+
+  const parsed = parseSiteConfigSource(siteConfig);
+  const sectionTypes = new Set(
+    (parsed?.sections ?? []).map((s) => String((s as { type?: string }).type ?? ''))
+  );
+  if (sectionTypes.size === 0) {
+    sectionTypes.add('gallery');
+    sectionTypes.add('services');
+    sectionTypes.add('testimonials');
+    sectionTypes.add('about');
+  }
+
+  let nextPage = pageContent;
+  let pageChanged = false;
+  for (const type of sectionTypes) {
+    if (!type) continue;
+    const component = rendererComponentForSectionType(type);
+    const upgraded = upgradeSectionComponentToPresentationResolver(nextPage, component);
+    if (upgraded.patched) {
+      nextPage = upgraded.content;
+      pageChanged = true;
+    }
+  }
+
+  if (pageChanged) {
+    await fs.writeFile(pagePath, nextPage, 'utf-8');
+    repaired.push('src/app/page.tsx');
+  }
+
+  return repaired;
 }

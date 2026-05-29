@@ -29,6 +29,22 @@ import {
 } from '@/lib/builder/sectionPresentation';
 import { buildSiteModel } from './siteModel';
 import { normalizeSectionStyleStep } from './normalizeSectionStyleStep';
+import {
+  ensureLegacyPageReadsPresentation,
+  rendererComponentForSectionType,
+} from '../website-edit-agent/legacySectionPresentation';
+import type { SiteModel } from './siteModel';
+
+async function wireSectionPresentationPreview(
+  options: WebsiteEditAgentOptions,
+  sectionIndex: number,
+  siteModel: SiteModel
+): Promise<void> {
+  const section = siteModel.sections.find((s) => s.index === sectionIndex);
+  if (!section) return;
+  const componentName = rendererComponentForSectionType(section.type);
+  await ensureLegacyPageReadsPresentation(options, componentName);
+}
 
 export interface ExecuteSkillResult {
   ok: boolean;
@@ -205,6 +221,9 @@ export async function executeSkill(
       const changed = await updateSiteConfig(options, (content) =>
         updateSectionBackgroundColorInSource(content, sectionIndex, backgroundColor)
       );
+      if (changed) {
+        await wireSectionPresentationPreview(options, sectionIndex, siteModel);
+      }
       return {
         ok: changed,
         skill: step.skill,
@@ -225,6 +244,9 @@ export async function executeSkill(
         const changed = await updateSiteConfig(options, (content) =>
           updateSectionBackgroundColorInSource(content, sectionIndex, fallbackColor)
         );
+        if (changed) {
+          await wireSectionPresentationPreview(options, sectionIndex, siteModel);
+        }
         return {
           ok: changed,
           skill: step.skill,
@@ -245,6 +267,9 @@ export async function executeSkill(
     const changed = await updateSiteConfig(options, (content) =>
       updateSectionPresentationInSource(content, sectionIndex, presentation)
     );
+    if (changed) {
+      await wireSectionPresentationPreview(options, sectionIndex, siteModel);
+    }
     return {
       ok: changed,
       skill: step.skill,

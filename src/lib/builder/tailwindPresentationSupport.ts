@@ -98,7 +98,17 @@ export function normalizeCustomerSiteTailwindConfig(content: string): {
   }
 
   if (!/\bsafelist\s*:/.test(next)) {
-    next = next.replace(/\n(\s*theme:\s*\{)/, `\n${CUSTOMER_SITE_TAILWIND_SAFELIST}\n$1`);
+    if (/\btheme\s*:\s*\{/.test(next)) {
+      next = next.replace(/\n(\s*theme:\s*\{)/, `\n${CUSTOMER_SITE_TAILWIND_SAFELIST}\n$1`);
+    } else {
+      const closingBrace = next.lastIndexOf('}');
+      if (closingBrace >= 0) {
+        const before = next.slice(0, closingBrace).trimEnd();
+        const after = next.slice(closingBrace);
+        const needsComma = before.length > 0 && !before.endsWith(',') && !before.endsWith('{');
+        next = `${before}${needsComma ? ',' : ''}\n${CUSTOMER_SITE_TAILWIND_SAFELIST}\n${after}`;
+      }
+    }
     changed = true;
   }
 

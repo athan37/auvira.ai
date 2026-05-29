@@ -136,12 +136,18 @@ export async function runSectionStyleStrategy(
   const componentName = plan.where.rendererComponent;
 
   const configUpdated = await tryConfigPresentationUpdate(options, sectionIndex, toColor);
+
+  if (configUpdated && componentName) {
+    await ensureLegacyPageReadsPresentation(options, componentName);
+  }
+
   const skipInfraInlineRepair = options.infraBaselineReady === true;
-  const tailwindPatched = skipInfraInlineRepair
-    ? false
-    : await ensureTailwindPresentationSupport(options);
+  const tailwindPatched =
+    configUpdated || skipInfraInlineRepair
+      ? false
+      : await ensureTailwindPresentationSupport(options);
   const pageUpgraded =
-    skipInfraInlineRepair || componentName == null
+    configUpdated || skipInfraInlineRepair || componentName == null
       ? false
       : await ensureLegacyPageReadsPresentation(options, componentName);
 
