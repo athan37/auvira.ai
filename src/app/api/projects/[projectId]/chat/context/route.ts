@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOwnerProject } from '@/lib/api/projectAccess';
-import { listProjectMessages } from '@/lib/chat/projectChatService';
+import { buildConversationHistory, listProjectMessages } from '@/lib/chat/projectChatService';
 
 export async function GET(
   request: NextRequest,
@@ -15,13 +15,19 @@ export async function GET(
   }
 
   const limitParam = Number(request.nextUrl.searchParams.get('limit') || '');
+  const maxTurnsParam = Number(request.nextUrl.searchParams.get('maxTurns') || '');
   const messages = await listProjectMessages({
     projectId: project._id,
     limit: Number.isFinite(limitParam) ? limitParam : undefined,
+  });
+  const conversationHistory = await buildConversationHistory({
+    projectId: project._id,
+    maxTurns: Number.isFinite(maxTurnsParam) ? maxTurnsParam : 6,
   });
 
   return NextResponse.json({
     ok: true,
     messages,
+    conversationHistory,
   });
 }

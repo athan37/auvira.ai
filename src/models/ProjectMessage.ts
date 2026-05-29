@@ -1,13 +1,11 @@
 import mongoose, { Schema, Document } from 'mongoose';
+import type { ProjectMessageMetadata } from '@/lib/chat/projectMessageMetadata';
 
 export interface IProjectMessage extends Document {
   projectId: mongoose.Types.ObjectId;
   role: 'user' | 'assistant' | 'system';
   content: string;
-  metadata?: {
-    editSummary?: string[];
-    stageLogs?: Array<{ stage: string; timestamp: string; duration_ms?: number }>;
-  };
+  metadata?: ProjectMessageMetadata;
   createdAt: Date;
 }
 
