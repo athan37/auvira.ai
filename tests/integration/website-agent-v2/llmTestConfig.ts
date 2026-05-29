@@ -1,5 +1,6 @@
 export {
   describeLlmIntegration,
+  describeRunLlmIntegration,
   hasLlmApiKey,
   llmDescribe,
   requireLlmApiKey,

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { SITECONFIG_PRESENTATION_SYNC_EXPORT } from '@/lib/site-manager/siteConfigAgentMarkers';
 import { runSectionStyleStrategy } from '@/lib/project-workspace/website-edit-agent/strategies/sectionStyleStrategy';
 import * as legacyPresentation from '@/lib/project-workspace/website-edit-agent/legacySectionPresentation';
 import type { WebsiteEditAgentOptions } from '@/lib/project-workspace/website-edit-agent/types';
@@ -76,6 +77,7 @@ describe('runSectionStyleStrategy with infra baseline ready', () => {
     expect(legacyPresentation.ensureLegacyPageReadsPresentation).not.toHaveBeenCalled();
 
     expect(files.get('src/lib/siteConfig.ts')).toContain('bg-yellow-200');
+    expect(files.get('src/lib/siteConfig.ts')).toContain(SITECONFIG_PRESENTATION_SYNC_EXPORT);
     expect(files.get('src/app/page.tsx')).toBe(LEGACY_PAGE);
     expect(files.get('tailwind.config.js')).toBe(TAILWIND);
 

@@ -32,6 +32,11 @@ import {
 } from '@/lib/project-workspace/editFailureDetail';
 import { resolveEditPreviewVerification } from '@/lib/project-workspace/verifyPreviewForPrompt';
 import { resolveEditStreamPreviewOutcome } from '@/lib/project-workspace/previewStability';
+import { workspaceEditNeedsPreviewReload } from '@/lib/project-workspace/previewReloadAfterEdit';
+import {
+  resolveExpectedPreviewPresentationClasses,
+  waitForPresentationClassInPreview,
+} from '@/lib/project-workspace/previewReflectsSiteConfig';
 import { resolveSiteWorkspace } from '@/lib/project-workspace/website-edit-agent/resolveSiteWorkspace';
 import {
   EditStepTimer,
@@ -704,6 +709,16 @@ export async function POST(
           project.preview?.url?.trim() ||
           null;
 
+        let siteConfigForVerify: string | undefined;
+        if (activeGateway && changedPaths.some((p) => p.includes('siteConfig'))) {
+          try {
+            siteConfigForVerify =
+              (await activeGateway.readFile('src/lib/siteConfig.ts')) ?? undefined;
+          } catch {
+            siteConfigForVerify = undefined;
+          }
+        }
+
         let previewVerify = { ok: true, reason: 'skipped', imagesFound: 0, htmlLength: 0 };
         let previewVerifySkipped = true;
         let editStreamOutcome = resolveEditStreamPreviewOutcome({
@@ -745,6 +760,8 @@ export async function POST(
             mode,
             workspaceSnap,
             gateway: activeGateway ?? undefined,
+            siteConfigContent: siteConfigForVerify,
+            pageContent: workspaceSnap?.pageContent,
           });
           await appendTimedEditJobLog(
             jobId,
@@ -812,6 +829,57 @@ export async function POST(
             },
           }
         );
+
+        if (
+          !isSandbox &&
+          workspaceEditNeedsPreviewReload(changedPaths) &&
+          editStreamOutcome.editApplied &&
+          previewUrlForVerify
+        ) {
+          let siteConfigSettle: string | undefined = siteConfigForVerify;
+          if (!siteConfigSettle && activeGateway) {
+            try {
+              siteConfigSettle =
+                (await activeGateway.readFile('src/lib/siteConfig.ts')) ?? undefined;
+            } catch {
+              siteConfigSettle = undefined;
+            }
+          }
+          const expectedClasses = resolveExpectedPreviewPresentationClasses(
+            siteConfigSettle,
+            message
+          );
+          if (expectedClasses.length > 0) {
+            await appendEditJobLog(
+              jobId,
+              'preview_compile_settle',
+              'Waiting for preview HTML to include saved presentation classes',
+              { expectedClasses }
+            );
+            const sync = await waitForPresentationClassInPreview(
+              previewUrlForVerify,
+              expectedClasses
+            );
+            await appendEditJobLog(
+              jobId,
+              sync.ok ? 'preview_presentation_synced' : 'preview_presentation_pending',
+              sync.reason,
+              { expectedClasses }
+            );
+            if (!sync.ok && editStreamOutcome.previewSynced) {
+              editStreamOutcome = {
+                ...editStreamOutcome,
+                previewSynced: false,
+                previewVerifyStatus: 'pending',
+                previewVerifyReason: sync.reason,
+                ownerMessage:
+                  'Saved. Preview is still syncing; refresh in a moment.',
+              };
+            }
+          } else {
+            await new Promise((r) => setTimeout(r, 2_000));
+          }
+        }
 
         const successOwnerMessage = editStreamOutcome.ownerMessage;
         const finishLabel = editStreamOutcome.previewSynced

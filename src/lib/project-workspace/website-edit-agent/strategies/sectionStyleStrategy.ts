@@ -16,6 +16,7 @@ import {
   ensureTailwindPresentationSupport,
 } from '../legacySectionPresentation';
 import { updateSectionBackgroundColorInSource } from '../../website-edit-agent-v2/siteConfigMutations';
+import { appendSiteConfigPresentationSyncExport } from '@/lib/site-manager/siteConfigAgentMarkers';
 import type { WebsiteEditAgentOptions, WebsiteEditAgentResult } from '../types';
 
 function buildSectionStyleSummary(
@@ -44,7 +45,8 @@ async function tryConfigPresentationUpdate(
   const updated = updateSectionBackgroundColorInSource(siteConfigContent, sectionIndex, toColor);
   if (!updated || updated === siteConfigContent) return false;
 
-  await writeWorkspaceRel(options, SITE_CONFIG, updated);
+  const stamped = appendSiteConfigPresentationSyncExport(updated);
+  await writeWorkspaceRel(options, SITE_CONFIG, stamped);
   return true;
 }
 

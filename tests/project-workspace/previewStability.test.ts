@@ -44,6 +44,12 @@ describe('previewStability', () => {
     expect(outcome.previewVerifyStatus).toBe('failed');
   });
 
+  it('treats missing exact presentation class as soft pending', () => {
+    expect(
+      isSoftPreviewPendingFailure('Preview did not include expected class(es) yet: bg-red-200')
+    ).toBe(true);
+  });
+
   it('returns synced when preview verification succeeds', () => {
     const outcome = resolveEditStreamPreviewOutcome({
       sourceValidationPassed: true,

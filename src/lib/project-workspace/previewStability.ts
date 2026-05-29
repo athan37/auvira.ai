@@ -26,6 +26,10 @@ const SOFT_REASON_FRAGMENTS = [
   'restarting',
   'not ready',
   'still syncing',
+  'did not include expected class',
+  'preview did not include',
+  'not wired',
+  'does not use resolvesectionbackground',
 ];
 
 /**

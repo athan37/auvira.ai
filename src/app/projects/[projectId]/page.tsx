@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useEffect, useState, useCallback } from 'react';
 import { AppShell } from '@/components/layout/AppShell';
 import { ProjectPreviewFrame } from '@/components/ProjectPreviewFrame';
+import { schedulePreviewIframeReloads } from '@/lib/project-workspace/previewReloadAfterEdit';
 import { ProjectEditorSidebar } from '@/components/project/ProjectEditorSidebar';
 import { UnpublishedChangesBadge } from '@/components/UnpublishedChangesBadge';
 import { ownerProjectStatusLabel } from '@/lib/owner/ownerCopy';
@@ -187,13 +188,18 @@ export default function ProjectPage() {
             lastPublishedAt={project.lastPublishedAt}
             onEditStart={() => setEditInProgress(true)}
             onEditSuccess={() => fetchProject()}
-            onEditComplete={({ jobId, ok }) => {
+            onEditComplete={({ jobId, ok, previewSynced, changedFiles }) => {
               setEditInProgress(false);
               if (jobId) setLatestJobId(jobId);
               setDiffRefreshKey((k) => k + 1);
               if (ok) {
-                setPreviewRefreshKey((k) => k + 1);
-                fetchProject();
+                schedulePreviewIframeReloads(
+                  () => setPreviewRefreshKey((k) => k + 1),
+                  { changedPaths: changedFiles, previewSynced }
+                );
+                void fetchProject().then(() => {
+                  setPreviewRefreshKey((k) => k + 1);
+                });
               }
             }}
             onRollbackSuccess={handleDeploySuccess}

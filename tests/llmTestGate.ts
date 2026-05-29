@@ -37,5 +37,20 @@ export function llmDescribe(name: string, fn: () => void): void {
 export const describeLlmIntegration = llmDescribe;
 
 export function shouldRunLlmIntegrationTests(): boolean {
-  return hasLlmApiKey();
+  return (
+    hasLlmApiKey() &&
+    (process.env.RUN_LLM_INTEGRATION_TESTS === 'true' ||
+      process.env.VITEST_LLM_SUITE === '1')
+  );
+}
+
+/**
+ * Live LLM integration suite gated by RUN_LLM_INTEGRATION_TESTS=true (or test:llm).
+ */
+export function describeRunLlmIntegration(name: string, fn: () => void): void {
+  if (!shouldRunLlmIntegrationTests()) {
+    describe.skip(name, fn);
+    return;
+  }
+  llmDescribe(name, fn);
 }

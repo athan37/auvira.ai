@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   appendSiteConfigGallerySyncExport,
+  appendSiteConfigPresentationSyncExport,
+  SITECONFIG_PRESENTATION_SYNC_EXPORT,
   sanitizeSourceForPublish,
   stripAgentSyncMarkers,
 } from '../../src/lib/site-manager/siteConfigAgentMarkers';
@@ -41,7 +43,7 @@ describe('siteConfigAgentMarkers', () => {
     expect(patched).toContain('"hero"');
 
     const stamped = stampSiteConfigForGalleryPreviewReload(patched!);
-    expect(stamped).toContain('__siteAgentGallerySync');
+    expect(stamped).toContain(SITECONFIG_PRESENTATION_SYNC_EXPORT);
     const parsed = parseSiteConfigSource(stamped);
     expect(parsed?.sections.length).toBeGreaterThan(0);
     expect(stamped).toContain('"hero"');
@@ -51,17 +53,26 @@ describe('siteConfigAgentMarkers', () => {
   it('appendSiteConfigGallerySyncExport replaces prior sync export', () => {
     const once = appendSiteConfigGallerySyncExport(withHero);
     const twice = appendSiteConfigGallerySyncExport(once);
-    expect((twice.match(/__siteAgentGallerySync/g) ?? []).length).toBe(1);
+    expect((twice.match(new RegExp(SITECONFIG_PRESENTATION_SYNC_EXPORT, 'g')) ?? []).length).toBe(
+      1
+    );
     expect(parseSiteConfigSource(twice)?.sections.length).toBe(2);
+  });
+
+  it('appendSiteConfigPresentationSyncExport bumps __siteConfigSyncVersion', () => {
+    const stamped = appendSiteConfigPresentationSyncExport(withHero);
+    expect(stamped).toContain(SITECONFIG_PRESENTATION_SYNC_EXPORT);
+    const clean = sanitizeSourceForPublish('src/lib/siteConfig.ts', stamped);
+    expect(clean).not.toContain(SITECONFIG_PRESENTATION_SYNC_EXPORT);
   });
 
   it('sanitizeSourceForPublish strips agent markers from page and siteConfig', () => {
     const page = 'export default function Home() { return null; }\n// site-agent: page gallery sync 99\n';
-    const cfg = `${withHero}\nexport const __siteAgentGallerySync = 123;\n`;
+    const cfg = `${withHero}\nexport const ${SITECONFIG_PRESENTATION_SYNC_EXPORT} = 123;\n`;
     const cleanPage = sanitizeSourceForPublish('src/app/page.tsx', page);
     const cleanCfg = sanitizeSourceForPublish('src/lib/siteConfig.ts', cfg);
     expect(cleanPage).not.toContain('page gallery sync');
-    expect(cleanCfg).not.toContain('__siteAgentGallerySync');
+    expect(cleanCfg).not.toContain(SITECONFIG_PRESENTATION_SYNC_EXPORT);
     expect(parseSiteConfigSource(cleanCfg)?.sections).toHaveLength(2);
   });
 });

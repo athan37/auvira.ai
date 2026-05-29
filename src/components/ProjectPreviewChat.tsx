@@ -20,6 +20,8 @@ import {
 export interface EditCompleteResult {
   ok: boolean;
   jobId?: string;
+  previewSynced?: boolean;
+  changedFiles?: string[];
 }
 
 type PendingImage = {
@@ -407,6 +409,8 @@ export function ProjectPreviewChat({
     let suggestedReplies: string[] | undefined;
     let errorTrace = '';
     let errorStage = '';
+    let previewSynced: boolean | undefined;
+    let changedFilesFromEdit: string[] | undefined;
     let attachments: WorkspaceAssetAttachment[] = [];
 
     try {
@@ -431,12 +435,19 @@ export function ProjectPreviewChat({
         .slice(-6)
         .map((m) => ({ role: m.role, content: m.content }));
 
-      const response = await fetch(`/api/projects/${projectId}/code-agent/edit/stream`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMsg, attachments, conversationHistory }),
-        signal: AbortSignal.timeout(300000),
-      });
+      let response: Response;
+      try {
+        response = await fetch(`/api/projects/${projectId}/code-agent/edit/stream`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: userMsg, attachments, conversationHistory }),
+          signal: AbortSignal.timeout(300000),
+        });
+      } catch {
+        throw new Error(
+          'Could not reach the server. Make sure `npm run dev` is running at http://localhost:3000, then try again.'
+        );
+      }
 
       if (!response.ok) {
         throw new Error('Request failed');
@@ -478,6 +489,11 @@ export function ProjectPreviewChat({
               success = result.ok !== false;
               editFailed = !success && !needsClarification;
               jobId = result.jobId || event.jobId;
+              const donePreviewSynced =
+                typeof result.previewSynced === 'boolean' ? result.previewSynced : undefined;
+              const doneChangedFiles = Array.isArray(result.changedFiles)
+                ? (result.changedFiles as string[])
+                : undefined;
               suggestedReplies = Array.isArray(result.suggestedReplies)
                 ? (result.suggestedReplies as string[])
                 : undefined;
@@ -494,6 +510,12 @@ export function ProjectPreviewChat({
               }
               if (needsClarification && typeof result.errorStage === 'string') {
                 errorStage = result.errorStage;
+              }
+              if (donePreviewSynced !== undefined) {
+                previewSynced = donePreviewSynced;
+              }
+              if (doneChangedFiles) {
+                changedFilesFromEdit = doneChangedFiles;
               }
             }
           } catch {
@@ -525,7 +547,12 @@ export function ProjectPreviewChat({
           errorJobId: editFailed && jobId ? jobId : undefined,
         },
       ]);
-      onEditComplete?.({ ok: success || needsClarification, jobId });
+      onEditComplete?.({
+        ok: success || needsClarification,
+        jobId,
+        previewSynced,
+        changedFiles: changedFilesFromEdit,
+      });
 
       if (success) {
         onEditSuccess?.();

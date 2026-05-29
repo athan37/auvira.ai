@@ -2,6 +2,8 @@
 
 export const SITECONFIG_GALLERY_SYNC_MARKER = '// site-agent: siteconfig gallery sync';
 export const SITECONFIG_GALLERY_SYNC_EXPORT = '__siteAgentGallerySync';
+/** Bumped on siteConfig presentation edits to force Next dev server module reload. */
+export const SITECONFIG_PRESENTATION_SYNC_EXPORT = '__siteConfigSyncVersion';
 export const PAGE_GALLERY_SYNC_EXPORT = '__siteAgentPageGallerySync';
 export const PAGE_GALLERY_SYNC_MARKER = '// site-agent: page gallery sync';
 
@@ -10,6 +12,10 @@ const MARKER_LINE_PATTERNS = [
   new RegExp(`^${escapeRe(PAGE_GALLERY_SYNC_MARKER)} \\d+\\s*$`, 'gm'),
   new RegExp(
     `^export const ${SITECONFIG_GALLERY_SYNC_EXPORT} = \\d+;\\s*$`,
+    'gm'
+  ),
+  new RegExp(
+    `^export const ${SITECONFIG_PRESENTATION_SYNC_EXPORT} = \\d+;\\s*$`,
     'gm'
   ),
   new RegExp(
@@ -31,9 +37,14 @@ export function stripAgentSyncMarkers(content: string): string {
   return out.replace(/\n{3,}/g, '\n\n').trimEnd();
 }
 
-export function appendSiteConfigGallerySyncExport(content: string): string {
+/** Bump sync version export so siteConfig.ts changes reload in the workspace dev server. */
+export function appendSiteConfigPresentationSyncExport(content: string): string {
   const stripped = stripAgentSyncMarkers(content);
-  return `${stripped}\n\nexport const ${SITECONFIG_GALLERY_SYNC_EXPORT} = ${Date.now()};\n`;
+  return `${stripped}\n\nexport const ${SITECONFIG_PRESENTATION_SYNC_EXPORT} = ${Date.now()};\n`;
+}
+
+export function appendSiteConfigGallerySyncExport(content: string): string {
+  return appendSiteConfigPresentationSyncExport(content);
 }
 
 export function appendPageGallerySyncExport(content: string): string {

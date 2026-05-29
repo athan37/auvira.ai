@@ -3,6 +3,12 @@ import {
   htmlShowsTailwindColor,
 } from './verifyPreviewHints';
 import {
+  genericColorWouldPassButExactClassMissing,
+  presentationWiringIssues,
+  resolveExpectedPreviewPresentationClasses,
+  waitForPresentationClassInPreview,
+} from './previewReflectsSiteConfig';
+import {
   verifyEditVisibleInPreview,
   type VerifyPreviewResult,
 } from './verifyEditVisibleInPreview';
@@ -75,6 +81,23 @@ export async function verifyPreviewForPrompt(
   }
 
   if (colorHits.length > 0) {
+    const expectedFromMessage = resolveExpectedPreviewPresentationClasses(
+      null,
+      input.ownerMessage
+    );
+    if (
+      input.strictHints &&
+      expectedFromMessage.length > 0 &&
+      genericColorWouldPassButExactClassMissing(html, input.ownerMessage, expectedFromMessage)
+    ) {
+      return {
+        ok: false,
+        reason: `Preview shows ${colorHits.join(', ')} styling elsewhere but not exact class ${expectedFromMessage.join(', ')}.`,
+        htmlLength: html.length,
+        imagesFound: base.imagesFound,
+        phraseMatched: false,
+      };
+    }
     return {
       ok: true,
       reason: `Preview HTML includes ${colorHits.join(', ')} styling.`,
@@ -150,6 +173,10 @@ export interface ResolveEditPreviewVerificationInput {
   mode: 'gitlab' | 'static';
   workspaceSnap?: SiteWorkspaceSnapshot;
   gateway?: WorkspaceGateway;
+  /** Fresh siteConfig.ts after edit — used for presentation class sync checks. */
+  siteConfigContent?: string;
+  /** Fresh page.tsx — used to detect hardcoded section backgrounds. */
+  pageContent?: string;
 }
 
 /**
@@ -207,6 +234,66 @@ export async function resolveEditPreviewVerification(
   const hints = extractPreviewVerifyHints(input.ownerMessage);
   const strictColorHints =
     hints.isTextColorRequest || hints.isBackgroundColorRequest;
+
+  let siteConfigAfter = input.siteConfigContent ?? '';
+  if (!siteConfigAfter && input.workspaceSnap?.siteConfigContent) {
+    siteConfigAfter = input.workspaceSnap.siteConfigContent;
+  }
+  if (!siteConfigAfter && input.gateway) {
+    siteConfigAfter =
+      (await input.gateway.readFile('src/lib/siteConfig.ts').catch(() => '')) || '';
+  }
+
+  let pageAfter = input.pageContent ?? '';
+  if (!pageAfter && input.workspaceSnap?.pageContent) {
+    pageAfter = input.workspaceSnap.pageContent;
+  }
+  if (!pageAfter && input.gateway) {
+    pageAfter =
+      (await input.gateway.readFile('src/app/page.tsx').catch(() => '')) || '';
+  }
+
+  if (
+    strictColorHints &&
+    siteConfigAfter.includes('presentation') &&
+    siteConfigAfter.includes('backgroundClass')
+  ) {
+    const wiringIssues = pageAfter
+      ? presentationWiringIssues(siteConfigAfter, pageAfter)
+      : [];
+    if (wiringIssues.length > 0) {
+      return {
+        ok: false,
+        reason: `Saved siteConfig.presentation but preview renderer is not wired: ${wiringIssues.join('; ')}`,
+        htmlLength: 0,
+        imagesFound: 0,
+        phraseMatched: false,
+      };
+    }
+
+    const expectedClasses = resolveExpectedPreviewPresentationClasses(
+      siteConfigAfter,
+      input.ownerMessage
+    );
+    const sync = await waitForPresentationClassInPreview(input.previewUrl, expectedClasses);
+    if (sync.ok) {
+      return {
+        ok: true,
+        reason: sync.reason,
+        htmlLength: 0,
+        imagesFound: 0,
+        phraseMatched: false,
+      };
+    }
+    return {
+      ok: false,
+      reason: sync.reason,
+      htmlLength: 0,
+      imagesFound: 0,
+      phraseMatched: false,
+    };
+  }
+
   return verifyPreviewForPrompt({
     previewUrl: input.previewUrl,
     ownerMessage: input.ownerMessage,
