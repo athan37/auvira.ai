@@ -40,6 +40,34 @@ export async function workspaceExists(projectId: string): Promise<boolean> {
   }
 }
 
+/**
+ * Remove the on-disk git workspace for a project (best-effort).
+ */
+export async function removeGitWorkspace(projectId: string): Promise<void> {
+  const repoDir = getGitWorkspaceRepoDir(projectId);
+  await fs.rm(repoDir, { recursive: true, force: true });
+}
+
+function staleWorkspaceHint(projectId: string): string {
+  return (
+    `Close the preview dev server if it is running, delete ${getGitWorkspaceRepoDir(projectId)}, ` +
+    'then refresh the project.'
+  );
+}
+
+async function assertGitWorkspaceAbsent(projectId: string): Promise<void> {
+  if (await workspaceExists(projectId)) {
+    throw new Error(
+      `Stale git workspace could not be cleared for project ${projectId}. ${staleWorkspaceHint(projectId)}`
+    );
+  }
+}
+
+function isCloneDestinationExistsError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return msg.includes('already exists') && msg.includes('not an empty directory');
+}
+
 /** True when clone has minimum files needed for preview (package.json + git metadata). */
 export async function isGitWorkspaceUsable(projectId: string): Promise<boolean> {
   const workspacePath = getGitWorkspacePath(projectId);
@@ -143,11 +171,8 @@ export async function ensureGitWorkspace(project: IWebsiteProject, userId?: stri
     console.warn(
       `[workspace] ${projectId}: corrupt workspace (missing package.json or .git) — removing and re-cloning`
     );
-    try {
-      await fs.rm(repoDir, { recursive: true, force: true });
-    } catch {
-      /* best-effort; clone below may still fail if files are locked */
-    }
+    await removeGitWorkspace(projectId);
+    await assertGitWorkspaceAbsent(projectId);
   }
 
   // Need to clone
@@ -170,8 +195,21 @@ export async function ensureGitWorkspace(project: IWebsiteProject, userId?: stri
 
   console.log(`[workspace] Cloning ${repoUrl} (${branch}) into ${workspacePath}`);
 
-  // Create parent directory
+  // Create parent directory (target path must not exist for git clone)
   await fs.mkdir(repoDir, { recursive: true });
+  if (await workspaceExists(projectId)) {
+    await removeGitWorkspace(projectId);
+    await assertGitWorkspaceAbsent(projectId);
+    await fs.mkdir(repoDir, { recursive: true });
+  }
+
+  const runClone = (): void => {
+    execSync(`git clone --branch ${branch} --single-branch ${repoUrl} "${workspacePath}"`, {
+      cwd: repoDir,
+      timeout: 120000,
+      stdio: 'pipe',
+    });
+  };
 
   // Clone the repo
   try {
@@ -186,17 +224,26 @@ export async function ensureGitWorkspace(project: IWebsiteProject, userId?: stri
       message: `Cloning GitLab repo: ${repoUrl}`,
       metadata: { branch },
     }).catch(() => {});
-    execSync(`git clone --branch ${branch} --single-branch ${repoUrl} "${workspacePath}"`, {
-      cwd: repoDir,
-      timeout: 120000,
-      stdio: 'pipe',
-    });
-  } catch (e) {
-    // Clean up on failure
     try {
-      await fs.rm(repoDir, { recursive: true, force: true });
-    } catch {}
-    const errMsg = `Failed to clone ${repoUrl}: ${e instanceof Error ? e.message : 'Unknown error'}`;
+      runClone();
+    } catch (firstErr) {
+      if (!isCloneDestinationExistsError(firstErr)) {
+        throw firstErr;
+      }
+      console.warn(
+        `[workspace] ${projectId}: clone target already exists — clearing and retrying once`
+      );
+      await removeGitWorkspace(projectId);
+      await assertGitWorkspaceAbsent(projectId);
+      await fs.mkdir(repoDir, { recursive: true });
+      runClone();
+    }
+  } catch (e) {
+    await removeGitWorkspace(projectId).catch(() => {});
+    const base = e instanceof Error ? e.message : 'Unknown error';
+    const errMsg = isCloneDestinationExistsError(e)
+      ? `Failed to clone ${repoUrl}: stale workspace directory blocked clone. ${staleWorkspaceHint(projectId)} (${base})`
+      : `Failed to clone ${repoUrl}: ${base}`;
     await logProjectStep({
       projectId,
       userId: userId || 'unknown',
