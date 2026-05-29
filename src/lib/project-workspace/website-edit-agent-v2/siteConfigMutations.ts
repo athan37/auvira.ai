@@ -264,3 +264,43 @@ export function updateSectionBackgroundColorInSource(
   return updateSectionPresentationInSource(content, sectionIndex, { backgroundClass });
 }
 
+function subtitleStyleMarkerToColor(subtitle: string): string | null {
+  const trimmed = subtitle.trim();
+  if (!trimmed) return null;
+  const bgPrefix = trimmed.match(/^bg-([a-z]+)-\d{2,3}$/i);
+  if (bgPrefix?.[1]) return bgPrefix[1].toLowerCase();
+  const marker = trimmed.match(/^([a-z]+)_bg$/i);
+  if (marker?.[1]) return marker[1].toLowerCase();
+  return null;
+}
+
+/**
+ * Migrate legacy subtitle style markers (e.g. "YELLOW_BG") to presentation.backgroundClass.
+ */
+export function migrateSubtitleStyleMarkersInSource(content: string): string | null {
+  return mutateSiteConfigSource(content, (config) => {
+    const sections = Array.isArray(config.sections)
+      ? (config.sections as Array<Record<string, unknown>>)
+      : [];
+    let changed = false;
+
+    for (const section of sections) {
+      const subtitle = normalizeString(section.subtitle);
+      if (!subtitle) continue;
+      const color = subtitleStyleMarkerToColor(subtitle);
+      if (!color) continue;
+
+      const presentation = asMutableRecord(section.presentation);
+      const nextBackground = colorNameToBackgroundClass(color);
+      if (presentation.backgroundClass !== nextBackground) {
+        presentation.backgroundClass = nextBackground;
+        section.presentation = presentation;
+      }
+      delete section.subtitle;
+      changed = true;
+    }
+
+    return changed;
+  });
+}
+

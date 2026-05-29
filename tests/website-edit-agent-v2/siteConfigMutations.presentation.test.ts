@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  migrateSubtitleStyleMarkersInSource,
   updateSectionBackgroundColorInSource,
   updateSectionPresentationInSource,
 } from '@/lib/project-workspace/website-edit-agent-v2/siteConfigMutations';
@@ -26,5 +27,17 @@ describe('siteConfigMutations presentation', () => {
     });
     expect(updated).toContain('"cardClass": "border-amber-300"');
     expect(updated).toContain('"type": "about"');
+  });
+
+  it('migrates legacy subtitle color markers into presentation', () => {
+    const withSubtitleMarker = `export const siteConfig = {
+  sections: [
+    { type: "gallery", title: "Hello", subtitle: "YELLOW_BG" },
+  ],
+};`;
+    const updated = migrateSubtitleStyleMarkersInSource(withSubtitleMarker);
+    expect(updated).toContain('"presentation"');
+    expect(updated).toContain('"bg-yellow-200"');
+    expect(updated).not.toContain('"YELLOW_BG"');
   });
 });

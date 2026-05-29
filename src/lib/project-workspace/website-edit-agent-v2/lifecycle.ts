@@ -18,6 +18,7 @@ import { buildSiteModel } from './siteModel';
 import { resolveSectionIndexFromMessage } from './normalizeSectionStyleStep';
 import {
   updateSectionBackgroundColorInSource,
+  migrateSubtitleStyleMarkersInSource,
   updateSectionPresentationInSource,
 } from './siteConfigMutations';
 
@@ -123,6 +124,16 @@ export async function repairEditRun(
   const content = await readWorkspaceRel(options, SITE_CONFIG);
   if (!content) {
     return { ok: false, action: 'failed', reason: 'siteConfig.ts is missing after edit.' };
+  }
+
+  const migratedSubtitle = migrateSubtitleStyleMarkersInSource(content);
+  if (migratedSubtitle && migratedSubtitle !== content) {
+    await writeWorkspaceRel(options, SITE_CONFIG, migratedSubtitle);
+    return {
+      ok: true,
+      action: 'repaired',
+      reason: 'Migrated subtitle style markers to section.presentation.',
+    };
   }
 
   const presentationRepair = await repairMissingSectionPresentation(options, plan, content);
