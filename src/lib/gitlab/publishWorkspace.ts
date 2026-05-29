@@ -10,6 +10,7 @@ import {
   isSafePublishPath,
   WORKSPACE_BINARY_EXTENSIONS,
 } from '../project-workspace/workspaceEditShared';
+import { sanitizeSourceForPublish } from '../site-manager/siteConfigAgentMarkers';
 
 export interface WorkspaceFileChange {
   filePath: string;
@@ -194,7 +195,8 @@ export async function buildWorkspaceCommitActions(
       continue;
     }
 
-    const content = await fs.readFile(absPath, 'utf-8');
+    const raw = await fs.readFile(absPath, 'utf-8');
+    const content = sanitizeSourceForPublish(change.filePath, raw);
     actions.push({
       action: change.action,
       file_path: change.filePath,

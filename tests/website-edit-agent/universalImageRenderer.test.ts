@@ -124,15 +124,16 @@ export default function Home() {
     expect(pageHasGalleryRenderer(content)).toBe(true);
   });
 
-  it('stampPageForGalleryPreviewReload appends parse-safe sync export for dev reload', () => {
+  it('stampPageForGalleryPreviewReload appends comment-only sync marker for dev reload', () => {
     const page = readFileSync(
       path.join(FIXTURES, 'section-loop-default/src/app/page.tsx'),
       'utf8'
     );
     const stamped = stampPageForGalleryPreviewReload(page);
-    expect(stamped).toContain('__siteAgentPageGallerySync');
+    expect(stamped).toContain('site-agent: page gallery sync');
+    expect(stamped).not.toMatch(/export const __siteAgentPageGallerySync/);
     expect(stamped.length).toBeGreaterThan(page.length);
     const restamped = stampPageForGalleryPreviewReload(stamped);
-    expect((restamped.match(/__siteAgentPageGallerySync/g) ?? []).length).toBe(1);
+    expect((restamped.match(/site-agent: page gallery sync/g) ?? []).length).toBe(1);
   });
 });

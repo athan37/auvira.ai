@@ -75,4 +75,13 @@ describe('siteConfigAgentMarkers', () => {
     expect(cleanCfg).not.toContain(SITECONFIG_PRESENTATION_SYNC_EXPORT);
     expect(parseSiteConfigSource(cleanCfg)?.sections).toHaveLength(2);
   });
+
+  it('sanitizeSourceForPublish removes legacy __siteAgentPageGallerySync export from page.tsx', () => {
+    const page = `export default function Home() { return null; }
+export const __siteAgentPageGallerySync = 1234567890;
+`;
+    const clean = sanitizeSourceForPublish('src/app/page.tsx', page);
+    expect(clean).not.toContain('__siteAgentPageGallerySync');
+    expect(clean).toContain('export default function Home');
+  });
 });

@@ -37,6 +37,14 @@ export function stripAgentSyncMarkers(content: string): string {
   return out.replace(/\n{3,}/g, '\n\n').trimEnd();
 }
 
+/** Next.js pages reject unknown exports like __siteAgentPageGallerySync (legacy agent stamps). */
+export function stripInvalidNextJsPageExports(content: string): string {
+  return content
+    .replace(/^export const __site[A-Za-z0-9_]+ = \d+;\s*$/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trimEnd();
+}
+
 /** Bump sync version export so siteConfig.ts changes reload in the workspace dev server. */
 export function appendSiteConfigPresentationSyncExport(content: string): string {
   const stripped = stripAgentSyncMarkers(content);
@@ -55,13 +63,57 @@ export function appendPageGallerySyncExport(content: string): string {
 /** Strip dev-only markers before committing to GitLab / production deploys. */
 export function sanitizeSourceForPublish(filePath: string, content: string): string {
   const normalized = filePath.replace(/\\/g, '/');
-  if (
-    normalized === 'src/app/page.tsx' ||
-    normalized === 'src/lib/siteConfig.ts' ||
-    normalized.endsWith('/src/app/page.tsx') ||
-    normalized.endsWith('/src/lib/siteConfig.ts')
-  ) {
+  const isPage =
+    normalized === 'src/app/page.tsx' || normalized.endsWith('/src/app/page.tsx');
+  const isSiteConfig =
+    normalized === 'src/lib/siteConfig.ts' || normalized.endsWith('/src/lib/siteConfig.ts');
+
+  if (isPage) {
+    return stripInvalidNextJsPageExports(stripAgentSyncMarkers(content));
+  }
+  if (isSiteConfig) {
     return stripAgentSyncMarkers(content);
   }
   return content;
+}
+
+const AGENT_MARKER_FILE_PATHS = ['src/app/page.tsx', 'src/lib/siteConfig.ts'] as const;
+
+/** Write sanitized page/siteConfig sources to disk before git publish or deploy. */
+export async function sanitizeAgentMarkerFilesInWorkspace(
+  workspacePath: string,
+  readWrite?: {
+    read: (rel: string) => Promise<string | null>;
+    write: (rel: string, content: string) => Promise<void>;
+  }
+): Promise<string[]> {
+  const { promises: fs } = await import('fs');
+  const path = await import('path');
+  const sanitized: string[] = [];
+
+  for (const rel of AGENT_MARKER_FILE_PATHS) {
+    let before: string | null = null;
+    if (readWrite) {
+      before = await readWrite.read(rel);
+    } else {
+      try {
+        before = await fs.readFile(path.join(workspacePath, rel), 'utf-8');
+      } catch {
+        before = null;
+      }
+    }
+    if (before == null) continue;
+
+    const after = sanitizeSourceForPublish(rel, before);
+    if (after === before) continue;
+
+    if (readWrite) {
+      await readWrite.write(rel, after);
+    } else {
+      await fs.writeFile(path.join(workspacePath, rel), after, 'utf-8');
+    }
+    sanitized.push(rel);
+  }
+
+  return sanitized;
 }

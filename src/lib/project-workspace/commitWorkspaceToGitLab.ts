@@ -14,6 +14,7 @@ import {
   repairSiteConfigTypesViaGateway,
 } from '@/lib/preview/repairSiteConfigTypes';
 import { getSandboxGateway } from '@/lib/sandbox/sandboxWorkspaceGateway';
+import { sanitizeAgentMarkerFilesInWorkspace } from '@/lib/site-manager/siteConfigAgentMarkers';
 
 export type CommitWorkspaceResult = {
   commitSha: string;
@@ -57,11 +58,17 @@ export async function commitWorkspaceToGitLab(
     try {
       const gateway = await getSandboxGateway(projectId);
       await repairSiteConfigTypesViaGateway(gateway);
+      await sanitizeAgentMarkerFilesInWorkspace('', {
+        read: (rel) => gateway.readFile(rel).catch(() => null),
+        write: (rel, content) => gateway.writeFile(rel, content),
+      });
     } catch {
       /* non-fatal */
     }
   } else {
-    await repairSiteConfigTypesInWorkspace(getGitWorkspacePath(projectId)).catch(() => {});
+    const workspacePath = getGitWorkspacePath(projectId);
+    await repairSiteConfigTypesInWorkspace(workspacePath).catch(() => {});
+    await sanitizeAgentMarkerFilesInWorkspace(workspacePath).catch(() => {});
   }
   const result = useSandbox
     ? await publishSandboxWorkspaceToGitLab({

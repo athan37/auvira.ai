@@ -4,7 +4,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { repairTailwindConfigInWorkspace } from '@/lib/builder/tailwindPresentationSupport';
 import { repairSiteConfigTypesInWorkspace } from '@/lib/preview/repairSiteConfigTypes';
-import { sanitizeSourceForPublish } from '@/lib/site-manager/siteConfigAgentMarkers';
+import { sanitizeAgentMarkerFilesInWorkspace } from '@/lib/site-manager/siteConfigAgentMarkers';
 import { validateChangedSourceSyntax } from './validateTsxSyntax';
 import { repairPageTsxStructure } from './repairPageTsxStructure';
 
@@ -20,8 +20,6 @@ export interface ValidateWorkspaceResult {
 export interface ValidateWorkspaceOptions {
   changedFiles?: string[];
 }
-
-const MARKER_SANITIZE_PATHS = ['src/app/page.tsx', 'src/lib/siteConfig.ts'] as const;
 
 /** Auto-fix known ESLint/structure issues in page.tsx before build. */
 async function repairPageTsxInWorkspace(workspacePath: string): Promise<string[]> {
@@ -39,25 +37,6 @@ async function repairPageTsxInWorkspace(workspacePath: string): Promise<string[]
   }
   await fs.writeFile(abs, content, 'utf-8');
   return [rel];
-}
-
-async function sanitizeMarkerFilesInWorkspace(workspacePath: string): Promise<string[]> {
-  const sanitized: string[] = [];
-  for (const rel of MARKER_SANITIZE_PATHS) {
-    const abs = path.join(workspacePath, rel);
-    let before: string;
-    try {
-      before = await fs.readFile(abs, 'utf-8');
-    } catch {
-      continue;
-    }
-    const after = sanitizeSourceForPublish(rel, before);
-    if (after !== before) {
-      await fs.writeFile(abs, after, 'utf-8');
-      sanitized.push(rel);
-    }
-  }
-  return sanitized;
 }
 
 /**
@@ -105,7 +84,7 @@ export async function validateWorkspace(
   const scripts = pkg.scripts || {};
   const changed = new Set(options.changedFiles || []);
   const changedList = [...changed];
-  const sanitizedMarkers = await sanitizeMarkerFilesInWorkspace(resolved);
+  const sanitizedMarkers = await sanitizeAgentMarkerFilesInWorkspace(resolved);
   if (sanitizedMarkers.length > 0) {
     logs.push(`Removed dev-only agent sync markers from: ${sanitizedMarkers.join(', ')}`);
   }

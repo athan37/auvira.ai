@@ -12,6 +12,7 @@ import {
   isSafePublishPath,
   WORKSPACE_BINARY_EXTENSIONS,
 } from '@/lib/project-workspace/workspaceEditShared';
+import { sanitizeSourceForPublish } from '@/lib/site-manager/siteConfigAgentMarkers';
 import { getProjectSandbox } from './sandboxClient';
 import { SANDBOX_WORKDIR } from './types';
 
@@ -130,7 +131,8 @@ async function buildSandboxCommitActions(
       continue;
     }
 
-    const content = await sandbox.fs.readFile(abs, 'utf8');
+    const raw = await sandbox.fs.readFile(abs, 'utf8');
+    const content = sanitizeSourceForPublish(change.filePath, raw);
     actions.push({
       action: change.action,
       file_path: change.filePath,

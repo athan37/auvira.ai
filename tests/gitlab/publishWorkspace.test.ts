@@ -1,5 +1,12 @@
-import { describe, it, expect } from 'vitest';
-import { parseGitStatusPorcelain, expandPublishableChanges } from '../../src/lib/gitlab/publishWorkspace';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { promises as fs } from 'fs';
+import path from 'path';
+import os from 'os';
+import {
+  buildWorkspaceCommitActions,
+  parseGitStatusPorcelain,
+  expandPublishableChanges,
+} from '../../src/lib/gitlab/publishWorkspace';
 
 describe('parseGitStatusPorcelain', () => {
   it('maps untracked to create', () => {
@@ -32,5 +39,39 @@ describe('parseGitStatusPorcelain', () => {
         { filePath: 'public/uploads/logo-abc123.png', action: 'create' },
       ])
     );
+  });
+});
+
+describe('buildWorkspaceCommitActions', () => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'publish-sanitize-'));
+    await fs.mkdir(path.join(tmpDir, 'src/app'), { recursive: true });
+  });
+
+  afterEach(async () => {
+    await fs.rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it('strips invalid Next.js page exports before GitLab commit', async () => {
+    const pagePath = path.join(tmpDir, 'src/app/page.tsx');
+    await fs.writeFile(
+      pagePath,
+      'export default function Home() { return null; }\nexport const __siteAgentPageGallerySync = 1;\n',
+      'utf-8'
+    );
+
+    const actions = await buildWorkspaceCommitActions(tmpDir, [
+      { filePath: 'src/app/page.tsx', action: 'update' },
+    ]);
+
+    expect(actions).toHaveLength(1);
+    const action = actions[0];
+    expect(action?.action).not.toBe('delete');
+    if (action && action.action !== 'delete') {
+      expect(action.content).not.toContain('__siteAgentPageGallerySync');
+      expect(action.content).toContain('export default function Home');
+    }
   });
 });
