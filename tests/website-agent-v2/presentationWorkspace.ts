@@ -3,7 +3,7 @@ import { promises as fs } from 'fs';
 import os from 'os';
 import { SECTION_PRESENTATION_RUNTIME } from '@/lib/builder/sectionPresentationRuntime';
 
-const SITE_CONFIG_SOURCE = `export type SiteSectionPresentation = {
+export const SITE_CONFIG_SOURCE = `export type SiteSectionPresentation = {
   backgroundClass?: string;
   cardClass?: string;
   eyebrowClass?: string;
@@ -44,7 +44,7 @@ export const siteConfig = {
   ],
 };`;
 
-const PAGE_SOURCE = `${SECTION_PRESENTATION_RUNTIME}
+export const PAGE_SOURCE = `${SECTION_PRESENTATION_RUNTIME}
 
 import { siteConfig } from "../lib/siteConfig";
 

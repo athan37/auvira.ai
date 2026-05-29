@@ -177,6 +177,8 @@ export interface ResolveEditPreviewVerificationInput {
   siteConfigContent?: string;
   /** Fresh page.tsx — used to detect hardcoded section backgrounds. */
   pageContent?: string;
+  /** Override poll timing (tests / fast settle). */
+  presentationPoll?: { retries?: number; delayMs?: number };
 }
 
 /**
@@ -275,7 +277,11 @@ export async function resolveEditPreviewVerification(
       siteConfigAfter,
       input.ownerMessage
     );
-    const sync = await waitForPresentationClassInPreview(input.previewUrl, expectedClasses);
+    const sync = await waitForPresentationClassInPreview(
+      input.previewUrl,
+      expectedClasses,
+      input.presentationPoll
+    );
     if (sync.ok) {
       return {
         ok: true,
@@ -283,6 +289,7 @@ export async function resolveEditPreviewVerification(
         htmlLength: 0,
         imagesFound: 0,
         phraseMatched: false,
+        presentationClassPolled: true,
       };
     }
     return {
@@ -291,6 +298,7 @@ export async function resolveEditPreviewVerification(
       htmlLength: 0,
       imagesFound: 0,
       phraseMatched: false,
+      presentationClassPolled: true,
     };
   }
 

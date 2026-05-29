@@ -18,7 +18,6 @@ import {
   resolveEditPreviewVerification,
   verifyPreviewForPrompt,
 } from '@/lib/project-workspace/verifyPreviewForPrompt';
-import * as previewReflects from '@/lib/project-workspace/previewReflectsSiteConfig';
 import {
   genericColorWouldPassButExactClassMissing,
   htmlContainsExactPresentationClass,
@@ -135,11 +134,6 @@ describe('verifyPreviewForPrompt — exact presentation class', () => {
   });
 
   it('resolveEditPreviewVerification fails when only unrelated red exists in HTML', async () => {
-    vi.spyOn(previewReflects, 'waitForPresentationClassInPreview').mockResolvedValue({
-      ok: false,
-      reason: `Preview did not include expected class(es) yet: ${EXPECTED_CLASS}`,
-    });
-
     const result = await resolveEditPreviewVerification({
       previewUrl: 'http://127.0.0.1:3999',
       ownerMessage: PROMPT,
@@ -148,17 +142,21 @@ describe('verifyPreviewForPrompt — exact presentation class', () => {
       mode: 'gitlab',
       siteConfigContent: SITE_CONFIG,
       pageContent: PAGE_WIRED,
+      presentationPoll: { retries: 3, delayMs: 5 },
     });
+    expect(result.presentationClassPolled).toBe(true);
     expect(result.ok).toBe(false);
     expect(result.reason).toContain(EXPECTED_CLASS);
   });
 
   it('resolveEditPreviewVerification passes when exact class is present', async () => {
-    vi.spyOn(previewReflects, 'waitForPresentationClassInPreview').mockResolvedValue({
-      ok: true,
-      reason: `Preview HTML includes ${EXPECTED_CLASS}`,
-      matchedClass: EXPECTED_CLASS,
-    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        text: async () => htmlWithExactClass(),
+      })
+    );
 
     const result = await resolveEditPreviewVerification({
       previewUrl: 'http://127.0.0.1:3999',
@@ -168,7 +166,9 @@ describe('verifyPreviewForPrompt — exact presentation class', () => {
       mode: 'gitlab',
       siteConfigContent: SITE_CONFIG,
       pageContent: PAGE_WIRED,
+      presentationPoll: { retries: 2, delayMs: 5 },
     });
+    expect(result.presentationClassPolled).toBe(true);
     expect(result.ok).toBe(true);
     expect(result.reason).toContain(EXPECTED_CLASS);
   });

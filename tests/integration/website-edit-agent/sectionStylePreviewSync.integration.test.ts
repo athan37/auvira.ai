@@ -81,9 +81,11 @@ describeRunLlmIntegration(
         mode: 'gitlab',
         siteConfigContent: siteConfig,
         pageContent: page,
+        presentationPoll: { retries: 4, delayMs: 50 },
       });
       const verifyElapsed = Date.now() - verifyStart;
 
+      expect(verifyFail.presentationClassPolled).toBe(true);
       expect(verifyFail.ok).toBe(false);
       expect(verifyFail.reason).toContain(EXPECTED_CLASS);
       expect(verifyElapsed).toBeGreaterThan(50);
@@ -105,6 +107,7 @@ describeRunLlmIntegration(
         mode: 'gitlab',
         siteConfigContent: siteConfig,
         pageContent: page,
+        presentationPoll: { retries: 2, delayMs: 5 },
       });
       expect(verifyPass.ok).toBe(true);
       expect(verifyPass.reason).toContain(EXPECTED_CLASS);

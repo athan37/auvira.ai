@@ -21,6 +21,8 @@ export interface VerifyPreviewResult {
   htmlLength: number;
   imagesFound: number;
   phraseMatched: boolean;
+  /** True when preview was polled for exact siteConfig presentation classes. */
+  presentationClassPolled?: boolean;
 }
 
 function sleep(ms: number): Promise<void> {

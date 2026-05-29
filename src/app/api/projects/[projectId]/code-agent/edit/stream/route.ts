@@ -30,7 +30,10 @@ import {
   buildEditFailureReport,
   type EditFailureStage,
 } from '@/lib/project-workspace/editFailureDetail';
-import { resolveEditPreviewVerification } from '@/lib/project-workspace/verifyPreviewForPrompt';
+import {
+  resolveEditPreviewVerification,
+  type VerifyPreviewResult,
+} from '@/lib/project-workspace/verifyPreviewForPrompt';
 import { resolveEditStreamPreviewOutcome } from '@/lib/project-workspace/previewStability';
 import { workspaceEditNeedsPreviewReload } from '@/lib/project-workspace/previewReloadAfterEdit';
 import {
@@ -719,7 +722,13 @@ export async function POST(
           }
         }
 
-        let previewVerify = { ok: true, reason: 'skipped', imagesFound: 0, htmlLength: 0 };
+        let previewVerify: VerifyPreviewResult = {
+          ok: true,
+          reason: 'skipped',
+          imagesFound: 0,
+          htmlLength: 0,
+          phraseMatched: false,
+        };
         let previewVerifySkipped = true;
         let editStreamOutcome = resolveEditStreamPreviewOutcome({
           sourceValidationPassed: true,
@@ -761,7 +770,7 @@ export async function POST(
             workspaceSnap,
             gateway: activeGateway ?? undefined,
             siteConfigContent: siteConfigForVerify,
-            pageContent: workspaceSnap?.pageContent,
+            pageContent: workspaceSnap?.pageContent ?? undefined,
           });
           await appendTimedEditJobLog(
             jobId,
@@ -850,31 +859,43 @@ export async function POST(
             message
           );
           if (expectedClasses.length > 0) {
-            await appendEditJobLog(
-              jobId,
-              'preview_compile_settle',
-              'Waiting for preview HTML to include saved presentation classes',
-              { expectedClasses }
-            );
-            const sync = await waitForPresentationClassInPreview(
-              previewUrlForVerify,
-              expectedClasses
-            );
-            await appendEditJobLog(
-              jobId,
-              sync.ok ? 'preview_presentation_synced' : 'preview_presentation_pending',
-              sync.reason,
-              { expectedClasses }
-            );
-            if (!sync.ok && editStreamOutcome.previewSynced) {
-              editStreamOutcome = {
-                ...editStreamOutcome,
-                previewSynced: false,
-                previewVerifyStatus: 'pending',
-                previewVerifyReason: sync.reason,
-                ownerMessage:
-                  'Saved. Preview is still syncing; refresh in a moment.',
-              };
+            if (previewVerify.presentationClassPolled) {
+              await appendEditJobLog(
+                jobId,
+                editStreamOutcome.previewSynced
+                  ? 'preview_presentation_synced'
+                  : 'preview_presentation_pending',
+                previewVerify.reason,
+                { expectedClasses, alreadyPolled: true }
+              );
+            } else {
+              await appendEditJobLog(
+                jobId,
+                'preview_compile_settle',
+                'Waiting for preview HTML to include saved presentation classes',
+                { expectedClasses }
+              );
+              const sync = await waitForPresentationClassInPreview(
+                previewUrlForVerify,
+                expectedClasses,
+                { retries: 6, delayMs: 1_000 }
+              );
+              await appendEditJobLog(
+                jobId,
+                sync.ok ? 'preview_presentation_synced' : 'preview_presentation_pending',
+                sync.reason,
+                { expectedClasses }
+              );
+              if (!sync.ok && editStreamOutcome.previewSynced) {
+                editStreamOutcome = {
+                  ...editStreamOutcome,
+                  previewSynced: false,
+                  previewVerifyStatus: 'pending',
+                  previewVerifyReason: sync.reason,
+                  ownerMessage:
+                    'Saved. Preview is still syncing; refresh in a moment.',
+                };
+              }
             }
           } else {
             await new Promise((r) => setTimeout(r, 2_000));
