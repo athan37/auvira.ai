@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   appendSiteConfigGallerySyncExport,
+  sanitizeSourceForPublish,
   stripAgentSyncMarkers,
 } from '../../src/lib/site-manager/siteConfigAgentMarkers';
 import {
@@ -52,5 +53,15 @@ describe('siteConfigAgentMarkers', () => {
     const twice = appendSiteConfigGallerySyncExport(once);
     expect((twice.match(/__siteAgentGallerySync/g) ?? []).length).toBe(1);
     expect(parseSiteConfigSource(twice)?.sections.length).toBe(2);
+  });
+
+  it('sanitizeSourceForPublish strips agent markers from page and siteConfig', () => {
+    const page = 'export default function Home() { return null; }\n// site-agent: page gallery sync 99\n';
+    const cfg = `${withHero}\nexport const __siteAgentGallerySync = 123;\n`;
+    const cleanPage = sanitizeSourceForPublish('src/app/page.tsx', page);
+    const cleanCfg = sanitizeSourceForPublish('src/lib/siteConfig.ts', cfg);
+    expect(cleanPage).not.toContain('page gallery sync');
+    expect(cleanCfg).not.toContain('__siteAgentGallerySync');
+    expect(parseSiteConfigSource(cleanCfg)?.sections).toHaveLength(2);
   });
 });

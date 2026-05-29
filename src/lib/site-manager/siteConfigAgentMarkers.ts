@@ -3,9 +3,11 @@
 export const SITECONFIG_GALLERY_SYNC_MARKER = '// site-agent: siteconfig gallery sync';
 export const SITECONFIG_GALLERY_SYNC_EXPORT = '__siteAgentGallerySync';
 export const PAGE_GALLERY_SYNC_EXPORT = '__siteAgentPageGallerySync';
+export const PAGE_GALLERY_SYNC_MARKER = '// site-agent: page gallery sync';
 
 const MARKER_LINE_PATTERNS = [
   new RegExp(`^${escapeRe(SITECONFIG_GALLERY_SYNC_MARKER)} \\d+\\s*$`, 'gm'),
+  new RegExp(`^${escapeRe(PAGE_GALLERY_SYNC_MARKER)} \\d+\\s*$`, 'gm'),
   new RegExp(
     `^export const ${SITECONFIG_GALLERY_SYNC_EXPORT} = \\d+;\\s*$`,
     'gm'
@@ -35,9 +37,20 @@ export function appendSiteConfigGallerySyncExport(content: string): string {
 }
 
 export function appendPageGallerySyncExport(content: string): string {
-  const without = content.replace(
-    new RegExp(`^export const ${PAGE_GALLERY_SYNC_EXPORT} = \\d+;\\s*$`, 'gm'),
-    ''
-  );
-  return `${without.trimEnd()}\n\nexport const ${PAGE_GALLERY_SYNC_EXPORT} = ${Date.now()};\n`;
+  const without = stripAgentSyncMarkers(content);
+  return `${without}\n\n${PAGE_GALLERY_SYNC_MARKER} ${Date.now()}\n`;
+}
+
+/** Strip dev-only markers before committing to GitLab / production deploys. */
+export function sanitizeSourceForPublish(filePath: string, content: string): string {
+  const normalized = filePath.replace(/\\/g, '/');
+  if (
+    normalized === 'src/app/page.tsx' ||
+    normalized === 'src/lib/siteConfig.ts' ||
+    normalized.endsWith('/src/app/page.tsx') ||
+    normalized.endsWith('/src/lib/siteConfig.ts')
+  ) {
+    return stripAgentSyncMarkers(content);
+  }
+  return content;
 }
