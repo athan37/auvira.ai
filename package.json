@@ -31,6 +31,7 @@
     "@vercel/sandbox": "^2.0.0",
     "ajv": "^8.17.1",
     "cheerio": "^0.22.0",
+    "diff": "^5.2.0",
     "mongoose": "^7.8.9",
     "next": "^14.2.0",
     "next-auth": "^5.0.0-beta.31",
@@ -40,6 +41,7 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@types/diff": "^5.2.0",
     "@types/node": "^20.0.0",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",

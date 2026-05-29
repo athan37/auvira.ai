@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardBody } from '@/components/ui/Card';
 import { Spinner } from '@/components/ui/Spinner';
 import EditErrorTrace from '@/components/project/EditErrorTrace';
+import { FileDiffViewer } from '@/components/project/FileDiffViewer';
 
 interface ChangedFile {
   path: string;
@@ -68,6 +69,11 @@ export function ChangedFilesPanel({
   const [showAgentLogs, setShowAgentLogs] = useState(false);
   const [rollingBack, setRollingBack] = useState(false);
   const [rollbackMsg, setRollbackMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [expandedFile, setExpandedFile] = useState<string | null>(null);
+
+  useEffect(() => {
+    setExpandedFile(null);
+  }, [jobId, refreshKey]);
 
   useEffect(() => {
     const fetchDiff = async () => {
@@ -282,23 +288,48 @@ export function ChangedFilesPanel({
             <p className="text-xs font-medium text-zinc-700">
               Files touched ({changedCount})
             </p>
-            <ul className="text-xs space-y-1 max-h-40 overflow-y-auto">
-              {data.changedFiles.map((f) => (
-                <li
-                  key={f.path}
-                  className="flex items-center justify-between gap-2 font-mono text-zinc-700"
-                >
-                  <span className="truncate">{f.path}</span>
-                  <span className="flex-shrink-0 text-zinc-500">
-                    {f.status}
-                    {f.additions || f.deletions ? (
-                      <span className="ml-1 text-zinc-400">
-                        +{f.additions || 0}/-{f.deletions || 0}
+            <ul className="text-xs space-y-1">
+              {data.changedFiles.map((f) => {
+                const isOpen = expandedFile === f.path;
+                return (
+                  <li key={f.path} className="rounded-md border border-zinc-100 bg-white">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedFile(isOpen ? null : f.path)}
+                      className="flex w-full items-center justify-between gap-2 px-2 py-1.5 font-mono text-zinc-700 hover:bg-zinc-50 rounded-md text-left"
+                      aria-expanded={isOpen}
+                    >
+                      <span className="flex items-center gap-1.5 min-w-0">
+                        <span
+                          className="text-zinc-400 shrink-0 w-3"
+                          aria-hidden
+                        >
+                          {isOpen ? '▾' : '▸'}
+                        </span>
+                        <span className="truncate">{f.path}</span>
                       </span>
-                    ) : null}
-                  </span>
-                </li>
-              ))}
+                      <span className="flex-shrink-0 text-zinc-500 text-[10px]">
+                        {f.status}
+                        {f.additions || f.deletions ? (
+                          <span className="ml-1 text-zinc-400">
+                            +{f.additions || 0}/-{f.deletions || 0}
+                          </span>
+                        ) : null}
+                      </span>
+                    </button>
+                    {data.jobId && (
+                      <div className="px-2 pb-2">
+                        <FileDiffViewer
+                          projectId={projectId}
+                          jobId={data.jobId}
+                          filePath={f.path}
+                          expanded={isOpen}
+                        />
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           </>
         )}
