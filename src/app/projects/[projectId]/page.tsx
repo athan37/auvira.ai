@@ -115,10 +115,10 @@ export default function ProjectPage() {
   }, [sessionStatus, router, devBypassAuth]);
 
   useEffect(() => {
-    if (sessionStatus === 'authenticated' && projectId) {
+    if ((devBypassAuth || sessionStatus === 'authenticated') && projectId) {
       fetchProject();
     }
-  }, [sessionStatus, projectId, fetchProject]);
+  }, [sessionStatus, projectId, fetchProject, devBypassAuth]);
 
   if ((!devBypassAuth && sessionStatus === 'loading') || loading) {
     return (

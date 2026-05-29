@@ -108,9 +108,10 @@ describe('editAmbiguity', () => {
       { role: 'user', content: 'hello' },
       { role: 'assistant', content: 'hi there' },
     ]);
-    expect(block).toContain('RECENT CONVERSATION');
-    expect(block).toContain('User: hello');
-    expect(block).toContain('Assistant: hi there');
+    expect(block).toContain('CONVERSATION CONTEXT');
+    expect(block).toContain('★★★ Assistant');
+    expect(block).toContain('hello');
+    expect(block).toContain('hi there');
   });
 
   it('uses EditTargetPlan WHERE clarification for multiple section matches', () => {

@@ -317,7 +317,7 @@ export async function POST(
         });
         conversationHistory = await buildConversationHistory({
           projectId: project._id,
-          maxTurns: 6,
+          maxTurns: 8,
         });
         emit('step', { id: 'loading', label: 'Loading your website draft', status: 'active', jobId });
 

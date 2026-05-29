@@ -1,5 +1,6 @@
 import type { EditPlan, SiteModel } from '../../src/lib/project-workspace/website-edit-agent-v2';
 import { planEdit } from '../../src/lib/project-workspace/website-edit-agent-v2';
+import type { ConversationTurn } from '../../src/lib/project-workspace/website-edit-agent/types';
 import { hasLlmApiKey, llmDescribe } from '../llmTestGate';
 
 export { hasLlmApiKey, llmDescribe };
@@ -65,7 +66,8 @@ export const BASE_SITE_MODEL: SiteModel = {
  */
 export async function planWithLiveLlm(
   ownerMessage: string,
-  siteModel: SiteModel = BASE_SITE_MODEL
+  siteModel: SiteModel = BASE_SITE_MODEL,
+  conversationHistory?: ConversationTurn[]
 ): Promise<EditPlan> {
   return planEdit(
     {
@@ -73,6 +75,7 @@ export async function planWithLiveLlm(
       ownerMessage,
       projectId: 'llm-integration',
       mode: 'gitlab',
+      conversationHistory,
     },
     { siteModel }
   );

@@ -2,6 +2,19 @@ import {
   extractColorsFromMessage,
 } from './preset/presetUtils';
 import type { EditTargetPlan } from './types';
+import {
+  DEFAULT_EDIT_CONTEXT_TURNS,
+  formatWeightedConversationForPrompt,
+  wasSectionListClarificationAsked,
+  wasTestimonialCardClarificationAsked,
+} from '@/lib/chat/conversationContextForEdit';
+
+export {
+  resolveEffectiveEditMessage,
+  formatWeightedConversationForPrompt,
+  formatConversationForIntentClarifier,
+  DEFAULT_EDIT_CONTEXT_TURNS,
+} from '@/lib/chat/conversationContextForEdit';
 
 export interface ConversationTurn {
   role: 'user' | 'assistant';
@@ -111,11 +124,7 @@ function buildCardSectionClarification(sectionTitle: string): AmbiguityResult {
 }
 
 function wasClarificationAsked(history: ConversationTurn[]): boolean {
-  return history.some(
-    (m) =>
-      m.role === 'assistant' &&
-      /testimonial cards|Reply with 1, 2, or 3/i.test(m.content)
-  );
+  return wasTestimonialCardClarificationAsked(history);
 }
 
 function resolveClarificationReply(
@@ -135,6 +144,15 @@ function resolveClarificationReply(
   }
 
   return null;
+}
+
+function resolveSectionListReply(
+  message: string,
+  history: ConversationTurn[]
+): AmbiguityResult | null {
+  if (!wasSectionListClarificationAsked(history)) return null;
+  if (!/^\d\s*(?:—|$|\b)/.test(message.trim())) return null;
+  return { ambiguous: false, confidence: 'high' };
 }
 
 /**
@@ -169,9 +187,11 @@ export function detectAmbiguousEditRequest(
     };
   }
 
-  const recent = history.slice(-6);
+  const recent = history.slice(-DEFAULT_EDIT_CONTEXT_TURNS);
 
-  const resolved = resolveClarificationReply(message, recent);
+  const resolved =
+    resolveClarificationReply(message, recent) ??
+    resolveSectionListReply(message, recent);
   if (resolved) return resolved;
 
   const lower = message.toLowerCase();
@@ -182,6 +202,17 @@ export function detectAmbiguousEditRequest(
   const hasSection = SECTION_ANCHORS.some((a) => lower.includes(a)) || Boolean(sectionTitle);
 
   if (hasDeictic && /\b(background|color|colour)\b/.test(lower) && !sectionTitle) {
+    const priorUser = [...recent]
+      .reverse()
+      .find((m) => m.role === 'user' && m.content.trim() !== message.trim());
+    const priorSection = priorUser ? extractSectionTitle(priorUser.content) : null;
+    if (priorSection) {
+      return detectAmbiguousEditRequest(
+        `${priorUser!.content}. ${message}`,
+        history.slice(0, Math.max(0, history.length - 1)),
+        editTargetPlan
+      );
+    }
     return {
       ambiguous: true,
       confidence: 'low',
@@ -254,39 +285,12 @@ export function detectAmbiguousEditRequest(
   return { ambiguous: false, confidence: 'high' };
 }
 
-/** Combine clarification follow-ups with prior user context for routing. */
-export function resolveEffectiveEditMessage(
-  message: string,
-  history: ConversationTurn[] = []
-): string {
-  const recent = history.slice(-6);
-  if (!wasClarificationAsked(recent)) return message;
-
-  const lower = message.trim().toLowerCase();
-  const priorUser = [...recent]
-    .reverse()
-    .find((m) => m.role === 'user' && m.content.trim() !== message.trim());
-  const color =
-    (priorUser ? extractColorsFromMessage(priorUser.content) : []).pop() ??
-    extractColorsFromMessage(message).pop();
-  const colorPhrase = color ? ` to ${color}` : '';
-
-  if (/^1\b|all testimonial|all card backgrounds?/i.test(lower)) {
-    return `change all testimonial card backgrounds${colorPhrase}`;
-  }
-  if (/^3\b|text color/i.test(lower)) {
-    return `change testimonial section text color${colorPhrase}`;
-  }
-
-  return message;
-}
-
 /** Resolve scoped style intent from clarification follow-ups in chat history. */
 export function tryResolveScopedStyleFromHistory(
   message: string,
   history: ConversationTurn[]
 ): ScopedStyleResolution {
-  const recent = history.slice(-6);
+  const recent = history.slice(-DEFAULT_EDIT_CONTEXT_TURNS);
   if (!wasClarificationAsked(recent)) {
     return { resolved: false };
   }
@@ -338,20 +342,10 @@ export function isTestimonialsTextColorRequest(message: string): boolean {
   );
 }
 
-/** Format recent chat for LLM / agent prompts. */
+/** Format recent chat for LLM / agent prompts (recency-weighted). */
 export function formatConversationForPrompt(
   history: ConversationTurn[] | undefined,
-  maxTurns = 6
+  maxTurns = DEFAULT_EDIT_CONTEXT_TURNS
 ): string {
-  if (!history?.length) return '';
-
-  const lines = history.slice(-maxTurns).map((t) => {
-    const label = t.role === 'assistant' ? 'Assistant' : 'User';
-    return `${label}: ${t.content.trim()}`;
-  });
-
-  return (
-    'RECENT CONVERSATION (for reference — latest owner message is authoritative):\n' +
-    `${lines.join('\n')}\n\n`
-  );
+  return formatWeightedConversationForPrompt(history, maxTurns);
 }

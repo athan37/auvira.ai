@@ -12,7 +12,7 @@ import {
 
 const DEFAULT_MESSAGE_LIMIT = 100;
 const MAX_MESSAGE_LIMIT = 200;
-const DEFAULT_CONTEXT_TURNS = 6;
+const DEFAULT_CONTEXT_TURNS = 8;
 
 function asObjectId(projectId: string | mongoose.Types.ObjectId): mongoose.Types.ObjectId {
   if (projectId instanceof mongoose.Types.ObjectId) return projectId;

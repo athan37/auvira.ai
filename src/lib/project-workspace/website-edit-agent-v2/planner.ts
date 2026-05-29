@@ -1,6 +1,7 @@
 import Ajv from 'ajv';
 import { getLLMClient } from '@/lib/llm/llmClient';
 import type { LLMProvider } from '@/lib/llm/types';
+import { formatConversationForIntentClarifier } from '@/lib/chat/conversationContextForEdit';
 import type { ConversationTurn, WebsiteEditAgentOptions } from '../website-edit-agent/types';
 import { EDIT_PLAN_SCHEMA, type EditPlan } from './editPlanSchema';
 import { normalizeEditPlanSectionStyles } from './normalizeSectionStyleStep';
@@ -14,12 +15,14 @@ export interface PlanEditOptions {
   siteModel?: SiteModel;
 }
 
-function formatConversation(history: ConversationTurn[] | undefined): string {
+function formatConversation(
+  ownerMessage: string,
+  history: ConversationTurn[] | undefined
+): string {
   if (!history?.length) return 'No prior conversation.';
-  return history
-    .slice(-6)
-    .map((turn) => `${turn.role.toUpperCase()}: ${turn.content}`)
-    .join('\n');
+  return formatConversationForIntentClarifier(ownerMessage, history)
+    .replace(/^CONVERSATION CONTEXT[^\n]*\n/, '')
+    .trim();
 }
 
 function describeValidationErrors(): string {
@@ -72,7 +75,7 @@ Rules:
 ${options.ownerMessage}
 
 Recent conversation:
-${formatConversation(options.conversationHistory)}
+${formatConversation(options.ownerMessage, options.conversationHistory)}
 
 Site model:
 ${summarizeSiteModel(siteModel)}

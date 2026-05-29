@@ -277,15 +277,11 @@ function detectSpecialTarget(message: string): SectionTargetKind | null {
   return null;
 }
 
-/** True when assistant recently asked user to pick a section by number. */
-export function wasSectionListClarificationAsked(history: ConversationTurn[]): boolean {
-  return history.some(
-    (m) =>
-      m.role === 'assistant' &&
-      /I found .* sections that could match|Reply with the number/i.test(m.content)
-  );
-}
+import {
+  wasSectionListClarificationAsked,
+} from '@/lib/chat/conversationContextForEdit';
 
+export { wasSectionListClarificationAsked };
 function resolveNumberedSectionReply(
   message: string,
   history: ConversationTurn[],

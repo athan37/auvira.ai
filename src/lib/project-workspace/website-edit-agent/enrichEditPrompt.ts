@@ -1,4 +1,4 @@
-import { formatConversationForPrompt, type ConversationTurn } from './editAmbiguity';
+import { formatConversationForIntentClarifier, type ConversationTurn } from './editAmbiguity';
 import { formatEditTargetPlanForPrompt } from './buildGroundedEditContext';
 import type { EditIntent, EditTargetPlan } from './types';
 import type { WorkspaceAssetAttachment } from '../workspaceAssetTypes';
@@ -293,7 +293,7 @@ export async function enrichEditPrompt(
   const guidance = buildIntentGuidance(intent, ownerMessage, context);
   const imageGuidance = buildImageAttachmentGuidance(attachments);
 
-  const historyBlock = formatConversationForPrompt(conversationHistory);
+  const historyBlock = formatConversationForIntentClarifier(ownerMessage.trim(), conversationHistory);
   const groundedBlock =
     editTargetPlan && editTargetPlan.where.confidence !== 'low'
       ? `${formatEditTargetPlanForPrompt(editTargetPlan)}\n\n`

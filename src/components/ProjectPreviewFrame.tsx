@@ -139,10 +139,18 @@ export function ProjectPreviewFrame({
           setSetupError(status.error);
           if (pollTimer) clearInterval(pollTimer);
         }
-        // Stale preview (files on disk but hung dev server) — retry bootstrap after ~2 min
+        // Stale preview (files on disk but hung dev server) — retry bootstrap after ~6s when
+        // status already says restart is required; otherwise wait ~2 min for slow first boot.
+        const needsPreviewRestart =
+          !status.ready &&
+          status.codeWorkspaceStatus === 'ready' &&
+          (status.stage === 'starting_server' ||
+            status.label?.includes('restart required') ||
+            status.label?.includes('stopped responding'));
+        const retryAfterPolls = needsPreviewRestart ? 4 : 80;
         if (
           !status.ready &&
-          pollCountRef.current >= 80 &&
+          pollCountRef.current >= retryAfterPolls &&
           status.codeWorkspaceStatus === 'ready' &&
           !bootstrapStarted.current
         ) {

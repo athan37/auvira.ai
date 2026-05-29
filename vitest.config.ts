@@ -8,6 +8,7 @@ const llmIntegrationFiles = [
   'tests/integration/website-agent-v2/websiteAgentV2.plan.integration.test.ts',
   'tests/integration/website-agent-v2/websiteAgentV2.clarification.integration.test.ts',
   'tests/integration/website-edit-agent/sectionStylePreviewSync.integration.test.ts',
+  'tests/integration/website-edit-agent/chatHistoryEdit.llm.test.ts',
 ];
 
 export default defineConfig({
