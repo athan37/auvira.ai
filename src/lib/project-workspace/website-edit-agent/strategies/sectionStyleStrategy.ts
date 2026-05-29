@@ -143,10 +143,17 @@ export async function runSectionStyleStrategy(
       ? false
       : await ensureLegacyPageReadsPresentation(options, componentName);
 
-  if (configUpdated || pageUpgraded || tailwindPatched) {
+  if (configUpdated) {
     const summary = buildSectionStyleSummary(sectionLabel, toColor, swap);
     return buildStrategyResult(options, beforeHashes, 'section_style', 'L0', summary, {
-      confidence: configUpdated ? 'high' : 'medium',
+      confidence: 'high',
+    });
+  }
+
+  if (pageUpgraded || tailwindPatched) {
+    const summary = buildSectionStyleSummary(sectionLabel, toColor, swap);
+    return buildStrategyResult(options, beforeHashes, 'section_style', 'L0', summary, {
+      confidence: 'medium',
     });
   }
 

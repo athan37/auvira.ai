@@ -9,6 +9,13 @@ import path from 'path';
 /** Scans all app source (siteConfig, page.tsx, components, future folders). */
 export const CUSTOMER_SITE_TAILWIND_CONTENT_GLOB = "'./src/**/*.{js,ts,jsx,tsx,mdx}'";
 
+/** Legacy Next.js layouts — kept when normalizing so existing sites do not lose scanned classes. */
+export const LEGACY_TAILWIND_CONTENT_GLOBS = [
+  "'./src/pages/**/*.{js,ts,jsx,tsx,mdx}'",
+  "'./src/components/**/*.{js,ts,jsx,tsx,mdx}'",
+  "'./src/app/**/*.{js,ts,jsx,tsx,mdx}'",
+] as const;
+
 /** Agent-driven section.presentation and theme edits (runtime class strings). */
 export const CUSTOMER_SITE_TAILWIND_SAFELIST = `  safelist: [
     {
@@ -31,9 +38,19 @@ export const CUSTOMER_SITE_TAILWIND_SAFELIST = `  safelist: [
     },
   ],`;
 
-const CANONICAL_CONTENT_BLOCK = `  content: [
-    ${CUSTOMER_SITE_TAILWIND_CONTENT_GLOB},
-  ]`;
+function buildCanonicalContentBlock(existingContent?: string): string {
+  const globs = new Set<string>([...LEGACY_TAILWIND_CONTENT_GLOBS, CUSTOMER_SITE_TAILWIND_CONTENT_GLOB]);
+  if (existingContent) {
+    const quoted = existingContent.match(/'(\.\/[^']+)'/g) ?? [];
+    for (const q of quoted) {
+      globs.add(q);
+    }
+  }
+  const lines = [...globs].map((g) => `    ${g},`).join('\n');
+  return `  content: [\n${lines}\n  ]`;
+}
+
+const CANONICAL_CONTENT_BLOCK = buildCanonicalContentBlock();
 
 /** Body inside module.exports for newly generated customer sites. */
 export function tailwindContentPathsForGeneratedSite(): string {
@@ -60,14 +77,17 @@ export function normalizeCustomerSiteTailwindConfig(content: string): {
   let next = content;
   let changed = false;
 
-  if (!next.includes('./src/**/*')) {
-    if (/content:\s*\[[\s\S]*?\],?/m.test(next)) {
-      next = next.replace(/content:\s*\[[\s\S]*?\],?/m, `${CANONICAL_CONTENT_BLOCK},`);
+  const contentMatch = next.match(/content:\s*\[([\s\S]*?)\],?/m);
+  const existingInner = contentMatch?.[1] ?? '';
+  const needsContentUpgrade =
+    !next.includes('./src/**/*') ||
+    !LEGACY_TAILWIND_CONTENT_GLOBS.every((g) => next.includes(g.replace(/'/g, '')));
+  if (needsContentUpgrade) {
+    const block = buildCanonicalContentBlock(existingInner);
+    if (contentMatch) {
+      next = next.replace(/content:\s*\[[\s\S]*?\],?/m, `${block},`);
     } else {
-      next = next.replace(
-        /module\.exports\s*=\s*\{/,
-        `module.exports = {\n${CANONICAL_CONTENT_BLOCK},`
-      );
+      next = next.replace(/module\.exports\s*=\s*\{/, `module.exports = {\n${block},`);
     }
     changed = true;
   }
