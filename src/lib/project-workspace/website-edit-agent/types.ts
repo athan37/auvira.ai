@@ -178,6 +178,8 @@ export interface WebsiteEditAgentOptions {
   conversationHistory?: ConversationTurn[];
   /** Pre-resolved WHERE/WHAT from buildGroundedEditContext. */
   editTargetPlan?: EditTargetPlan;
+  /** When true, skip inline tailwind/page infra repairs (migration baseline ready). */
+  infraBaselineReady?: boolean;
 }
 
 export interface WebsiteEditAgentResult {

@@ -13,6 +13,7 @@ import type {
 } from './types';
 
 export const PAGE_TSX = 'src/app/page.tsx';
+export const TAILWIND_CONFIG = 'tailwind.config.js';
 export const GLOBALS_CSS = 'src/app/globals.css';
 export const SITE_CONFIG = 'src/lib/siteConfig.ts';
 export const LAYOUT_TSX = 'src/app/layout.tsx';

@@ -8,6 +8,7 @@ import { runWebsiteEditAgent } from './website-edit-agent';
 import { runWebsiteEditAgentV2 } from './website-edit-agent-v2';
 import type { AgentStepEvent } from './website-edit-agent/types';
 import { isAllowedWorkspacePath } from './workspaceEditShared';
+import { isInfraBaselineReady } from './infra/isInfraBaselineReady';
 
 export type WebsiteEditAgentMode = 'ts' | 'ts-v2';
 
@@ -38,6 +39,8 @@ export interface WebsiteEditOptions {
   attachments?: import('./workspaceAssetTypes').WorkspaceAssetAttachment[];
   gateway?: WorkspaceGateway;
   conversationHistory?: import('./website-edit-agent/types').ConversationTurn[];
+  infraStatus?: 'pending' | 'ready' | 'failed' | string;
+  infraVersion?: number;
 }
 
 export { routeEditRequest, isTrivialStyleEdit } from './website-edit-agent/intentRouter';
@@ -65,6 +68,10 @@ export async function runWebsiteEdit(
   }
 
   const useV2 = process.env.WEBSITE_AGENT_V2 === 'true';
+  const infraBaselineReady = isInfraBaselineReady({
+    infraStatus: options.infraStatus,
+    infraVersion: options.infraVersion,
+  });
   const result = await (useV2 ? runWebsiteEditAgentV2 : runWebsiteEditAgent)(
     {
       workspacePath: options.workspacePath,
@@ -74,6 +81,7 @@ export async function runWebsiteEdit(
       attachments: options.attachments,
       gateway: options.gateway,
       conversationHistory: options.conversationHistory,
+      infraBaselineReady,
     },
     onStep
   );

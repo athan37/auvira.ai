@@ -31,12 +31,14 @@ import {
   type EditFailureStage,
 } from '@/lib/project-workspace/editFailureDetail';
 import { resolveEditPreviewVerification } from '@/lib/project-workspace/verifyPreviewForPrompt';
+import { resolveEditStreamPreviewOutcome } from '@/lib/project-workspace/previewStability';
 import { resolveSiteWorkspace } from '@/lib/project-workspace/website-edit-agent/resolveSiteWorkspace';
 import {
   EditStepTimer,
   appendTimedEditJobLog,
   logEditTimingSummary,
 } from '@/lib/project-workspace/editTiming';
+import { migrateSubtitleStyleMarkersInSource } from '@/lib/project-workspace/website-edit-agent-v2/siteConfigMutations';
 import { promises as fs } from 'fs';
 import path from 'path';
 import crypto from 'crypto';
@@ -370,6 +372,8 @@ export async function POST(
             attachments,
             gateway,
             conversationHistory,
+            infraStatus: project.infraStatus,
+            infraVersion: project.infraVersion,
           },
           (stepEvent) => {
             emit('step', {
@@ -481,8 +485,29 @@ export async function POST(
           await appendEditJobLog(jobId, 'workspace_repaired', 'Applied preview-safe repairs');
         }
 
-        const afterHashes = await computeHashes(gateway, source);
-        const changedPaths = getChangedPathsFromHashes(beforeHashes, afterHashes);
+        let afterHashes = await computeHashes(gateway, source);
+        let changedPaths = getChangedPathsFromHashes(beforeHashes, afterHashes);
+
+        if (mode === 'gitlab' && changedPaths.includes('src/lib/siteConfig.ts')) {
+          try {
+            const siteConfigCurrent = await gateway.readFile('src/lib/siteConfig.ts');
+            if (siteConfigCurrent) {
+              const migrated = migrateSubtitleStyleMarkersInSource(siteConfigCurrent);
+              if (migrated && migrated !== siteConfigCurrent) {
+                await gateway.writeFile('src/lib/siteConfig.ts', migrated);
+                await appendEditJobLog(
+                  jobId,
+                  'subtitle_style_marker_migrated',
+                  'Migrated subtitle style marker to section.presentation'
+                );
+                afterHashes = await computeHashes(gateway, source);
+                changedPaths = getChangedPathsFromHashes(beforeHashes, afterHashes);
+              }
+            }
+          } catch {
+            /* best effort; continue normal flow */
+          }
+        }
         const blockedChanged = changedPaths.filter((f) => isBlockedPath(f));
 
         if (blockedChanged.length > 0) {
@@ -680,7 +705,17 @@ export async function POST(
           null;
 
         let previewVerify = { ok: true, reason: 'skipped', imagesFound: 0, htmlLength: 0 };
+        let previewVerifySkipped = true;
+        let editStreamOutcome = resolveEditStreamPreviewOutcome({
+          sourceValidationPassed: true,
+          editApplied: true,
+          previewVerify,
+          previewVerifySkipped: true,
+          defaultSuccessMessage:
+            agentResult.ownerMessage || agentResult.summary || 'Updated your website.',
+        });
         if (previewUrlForVerify && changedPaths.length > 0) {
+          previewVerifySkipped = false;
           emit('step', {
             id: 'validate',
             label: 'Confirming changes appear in preview',
@@ -723,33 +758,33 @@ export async function POST(
               phase: 'preview_verify',
             }
           );
+          editStreamOutcome = resolveEditStreamPreviewOutcome({
+            sourceValidationPassed: true,
+            editApplied: true,
+            previewVerify,
+            previewVerifySkipped: false,
+            defaultSuccessMessage:
+              attachments.length > 0 && previewVerify.imagesFound > 0
+                ? `Added your product section with ${previewVerify.imagesFound} image(s) in the preview. Scroll just below the hero to see it.`
+                : agentResult.ownerMessage || agentResult.summary || 'Updated your website.',
+          });
           if (!previewVerify.ok) {
-            const kept = await keepPartialChanges(agentResult.summary || 'Preview verify failed');
+            await appendEditJobLog(
+              jobId,
+              'preview_verify_soft_pass',
+              'Preview not synced; source edit saved',
+              {
+                reason: previewVerify.reason,
+                previewUrl: previewUrlForVerify,
+                changedPaths,
+                previewVerifyStatus: editStreamOutcome.previewVerifyStatus,
+              }
+            );
             emit('step', {
               id: 'validate',
               label: 'Confirming changes appear in preview',
-              status: 'failed',
+              status: 'completed',
             });
-            emit('step', { id: 'finish', label: 'Preview not updated', status: 'failed' });
-            const userMsg =
-              attachments.length > 0
-                ? kept
-                  ? 'Images were uploaded and site files changed, but the preview still does not show your new section. Use Refresh on the preview or try the edit again.'
-                  : 'Images were uploaded, but the preview does not show your new product section yet. Please try the edit again.'
-                : kept
-                  ? 'Your changes were saved, but the preview does not reflect your request yet. Use Refresh on the preview or try the edit again.'
-                  : 'The preview does not show your requested change yet. Please try the edit again.';
-            await fail(userMsg, {
-              stage: 'agent_failed',
-              technicalMessage: previewVerify.reason,
-              hasPartialChanges: kept,
-              extra: {
-                previewUrl: previewUrlForVerify,
-                strategy: agentResult.strategy,
-                changedPaths,
-              },
-            });
-            return;
           }
         }
 
@@ -778,17 +813,17 @@ export async function POST(
           }
         );
 
-        const successOwnerMessage =
-          attachments.length > 0 && previewVerify.imagesFound > 0
-            ? `Added your product section with ${previewVerify.imagesFound} image(s) in the preview. Scroll just below the hero to see it.`
-            : agentResult.ownerMessage || agentResult.summary || 'Updated your website.';
+        const successOwnerMessage = editStreamOutcome.ownerMessage;
+        const finishLabel = editStreamOutcome.previewSynced
+          ? 'Preview updated'
+          : 'Saved — preview syncing';
 
         await logEditTimingSummary(jobId, editTimer);
         const timingSummary = editTimer.summary();
         const slowest = editTimer.slowest();
 
         emit('step', { id: 'validate', label: 'Checking the preview', status: 'completed' });
-        emit('step', { id: 'finish', label: 'Preview updated', status: 'completed' });
+        emit('step', { id: 'finish', label: finishLabel, status: 'completed' });
         emit('done', {
           ok: true,
           jobId,
@@ -796,7 +831,11 @@ export async function POST(
             ok: true,
             jobId,
             ownerMessage: successOwnerMessage,
-            previewVerified: previewVerify.ok,
+            previewVerified: editStreamOutcome.previewSynced,
+            editApplied: editStreamOutcome.editApplied,
+            previewSynced: editStreamOutcome.previewSynced,
+            previewVerifyStatus: editStreamOutcome.previewVerifyStatus,
+            previewVerifyReason: editStreamOutcome.previewVerifyReason,
             changedFiles: changedPaths,
           version: newVersion,
             timing: {

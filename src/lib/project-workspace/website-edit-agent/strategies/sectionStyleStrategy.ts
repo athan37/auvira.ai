@@ -11,8 +11,23 @@ import {
   writeWorkspaceRel,
 } from '../strategyContext';
 import { extractSectionComponentSource } from '../resolveSectionTarget';
+import {
+  ensureLegacyPageReadsPresentation,
+  ensureTailwindPresentationSupport,
+} from '../legacySectionPresentation';
 import { updateSectionBackgroundColorInSource } from '../../website-edit-agent-v2/siteConfigMutations';
 import type { WebsiteEditAgentOptions, WebsiteEditAgentResult } from '../types';
+
+function buildSectionStyleSummary(
+  sectionLabel: string,
+  toColor: string,
+  swap: ReturnType<typeof parseColorSwap>
+): string {
+  if (swap && swap.fromColor !== swap.toColor) {
+    return `Changed background of "${sectionLabel}" from ${swap.fromColor} to ${swap.toColor}.`;
+  }
+  return `Changed background of "${sectionLabel}" to ${toColor}.`;
+}
 
 function tailwindBgClass(color: string): string {
   return `bg-${color}-100`;
@@ -116,18 +131,25 @@ export async function runSectionStyleStrategy(
 
   const sectionIndex = plan.where.sectionIndex;
   const sectionLabel = plan.where.title ?? `section ${sectionIndex}`;
+  const componentName = plan.where.rendererComponent;
 
   const configUpdated = await tryConfigPresentationUpdate(options, sectionIndex, toColor);
-  if (configUpdated) {
-    const summary = swap
-      ? `Changed background of "${sectionLabel}" from ${swap.fromColor} to ${swap.toColor}.`
-      : `Changed background of "${sectionLabel}" to ${toColor}.`;
+  const skipInfraInlineRepair = options.infraBaselineReady === true;
+  const tailwindPatched = skipInfraInlineRepair
+    ? false
+    : await ensureTailwindPresentationSupport(options);
+  const pageUpgraded =
+    skipInfraInlineRepair || componentName == null
+      ? false
+      : await ensureLegacyPageReadsPresentation(options, componentName);
+
+  if (configUpdated || pageUpgraded || tailwindPatched) {
+    const summary = buildSectionStyleSummary(sectionLabel, toColor, swap);
     return buildStrategyResult(options, beforeHashes, 'section_style', 'L0', summary, {
-      confidence: 'high',
+      confidence: configUpdated ? 'high' : 'medium',
     });
   }
 
-  const componentName = plan.where.rendererComponent;
   if (!componentName) return null;
 
   return tryPageComponentPatch(options, beforeHashes, componentName, toColor, swap);

@@ -56,6 +56,8 @@ export interface IPreview {
   sandboxExpiresAt?: Date;
 }
 
+export type InfraStatus = 'pending' | 'ready' | 'failed';
+
 export interface ICodeWorkspace {
   status: 'not_started' | 'setting_up' | 'ready' | 'editing' | 'failed';
   version: number;
@@ -115,6 +117,11 @@ export interface IWebsiteProject extends Document {
   deployment?: IDeploymentInfo;
   preview?: IPreview;
   codeWorkspace?: ICodeWorkspace;
+  /** Migration-first infra baseline (tailwind, page wiring, types). */
+  infraVersion?: number;
+  infraStatus?: InfraStatus;
+  infraLastError?: string;
+  infraMigratedAt?: Date;
   editingMode?: 'spec' | 'code';
   status: 'draft' | 'building' | 'deployed' | 'failed' | 'archived';
   hasUnpublishedChanges?: boolean;
@@ -155,6 +162,10 @@ const WebsiteProjectSchema = new Schema<IWebsiteProject>(
     },
     deployment: { type: Schema.Types.Mixed },
     preview: { type: Schema.Types.Mixed },
+    infraVersion: { type: Number, default: 0 },
+    infraStatus: { type: String, enum: ['pending', 'ready', 'failed'] },
+    infraLastError: String,
+    infraMigratedAt: Date,
     codeWorkspace: {
       status: {
         type: String,
