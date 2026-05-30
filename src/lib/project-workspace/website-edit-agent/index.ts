@@ -105,6 +105,13 @@ export {
   resolveSectionTarget,
   formatStructureMap,
 } from './resolveSectionTarget';
+export {
+  buildSiteSectionCatalog,
+  formatSectionCatalogForPrompt,
+  matchSectionFromMessage,
+  buildSectionSuggestedReplies,
+} from './siteSectionCatalog';
+export type { SiteSectionCatalog } from './siteSectionCatalog';
 export type { SiteWorkspaceSnapshot, PageArchetype } from './resolveSiteWorkspace';
 export type {
   WebsiteEditAgentOptions,
@@ -181,9 +188,11 @@ export async function runWebsiteEditAgent(
   }
 
   const editTargetPlan = grounded.plan;
+  const sectionCatalog = grounded.sectionCatalog ?? editTargetPlan?.sectionCatalog;
   const agentOptions: WebsiteEditAgentOptions = {
     ...options,
     editTargetPlan,
+    sectionCatalog,
   };
 
   const plan = classifyEditJob(
@@ -248,7 +257,8 @@ export async function runWebsiteEditAgent(
   const ambiguity = detectAmbiguousEditRequest(
     options.ownerMessage,
     options.conversationHistory ?? [],
-    editTargetPlan ?? undefined
+    editTargetPlan ?? undefined,
+    sectionCatalog
   );
   if (ambiguity.ambiguous && ambiguity.clarificationMessage) {
     return {

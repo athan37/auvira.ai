@@ -18,9 +18,11 @@ export const LEGACY_TAILWIND_CONTENT_GLOBS = [
 
 /** Agent-driven section.presentation and theme edits (runtime class strings). */
 export const CUSTOMER_SITE_TAILWIND_SAFELIST = `  safelist: [
+    'bg-black',
+    'bg-white',
     {
       pattern:
-        /^bg-(red|yellow|blue|green|orange|purple|pink|teal|cyan|indigo|gray|grey|brown|black|white)-(50|100|200|300|400|500|600|700|800|900)$/,
+        /^bg-(red|yellow|blue|green|orange|purple|pink|teal|cyan|indigo|gray|grey|brown)-(50|100|200|300|400|500|600|700|800|900)$/,
     },
     {
       pattern:
@@ -38,6 +40,21 @@ export const CUSTOMER_SITE_TAILWIND_SAFELIST = `  safelist: [
     },
   ],`;
 
+const SHADED_BG_PATTERN =
+  /^bg-(red|yellow|blue|green|orange|purple|pink|teal|cyan|indigo|gray|grey|brown)-(50|100|200|300|400|500|600|700|800|900)$/i;
+
+const FLAT_BG_PATTERN = /^bg-(black|white)$/i;
+
+/** True when a string is a valid Tailwind background utility (emitable by JIT/safelist). */
+export function isEmitableTailwindBackgroundClass(className: string): boolean {
+  const normalized = className.trim();
+  if (!normalized) return false;
+  if (FLAT_BG_PATTERN.test(normalized)) return true;
+  if (SHADED_BG_PATTERN.test(normalized)) return true;
+  if (/^bg-\[[^\]]+\]$/.test(normalized)) return true;
+  return false;
+}
+
 /** True when tailwind.config.js can emit a runtime presentation background class. */
 export function tailwindConfigCoversBackgroundClass(
   tailwindContent: string,
@@ -48,19 +65,33 @@ export function tailwindConfigCoversBackgroundClass(
     return false;
   }
 
+  if (!isEmitableTailwindBackgroundClass(normalized)) {
+    return false;
+  }
+
   // Full src scan picks up class strings in siteConfig.ts at build/dev time.
   if (tailwindContent.includes('./src/**/*')) {
     return true;
+  }
+
+  if (FLAT_BG_PATTERN.test(normalized)) {
+    return (
+      /\bsafelist\s*:/.test(tailwindContent) &&
+      (tailwindContent.includes("'bg-black'") ||
+        tailwindContent.includes('"bg-black"') ||
+        tailwindContent.includes("'bg-white'") ||
+        tailwindContent.includes('"bg-white"') ||
+        tailwindContent.includes(normalized))
+    );
   }
 
   if (!/\bsafelist\s*:/.test(tailwindContent)) {
     return false;
   }
 
-  const standardBg = normalized.match(/^bg-([a-z]+)-(\d{2,3})$/i);
-  if (standardBg) {
+  if (SHADED_BG_PATTERN.test(normalized)) {
     const safelistBgPattern =
-      /^bg-(red|yellow|blue|green|orange|purple|pink|teal|cyan|indigo|gray|grey|brown|black|white)-(50|100|200|300|400|500|600|700|800|900)$/;
+      /^bg-(red|yellow|blue|green|orange|purple|pink|teal|cyan|indigo|gray|grey|brown)-(50|100|200|300|400|500|600|700|800|900)$/;
     return safelistBgPattern.test(normalized);
   }
 

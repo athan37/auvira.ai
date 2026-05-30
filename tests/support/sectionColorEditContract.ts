@@ -247,4 +247,21 @@ export const GENERIC_SECTION_COLOR_SCENARIOS: SectionColorEditScenario[] = [
     infraBaselineReady: true,
     expectFiles: { mustInclude: ['src/lib/siteConfig.ts', 'src/app/page.tsx'] },
   },
+  {
+    name: 'flat color: black on last section (legacy contact)',
+    sectionType: 'contact',
+    sectionIndex: 0,
+    color: 'black',
+    ownerMessage: 'change background color of the last section to black',
+    pageMode: 'legacy',
+    infraBaselineReady: true,
+    expectFiles: { mustInclude: ['src/lib/siteConfig.ts', 'src/app/page.tsx'] },
+  },
+  {
+    name: 'flat color: white on gallery (wired)',
+    sectionType: 'gallery',
+    color: 'white',
+    pageMode: 'wired',
+    infraBaselineReady: true,
+  },
 ];

@@ -169,7 +169,9 @@ export function buildSyntheticTailwindConfig(mode: TailwindMode): string {
     './src/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   safelist: [
-    { pattern: /^bg-(red|yellow|blue|green|orange|purple|pink|teal|cyan|indigo|gray|grey|brown|black|white)-(50|100|200|300|400|500|600|700|800|900)$/ },
+    'bg-black',
+    'bg-white',
+    { pattern: /^bg-(red|yellow|blue|green|orange|purple|pink|teal|cyan|indigo|gray|grey|brown)-(50|100|200|300|400|500|600|700|800|900)$/ },
   ],
 };`;
 }

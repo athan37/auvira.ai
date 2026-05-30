@@ -168,9 +168,48 @@ export function messageHasColorWord(message: string, color: string): boolean {
   return new RegExp(`\\b${escaped}\\b`, 'i').test(message);
 }
 
+/** Remove quoted spans so section titles do not pollute color detection. */
+export function stripQuotedSpans(message: string): string {
+  return message.replace(/["'][^"']*["']/g, ' ');
+}
+
 export function extractColorsFromMessage(message: string): string[] {
-  const lower = message.toLowerCase();
+  const lower = stripQuotedSpans(message).toLowerCase();
   return TAILWIND_COLOR_NAMES.filter((c) => messageHasColorWord(lower, c));
+}
+
+/**
+ * Target background color from owner message — prefers explicit `to {color}` after background/section.
+ */
+export function extractBackgroundColorFromMessage(message: string): string | null {
+  const withoutQuotes = stripQuotedSpans(message);
+  const swap = parseColorSwap(withoutQuotes);
+  if (swap?.toColor) return swap.toColor;
+
+  const styledTo = withoutQuotes.match(
+    /\b(?:background|section)\b[^.\n]{0,120}?\bto\s+(?:(light|dark|deep|pale|soft)\s+)?([a-z]+(?:-\d{2,3})?)\b/i
+  );
+  if (styledTo?.[2]) {
+    const modifier = styledTo[1]?.toLowerCase();
+    const color = styledTo[2].toLowerCase();
+    if (modifier && !color.includes('-')) {
+      return `${modifier} ${color}`;
+    }
+    return color;
+  }
+
+  const bareTo = withoutQuotes.match(/\bto\s+(?:(light|dark|deep|pale|soft)\s+)?([a-z]+(?:-\d{2,3})?)\b/i);
+  if (bareTo?.[2]) {
+    const modifier = bareTo[1]?.toLowerCase();
+    const color = bareTo[2].toLowerCase();
+    if (modifier && !color.includes('-')) {
+      return `${modifier} ${color}`;
+    }
+    return color;
+  }
+
+  const colors = extractColorsFromMessage(withoutQuotes);
+  return colors.length > 0 ? colors[colors.length - 1] : null;
 }
 
 /** Parse "red to yellow" / "from red to yellow" style swaps. */

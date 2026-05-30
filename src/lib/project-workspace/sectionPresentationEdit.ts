@@ -4,7 +4,8 @@
  */
 
 import { colorNameToBackgroundClass } from '@/lib/builder/sectionPresentation';
-import { tailwindConfigCoversBackgroundClass } from '@/lib/builder/tailwindPresentationSupport';
+import { normalizeTailwindBackgroundClass } from '@/lib/builder/tailwindBackgroundResolver';
+import { tailwindConfigCoversBackgroundClass, isEmitableTailwindBackgroundClass } from '@/lib/builder/tailwindPresentationSupport';
 import { appendSiteConfigPresentationSyncExport, hasInvalidNextJsPageExports, sanitizeSourceForPublish } from '@/lib/site-manager/siteConfigAgentMarkers';
 import { parseSiteConfigSource } from '@/lib/site-manager/siteConfigParser';
 import {
@@ -27,6 +28,7 @@ import {
   writeWorkspaceRel,
 } from './website-edit-agent/strategyContext';
 import {
+  presentationWiringIssues,
   sectionPresentationBackgroundClass,
   sectionRendererUsesPresentationResolver,
 } from './previewReflectsSiteConfig';
@@ -139,12 +141,22 @@ export function assertSectionColorEditInvariants(
     errors.push(`${rendererComponent} does not use resolveSectionBackground`);
   }
 
+  const wiringIssues = presentationWiringIssues(siteConfigContent, pageContent);
+  const targetWiringIssue = wiringIssues.find((issue) => issue.startsWith(rendererComponent));
+  if (targetWiringIssue) {
+    errors.push(targetWiringIssue);
+  }
+
   if (hasInvalidNextJsPageExports(pageContent)) {
     errors.push('page.tsx contains invalid Next.js agent export stubs (must be sanitized)');
   }
 
   if (tailwindContent && !tailwindConfigCoversBackgroundClass(tailwindContent, expectedBackgroundClass)) {
     errors.push(`tailwind.config.js does not cover class "${expectedBackgroundClass}"`);
+  }
+
+  if (!isEmitableTailwindBackgroundClass(expectedBackgroundClass)) {
+    errors.push(`background class "${expectedBackgroundClass}" is not a valid Tailwind utility`);
   }
 
   if (infraBaselineReady) {
@@ -210,11 +222,14 @@ export async function applySectionBackgroundEdit(
   const options = workspaceOptions(workspace);
   const infraReady = projectInfraStatus.infraBaselineReady === true;
 
-  const backgroundClass =
+  const rawBackgroundClass =
     input.backgroundClass?.trim() ||
     (input.colorName
       ? colorNameToBackgroundClass(input.colorName, workspace.ownerMessage)
       : '');
+  const backgroundClass = rawBackgroundClass
+    ? normalizeTailwindBackgroundClass(rawBackgroundClass, workspace.ownerMessage)
+    : '';
   if (!backgroundClass) {
     return {
       ok: false,
@@ -269,7 +284,10 @@ export async function applySectionBackgroundEdit(
         workspace.ownerMessage
       );
 
-  if (!updated || updated === siteConfigBefore) {
+  const presentationAlreadyCorrect =
+    sectionPresentationBackgroundClass(siteConfigBefore, sectionIndex) === backgroundClass;
+
+  if ((!updated || updated === siteConfigBefore) && !presentationAlreadyCorrect) {
     return {
       ok: false,
       backgroundClass,
@@ -283,10 +301,13 @@ export async function applySectionBackgroundEdit(
     };
   }
 
-  const stamped = appendSiteConfigPresentationSyncExport(updated);
-  await writeWorkspaceRel(options, SITE_CONFIG, stamped);
-
-  const changedFiles: string[] = ['src/lib/siteConfig.ts'];
+  const changedFiles: string[] = [];
+  const siteConfigBase = updated && updated !== siteConfigBefore ? updated : siteConfigBefore;
+  const stamped = appendSiteConfigPresentationSyncExport(siteConfigBase);
+  if (stamped !== siteConfigBefore) {
+    await writeWorkspaceRel(options, SITE_CONFIG, stamped);
+    changedFiles.push('src/lib/siteConfig.ts');
+  }
   const tailwindBefore = await readWorkspaceRel(options, TAILWIND_CONFIG);
 
   if (infraReady) {
@@ -390,3 +411,166 @@ export function sectionBackgroundEditFromAgentOptions(
 
 /** Plan alias for unified section background pipeline entrypoint. */
 export const applySectionBackgroundColorEdit = applySectionBackgroundEdit;
+
+export interface SectionColorEditGateInput {
+  workspace: SectionPresentationWorkspace;
+  projectInfraStatus: ProjectInfraStatus;
+  /** When set, gate runs for section_style even without persisted presentation. */
+  strategy?: string;
+  ownerMessage?: string;
+  /** Re-run pipeline once when invariants fail (default true). */
+  autoRepair?: boolean;
+}
+
+export interface SectionColorEditGateResult {
+  ok: boolean;
+  errors: string[];
+  retried: boolean;
+  summary?: string;
+}
+
+interface PresentationSectionTarget {
+  sectionIndex: number;
+  sectionType: string;
+  title: string;
+  rendererComponent: string;
+  backgroundClass: string;
+}
+
+/** Sections with a persisted presentation.backgroundClass in siteConfig. */
+export function listSectionsWithPresentationBackground(
+  siteConfigContent: string
+): PresentationSectionTarget[] {
+  const parsed = parseSiteConfigSource(siteConfigContent);
+  if (!parsed?.sections?.length) return [];
+
+  const targets: PresentationSectionTarget[] = [];
+  for (let i = 0; i < parsed.sections.length; i++) {
+    const section = parsed.sections[i] as {
+      type?: string;
+      title?: string;
+      presentation?: { backgroundClass?: string };
+    };
+    const backgroundClass = section.presentation?.backgroundClass?.trim();
+    if (!backgroundClass) continue;
+    const sectionType = String(section.type ?? 'generic');
+    targets.push({
+      sectionIndex: i,
+      sectionType,
+      title: section.title ?? `section ${i}`,
+      rendererComponent: rendererComponentForSectionType(sectionType),
+      backgroundClass,
+    });
+  }
+  return targets;
+}
+
+function collectSectionColorInvariantErrors(
+  siteConfigContent: string,
+  pageContent: string,
+  tailwindContent: string | null,
+  targets: PresentationSectionTarget[],
+  infraBaselineReady: boolean
+): string[] {
+  const errors: string[] = [];
+  for (const target of targets) {
+    const sectionErrors = assertSectionColorEditInvariants({
+      siteConfigContent,
+      pageContent,
+      tailwindContent,
+      sectionIndex: target.sectionIndex,
+      rendererComponent: target.rendererComponent,
+      expectedBackgroundClass: target.backgroundClass,
+      infraBaselineReady,
+      changedFiles: ['src/lib/siteConfig.ts', 'src/app/page.tsx', 'tailwind.config.js'],
+    });
+    errors.push(...sectionErrors);
+  }
+  return [...new Set(errors)];
+}
+
+/**
+ * Post-apply gate for section background edits — verifies invariants and optionally
+ * re-runs the unified pipeline once before validation/build gates.
+ */
+export async function enforceSectionColorEditReadyAfterApply(
+  input: SectionColorEditGateInput
+): Promise<SectionColorEditGateResult> {
+  const { workspace, projectInfraStatus, strategy, autoRepair = true } = input;
+  const options = workspaceOptions(workspace);
+  const infraReady = projectInfraStatus.infraBaselineReady === true;
+
+  const shouldGate = strategy === 'section_style';
+  if (!shouldGate) {
+    return { ok: true, errors: [], retried: false };
+  }
+
+  const readState = async () => {
+    const siteConfigContent = (await readWorkspaceRel(options, SITE_CONFIG)) ?? '';
+    const pageContent = (await readWorkspaceRel(options, PAGE_TSX)) ?? '';
+    const tailwindContent = await readWorkspaceRel(options, TAILWIND_CONFIG);
+    const targets = listSectionsWithPresentationBackground(siteConfigContent);
+    return { siteConfigContent, pageContent, tailwindContent, targets };
+  };
+
+  let state = await readState();
+  if (state.targets.length === 0) {
+    return {
+      ok: false,
+      errors: ['section_style edit did not persist presentation.backgroundClass in siteConfig'],
+      retried: false,
+    };
+  }
+
+  let errors = collectSectionColorInvariantErrors(
+    state.siteConfigContent,
+    state.pageContent,
+    state.tailwindContent,
+    state.targets,
+    infraReady
+  );
+  if (errors.length === 0) {
+    const target = state.targets[state.targets.length - 1];
+    return {
+      ok: true,
+      errors: [],
+      retried: false,
+      summary: buildSummary(target.title, target.backgroundClass),
+    };
+  }
+
+  if (!autoRepair) {
+    return { ok: false, errors, retried: false };
+  }
+
+  for (const target of state.targets) {
+    await applySectionBackgroundEdit({
+      workspace,
+      sectionTarget: {
+        sectionIndex: target.sectionIndex,
+        sectionType: target.sectionType,
+        title: target.title,
+        rendererComponent: target.rendererComponent,
+      },
+      backgroundClass: target.backgroundClass,
+      projectInfraStatus,
+    });
+  }
+
+  state = await readState();
+  errors = collectSectionColorInvariantErrors(
+    state.siteConfigContent,
+    state.pageContent,
+    state.tailwindContent,
+    state.targets,
+    infraReady
+  );
+
+  const lastTarget = state.targets[state.targets.length - 1];
+  return {
+    ok: errors.length === 0,
+    errors,
+    retried: true,
+    summary: lastTarget ? buildSummary(lastTarget.title, lastTarget.backgroundClass) : undefined,
+  };
+}

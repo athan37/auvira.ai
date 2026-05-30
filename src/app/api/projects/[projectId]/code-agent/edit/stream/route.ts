@@ -40,6 +40,8 @@ import {
   resolveExpectedPreviewPresentationClasses,
   waitForPresentationClassInPreview,
 } from '@/lib/project-workspace/previewReflectsSiteConfig';
+import { enforceSectionColorEditReadyAfterApply } from '@/lib/project-workspace/sectionPresentationEdit';
+import { isInfraBaselineReady } from '@/lib/project-workspace/infra/isInfraBaselineReady';
 import { resolveSiteWorkspace } from '@/lib/project-workspace/website-edit-agent/resolveSiteWorkspace';
 import {
   appendAssistantMessage,
@@ -629,6 +631,55 @@ export async function POST(
             : undefined
         );
         await attachChangedFiles(jobId, changedFiles);
+
+        if (mode === 'gitlab' && agentResult.strategy === 'section_style') {
+          editTimer.start('section_color_gate');
+          const colorGate = await enforceSectionColorEditReadyAfterApply({
+            workspace: {
+              workspacePath,
+              gateway: activeGateway ?? undefined,
+              ownerMessage: message,
+            },
+            projectInfraStatus: {
+              infraBaselineReady: isInfraBaselineReady({
+                infraStatus: project.infraStatus,
+                infraVersion: project.infraVersion,
+              }),
+            },
+            strategy: agentResult.strategy,
+            ownerMessage: message,
+          });
+          await appendTimedEditJobLog(
+            jobId,
+            colorGate.ok ? 'section_color_gate_passed' : 'section_color_gate_failed',
+            colorGate.ok
+              ? 'Section color invariants satisfied'
+              : colorGate.errors.join('; '),
+            editTimer.finish('section_color_gate'),
+            { retried: colorGate.retried, errors: colorGate.errors }
+          );
+          if (!colorGate.ok) {
+            emit('step', { id: 'validate', label: 'Checking the preview', status: 'failed' });
+            emit('step', { id: 'finish', label: 'Preview not updated', status: 'failed' });
+            await fail(
+              "That section color change didn't fully apply. Please try again.",
+              {
+                stage: 'validation_failed',
+                technicalMessage: colorGate.errors.join('; '),
+                extra: {
+                  strategy: agentResult.strategy,
+                  sectionColorGate: colorGate,
+                  changedPaths,
+                },
+              }
+            );
+            return;
+          }
+          if (colorGate.summary) {
+            agentResult.summary = colorGate.summary;
+            agentResult.ownerMessage = colorGate.summary;
+          }
+        }
 
         await markEditJobStatus(jobId, 'validating');
         editTimer.start('validation');

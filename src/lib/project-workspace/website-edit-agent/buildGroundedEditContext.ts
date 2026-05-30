@@ -1,12 +1,18 @@
 import { hasExplicitEditTarget } from './enrichEditPrompt';
 import { wantsNewImageSection } from './imagePlacementIntent';
 import type { ConversationTurn } from './editAmbiguity';
+import { resolveEffectiveEditMessage } from '@/lib/chat/conversationContextForEdit';
 import { extractEditCodeContext, formatCodeContextBlocks } from './extractEditCodeContext';
 import {
   buildEnrichedSiteStructure,
-  formatStructureMap,
   resolveSectionTarget,
 } from './resolveSectionTarget';
+import {
+  applyCatalogMatchToTarget,
+  buildSiteSectionCatalog,
+  matchSectionFromMessage,
+} from './siteSectionCatalog';
+import { resolveSectionWithCatalogLLM } from './resolveSectionWithCatalogLLM';
 import type { SiteWorkspaceSnapshot } from './resolveSiteWorkspace';
 import {
   isBackgroundColorEditRequest,
@@ -27,8 +33,30 @@ function messageHasKeyword(message: string, keyword: string): boolean {
 /** Classify WHAT the owner wants to change from the message. */
 export function classifyEditWhat(message: string): EditWhatKind {
   const lower = message.toLowerCase();
+  const hasColorSignal =
+    /\b(backgrounds?|colours?|colors?)\b/.test(lower) ||
+    isBackgroundColorEditRequest(message) ||
+    isTextColorEditRequest(message);
 
-  if (/\b(image|photo|picture|gallery|upload)\b/.test(lower)) {
+  if (/\bcard\b/.test(lower) && /\b(backgrounds?|colours?|colors?)\b/.test(lower)) {
+    return 'style_card';
+  }
+
+  if (
+    isTextColorEditRequest(message) ||
+    (/\btext\b/.test(lower) && /\b(colours?|colors?)\b/.test(lower))
+  ) {
+    return 'style_text';
+  }
+
+  if (
+    isBackgroundColorEditRequest(message) ||
+    (/\bbackgrounds?\b/.test(lower) && !/\bcard\b/.test(lower))
+  ) {
+    return 'style_background';
+  }
+
+  if (/\b(image|photo|picture|gallery|upload)\b/.test(lower) && !hasColorSignal) {
     return 'images';
   }
 
@@ -38,24 +66,6 @@ export function classifyEditWhat(message: string): EditWhatKind {
     !/\b(background|colour|color)\b/.test(lower)
   ) {
     return 'structure';
-  }
-
-  if (/\bcard\b/.test(lower) && /\b(color|colour|background)\b/.test(lower)) {
-    return 'style_card';
-  }
-
-  if (
-    isTextColorEditRequest(message) ||
-    (/\btext\b/.test(lower) && /\b(color|colour)\b/.test(lower))
-  ) {
-    return 'style_text';
-  }
-
-  if (
-    isBackgroundColorEditRequest(message) ||
-    (/\bbackground\b/.test(lower) && !/\bcard\b/.test(lower))
-  ) {
-    return 'style_background';
   }
 
   if (
@@ -163,37 +173,77 @@ export async function buildGroundedEditContext(
   }
 
   const enriched = buildEnrichedSiteStructure(siteConfigContent, pageContent);
-  const structureBrief = formatStructureMap(enriched);
-  const where = resolveSectionTarget(message, history, enriched);
+  const sectionCatalog = buildSiteSectionCatalog(siteConfigContent, pageContent);
+  const structureBrief = sectionCatalog.textBlock;
+  const effectiveMessage = resolveEffectiveEditMessage(message, history);
+  let where = resolveSectionTarget(message, history, enriched, sectionCatalog);
 
   if (
     where.clarificationMessage &&
     where.confidence !== 'high' &&
-    !wantsNewImageSection(message)
+    !wantsNewImageSection(effectiveMessage)
   ) {
     return {
       needsClarification: true,
       clarificationMessage: where.clarificationMessage,
-      suggestedReplies: where.suggestedReplies,
+      suggestedReplies: where.suggestedReplies ?? sectionCatalog.numberedReplies,
+      sectionCatalog,
     };
   }
 
-  const what = classifyEditWhat(message);
+  const what = classifyEditWhat(effectiveMessage);
 
   if (
     (what === 'style_background' || what === 'style_text' || what === 'style_card') &&
     where.kind === 'section' &&
     where.sectionIndex == null
   ) {
-    return {
-      needsClarification: true,
-      clarificationMessage:
-        where.clarificationMessage ??
-        'Which section should I update? Reply with the section title in quotes, or say "first section".',
-      suggestedReplies: where.suggestedReplies,
-    };
+    const catalogMatch = matchSectionFromMessage(effectiveMessage, sectionCatalog, { history });
+    if (catalogMatch?.sectionIndex != null && catalogMatch.confidence === 'high') {
+      where = applyCatalogMatchToTarget(where, catalogMatch);
+    } else if (catalogMatch?.confidence === 'low' && catalogMatch.clarificationMessage) {
+      return {
+        needsClarification: true,
+        clarificationMessage: catalogMatch.clarificationMessage,
+        suggestedReplies: catalogMatch.suggestedReplies ?? sectionCatalog.numberedReplies,
+        sectionCatalog,
+      };
+    } else {
+      const llmPick = await resolveSectionWithCatalogLLM(effectiveMessage, sectionCatalog);
+      if (llmPick && llmPick.confidence !== 'low') {
+        const section = sectionCatalog.sections.find((s) => s.index === llmPick.sectionIndex);
+        if (section) {
+          where = applyCatalogMatchToTarget(where, {
+            confidence: llmPick.confidence === 'high' ? 'high' : 'medium',
+            kind: 'section',
+            sectionIndex: section.index,
+            sectionType: section.type,
+            title: section.title,
+            rendererComponent: section.rendererComponent,
+            configLineRange: section.configLineRange ?? undefined,
+            pageComponentRange: section.pageComponentRange ?? undefined,
+            reason: llmPick.reason,
+            matches: [],
+          });
+        }
+      }
+    }
+
+    if (where.kind === 'section' && where.sectionIndex == null) {
+      return {
+        needsClarification: true,
+        clarificationMessage:
+          where.clarificationMessage ??
+          'Which section should I update? Reply with the number:\n\n' +
+            sectionCatalog.sections
+              .map((s, i) => `${i + 1}. [${s.index}] ${s.type} — "${s.title}"`)
+              .join('\n'),
+        suggestedReplies: where.suggestedReplies ?? sectionCatalog.numberedReplies,
+        sectionCatalog,
+      };
+    }
   }
-  const whatClarification = needsWhatClarification(what, message);
+  const whatClarification = needsWhatClarification(what, effectiveMessage);
   if (whatClarification) {
     return whatClarification;
   }
@@ -205,18 +255,19 @@ export async function buildGroundedEditContext(
     snapshot: enriched,
     workspacePath,
     mode: snap.mode,
-    ownerMessage: message,
+    ownerMessage: effectiveMessage,
   });
 
   const plan: EditTargetPlan = {
     where,
     what,
-    valueExplicit: hasExplicitEditTarget(message),
+    valueExplicit: hasExplicitEditTarget(effectiveMessage),
     codeBlocks,
     structureBrief,
+    sectionCatalog,
   };
 
-  return { plan };
+  return { plan, sectionCatalog };
 }
 
 /** Adjust WHERE confidence when WHAT is ambiguous (medium confidence). */

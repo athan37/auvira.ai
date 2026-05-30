@@ -44,6 +44,8 @@ export function wasSectionListClarificationAsked(history: ConversationTurn[]): b
     (m) =>
       m.role === 'assistant' &&
       (/Which section should I change\? Reply with the number/i.test(m.content) ||
+        /Which section do you mean\? Reply with the number/i.test(m.content) ||
+        /Which section should I update/i.test(m.content) ||
         /I found .* sections that could match|Reply with the number/i.test(m.content))
   );
 }
@@ -236,7 +238,8 @@ export function formatWeightedConversationForPrompt(
  */
 export function formatConversationForIntentClarifier(
   message: string,
-  history: ConversationTurn[] | undefined
+  history: ConversationTurn[] | undefined,
+  catalogBlock?: string
 ): string {
   const effective = resolveEffectiveEditMessage(message, history ?? []);
   const historyBlock = formatWeightedConversationForPrompt(history);
@@ -244,6 +247,9 @@ export function formatConversationForIntentClarifier(
     effective.trim() !== message.trim()
       ? `RESOLVED REQUEST (merged from recent clarification context):\n"${effective.trim()}"\n\n`
       : '';
+  const catalogSection = catalogBlock?.trim()
+    ? `${catalogBlock.trim()}\n\n`
+    : '';
 
-  return `${historyBlock}${effectiveBlock}`;
+  return `${historyBlock}${catalogSection}${effectiveBlock}`;
 }

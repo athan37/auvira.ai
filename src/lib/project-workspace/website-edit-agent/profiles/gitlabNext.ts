@@ -22,7 +22,8 @@ Rules:
 - Always search before editing when unsure where content lives.
 - Always read before editing.
 - For section/content requests, update src/lib/siteConfig.ts sections array when present; page.tsx maps those sections to UI. write_file siteConfig.ts with the full updated file.
-- For background/color/style requests on Tailwind sites: update src/app/page.tsx first — change preset.pageBg, preset.heroBg, preset.surfaceBg AND any main/hero className values to Tailwind classes like bg-blue-600 (not only globals.css). Remove conflicting classes (e.g. replace bg-red-600 with bg-blue-600). The editable preview reads page.tsx, not body CSS alone.
+- For section-scoped background/color requests: update siteConfig.sections[].presentation.backgroundClass only (via siteConfig.ts). Do not edit preset.contactBg, preset.mutedBg, preset.surfaceBg, or preset.pageBg for individual sections — page.tsx section renderers read presentation through resolveSectionBackground(section, preset).
+- For whole-site or hero-level background/color requests on Tailwind sites: update src/app/page.tsx preset.pageBg, preset.heroBg, preset.surfaceBg AND any main/hero className values to Tailwind classes like bg-blue-600 (not only globals.css). Remove conflicting classes (e.g. replace bg-red-600 with bg-blue-600). The editable preview reads page.tsx, not body CSS alone.
 - When the owner attaches images, they are already saved under public/uploads/. Use the provided /uploads/... URL in page.tsx or siteConfig and render with img/next/image — do not use external image URLs.
 - Preserve real business facts.
 - Do not invent phone numbers, addresses, reviews, certifications, prices, guarantees, or years in business.

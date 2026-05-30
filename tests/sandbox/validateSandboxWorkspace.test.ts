@@ -93,4 +93,47 @@ export const __siteAgentPageGallerySync = 999;
       expect.objectContaining({ cmd: 'npm', args: ['run', 'build'] })
     );
   });
+
+  it('skips npm build for section color edits (siteConfig + page + tailwind)', async () => {
+    const pageWithLegacyExport = `function ContactSection({ section }) {
+  return <section className={"py-20 " + preset.contactBg}>{section.title}</section>;
+}
+export default function Home() { return null; }
+export const __siteAgentPageGallerySync = 1;
+`;
+    const siteConfigWithPresentation = `export const siteConfig = {
+  sections: [{ type: "contact", title: "Contact", presentation: { backgroundClass: "bg-red-600" } }],
+};
+`;
+    const files = new Map<string, string>([
+      ['src/app/page.tsx', pageWithLegacyExport],
+      ['src/lib/siteConfig.ts', siteConfigWithPresentation],
+      ['tailwind.config.js', 'module.exports = { content: ["./src/app/**/*"] };\n'],
+    ]);
+
+    mockRunCommand.mockImplementation(async (opts: { cmd: string; args: string[] }) => {
+      if (opts.cmd === 'test') return { exitCode: 0 };
+      throw new Error('build should not run for preview-safe color edit');
+    });
+
+    mockGetGateway.mockResolvedValue({
+      readFile: async (rel: string) => files.get(rel) ?? Promise.reject(new Error('missing')),
+      writeFile: async (rel: string, body: string) => {
+        files.set(rel, body);
+      },
+    });
+
+    const result = await validateSandboxWorkspace('proj-1', [
+      'src/lib/siteConfig.ts',
+      'src/app/page.tsx',
+      'tailwind.config.js',
+    ]);
+
+    expect(result.ok).toBe(true);
+    expect(files.get('src/app/page.tsx')).not.toContain('__siteAgentPageGallerySync');
+    expect(result.buildLog).toContain('skipping npm run build');
+    expect(mockRunCommand).not.toHaveBeenCalledWith(
+      expect.objectContaining({ cmd: 'npm', args: ['run', 'build'] })
+    );
+  });
 });

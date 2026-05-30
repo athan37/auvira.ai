@@ -1,6 +1,6 @@
-import {
-  extractColorsFromMessage,
-} from './preset/presetUtils';
+import { extractColorsFromMessage } from './preset/presetUtils';
+import { extractSectionTitleCandidates } from './resolveSectionTarget';
+import { matchSectionFromMessage, type SiteSectionCatalog } from './siteSectionCatalog';
 import type { EditTargetPlan } from './types';
 import {
   DEFAULT_EDIT_CONTEXT_TURNS,
@@ -88,13 +88,9 @@ export function detectScopedStyleRequest(message: string): boolean {
 }
 
 function extractSectionTitle(message: string): string | null {
-  const quoted = message.match(/["']([^"']{3,60})["']/);
-  if (quoted?.[1]) return quoted[1].trim();
+  const candidates = extractSectionTitleCandidates(message);
+  if (candidates.length > 0) return candidates[0];
 
-  const colon = message.match(/:\s*([^:\n]{3,60})\s*$/);
-  if (colon?.[1]) return colon[1].trim();
-
-  if (/\bwhat our customers say\b/i.test(message)) return 'What Our Customers Say';
   if (/\btestimonial/i.test(message)) return 'testimonials';
 
   const sectionMatch = message.match(/\bsection\s+(.+?)(?:\s+to\s+\w+\s*$|\s*$)/i);
@@ -155,14 +151,29 @@ function resolveSectionListReply(
   return { ambiguous: false, confidence: 'high' };
 }
 
+function buildCatalogClarification(catalog: SiteSectionCatalog): AmbiguityResult {
+  return {
+    ambiguous: true,
+    confidence: 'low',
+    clarificationMessage:
+      'Which section do you mean? Reply with the number:\n\n' +
+      catalog.sections
+        .map((s, i) => `${i + 1}. [${s.index}] ${s.type} — "${s.title}"`)
+        .join('\n'),
+    suggestedReplies: catalog.numberedReplies,
+  };
+}
+
 /**
  * Detect ambiguous edit requests that need owner clarification before applying changes.
  */
 export function detectAmbiguousEditRequest(
   message: string,
   history: ConversationTurn[] = [],
-  editTargetPlan?: EditTargetPlan
+  editTargetPlan?: EditTargetPlan,
+  sectionCatalog?: SiteSectionCatalog
 ): AmbiguityResult {
+  const catalog = sectionCatalog ?? editTargetPlan?.sectionCatalog;
   if (
     editTargetPlan?.where.confidence === 'low' &&
     editTargetPlan.where.clarificationMessage
@@ -210,8 +221,16 @@ export function detectAmbiguousEditRequest(
       return detectAmbiguousEditRequest(
         `${priorUser!.content}. ${message}`,
         history.slice(0, Math.max(0, history.length - 1)),
-        editTargetPlan
+        editTargetPlan,
+        catalog
       );
+    }
+    if (catalog) {
+      const catalogMatch = matchSectionFromMessage(message, catalog, { history });
+      if (catalogMatch?.sectionIndex != null && catalogMatch.confidence === 'high') {
+        return { ambiguous: false, confidence: 'high' };
+      }
+      return buildCatalogClarification(catalog);
     }
     return {
       ambiguous: true,

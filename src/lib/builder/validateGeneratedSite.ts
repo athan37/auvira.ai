@@ -6,6 +6,9 @@ import * as path from 'path';
 import { getNodeBinDir } from '@/lib/runtime/nodeRuntime';
 import { isVercelServerless } from '@/lib/runtime/isVercelServerless';
 import { scratchPath } from '@/lib/runtime/scratchDir';
+import { parseSiteConfigSource } from '@/lib/site-manager/siteConfigParser';
+import { rendererComponentForSectionType } from '@/lib/project-workspace/website-edit-agent/legacySectionPresentation';
+import { sectionRendererUsesPresentationResolver } from '@/lib/project-workspace/previewReflectsSiteConfig';
 
 const execFileAsync = promisify(execFile);
 
@@ -112,6 +115,31 @@ function checkStringPatterns(content: string, patterns: string[], fileName: stri
   for (const pattern of patterns) {
     if (content.includes(pattern)) {
       errors.push(`${fileName}: contains unsafe pattern "${pattern}"`);
+    }
+  }
+  return errors;
+}
+
+/** Standard section renderers must read siteConfig.presentation via resolveSectionBackground. */
+function checkGeneratedSectionPresentationWiring(
+  pageContent: string,
+  siteConfigContent: string
+): string[] {
+  const parsed = parseSiteConfigSource(siteConfigContent);
+  const sectionTypes = new Set(
+    (parsed?.sections ?? []).map((section) =>
+      String((section as { type?: string }).type ?? 'generic').toLowerCase()
+    )
+  );
+  if (sectionTypes.size === 0) return [];
+
+  const errors: string[] = [];
+  for (const type of sectionTypes) {
+    const component = rendererComponentForSectionType(type);
+    if (!sectionRendererUsesPresentationResolver(pageContent, component)) {
+      errors.push(
+        `page.tsx: ${component} must use resolveSectionBackground(section, preset) for section presentation`
+      );
     }
   }
   return errors;
@@ -255,6 +283,8 @@ export async function validateGeneratedSite(
         allErrors.push(`siteConfig.ts missing required content: "${required}"`);
       }
     }
+
+    allErrors.push(...checkGeneratedSectionPresentationWiring(pageTsxContent, siteConfigContent));
 
     if (allErrors.length > 0) {
       logs.push('String validation failed');

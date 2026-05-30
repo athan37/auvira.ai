@@ -433,6 +433,32 @@ export function summarizeActualChanges(
     return 'No changes were made.';
   }
 
+  const siteConfigPath = changedFiles.find((f) => /siteConfig\.ts$/i.test(f.replace(/\\/g, '/')));
+  if (siteConfigPath) {
+    const beforeSite = beforeFiles[siteConfigPath] ?? '';
+    const afterSite = afterFiles[siteConfigPath] ?? '';
+    if (beforeSite && afterSite && beforeSite !== afterSite) {
+      const beforeParsed = parseSiteConfigSource(beforeSite);
+      const afterParsed = parseSiteConfigSource(afterSite);
+      const sections = afterParsed?.sections ?? [];
+      for (let i = 0; i < sections.length; i++) {
+        const afterSection = sections[i] as {
+          title?: string;
+          presentation?: { backgroundClass?: string };
+        };
+        const beforeSection = beforeParsed?.sections?.[i] as
+          | { presentation?: { backgroundClass?: string } }
+          | undefined;
+        const afterBg = afterSection.presentation?.backgroundClass?.trim();
+        const beforeBg = beforeSection?.presentation?.backgroundClass?.trim();
+        if (afterBg && afterBg !== beforeBg) {
+          const title = afterSection.title ?? `section ${i + 1}`;
+          return `Changed background of "${title}" to ${afterBg}.`;
+        }
+      }
+    }
+  }
+
   const changes: string[] = [];
   if (htmlChanged) {
     changes.push('Updated the page content.');

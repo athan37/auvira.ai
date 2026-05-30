@@ -6,6 +6,12 @@ import {
 } from './siteStructureAnalysis';
 import type { ConversationTurn } from './editAmbiguity';
 import { wantsNewImageSection } from './imagePlacementIntent';
+import { resolveEffectiveEditMessage } from '@/lib/chat/conversationContextForEdit';
+import {
+  buildSiteSectionCatalogFromSnapshot,
+  matchSectionFromMessage,
+  type SiteSectionCatalog,
+} from './siteSectionCatalog';
 import type {
   LineRange,
   SectionMatchCandidate,
@@ -60,12 +66,79 @@ function messageHasKeyword(message: string, keyword: string): boolean {
   return new RegExp(`\\b${escaped}\\b`, 'i').test(message);
 }
 
+/** Fuzzy match score (0–100) between a section title and user intent. */
+export function scoreTitleMatch(sectionTitle: string, intent: string): number {
+  const t = sectionTitle.toLowerCase().trim();
+  const i = intent.toLowerCase().trim();
+  if (!t || !i) return 0;
+  if (t === i) return 100;
+
+  const shorter = t.length <= i.length ? t : i;
+  const longer = t.length > i.length ? t : i;
+  if (longer.includes(shorter)) {
+    if (!shorter.includes(' ') && shorter.length < 12) return 0;
+    if (shorter.length >= 12 || shorter.includes(' ')) return 85;
+    return 55;
+  }
+
+  const tWords = new Set(t.split(/\W+/).filter((w) => w.length > 2));
+  const iWords = i.split(/\W+/).filter((w) => w.length > 2);
+  if (iWords.length === 0) return 0;
+  let overlap = 0;
+  for (const w of iWords) {
+    if (tWords.has(w)) overlap += 1;
+  }
+  return Math.round((overlap / iWords.length) * 70);
+}
+
 /** Fuzzy match between section title and user intent (shared with image pipeline). */
 export function titleMatchesIntent(title: string, intent: string): boolean {
-  const t = title.toLowerCase().trim();
-  const i = intent.toLowerCase().trim();
-  if (!t || !i) return false;
-  return t === i || t.includes(i) || i.includes(t);
+  return scoreTitleMatch(title, intent) >= 50;
+}
+
+/** Extract possible section titles from owner phrasing (quotes, colon suffix, etc.). */
+export function extractSectionTitleCandidates(message: string): string[] {
+  const candidates: string[] = [];
+
+  const colon = message.match(/:\s*([^:\n"']{3,120})\s*$/);
+  if (colon?.[1]) candidates.push(colon[1].trim());
+
+  const copyValueEdit =
+    /\b(title|headline|text|copy|wording|rename|name)\b/i.test(message) &&
+    /\bto\s+["']/i.test(message);
+
+  if (!copyValueEdit) {
+    for (const match of message.matchAll(/["']([^"']{3,120})["']/g)) {
+      candidates.push(match[1].trim());
+    }
+  }
+
+  const titled = message.match(
+    /\b(?:section|heading)\s+(?:titled|called|named)\s+["']?([^"'\n]{3,120})["']?\s*$/i
+  );
+  if (titled?.[1]) candidates.push(titled[1].trim());
+
+  if (/\bwhat our customers say\b/i.test(message)) {
+    candidates.push('What Our Customers Say');
+  }
+
+  return [...new Set(candidates.filter(Boolean))];
+}
+
+export function findBestSectionTitleMatch<T extends SiteSectionSummary>(
+  titleCandidates: string[],
+  sections: T[]
+): { section: T; intent: string; score: number } | null {
+  let best: { section: T; intent: string; score: number } | null = null;
+  for (const intent of titleCandidates) {
+    for (const section of sections) {
+      const score = scoreTitleMatch(section.title, intent);
+      if (score >= 50 && (!best || score > best.score)) {
+        best = { section, intent, score };
+      }
+    }
+  }
+  return best;
 }
 
 function lineNumberAt(content: string, index: number): number {
@@ -221,10 +294,7 @@ export function buildStructureBrief(snapshot: EnrichedSiteStructureSnapshot): st
 }
 
 function extractQuotedTitle(message: string): string | null {
-  const quoted = message.match(/["']([^"']{3,80})["']/);
-  if (quoted?.[1]) return quoted[1].trim();
-  if (/\bwhat our customers say\b/i.test(message)) return 'What Our Customers Say';
-  return null;
+  return extractSectionTitleCandidates(message)[0] ?? null;
 }
 
 /** Title after a colon, e.g. "change this to red: Everything You Need to Grow". */
@@ -278,7 +348,9 @@ function detectSpecialTarget(message: string): SectionTargetKind | null {
 }
 
 import {
+  extractSectionPickFromListReply,
   wasSectionListClarificationAsked,
+  wasTestimonialCardClarificationAsked,
 } from '@/lib/chat/conversationContextForEdit';
 
 export { wasSectionListClarificationAsked };
@@ -288,12 +360,31 @@ function resolveNumberedSectionReply(
   snapshot: EnrichedSiteStructureSnapshot
 ): SectionTargetResult | null {
   if (!wasSectionListClarificationAsked(history)) return null;
+  if (wasTestimonialCardClarificationAsked(history) && /^[1-3]\b/.test(message.trim())) {
+    return null;
+  }
   const match = message.trim().match(/^([1-9])\b/);
   if (!match) return null;
-  const idx = parseInt(match[1], 10) - 1;
-  const section = snapshot.sections[idx];
+
+  const pick = parseInt(match[1], 10);
+  const assistant = [...history].reverse().find((m) => m.role === 'assistant');
+  const pickInfo = assistant
+    ? extractSectionPickFromListReply(assistant.content, pick)
+    : null;
+
+  const section =
+    pickInfo != null
+      ? snapshot.sections.find((s) => s.index === pickInfo.sectionIndex)
+      : snapshot.sections[pick - 1];
+
   if (!section) return null;
-  return sectionTarget(section, 'high', `Owner picked section ${idx + 1} from clarification list.`);
+  return sectionTarget(
+    section,
+    'high',
+    pickInfo
+      ? `Owner picked list item ${pick} → sections[${pickInfo.sectionIndex}] "${pickInfo.title}".`
+      : `Owner picked section ${pick} from clarification list.`
+  );
 }
 
 function buildMultipleMatchClarification(
@@ -380,15 +471,18 @@ function unresolvedTarget(
 export function resolveSectionTarget(
   message: string,
   history: ConversationTurn[],
-  snapshot: EnrichedSiteStructureSnapshot
+  snapshot: EnrichedSiteStructureSnapshot,
+  catalog?: SiteSectionCatalog
 ): SectionTargetResult {
+  const effectiveMessage = resolveEffectiveEditMessage(message, history);
   const recent = history.slice(-8);
+  const sectionCatalog = catalog ?? buildSiteSectionCatalogFromSnapshot(snapshot);
   const numbered = resolveNumberedSectionReply(message, recent, snapshot);
   if (numbered) return numbered;
 
-  const lower = message.toLowerCase();
+  const lower = effectiveMessage.toLowerCase();
 
-  if (wantsNewImageSection(message)) {
+  if (wantsNewImageSection(effectiveMessage)) {
     return {
       confidence: 'high',
       kind: 'section',
@@ -397,68 +491,16 @@ export function resolveSectionTarget(
     };
   }
 
-  const special = detectSpecialTarget(message);
+  const special = detectSpecialTarget(effectiveMessage);
   if (special && special !== 'section' && !/\bsection\b/.test(lower)) {
     return specialTarget(special, 'high', `Message targets ${special} (non-section).`);
   }
 
-  for (const { pattern, index } of ORDINAL_PATTERNS) {
-    if (pattern.test(message) && snapshot.sections.length > 0) {
-      const idx = index(snapshot.sections.length);
-      const section = snapshot.sections[idx];
-      if (section) {
-        return sectionTarget(section, 'high', `Ordinal match: ${pattern.source}`);
-      }
+  const catalogMatch = matchSectionFromMessage(message, sectionCatalog, { history });
+  if (catalogMatch) {
+    if (catalogMatch.sectionIndex != null || catalogMatch.confidence === 'low') {
+      return catalogMatch;
     }
-  }
-
-  const quoted = /\bto\s*["'][^"']+["']/i.test(message) ? null : extractQuotedTitle(message);
-  if (quoted) {
-    return resolveTitleIntent(quoted, snapshot, `Title match: "${quoted}"`);
-  }
-
-  const colonTitle = extractColonSectionTitle(message);
-  if (colonTitle) {
-    return resolveTitleIntent(colonTitle, snapshot, `Colon title match: "${colonTitle}"`);
-  }
-
-  const typeKeyword = extractSectionTypeKeyword(message);
-  if (typeKeyword) {
-    const matches = snapshot.sections.filter((s) => s.type === typeKeyword);
-    if (matches.length === 1) {
-      return sectionTarget(matches[0]!, 'high', `Type keyword: ${typeKeyword}`);
-    }
-    if (matches.length > 1) {
-      const candidates = matches.map(toMatchCandidate);
-      return {
-        confidence: 'low',
-        kind: 'section',
-        matches: candidates,
-        ...buildMultipleMatchClarification(candidates),
-      };
-    }
-  }
-
-  if (
-    (/\b(this|that)\b/i.test(message) &&
-      /\b(background|color|colour|card|text)\b/i.test(lower) &&
-      !colonTitle &&
-      !quoted) ||
-    /\b(this|that)\s+section\b/i.test(message) ||
-    /\bbelow\b|\babove\b/.test(lower)
-  ) {
-    const candidates = snapshot.sections.map(toMatchCandidate);
-    return {
-      confidence: 'low',
-      kind: 'section',
-      matches: candidates,
-      clarificationMessage:
-        'Which section do you mean? Reply with the number:\n\n' +
-        snapshot.sections
-          .map((s, i) => `${i + 1}. [${s.index}] ${s.type} — "${s.title}"`)
-          .join('\n'),
-      suggestedReplies: snapshot.sections.map((s, i) => `${i + 1} — ${s.title}`),
-    };
   }
 
   if (/\b(top|first)\b/.test(lower) && !/\bsection\b/.test(lower)) {
@@ -473,14 +515,16 @@ export function resolveSectionTarget(
     };
   }
 
+  const titleCandidates = extractSectionTitleCandidates(effectiveMessage);
   const mentionsSection =
     /\bsection\b/.test(lower) ||
-    ORDINAL_PATTERNS.some(({ pattern }) => pattern.test(message)) ||
-    Boolean(extractQuotedTitle(message)) ||
-    Boolean(extractColonSectionTitle(message)) ||
-    Boolean(extractSectionTypeKeyword(message)) ||
-    /\b(this|that)\s+section\b/i.test(message) ||
-    (/\b(this|that)\b/i.test(message) && /\b(background|color|colour|card)\b/i.test(lower)) ||
+    ORDINAL_PATTERNS.some(({ pattern }) => pattern.test(effectiveMessage)) ||
+    Boolean(extractQuotedTitle(effectiveMessage)) ||
+    Boolean(extractColonSectionTitle(effectiveMessage)) ||
+    titleCandidates.length > 0 ||
+    Boolean(extractSectionTypeKeyword(effectiveMessage)) ||
+    /\b(this|that)\s+section\b/i.test(effectiveMessage) ||
+    (/\b(this|that)\b/i.test(effectiveMessage) && /\b(background|color|colour|card)\b/i.test(lower)) ||
     /\bbelow\b|\babove\b/.test(lower);
 
   if (!mentionsSection) {

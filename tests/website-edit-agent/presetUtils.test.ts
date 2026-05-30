@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  extractBackgroundColorFromMessage,
   parseColorSwap,
   swapTailwindColorInText,
 } from '../../src/lib/project-workspace/website-edit-agent/preset/presetUtils';
@@ -22,5 +23,11 @@ describe('presetUtils', () => {
 
   it('htmlShowsTailwindColor matches text-black', () => {
     expect(htmlShowsTailwindColor('<h1 class="text-black">Hi</h1>', 'black')).toBe(true);
+  });
+
+  it('extractBackgroundColorFromMessage ignores quoted section titles', () => {
+    const message =
+      'change this section background to blue "Everything You Need to Grow Your Business"';
+    expect(extractBackgroundColorFromMessage(message)).toBe('blue');
   });
 });

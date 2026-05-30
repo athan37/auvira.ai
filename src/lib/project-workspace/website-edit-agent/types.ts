@@ -84,12 +84,16 @@ export interface CodeContextBlock {
   content: string;
 }
 
+import type { SiteSectionCatalog } from './siteSectionCatalog';
+
 export interface EditTargetPlan {
   where: SectionTargetResult;
   what: EditWhatKind;
   valueExplicit: boolean;
   codeBlocks: CodeContextBlock[];
   structureBrief: string;
+  /** Canonical section list for prompts and disambiguation. */
+  sectionCatalog?: SiteSectionCatalog;
 }
 
 export interface GroundedEditContextResult {
@@ -97,6 +101,7 @@ export interface GroundedEditContextResult {
   clarificationMessage?: string;
   suggestedReplies?: string[];
   plan?: EditTargetPlan;
+  sectionCatalog?: SiteSectionCatalog;
 }
 
 /** @deprecated Legacy strategy labels; prefer EditStrategyId */
@@ -178,6 +183,8 @@ export interface WebsiteEditAgentOptions {
   conversationHistory?: ConversationTurn[];
   /** Pre-resolved WHERE/WHAT from buildGroundedEditContext. */
   editTargetPlan?: EditTargetPlan;
+  /** Section catalog when grounded context is unavailable but snap exists. */
+  sectionCatalog?: import('./siteSectionCatalog').SiteSectionCatalog;
   /** When true, skip inline tailwind/page infra repairs (migration baseline ready). */
   infraBaselineReady?: boolean;
 }

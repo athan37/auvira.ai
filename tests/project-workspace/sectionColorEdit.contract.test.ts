@@ -11,6 +11,7 @@ import {
   assertSectionColorEditInvariants,
   assertSectionColorEditReady,
   applySectionBackgroundColorEdit,
+  enforceSectionColorEditReadyAfterApply,
 } from '@/lib/project-workspace/sectionPresentationEdit';
 import {
   createSyntheticWorkspace,
@@ -124,6 +125,38 @@ describe('agent contracts: section background color (generic)', () => {
       infraBaselineReady: true,
       changedFiles: pipeline.changedFiles,
     });
+
+    await destroySyntheticWorkspace(workspacePath);
+  });
+
+  it('enforceSectionColorEditReadyAfterApply repairs legacy wiring before validation', async () => {
+    const workspacePath = await createSyntheticWorkspace({
+      site: { sections: [{ type: 'contact', title: 'Reach Us' }] },
+      pageMode: 'legacy',
+      tailwind: 'canonical',
+    });
+    const siteConfigBefore = await readSyntheticFile(workspacePath, 'src/lib/siteConfig.ts');
+    const expectedClass = colorNameToBackgroundClass('blue');
+    const siteConfigOnly = siteConfigBefore.replace(
+      'items: []',
+      `items: [], presentation: { backgroundClass: "${expectedClass}" }`
+    );
+    const { writeFile } = await import('fs/promises');
+    const { join } = await import('path');
+    await writeFile(join(workspacePath, 'src/lib/siteConfig.ts'), siteConfigOnly, 'utf-8');
+
+    const gateBeforeRepair = await enforceSectionColorEditReadyAfterApply({
+      workspace: { workspacePath, ownerMessage: 'change contact background to blue' },
+      projectInfraStatus: { infraBaselineReady: true },
+      strategy: 'section_style',
+    });
+
+    expect(gateBeforeRepair.ok).toBe(true);
+    expect(gateBeforeRepair.retried).toBe(true);
+    expect(gateBeforeRepair.summary).toContain(expectedClass);
+    expect(await readSyntheticFile(workspacePath, 'src/app/page.tsx')).toContain(
+      'resolveSectionBackground(section, preset)'
+    );
 
     await destroySyntheticWorkspace(workspacePath);
   });

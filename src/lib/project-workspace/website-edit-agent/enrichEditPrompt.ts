@@ -1,4 +1,8 @@
 import { formatConversationForIntentClarifier, type ConversationTurn } from './editAmbiguity';
+import {
+  formatSectionCatalogForClarifier,
+  formatSectionCatalogForPrompt,
+} from './siteSectionCatalog';
 import { formatEditTargetPlanForPrompt } from './buildGroundedEditContext';
 import type { EditIntent, EditTargetPlan } from './types';
 import type { WorkspaceAssetAttachment } from '../workspaceAssetTypes';
@@ -293,10 +297,23 @@ export async function enrichEditPrompt(
   const guidance = buildIntentGuidance(intent, ownerMessage, context);
   const imageGuidance = buildImageAttachmentGuidance(attachments);
 
-  const historyBlock = formatConversationForIntentClarifier(ownerMessage.trim(), conversationHistory);
-  const groundedBlock =
-    editTargetPlan && editTargetPlan.where.confidence !== 'low'
-      ? `${formatEditTargetPlanForPrompt(editTargetPlan)}\n\n`
+  const catalog = editTargetPlan?.sectionCatalog;
+  const catalogClarifier = catalog ? formatSectionCatalogForClarifier(catalog) : undefined;
+  const historyBlock = formatConversationForIntentClarifier(
+    ownerMessage.trim(),
+    conversationHistory,
+    catalogClarifier
+  );
+
+  const targetLock =
+    editTargetPlan?.where.sectionIndex != null
+      ? `TARGET LOCK: sections[${editTargetPlan.where.sectionIndex}] "${editTargetPlan.where.title ?? ''}" — do not edit a different section.\n\n`
+      : '';
+
+  const groundedBlock = editTargetPlan
+    ? `${targetLock}${formatEditTargetPlanForPrompt(editTargetPlan)}\n\n`
+    : catalog
+      ? `${formatSectionCatalogForPrompt(catalog)}\n\n`
       : '';
 
   const agentPrompt = `${historyBlock}${groundedBlock}OWNER REQUEST (exact words from customer):

@@ -14,6 +14,16 @@ describe('sectionPresentation', () => {
     );
     expect(colorNameToBackgroundClass('bg-blue-500')).toBe('bg-blue-500');
     expect(colorNameToBackgroundClass('red-600')).toBe('bg-red-600');
+    expect(colorNameToBackgroundClass('black')).toBe('bg-black');
+    expect(colorNameToBackgroundClass('white')).toBe('bg-white');
+    expect(colorNameToBackgroundClass('black-600')).toBe('bg-black');
+    expect(colorNameToBackgroundClass('navy')).toBe('bg-blue-900');
+    expect(colorNameToBackgroundClass('white', 'use a light white background')).toBe(
+      'bg-gray-100'
+    );
+    expect(colorNameToBackgroundClass('black', 'use a light black background')).toBe(
+      'bg-gray-800'
+    );
   });
 
   it('uses per-type preset keys when presentation is unset', () => {

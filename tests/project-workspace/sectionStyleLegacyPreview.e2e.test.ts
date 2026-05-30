@@ -145,4 +145,29 @@ describe('section style legacy preview wiring e2e (synthetic)', () => {
     expect(page).toContain('resolveSectionBackground(section, preset)');
     expect(presentationWiringIssues(siteConfig, page)).toEqual([]);
   });
+
+  it('applies bg-black for last-section black background edit', async () => {
+    const fixture = await createLegacySectionWorkspace('contact');
+    workspacePath = fixture.workspacePath;
+    const { title } = fixture;
+
+    const result = await runSectionStyleStrategy(
+      {
+        workspacePath,
+        ownerMessage: 'change background color of the last section to black',
+        projectId: 'synthetic-legacy-contact-black',
+        mode: 'gitlab',
+        editTargetPlan: sectionStylePlan(0, 'contact', title),
+        infraBaselineReady: true,
+      },
+      {}
+    );
+
+    expect(result?.ok).toBe(true);
+    expect(result?.summary).toContain('bg-black');
+    expect(result?.summary).not.toContain('bg-black-600');
+
+    const siteConfig = await readSyntheticFile(workspacePath, 'src/lib/siteConfig.ts');
+    expect(siteConfig).toContain('"backgroundClass": "bg-black"');
+  });
 });

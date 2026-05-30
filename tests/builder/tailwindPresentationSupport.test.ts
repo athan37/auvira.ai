@@ -24,6 +24,8 @@ describe('tailwindPresentationSupport', () => {
     expect(customerSiteTailwindConfigIsComplete(generated)).toBe(true);
     expect(generated).toContain('./src/**/*');
     expect(generated).toContain('safelist');
+    expect(generated).toContain("'bg-black'");
+    expect(generated).toContain("'bg-white'");
   });
 
   it('tailwindContentPathsForGeneratedSite uses src catch-all', () => {

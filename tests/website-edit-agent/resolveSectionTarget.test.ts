@@ -65,6 +65,28 @@ describe('resolveSectionTarget', () => {
     expect(result.sectionIndex).toBe(1);
     expect(result.confidence).toBe('high');
     expect(titleMatchesIntent('What Our Customers Say', 'customers say')).toBe(true);
+    expect(titleMatchesIntent('Everything You Need to Grow Your Business', 'business')).toBe(
+      false
+    );
+  });
+
+  it('resolves deictic + quoted title + explicit color to the named section', () => {
+    const growConfig = siteConfig.replace(
+      '{ type: "services", title: "Our Products", items: [] }',
+      '{ type: "services", title: "Everything You Need to Grow Your Business", items: [] }'
+    ).replace(
+      '{ type: "faq", title: "Questions", items: [] }',
+      '{ type: "contact", title: "Get Started Today", items: [] }'
+    );
+    const growSnap = buildEnrichedSiteStructure(growConfig, page);
+    const result = resolveSectionTarget(
+      'change this section background to blue "Everything You Need to Grow Your Business"',
+      [],
+      growSnap
+    );
+    expect(result.confidence).toBe('high');
+    expect(result.sectionIndex).toBe(0);
+    expect(result.title).toMatch(/grow your business/i);
   });
 
   it('matches section title after colon (deictic + title suffix)', () => {
