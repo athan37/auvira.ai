@@ -105,33 +105,7 @@ export function WebsiteAnalytics() {
       const visibleSince = new Map<string, number>();
       const latestRatio = new Map<string, number>();
 
-      const enqueue = (event: AnalyticsEvent) => {
-        queue.push(event);
-        if (queue.length >= MAX_BATCH_SIZE) {
-          flush();
-        }
-      };
-
-      const stopFocus = (componentId: string) => {
-        const startedAt = visibleSince.get(componentId);
-        if (!startedAt) return;
-        visibleSince.delete(componentId);
-        const element = trackedElements.find((candidate) => candidate.getAttribute('data-analytics-id') === componentId);
-        if (!element) return;
-        const base = elementEventBase(element);
-        if (!base) return;
-        const durationMs = Math.max(0, Math.round(performance.now() - startedAt));
-        if (durationMs < 100) return;
-        enqueue({
-          ...base,
-          type: 'focus',
-          durationMs,
-          visibleRatio: latestRatio.get(componentId) ?? FOCUS_THRESHOLD,
-          occurredAt: new Date().toISOString(),
-        });
-      };
-
-      function flush() {
+      const flush = () => {
         if (queue.length === 0) return;
         const events = queue.splice(0, queue.length);
         const payload = JSON.stringify({
@@ -160,7 +134,33 @@ export function WebsiteAnalytics() {
         } catch {
           /* Analytics must never affect rendering. */
         }
-      }
+      };
+
+      const enqueue = (event: AnalyticsEvent) => {
+        queue.push(event);
+        if (queue.length >= MAX_BATCH_SIZE) {
+          flush();
+        }
+      };
+
+      const stopFocus = (componentId: string) => {
+        const startedAt = visibleSince.get(componentId);
+        if (!startedAt) return;
+        visibleSince.delete(componentId);
+        const element = trackedElements.find((candidate) => candidate.getAttribute('data-analytics-id') === componentId);
+        if (!element) return;
+        const base = elementEventBase(element);
+        if (!base) return;
+        const durationMs = Math.max(0, Math.round(performance.now() - startedAt));
+        if (durationMs < 100) return;
+        enqueue({
+          ...base,
+          type: 'focus',
+          durationMs,
+          visibleRatio: latestRatio.get(componentId) ?? FOCUS_THRESHOLD,
+          occurredAt: new Date().toISOString(),
+        });
+      };
 
       const observer = new IntersectionObserver(
         (entries) => {

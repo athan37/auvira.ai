@@ -104,4 +104,10 @@ describe('generated-site analytics instrumentation', () => {
     expect(beforeEffect).not.toContain('document.');
     expect(source).toContain('return null');
   });
+
+  it('runtime source avoids block-scoped function declarations (Next.js ES5 typecheck)', () => {
+    const source = generateWebsiteAnalyticsSource();
+    expect(source).not.toMatch(/\n\s+function flush\(/);
+    expect(source).toContain('const flush = () =>');
+  });
 });
