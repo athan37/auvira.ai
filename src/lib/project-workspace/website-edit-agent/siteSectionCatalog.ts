@@ -68,7 +68,7 @@ export function stripColorWordsFromMessage(message: string): string {
     stripped = stripped.replace(new RegExp(`\\b${color.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'gi'), ' ');
   }
   return stripped
-    .replace(/\b(background|color|colour|section|this|that|change|update|make|to)\b/gi, ' ')
+    .replace(/\b(background|color|colour|gradient|section|this|that|change|update|make|to)\b/gi, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }

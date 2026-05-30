@@ -1,9 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import {
   extractBackgroundColorFromMessage,
+  extractColorTokenAfterTo,
+  isGradientBackgroundRequest,
   parseColorSwap,
   swapTailwindColorInText,
 } from '../../src/lib/project-workspace/website-edit-agent/preset/presetUtils';
+import {
+  extractSectionBackgroundClassFromMessage,
+  resolveGradientBackgroundClass,
+} from '../../src/lib/builder/sectionPresentation';
 import { htmlShowsTailwindColor } from '../../src/lib/project-workspace/verifyPreviewHints';
 
 describe('presetUtils', () => {
@@ -29,5 +35,38 @@ describe('presetUtils', () => {
     const message =
       'change this section background to blue "Everything You Need to Grow Your Business"';
     expect(extractBackgroundColorFromMessage(message)).toBe('blue');
+  });
+
+  it('extractBackgroundColorFromMessage skips "color gradient" filler before quoted title', () => {
+    const message =
+      'change this section background to color gradient "Everything You Need to Grow Your Business"';
+    expect(extractBackgroundColorFromMessage(message)).toBeNull();
+    expect(extractColorTokenAfterTo(message)).toBeNull();
+  });
+
+  it('extractBackgroundColorFromMessage returns null for gradient-only phrasing', () => {
+    expect(extractBackgroundColorFromMessage('make it a blue gradient background')).toBeNull();
+    expect(extractBackgroundColorFromMessage('change section to gradient background blue')).toBeNull();
+  });
+
+  it('extractBackgroundColorFromMessage resolves flat black and white', () => {
+    expect(extractBackgroundColorFromMessage('change background to black')).toBe('black');
+    expect(extractBackgroundColorFromMessage('make section background white')).toBe('white');
+  });
+
+  it('extractColorTokenAfterTo skips filler words after to', () => {
+    expect(extractColorTokenAfterTo('change background to color red')).toBe('red');
+    expect(extractColorTokenAfterTo('change background to a dark blue')).toBe('dark blue');
+    expect(extractColorTokenAfterTo('change background to gradient orange')).toBe('orange');
+  });
+
+  it('extractSectionBackgroundClassFromMessage resolves gradient classes with explicit hue', () => {
+    expect(isGradientBackgroundRequest('make it a blue gradient background')).toBe(true);
+    expect(extractSectionBackgroundClassFromMessage('make it a blue gradient background')).toBe(
+      'bg-gradient-to-br from-blue-400 via-blue-600 to-blue-900'
+    );
+    expect(resolveGradientBackgroundClass('change section to gradient background blue')).toBe(
+      'bg-gradient-to-br from-blue-400 via-blue-600 to-blue-900'
+    );
   });
 });

@@ -173,6 +173,96 @@ export function stripQuotedSpans(message: string): string {
   return message.replace(/["'][^"']*["']/g, ' ');
 }
 
+/** Words that appear in styling phrases but are not paint colors. */
+export const BACKGROUND_STYLING_META_WORDS = new Set([
+  'color',
+  'colour',
+  'gradient',
+  'gradients',
+  'background',
+  'backgrounds',
+  'section',
+  'this',
+  'that',
+  'change',
+  'make',
+  'update',
+  'bg',
+  'a',
+  'an',
+  'the',
+  'flat',
+  'solid',
+]);
+
+/** True when the token is a known Tailwind color name (not "color"/"gradient"). */
+export function isKnownBackgroundColorWord(token: string): boolean {
+  const normalized = token.trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
+  if (!normalized || BACKGROUND_STYLING_META_WORDS.has(normalized)) return false;
+  if (TAILWIND_COLOR_NAMES.includes(normalized as TailwindColorName)) return true;
+  const base = normalized.replace(/-\d{2,3}$/, '');
+  return TAILWIND_COLOR_NAMES.includes(base as TailwindColorName);
+}
+
+/** True when the owner asks for a gradient section background. */
+export function isGradientBackgroundRequest(message: string): boolean {
+  const lower = stripQuotedSpans(message).toLowerCase();
+  return (
+    /\bgradient\b/.test(lower) ||
+    /\b(color|colour)\s+gradient\b/.test(lower) ||
+    /\bgradient\s+(color|colour|background)\b/.test(lower)
+  );
+}
+
+/**
+ * Parse the token after `to`, skipping filler like "color gradient" before the real hue.
+ * Returns null when only filler remains (e.g. "to color gradient" with title in quotes).
+ */
+export function extractColorTokenAfterTo(message: string): string | null {
+  const withoutQuotes = stripQuotedSpans(message);
+  const toIdx = withoutQuotes.search(/\bto\b/i);
+  if (toIdx < 0) return null;
+
+  let rest = withoutQuotes.slice(toIdx + 2).trimStart();
+  let modifier: string | undefined;
+
+  while (rest.length > 0) {
+    const filler = rest.match(
+      /^(color|colour|gradient|background|bg|a|an|the|flat|solid)\b\s*/i
+    );
+    if (filler) {
+      rest = rest.slice(filler[0].length).trimStart();
+      continue;
+    }
+
+    const modMatch = rest.match(/^(light|dark|deep|pale|soft)\b\s*/i);
+    if (modMatch) {
+      modifier = modMatch[1]!.toLowerCase();
+      rest = rest.slice(modMatch[0].length).trimStart();
+      continue;
+    }
+
+    const colorMatch = rest.match(/^([a-z]+(?:-\d{2,3})?)\b/i);
+    if (!colorMatch?.[1]) return null;
+
+    const token = colorMatch[1].toLowerCase();
+    if (BACKGROUND_STYLING_META_WORDS.has(token)) {
+      rest = rest.slice(colorMatch[0].length).trimStart();
+      modifier = undefined;
+      continue;
+    }
+
+    if (!isKnownBackgroundColorWord(token)) return null;
+
+    if (modifier && !token.includes('-')) {
+      return `${modifier} ${token}`;
+    }
+    return token;
+  }
+
+  return null;
+}
+
 export function extractColorsFromMessage(message: string): string[] {
   const lower = stripQuotedSpans(message).toLowerCase();
   return TAILWIND_COLOR_NAMES.filter((c) => messageHasColorWord(lower, c));
@@ -180,33 +270,17 @@ export function extractColorsFromMessage(message: string): string[] {
 
 /**
  * Target background color from owner message — prefers explicit `to {color}` after background/section.
+ * Returns null for gradient-only requests (use extractSectionBackgroundClassFromMessage).
  */
 export function extractBackgroundColorFromMessage(message: string): string | null {
+  if (isGradientBackgroundRequest(message)) return null;
+
   const withoutQuotes = stripQuotedSpans(message);
   const swap = parseColorSwap(withoutQuotes);
   if (swap?.toColor) return swap.toColor;
 
-  const styledTo = withoutQuotes.match(
-    /\b(?:background|section)\b[^.\n]{0,120}?\bto\s+(?:(light|dark|deep|pale|soft)\s+)?([a-z]+(?:-\d{2,3})?)\b/i
-  );
-  if (styledTo?.[2]) {
-    const modifier = styledTo[1]?.toLowerCase();
-    const color = styledTo[2].toLowerCase();
-    if (modifier && !color.includes('-')) {
-      return `${modifier} ${color}`;
-    }
-    return color;
-  }
-
-  const bareTo = withoutQuotes.match(/\bto\s+(?:(light|dark|deep|pale|soft)\s+)?([a-z]+(?:-\d{2,3})?)\b/i);
-  if (bareTo?.[2]) {
-    const modifier = bareTo[1]?.toLowerCase();
-    const color = bareTo[2].toLowerCase();
-    if (modifier && !color.includes('-')) {
-      return `${modifier} ${color}`;
-    }
-    return color;
-  }
+  const afterTo = extractColorTokenAfterTo(message);
+  if (afterTo) return afterTo;
 
   const colors = extractColorsFromMessage(withoutQuotes);
   return colors.length > 0 ? colors[colors.length - 1] : null;

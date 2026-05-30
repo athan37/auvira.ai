@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   colorNameToBackgroundClass,
   defaultSectionBackgroundKey,
+  extractSectionBackgroundClassFromMessage,
+  resolveGradientBackgroundClass,
   resolveSectionBackground,
   resolveSectionCardClass,
 } from '@/lib/builder/sectionPresentation';
@@ -49,5 +51,16 @@ describe('sectionPresentation', () => {
       presentation: { cardClass: 'border-red-300 bg-red-50' },
     };
     expect(resolveSectionCardClass(section, preset)).toBe('border-red-300 bg-red-50');
+  });
+
+  it('resolves gradient background class for color gradient phrasing', () => {
+    const message =
+      'change this section background to color gradient "Everything You Need to Grow Your Business"';
+    expect(extractSectionBackgroundClassFromMessage(message)).toBe(
+      'bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600'
+    );
+    expect(resolveGradientBackgroundClass('make section background a blue gradient')).toBe(
+      'bg-gradient-to-br from-blue-400 via-blue-600 to-blue-900'
+    );
   });
 });

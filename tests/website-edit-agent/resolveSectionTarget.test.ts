@@ -105,6 +105,51 @@ describe('resolveSectionTarget', () => {
     expect(result.title).toMatch(/grow your business/i);
   });
 
+  it('matches unquoted title suffix at end without quotes', () => {
+    const growConfig = siteConfig.replace(
+      '{ type: "services", title: "Our Products", items: [] }',
+      '{ type: "services", title: "Everything You Need to Grow Your Business", items: [] }'
+    ).replace(
+      '{ type: "faq", title: "Questions", items: [] }',
+      '{ type: "contact", title: "Get Started Today", items: [] }'
+    );
+    const growSnap = buildEnrichedSiteStructure(growConfig, page);
+    const result = resolveSectionTarget(
+      'change this section background to blue Everything You Need to Grow Your Business',
+      [],
+      growSnap
+    );
+    expect(result.confidence).toBe('high');
+    expect(result.sectionIndex).toBe(0);
+    expect(result.sectionIndex).not.toBe(2);
+  });
+
+  it('disambiguates Get Started vs Getting Started by full title', () => {
+    const similarConfig = siteConfig.replace(
+      '{ type: "services", title: "Our Products", items: [] }',
+      '{ type: "services", title: "Get Started With Our Services", items: [] }'
+    ).replace(
+      '{ type: "testimonials", title: "What Our Customers Say", items: [] }',
+      '{ type: "contact", title: "Getting Started Today", items: [] }'
+    );
+    const similarSnap = buildEnrichedSiteStructure(similarConfig, page);
+    const gettingStarted = resolveSectionTarget(
+      'change background of Getting Started Today to green',
+      [],
+      similarSnap
+    );
+    expect(gettingStarted.sectionIndex).toBe(1);
+    expect(gettingStarted.title).toMatch(/getting started today/i);
+
+    const getStarted = resolveSectionTarget(
+      'change background of Get Started With Our Services to red',
+      [],
+      similarSnap
+    );
+    expect(getStarted.sectionIndex).toBe(0);
+    expect(getStarted.title).toMatch(/get started with our services/i);
+  });
+
   it('asks for section when "this" has no title suffix', () => {
     const result = resolveSectionTarget('change the background color of this to red', [], snapshot);
     expect(result.confidence).toBe('low');

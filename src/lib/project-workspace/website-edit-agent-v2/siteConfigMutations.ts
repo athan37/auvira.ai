@@ -210,6 +210,8 @@ export function addSectionToSource(
   });
 }
 
+import { normalizeTailwindBackgroundClass } from '@/lib/builder/tailwindBackgroundResolver';
+
 /**
  * Update presentation tokens on a section by index in siteConfig.ts source.
  */
@@ -232,8 +234,11 @@ export function updateSectionPresentationInSource(
 
     for (const [key, value] of Object.entries(presentation)) {
       if (value === undefined) continue;
-      const normalized =
+      let normalized =
         typeof value === 'string' && value.trim() ? value.trim() : undefined;
+      if (key === 'backgroundClass' && normalized) {
+        normalized = normalizeTailwindBackgroundClass(normalized);
+      }
       if (normalized) {
         if (current[key] !== normalized) {
           current[key] = normalized;

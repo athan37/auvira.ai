@@ -8,7 +8,10 @@ import '../../llmTestGate';
 import { afterEach, expect, it, vi } from 'vitest';
 import { describeRunLlmIntegration, LLM_TEST_TIMEOUT_MS } from '../../llmTestGate';
 import { runWebsiteEditAgent } from '@/lib/project-workspace/website-edit-agent';
-import { colorNameToBackgroundClass } from '@/lib/builder/sectionPresentation';
+import {
+  colorNameToBackgroundClass,
+  extractSectionBackgroundClassFromMessage,
+} from '@/lib/builder/sectionPresentation';
 import { extractSiteConfigObjectLiteral } from '@/lib/site-manager/siteConfigParser';
 import {
   buildSiteSectionCatalog,
@@ -38,6 +41,18 @@ export function confusingTitlesSiteSpec(): SyntheticSiteSpec {
       { type: 'gallery', title: 'See Our Work in Action' },
       { type: 'testimonials', title: 'What Our Customers Say About Growth' },
       { type: 'contact', title: 'Get Started Today' },
+    ],
+  };
+}
+
+/** Similar verb prefixes — "Get Started" vs "Getting Started". */
+export function similarVerbSiteSpec(): SyntheticSiteSpec {
+  return {
+    businessName: 'Similar Verb Test Site',
+    sections: [
+      { type: 'services', title: 'Get Started With Our Services' },
+      { type: 'about', title: 'About Our Company' },
+      { type: 'contact', title: 'Getting Started Today' },
     ],
   };
 }
@@ -333,7 +348,7 @@ describeRunLlmIntegration('section catalog hard scenarios (LLM integration)', ()
       const catalog = buildSiteSectionCatalog(siteConfigContent, pageContent);
 
       const pick = await resolveSectionWithCatalogLLM(
-        'update the about-us section background — the one titled Everything You Need to Know About Us — to teal',
+        'section index 1 — about type — title "Everything You Need to Know About Us" — change background to teal',
         catalog
       );
 
@@ -379,6 +394,390 @@ describeRunLlmIntegration('section catalog hard scenarios (LLM integration)', ()
       const sections = parseSections(siteConfig);
       expect(sectionBackgroundClass(sections[4] ?? {})).not.toBe(expectedClass);
       expect(String(sections[4]?.title)).toBe(contactTitle);
+    },
+    LLM_TEST_TIMEOUT_MS
+  );
+
+  it(
+    'regression: color gradient + quoted grow title targets services not contact',
+    async () => {
+      const spec = confusingTitlesSiteSpec();
+      workspacePath = await createSyntheticWorkspace({
+        site: spec,
+        pageMode: 'wired',
+        tailwind: 'canonical',
+      });
+
+      const growTitle = spec.sections[0].title!;
+      const ownerMessage = `change this section background to color gradient "${growTitle}"`;
+
+      const result = await runWebsiteEditAgent({
+        workspacePath,
+        ownerMessage,
+        projectId: 'hard-catalog-gradient-quote',
+        mode: 'gitlab',
+        infraBaselineReady: true,
+      });
+
+      if (!result.ok && result.needsClarification) {
+        expect(result.ownerMessage).toMatch(/which section|color|gradient/i);
+        return;
+      }
+
+      expect(result.needsClarification, result.ownerMessage).toBeFalsy();
+      expect(result.ok, result.error ?? result.summary).toBe(true);
+
+      const siteConfig = await readSyntheticFile(workspacePath, 'src/lib/siteConfig.ts');
+      const sections = parseSections(siteConfig);
+      const contactBg = sectionBackgroundClass(sections[4] ?? {});
+      const servicesBg = sectionBackgroundClass(sections[0] ?? {});
+      if (servicesBg) {
+        assertExactSectionBackgroundInSiteConfig(siteConfig, 0, {
+          type: 'services',
+          title: growTitle,
+          backgroundClass: servicesBg,
+        });
+        expect(contactBg).not.toBe(servicesBg);
+      }
+    },
+    LLM_TEST_TIMEOUT_MS
+  );
+
+  it(
+    'deterministic: unquoted title suffix at end targets grow-business section',
+    async () => {
+      const spec = confusingTitlesSiteSpec();
+      workspacePath = await createSyntheticWorkspace({
+        site: spec,
+        pageMode: 'wired',
+        tailwind: 'canonical',
+      });
+
+      const growTitle = spec.sections[0].title!;
+      const ownerMessage = `change this section background to blue ${growTitle}`;
+      const expectedClass = colorNameToBackgroundClass('blue', ownerMessage);
+
+      const result = await runWebsiteEditAgent({
+        workspacePath,
+        ownerMessage,
+        projectId: 'hard-catalog-unquoted-suffix',
+        mode: 'gitlab',
+        infraBaselineReady: true,
+      });
+
+      expect(result.needsClarification, result.ownerMessage).toBeFalsy();
+      expect(result.ok, result.error ?? result.summary).toBe(true);
+
+      const siteConfig = await readSyntheticFile(workspacePath, 'src/lib/siteConfig.ts');
+      assertExactSectionBackgroundInSiteConfig(siteConfig, 0, {
+        type: 'services',
+        title: growTitle,
+        backgroundClass: expectedClass,
+      });
+    },
+    LLM_TEST_TIMEOUT_MS
+  );
+
+  it(
+    'deterministic: color gradient filler + unquoted title suffix',
+    async () => {
+      const spec = confusingTitlesSiteSpec();
+      workspacePath = await createSyntheticWorkspace({
+        site: spec,
+        pageMode: 'wired',
+        tailwind: 'canonical',
+      });
+
+      const growTitle = spec.sections[0].title!;
+      const ownerMessage = `change this section background to color gradient ${growTitle}`;
+
+      const result = await runWebsiteEditAgent({
+        workspacePath,
+        ownerMessage,
+        projectId: 'hard-catalog-gradient-unquoted',
+        mode: 'gitlab',
+        infraBaselineReady: true,
+      });
+
+      if (result.needsClarification) {
+        expect(result.ownerMessage).toMatch(/which section|color/i);
+        return;
+      }
+
+      expect(result.ok, result.error ?? result.summary).toBe(true);
+      const siteConfig = await readSyntheticFile(workspacePath, 'src/lib/siteConfig.ts');
+      const sections = parseSections(siteConfig);
+      const servicesBg = sectionBackgroundClass(sections[0] ?? {});
+      if (servicesBg) {
+        expect(sectionBackgroundClass(sections[4] ?? {})).not.toBe(servicesBg);
+      }
+    },
+    LLM_TEST_TIMEOUT_MS
+  );
+
+  it(
+    'deterministic: Get Started vs Getting Started — full title wins',
+    async () => {
+      const spec = similarVerbSiteSpec();
+      workspacePath = await createSyntheticWorkspace({
+        site: spec,
+        pageMode: 'wired',
+        tailwind: 'canonical',
+      });
+
+      const contactTitle = spec.sections[2].title!;
+      const ownerMessage = `change background of ${contactTitle} to purple`;
+      const expectedClass = colorNameToBackgroundClass('purple', ownerMessage);
+
+      const result = await runWebsiteEditAgent({
+        workspacePath,
+        ownerMessage,
+        projectId: 'hard-catalog-getting-started',
+        mode: 'gitlab',
+        infraBaselineReady: true,
+      });
+
+      expect(result.needsClarification, result.ownerMessage).toBeFalsy();
+      expect(result.ok, result.error ?? result.summary).toBe(true);
+
+      const siteConfig = await readSyntheticFile(workspacePath, 'src/lib/siteConfig.ts');
+      assertExactSectionBackgroundInSiteConfig(siteConfig, 2, {
+        type: 'contact',
+        title: contactTitle,
+        backgroundClass: expectedClass,
+      });
+
+      const sections = parseSections(siteConfig);
+      expect(sectionBackgroundClass(sections[0] ?? {})).not.toBe(expectedClass);
+    },
+    LLM_TEST_TIMEOUT_MS
+  );
+
+  it(
+    'deterministic: flat black on named section uses bg-black not bg-black-600',
+    async () => {
+      const spec = confusingTitlesSiteSpec();
+      workspacePath = await createSyntheticWorkspace({
+        site: spec,
+        pageMode: 'wired',
+        tailwind: 'canonical',
+      });
+
+      const galleryIndex = 2;
+      const galleryTitle = spec.sections[galleryIndex].title!;
+      const ownerMessage = `change background of "${galleryTitle}" to black`;
+      const expectedClass = colorNameToBackgroundClass('black', ownerMessage);
+      expect(expectedClass).toBe('bg-black');
+
+      const result = await runWebsiteEditAgent({
+        workspacePath,
+        ownerMessage,
+        projectId: 'hard-catalog-flat-black',
+        mode: 'gitlab',
+        infraBaselineReady: true,
+      });
+
+      expect(result.needsClarification, result.ownerMessage).toBeFalsy();
+      expect(result.ok, result.error ?? result.summary).toBe(true);
+
+      const siteConfig = await readSyntheticFile(workspacePath, 'src/lib/siteConfig.ts');
+      assertExactSectionBackgroundInSiteConfig(siteConfig, galleryIndex, {
+        type: 'gallery',
+        title: galleryTitle,
+        backgroundClass: expectedClass,
+      });
+    },
+    LLM_TEST_TIMEOUT_MS
+  );
+
+  it(
+    'deterministic: flat white on services section',
+    async () => {
+      const spec = confusingTitlesSiteSpec();
+      workspacePath = await createSyntheticWorkspace({
+        site: spec,
+        pageMode: 'wired',
+        tailwind: 'canonical',
+      });
+
+      const growTitle = spec.sections[0].title!;
+      const ownerMessage = `make the background of "${growTitle}" white`;
+      const expectedClass = colorNameToBackgroundClass('white', ownerMessage);
+      expect(expectedClass).toBe('bg-white');
+
+      const result = await runWebsiteEditAgent({
+        workspacePath,
+        ownerMessage,
+        projectId: 'hard-catalog-flat-white',
+        mode: 'gitlab',
+        infraBaselineReady: true,
+      });
+
+      expect(result.needsClarification, result.ownerMessage).toBeFalsy();
+      expect(result.ok, result.error ?? result.summary).toBe(true);
+
+      const siteConfig = await readSyntheticFile(workspacePath, 'src/lib/siteConfig.ts');
+      assertExactSectionBackgroundInSiteConfig(siteConfig, 0, {
+        type: 'services',
+        title: growTitle,
+        backgroundClass: expectedClass,
+      });
+    },
+    LLM_TEST_TIMEOUT_MS
+  );
+
+  it(
+    'deterministic: blue gradient phrasing resolves color and section',
+    async () => {
+      const spec = confusingTitlesSiteSpec();
+      workspacePath = await createSyntheticWorkspace({
+        site: spec,
+        pageMode: 'wired',
+        tailwind: 'canonical',
+      });
+
+      const aboutIndex = 1;
+      const aboutTitle = spec.sections[aboutIndex].title!;
+      const ownerMessage = `make "${aboutTitle}" a blue gradient background`;
+      const expectedClass = extractSectionBackgroundClassFromMessage(ownerMessage)!;
+      expect(expectedClass).toMatch(/gradient.*blue/i);
+
+      const result = await runWebsiteEditAgent({
+        workspacePath,
+        ownerMessage,
+        projectId: 'hard-catalog-blue-gradient',
+        mode: 'gitlab',
+        infraBaselineReady: true,
+      });
+
+      expect(result.needsClarification, result.ownerMessage).toBeFalsy();
+      expect(result.ok, result.error ?? result.summary).toBe(true);
+
+      const siteConfig = await readSyntheticFile(workspacePath, 'src/lib/siteConfig.ts');
+      assertExactSectionBackgroundInSiteConfig(siteConfig, aboutIndex, {
+        type: 'about',
+        title: aboutTitle,
+        backgroundClass: expectedClass,
+      });
+    },
+    LLM_TEST_TIMEOUT_MS
+  );
+
+  it(
+    'multi-turn: follow-up corrects wrong numbered pick from prior clarification',
+    async () => {
+      const spec = confusingTitlesSiteSpec();
+      workspacePath = await createSyntheticWorkspace({
+        site: spec,
+        pageMode: 'wired',
+        tailwind: 'canonical',
+      });
+
+      const siteConfigContent = await readSyntheticFile(workspacePath, 'src/lib/siteConfig.ts');
+      const pageContent = await readSyntheticFile(workspacePath, 'src/app/page.tsx');
+      const catalog = buildSiteSectionCatalog(siteConfigContent, pageContent);
+      const growIndex = 0;
+      const growTitle = spec.sections[growIndex].title!;
+
+      const turns = history(
+        { role: 'user', content: 'Change the background color of this section to orange' },
+        { role: 'assistant', content: buildCatalogClarification(catalog) },
+        { role: 'user', content: '5' },
+        {
+          role: 'assistant',
+          content: `Updated "${spec.sections[4].title}" background to orange.`,
+        }
+      );
+
+      const result = await runWebsiteEditAgent({
+        workspacePath,
+        ownerMessage: '1',
+        conversationHistory: turns,
+        projectId: 'hard-catalog-wrong-then-correct',
+        mode: 'gitlab',
+        infraBaselineReady: true,
+      });
+
+      expect(result.needsClarification, result.ownerMessage).toBeFalsy();
+      expect(result.ok, result.error ?? result.summary).toBe(true);
+
+      const siteConfig = await readSyntheticFile(workspacePath, 'src/lib/siteConfig.ts');
+      const sections = parseSections(siteConfig);
+      const appliedClass = sectionBackgroundClass(sections[growIndex] ?? {});
+      expect(appliedClass).toMatch(/^bg-orange-\d{3}$/);
+      expect(String(sections[growIndex]?.type)).toBe('services');
+      expect(String(sections[growIndex]?.title)).toBe(growTitle);
+    },
+    LLM_TEST_TIMEOUT_MS
+  );
+
+  it(
+    'V2 planner: hero vs first section color targets first content section when named',
+    async () => {
+      const spec = confusingTitlesSiteSpec();
+      const siteModel = buildSyntheticSiteModel(spec);
+
+      const plan = await planWithLiveLlm(
+        'Change the first content section (not the hero) background to teal — the one titled Everything You Need to Grow Your Business',
+        siteModel
+      );
+
+      expect(plan.needsClarification, JSON.stringify(plan)).not.toBe(true);
+      const styleStep = plan.steps.find((step) => step.skill === 'update_section_style');
+      expect(styleStep, JSON.stringify(plan.steps)).toBeTruthy();
+      expect(styleStep?.args?.sectionIndex).toBe(0);
+    },
+    LLM_TEST_TIMEOUT_MS
+  );
+
+  it(
+    'V2 planner: card color vs section background — whole section after scope clarification',
+    async () => {
+      const spec = confusingTitlesSiteSpec();
+      const siteModel = buildSyntheticSiteModel(spec);
+      const testimonialsTitle = spec.sections[3].title!;
+
+      const styleScopeClarification =
+        'This sounds like a color or style change, not new section content — can you confirm what you want to restyle (e.g. card backgrounds, text color, or the whole section background)?';
+
+      const turns = history(
+        { role: 'user', content: `Make ${testimonialsTitle} red` },
+        { role: 'assistant', content: styleScopeClarification }
+      );
+
+      const plan = await planWithLiveLlm('whole section background', siteModel, turns);
+
+      expect(plan.needsClarification, JSON.stringify(plan)).not.toBe(true);
+      const styleStep = plan.steps.find((step) => step.skill === 'update_section_style');
+      expect(styleStep, JSON.stringify(plan.steps)).toBeTruthy();
+      expect(styleStep?.args?.sectionIndex).toBe(3);
+    },
+    LLM_TEST_TIMEOUT_MS
+  );
+
+  it(
+    'LLM catalog picker: disambiguates Get Started vs Getting Started',
+    async () => {
+      vi.stubEnv('SECTION_TARGET_LLM', '1');
+
+      const spec = similarVerbSiteSpec();
+      workspacePath = await createSyntheticWorkspace({
+        site: spec,
+        pageMode: 'wired',
+        tailwind: 'canonical',
+      });
+
+      const siteConfigContent = await readSyntheticFile(workspacePath, 'src/lib/siteConfig.ts');
+      const pageContent = await readSyntheticFile(workspacePath, 'src/app/page.tsx');
+      const catalog = buildSiteSectionCatalog(siteConfigContent, pageContent);
+
+      const pick = await resolveSectionWithCatalogLLM(
+        'change the background of the contact section called Getting Started Today to yellow',
+        catalog
+      );
+
+      expect(pick).not.toBeNull();
+      expect(pick!.sectionIndex).toBe(2);
     },
     LLM_TEST_TIMEOUT_MS
   );

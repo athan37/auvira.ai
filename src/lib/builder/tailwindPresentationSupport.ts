@@ -52,6 +52,13 @@ export function isEmitableTailwindBackgroundClass(className: string): boolean {
   if (FLAT_BG_PATTERN.test(normalized)) return true;
   if (SHADED_BG_PATTERN.test(normalized)) return true;
   if (/^bg-\[[^\]]+\]$/.test(normalized)) return true;
+  if (/^bg-gradient-to-[a-z]+(?:-[a-z]+)*$/i.test(normalized.split(/\s+/)[0] ?? '')) {
+    const parts = normalized.split(/\s+/);
+    if (parts.length < 2) return false;
+    return parts.slice(1).every((part) =>
+      /^(from|via|to)-(?:[a-z]+-\d{2,3}|black|white)$/i.test(part)
+    );
+  }
   return false;
 }
 

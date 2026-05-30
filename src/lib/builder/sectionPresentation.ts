@@ -85,6 +85,12 @@ export function resolveSectionBodyClass(section: SectionLike, preset: PresetLike
   );
 }
 
+import {
+  extractBackgroundColorFromMessage,
+  extractColorsFromMessage,
+  isGradientBackgroundRequest,
+  stripQuotedSpans,
+} from '@/lib/project-workspace/website-edit-agent/preset/presetUtils';
 import { resolveTailwindBackgroundClass } from './tailwindBackgroundResolver';
 
 /** Tailwind background utilities without shade suffixes (not bg-black-600). */
@@ -104,6 +110,32 @@ export function colorNameToBackgroundClass(
   ownerMessage?: string
 ): string {
   return resolveTailwindBackgroundClass(color, ownerMessage);
+}
+
+/**
+ * Resolve a gradient background class from owner phrasing.
+ * Uses an explicit hue when present; otherwise a multi-color default gradient.
+ */
+export function resolveGradientBackgroundClass(ownerMessage?: string): string {
+  const colors = extractColorsFromMessage(stripQuotedSpans(ownerMessage ?? ''));
+  const family = colors[0] ?? null;
+  if (family) {
+    const normalized = family === 'grey' ? 'gray' : family;
+    return `bg-gradient-to-br from-${normalized}-400 via-${normalized}-600 to-${normalized}-900`;
+  }
+  return 'bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600';
+}
+
+/**
+ * Resolve section backgroundClass from owner message (solid or gradient).
+ */
+export function extractSectionBackgroundClassFromMessage(message: string): string | null {
+  if (isGradientBackgroundRequest(message)) {
+    return resolveGradientBackgroundClass(message);
+  }
+  const color = extractBackgroundColorFromMessage(message);
+  if (!color) return null;
+  return colorNameToBackgroundClass(color, message);
 }
 
 /** Map a color name to Tailwind classes for cards in a section. */

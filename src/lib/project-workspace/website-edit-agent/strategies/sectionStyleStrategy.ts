@@ -1,5 +1,5 @@
 import { resolveEffectiveEditMessage } from '@/lib/chat/conversationContextForEdit';
-import { extractBackgroundColorFromMessage } from '../preset/presetUtils';
+import { extractSectionBackgroundClassFromMessage } from '@/lib/builder/sectionPresentation';
 import { buildStrategyResult } from '../strategyContext';
 import {
   applySectionBackgroundEdit,
@@ -29,8 +29,8 @@ export async function runSectionStyleStrategy(
     options.ownerMessage,
     options.conversationHistory ?? []
   );
-  const toColor = extractBackgroundColorFromMessage(effectiveMessage);
-  if (!toColor) return null;
+  const backgroundClass = extractSectionBackgroundClassFromMessage(effectiveMessage);
+  if (!backgroundClass) return null;
 
   const sectionIndex = plan.where.sectionIndex;
   const componentName = plan.where.rendererComponent;
@@ -43,8 +43,9 @@ export async function runSectionStyleStrategy(
       title: plan.where.title,
       rendererComponent: componentName,
     },
-    toColor
+    ''
   );
+  pipelineInput.backgroundClass = backgroundClass;
   pipelineInput.workspace.ownerMessage = effectiveMessage;
 
   let pipelineResult = await applySectionBackgroundEdit(pipelineInput);

@@ -118,6 +118,28 @@ export function extractSectionTitleCandidates(message: string): string[] {
   );
   if (titled?.[1]) candidates.push(titled[1].trim());
 
+  // Unquoted title suffix after gradient phrasing: "to color gradient Grow Title Here"
+  const unquotedAfterGradient = message.match(
+    /\bto\s+(?:(?:color|colour|gradient|background|a|an|the)\s+)+([^:\n"']{8,120})\s*$/i
+  );
+  if (unquotedAfterGradient?.[1]) {
+    const title = unquotedAfterGradient[1].trim();
+    if (title.split(/\s+/).filter(Boolean).length >= 2) {
+      candidates.push(title);
+    }
+  }
+
+  // Unquoted title suffix after explicit color: "to blue Everything You Need..."
+  const unquotedAfterColor = message.match(
+    /\bto\s+(?:(?:color|colour|gradient|background|a|an|the)\s+)*(?:(?:light|dark|deep|pale|soft)\s+)?([a-z]+(?:-\d{2,3})?)\s+([^:\n"']{8,120})\s*$/i
+  );
+  if (unquotedAfterColor?.[2]) {
+    const colorToken = unquotedAfterColor[1]!.toLowerCase();
+    if (!['color', 'colour', 'gradient', 'background'].includes(colorToken)) {
+      candidates.push(unquotedAfterColor[2].trim());
+    }
+  }
+
   if (/\bwhat our customers say\b/i.test(message)) {
     candidates.push('What Our Customers Say');
   }
@@ -349,6 +371,7 @@ function detectSpecialTarget(message: string): SectionTargetKind | null {
 
 import {
   extractSectionPickFromListReply,
+  lastSectionListAssistantTurn,
   wasSectionListClarificationAsked,
   wasTestimonialCardClarificationAsked,
 } from '@/lib/chat/conversationContextForEdit';
@@ -367,7 +390,7 @@ function resolveNumberedSectionReply(
   if (!match) return null;
 
   const pick = parseInt(match[1], 10);
-  const assistant = [...history].reverse().find((m) => m.role === 'assistant');
+  const assistant = lastSectionListAssistantTurn(history);
   const pickInfo = assistant
     ? extractSectionPickFromListReply(assistant.content, pick)
     : null;

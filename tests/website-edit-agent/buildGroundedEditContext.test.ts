@@ -161,6 +161,30 @@ describe('buildGroundedEditContext', () => {
     }
   });
 
+  it('resolves color-gradient + quoted grow title to services section (not contact)', async () => {
+    const growConfig = siteConfig.replace(
+      '{ type: "services", title: "Our Products", items: [] }',
+      '{ type: "services", title: "Everything You Need to Grow Your Business", items: [] }'
+    ).replace(
+      '{ type: "testimonials", title: "What Our Customers Say", items: [] }',
+      '{ type: "contact", title: "Get Started Today", items: [] }'
+    );
+    const growSnap: SiteWorkspaceSnapshot = {
+      ...makeSnap(),
+      siteConfigContent: growConfig,
+    };
+    const result = await buildGroundedEditContext(
+      growSnap,
+      'change this section background to color gradient "Everything You Need to Grow Your Business"',
+      []
+    );
+
+    expect(result.needsClarification).toBeFalsy();
+    expect(result.plan?.where.sectionIndex).toBe(0);
+    expect(result.plan?.what).toBe('style_background');
+    expect(result.plan?.where.title).toMatch(/grow your business/i);
+  });
+
   it('routes testimonial card option "1" to preset_card_color via grounded plan', async () => {
     const spec = defaultMultiSectionSiteSpec();
     const testimonialsTitle = spec.sections[3].title!;

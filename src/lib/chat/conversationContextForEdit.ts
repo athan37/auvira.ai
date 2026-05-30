@@ -72,6 +72,18 @@ function lastAssistantTurn(history: ConversationTurn[]): ConversationTurn | null
   return null;
 }
 
+/** Most recent assistant turn that listed numbered sections (not a confirmation after a wrong pick). */
+export function lastSectionListAssistantTurn(history: ConversationTurn[]): ConversationTurn | null {
+  for (let i = history.length - 1; i >= 0; i--) {
+    const turn = history[i];
+    if (turn.role !== 'assistant') continue;
+    if (/Reply with the number/i.test(turn.content) && /\b\d+\.\s*\[\d+\]/m.test(turn.content)) {
+      return turn;
+    }
+  }
+  return null;
+}
+
 /** Parse `"Title"` and `[index]` from assistant section list lines like `3. [2] gallery — "Hello"`. */
 export function extractSectionTitleFromListReply(
   assistantContent: string,
@@ -160,7 +172,7 @@ function mergeSectionNumberReply(message: string, history: ConversationTurn[]): 
   if (!numMatch || !wasSectionListClarificationAsked(history)) return null;
 
   const pick = parseInt(numMatch[1], 10);
-  const assistant = lastAssistantTurn(history);
+  const assistant = lastSectionListAssistantTurn(history);
   const pickInfo = assistant ? extractSectionPickFromListReply(assistant.content, pick) : null;
   if (!pickInfo) return null;
 

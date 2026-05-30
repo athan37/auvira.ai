@@ -201,7 +201,7 @@ export function normalizeTailwindBackgroundClass(
 ): string {
   const trimmed = className.trim();
   if (isEmitableTailwindBackgroundClass(trimmed)) {
-    return trimmed.replace(/^bg-grey-/i, 'bg-gray-');
+    return trimmed.replace(/^bg-grey-/i, 'bg-gray-').replace(/grey-/g, 'gray-');
   }
 
   const match = trimmed.match(/^bg-([a-z]+)(?:-(\d{2,3}))?$/i);

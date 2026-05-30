@@ -76,6 +76,24 @@ describe('conversationContextForEdit', () => {
     expect(pick?.title).toBe('Hello');
   });
 
+  it('merges section number reply after a wrong confirmation still uses the numbered list', () => {
+    const catalogList =
+      'Which section do you mean? Reply with the number:\n\n' +
+      '1. [0] services — "Everything You Need to Grow Your Business"\n' +
+      '5. [4] contact — "Get Started Today"';
+    const history = [
+      { role: 'user' as const, content: 'Change the background color of this section to orange' },
+      { role: 'assistant' as const, content: catalogList },
+      { role: 'user' as const, content: '5' },
+      { role: 'assistant' as const, content: 'Updated "Get Started Today" background to orange.' },
+    ];
+
+    const effective = resolveEffectiveEditMessage('1', history);
+    expect(effective).toContain('orange');
+    expect(effective).toContain('Everything You Need to Grow Your Business');
+    expect(effective).toContain('section index 0');
+  });
+
   it('uses eight turns by default for edit context', () => {
     expect(DEFAULT_EDIT_CONTEXT_TURNS).toBe(8);
   });

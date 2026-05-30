@@ -101,4 +101,31 @@ describe('siteSectionCatalog', () => {
     expect(result?.sectionIndex).toBe(0);
     expect(result?.confidence).toBe('high');
   });
+
+  it('resolves unquoted title suffix after color word', () => {
+    const result = matchSectionFromMessage(
+      'change this section background to blue Everything You Need to Grow Your Business',
+      catalog
+    );
+    expect(result?.confidence).toBe('high');
+    expect(result?.sectionIndex).toBe(0);
+  });
+
+  it('resolves unquoted title suffix after color gradient filler', () => {
+    const result = matchSectionFromMessage(
+      'change this section background to color gradient Everything You Need to Grow Your Business',
+      catalog
+    );
+    expect(result?.confidence).toBe('high');
+    expect(result?.sectionIndex).toBe(0);
+    expect(result?.sectionIndex).not.toBe(2);
+  });
+
+  it('stripColorWordsFromMessage removes gradient filler tokens', () => {
+    const stripped = stripColorWordsFromMessage(
+      'change this section background to color gradient Everything You Need to Grow Your Business'
+    );
+    expect(stripped.toLowerCase()).not.toContain('gradient');
+    expect(stripped).toMatch(/grow your business/i);
+  });
 });

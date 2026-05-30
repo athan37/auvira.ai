@@ -43,27 +43,31 @@ Reply with JSON only:
 
 Rules:
 - sectionIndex MUST be one of the [index] values listed above.
+- Match section **type** and **title** to owner intent (e.g. portfolio/photos/work samples → type="gallery"; customer quotes/growth stories → type="testimonials").
 - If the message does not clearly target one section, use confidence "low" and pick the best guess anyway.
 - Do not invent sections.`;
 
   try {
-    const result = await llm.generateJSON<CatalogLLMMatch>({
-      prompt,
-      maxTokens: 256,
-    });
-    const parsed = result.data;
-    if (parsed == null || typeof parsed.sectionIndex !== 'number') {
-      return null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const result = await llm.generateJSON<CatalogLLMMatch>({
+        prompt,
+        maxTokens: 256,
+      });
+      const parsed = result.data;
+      if (parsed == null || typeof parsed.sectionIndex !== 'number') {
+        continue;
+      }
+      const exists = catalog.sections.some((s) => s.index === parsed.sectionIndex);
+      if (!exists) {
+        continue;
+      }
+      return {
+        sectionIndex: parsed.sectionIndex,
+        confidence: parsed.confidence ?? 'medium',
+        reason: parsed.reason ?? 'LLM catalog picker',
+      };
     }
-    const exists = catalog.sections.some((s) => s.index === parsed.sectionIndex);
-    if (!exists) {
-      return null;
-    }
-    return {
-      sectionIndex: parsed.sectionIndex,
-      confidence: parsed.confidence ?? 'medium',
-      reason: parsed.reason ?? 'LLM catalog picker',
-    };
+    return null;
   } catch {
     return null;
   }
