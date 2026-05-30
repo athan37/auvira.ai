@@ -1,4 +1,4 @@
-import { colorNameToBackgroundClass } from '@/lib/builder/sectionPresentation';
+import { colorNameToBackgroundClass, formatSectionBackgroundChangeSummary } from '@/lib/builder/sectionPresentation';
 import { parseSiteConfigSource } from '@/lib/site-manager/siteConfigParser';
 import { isTextColorEditRequest } from '../verifyPreviewHints';
 import { detectScopedStyleRequest } from './editAmbiguity';
@@ -453,7 +453,7 @@ export function summarizeActualChanges(
         const beforeBg = beforeSection?.presentation?.backgroundClass?.trim();
         if (afterBg && afterBg !== beforeBg) {
           const title = afterSection.title ?? `section ${i + 1}`;
-          return `Changed background of "${title}" to ${afterBg}.`;
+          return formatSectionBackgroundChangeSummary(title, afterBg, message);
         }
       }
     }

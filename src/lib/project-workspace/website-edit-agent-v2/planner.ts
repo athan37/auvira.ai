@@ -5,6 +5,7 @@ import { formatConversationForIntentClarifier } from '@/lib/chat/conversationCon
 import type { ConversationTurn, WebsiteEditAgentOptions } from '../website-edit-agent/types';
 import { EDIT_PLAN_SCHEMA, type EditPlan } from './editPlanSchema';
 import { normalizeEditPlanSectionStyles } from './normalizeSectionStyleStep';
+import { buildDeterministicGradientPlan } from './deterministicGradientPlan';
 import { buildSiteModel, summarizeSiteModel, type SiteModel } from './siteModel';
 
 const ajv = new Ajv({ allErrors: true });
@@ -54,6 +55,12 @@ export async function planEdit(
   planOptions: PlanEditOptions = {}
 ): Promise<EditPlan> {
   const siteModel = planOptions.siteModel ?? (await buildSiteModel(options));
+
+  const deterministicGradient = buildDeterministicGradientPlan(options, siteModel);
+  if (deterministicGradient) {
+    return normalizeEditPlanSectionStyles(deterministicGradient, options.ownerMessage, siteModel);
+  }
+
   const llm = planOptions.llm ?? getLLMClient();
 
   const result = await llm.generateJSON<EditPlan>({
@@ -69,6 +76,7 @@ Rules:
 - update_section_style MUST include sectionIndex (number) AND either backgroundColor (color name) or presentation.{backgroundClass|cardClass}.
 - For testimonial/service card colors use presentation.cardClass (e.g. border-red-300 bg-red-50), not subtitle.
 - Ask for clarification when the user does not provide the new value or the target is ambiguous.
+- For generic "color gradient" / "gradient background" on a named or ordinal section, use update_section_style with presentation.backgroundClass (default multi-color gradient) — do NOT ask which colors unless the user explicitly asks for a choice.
 - Do not invent phone numbers, addresses, emails, business facts, testimonials, or prices.
 - Use legacy_strategy only for edits not covered by V2 skills, such as broad layout code changes.`,
     prompt: `Owner request:

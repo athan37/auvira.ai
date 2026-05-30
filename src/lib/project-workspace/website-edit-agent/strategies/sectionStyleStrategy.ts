@@ -1,5 +1,5 @@
 import { resolveEffectiveEditMessage } from '@/lib/chat/conversationContextForEdit';
-import { extractSectionBackgroundClassFromMessage } from '@/lib/builder/sectionPresentation';
+import { extractSectionBackgroundClassFromMessage, resolveSectionBackgroundClassForEdit } from '@/lib/builder/sectionPresentation';
 import { buildStrategyResult } from '../strategyContext';
 import {
   applySectionBackgroundEdit,
@@ -29,7 +29,7 @@ export async function runSectionStyleStrategy(
     options.ownerMessage,
     options.conversationHistory ?? []
   );
-  const backgroundClass = extractSectionBackgroundClassFromMessage(effectiveMessage);
+  const backgroundClass = resolveSectionBackgroundClassForEdit(effectiveMessage);
   if (!backgroundClass) return null;
 
   const sectionIndex = plan.where.sectionIndex;

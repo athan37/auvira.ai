@@ -27,7 +27,7 @@ describe('runWebsiteEditAgentV3', () => {
     expect(result.needsClarification, result.ownerMessage).toBeFalsy();
     expect(result.ok, result.error ?? result.ownerMessage).toBe(true);
     expect(result.summary).toMatch(/Everything You Need to Grow Your Business/i);
-    expect(result.summary).toMatch(/gradient/);
+    expect(result.summary).toMatch(/color gradient/i);
 
     const siteConfig = await readSyntheticFile(workspacePath, 'src/lib/siteConfig.ts');
     expect(siteConfig).toContain('backgroundClass');

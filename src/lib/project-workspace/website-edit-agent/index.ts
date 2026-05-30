@@ -8,9 +8,11 @@ import { runAgentLoop } from './WebsiteEditAgent';
 import { resolveSiteWorkspace } from './resolveSiteWorkspace';
 import { runStrategyPlan } from './strategyRegistry';
 import { routeEditRequest } from './intentRouter';
+import { isGradientBackgroundRequest } from './preset/presetUtils';
 import type {
   AgentStepEvent,
   EditJobPlan,
+  EditStrategyId,
   EditTargetPlan,
   WebsiteEditAgentOptions,
   WebsiteEditAgentResult,
@@ -76,6 +78,29 @@ function clarificationForUnresolvedStyle(
     strategy: plan.primaryStrategy,
     tier: plan.tier,
     confidence: 'low',
+  };
+}
+
+function failedResolvedSectionBackgroundEdit(
+  ownerMessage: string,
+  editTargetPlan: EditTargetPlan | null | undefined,
+  attempted: EditStrategyId[]
+): WebsiteEditAgentResult | null {
+  if (editTargetPlan?.what !== 'style_background') return null;
+  if (editTargetPlan.where.sectionIndex == null) return null;
+  if (!attempted.includes('section_style')) return null;
+
+  const title = editTargetPlan.where.title ?? 'that section';
+  const gradient = isGradientBackgroundRequest(ownerMessage);
+  return {
+    ok: false,
+    error: 'Section background edit failed',
+    ownerMessage: gradient
+      ? `We couldn't apply a color gradient to "${title}". Please try again, or specify a solid color like blue or purple.`
+      : `We couldn't update the background for "${title}". Try quoting the section title and a color, e.g. change "Section Title" background to blue.`,
+    strategy: 'section_style',
+    tier: 'L0',
+    confidence: editTargetPlan.where.confidence ?? 'medium',
   };
 }
 
@@ -252,6 +277,15 @@ export async function runWebsiteEditAgent(
   const unresolvedStyle = clarificationForUnresolvedStyle(editTargetPlan, plan);
   if (unresolvedStyle) {
     return unresolvedStyle;
+  }
+
+  const failedSectionStyle = failedResolvedSectionBackgroundEdit(
+    options.ownerMessage,
+    editTargetPlan,
+    attempted
+  );
+  if (failedSectionStyle) {
+    return failedSectionStyle;
   }
 
   const ambiguity = detectAmbiguousEditRequest(

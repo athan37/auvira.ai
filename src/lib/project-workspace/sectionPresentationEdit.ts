@@ -3,8 +3,13 @@
  * All section_style / update_section_style paths should delegate here.
  */
 
-import { colorNameToBackgroundClass } from '@/lib/builder/sectionPresentation';
+import {
+  colorNameToBackgroundClass,
+  extractSectionBackgroundClassFromMessage,
+  formatSectionBackgroundChangeSummary,
+} from '@/lib/builder/sectionPresentation';
 import { normalizeTailwindBackgroundClass } from '@/lib/builder/tailwindBackgroundResolver';
+import { normalizeGradientBackgroundClass } from '@/lib/builder/sectionPresentation';
 import { tailwindConfigCoversBackgroundClass, isEmitableTailwindBackgroundClass } from '@/lib/builder/tailwindPresentationSupport';
 import { appendSiteConfigPresentationSyncExport, hasInvalidNextJsPageExports, sanitizeSourceForPublish } from '@/lib/site-manager/siteConfigAgentMarkers';
 import { parseSiteConfigSource } from '@/lib/site-manager/siteConfigParser';
@@ -20,6 +25,11 @@ import {
   upgradeSectionComponentToPresentationResolver,
   sectionComponentUsesPresetBackground,
 } from './website-edit-agent/legacySectionPresentation';
+import {
+  extractSectionTitleCandidates,
+  findBestSectionTitleMatch,
+  titleMatchesIntent,
+} from './website-edit-agent/resolveSectionTarget';
 import {
   PAGE_TSX,
   SITE_CONFIG,
@@ -110,8 +120,8 @@ function readWriteAdapter(workspace: SectionPresentationWorkspace) {
   };
 }
 
-function buildSummary(sectionTitle: string, backgroundClass: string): string {
-  return `Changed background of "${sectionTitle}" to ${backgroundClass}.`;
+function buildSummary(sectionTitle: string, backgroundClass: string, ownerMessage?: string): string {
+  return formatSectionBackgroundChangeSummary(sectionTitle, backgroundClass, ownerMessage);
 }
 
 /** Hard source invariants after a section background edit. */
@@ -224,11 +234,16 @@ export async function applySectionBackgroundEdit(
 
   const rawBackgroundClass =
     input.backgroundClass?.trim() ||
+    (workspace.ownerMessage
+      ? extractSectionBackgroundClassFromMessage(workspace.ownerMessage)
+      : null) ||
     (input.colorName
       ? colorNameToBackgroundClass(input.colorName, workspace.ownerMessage)
       : '');
   const backgroundClass = rawBackgroundClass
-    ? normalizeTailwindBackgroundClass(rawBackgroundClass, workspace.ownerMessage)
+    ? rawBackgroundClass.includes('gradient')
+      ? normalizeGradientBackgroundClass(rawBackgroundClass, workspace.ownerMessage)
+      : normalizeTailwindBackgroundClass(rawBackgroundClass, workspace.ownerMessage)
     : '';
   if (!backgroundClass) {
     return {
@@ -269,7 +284,7 @@ export async function applySectionBackgroundEdit(
   const parsed = parseSiteConfigSource(siteConfigBefore);
   const section = parsed?.sections?.[sectionIndex] as { title?: string; type?: string } | undefined;
   const sectionTitle =
-    sectionTarget.title ?? section?.title ?? `section ${sectionIndex}`;
+    section?.title ?? sectionTarget.title ?? `section ${sectionIndex}`;
   const sectionType = sectionTarget.sectionType || String(section?.type ?? 'generic');
 
   const colorName = input.colorName ?? backgroundClass.replace(/^bg-/, '');
@@ -374,7 +389,7 @@ export async function applySectionBackgroundEdit(
     tailwindContentBefore: tailwindBefore,
   });
 
-  const summary = buildSummary(sectionTitle, backgroundClass);
+  const summary = buildSummary(sectionTitle, backgroundClass, workspace.ownerMessage);
 
   return {
     ok: invariantErrors.length === 0,
@@ -418,6 +433,12 @@ export interface SectionColorEditGateInput {
   /** When set, gate runs for section_style even without persisted presentation. */
   strategy?: string;
   ownerMessage?: string;
+  /** Section the agent applied (preferred for owner-facing summary). */
+  sectionIndex?: number;
+  /** Agent summary — when set, gate must not replace it with a re-guessed title. */
+  agentSummary?: string;
+  /** Pre-edit siteConfig source for diff-based section detection. */
+  beforeSiteConfig?: string;
   /** Re-run pipeline once when invariants fail (default true). */
   autoRepair?: boolean;
 }
@@ -463,6 +484,99 @@ export function listSectionsWithPresentationBackground(
     });
   }
   return targets;
+}
+
+/** Index of the section whose presentation.backgroundClass changed, if exactly one. */
+export function findSectionIndexWithBackgroundClassChange(
+  beforeSiteConfig: string,
+  afterSiteConfig: string
+): number | null {
+  const beforeParsed = parseSiteConfigSource(beforeSiteConfig);
+  const afterParsed = parseSiteConfigSource(afterSiteConfig);
+  const afterSections = afterParsed?.sections ?? [];
+  if (afterSections.length === 0) return null;
+
+  let changedIndex: number | null = null;
+  for (let i = 0; i < afterSections.length; i++) {
+    const afterSection = afterSections[i] as {
+      presentation?: { backgroundClass?: string };
+    };
+    const beforeSection = beforeParsed?.sections?.[i] as
+      | { presentation?: { backgroundClass?: string } }
+      | undefined;
+    const afterBg = afterSection.presentation?.backgroundClass?.trim();
+    const beforeBg = beforeSection?.presentation?.backgroundClass?.trim();
+    if (afterBg && afterBg !== beforeBg) {
+      if (changedIndex != null) return null;
+      changedIndex = i;
+    }
+  }
+  return changedIndex;
+}
+
+function resolveGateSummaryTarget(
+  targets: PresentationSectionTarget[],
+  ownerMessage: string,
+  options: { sectionIndex?: number; beforeSiteConfig?: string; afterSiteConfig?: string }
+): PresentationSectionTarget | null {
+  if (targets.length === 0) return null;
+  if (targets.length === 1) return targets[0]!;
+
+  if (options.sectionIndex != null) {
+    const byIndex = targets.find((t) => t.sectionIndex === options.sectionIndex);
+    if (byIndex) return byIndex;
+  }
+
+  if (options.beforeSiteConfig && options.afterSiteConfig) {
+    const diffIndex = findSectionIndexWithBackgroundClassChange(
+      options.beforeSiteConfig,
+      options.afterSiteConfig
+    );
+    if (diffIndex != null) {
+      const byDiff = targets.find((t) => t.sectionIndex === diffIndex);
+      if (byDiff) return byDiff;
+    }
+  }
+
+  const titleCandidates = extractSectionTitleCandidates(ownerMessage);
+  const catalogSections = targets.map((t) => ({
+    index: t.sectionIndex,
+    title: t.title,
+    type: t.sectionType,
+  }));
+  const best = findBestSectionTitleMatch(titleCandidates, catalogSections);
+  if (best) {
+    return targets.find((t) => t.sectionIndex === best.section.index) ?? null;
+  }
+
+  for (const candidate of titleCandidates) {
+    const match = targets.find(
+      (t) => titleMatchesIntent(t.title, candidate) || titleMatchesIntent(candidate, t.title)
+    );
+    if (match) return match;
+  }
+
+  return null;
+}
+
+function buildGateSummary(
+  input: SectionColorEditGateInput,
+  targets: PresentationSectionTarget[],
+  afterSiteConfig: string,
+  ownerMessage: string
+): string | undefined {
+  if (input.agentSummary?.trim()) {
+    return undefined;
+  }
+
+  const target = resolveGateSummaryTarget(targets, ownerMessage, {
+    sectionIndex: input.sectionIndex,
+    beforeSiteConfig: input.beforeSiteConfig,
+    afterSiteConfig,
+  });
+  if (!target) return undefined;
+
+  return buildSummary(target.title, target.backgroundClass, ownerMessage);
 }
 
 function collectSectionColorInvariantErrors(
@@ -530,12 +644,12 @@ export async function enforceSectionColorEditReadyAfterApply(
     infraReady
   );
   if (errors.length === 0) {
-    const target = state.targets[state.targets.length - 1];
+    const ownerMessage = input.ownerMessage ?? workspace.ownerMessage ?? '';
     return {
       ok: true,
       errors: [],
       retried: false,
-      summary: buildSummary(target.title, target.backgroundClass),
+      summary: buildGateSummary(input, state.targets, state.siteConfigContent, ownerMessage),
     };
   }
 
@@ -566,11 +680,11 @@ export async function enforceSectionColorEditReadyAfterApply(
     infraReady
   );
 
-  const lastTarget = state.targets[state.targets.length - 1];
+  const ownerMessage = input.ownerMessage ?? workspace.ownerMessage ?? '';
   return {
     ok: errors.length === 0,
     errors,
     retried: true,
-    summary: lastTarget ? buildSummary(lastTarget.title, lastTarget.backgroundClass) : undefined,
+    summary: buildGateSummary(input, state.targets, state.siteConfigContent, ownerMessage),
   };
 }

@@ -45,6 +45,15 @@ const SHADED_BG_PATTERN =
 
 const FLAT_BG_PATTERN = /^bg-(black|white)$/i;
 
+function isValidGradientStop(part: string): boolean {
+  const match = part.match(/^(from|via|to)-(.+)$/i);
+  if (!match) return false;
+  const token = match[2].toLowerCase();
+  if (token === 'black' || token === 'white') return true;
+  if (/^(black|white)-\d{2,3}$/.test(token)) return false;
+  return /^[a-z]+-\d{2,3}$/.test(token);
+}
+
 /** True when a string is a valid Tailwind background utility (emitable by JIT/safelist). */
 export function isEmitableTailwindBackgroundClass(className: string): boolean {
   const normalized = className.trim();
@@ -55,9 +64,7 @@ export function isEmitableTailwindBackgroundClass(className: string): boolean {
   if (/^bg-gradient-to-[a-z]+(?:-[a-z]+)*$/i.test(normalized.split(/\s+/)[0] ?? '')) {
     const parts = normalized.split(/\s+/);
     if (parts.length < 2) return false;
-    return parts.slice(1).every((part) =>
-      /^(from|via|to)-(?:[a-z]+-\d{2,3}|black|white)$/i.test(part)
-    );
+    return parts.slice(1).every((part) => isValidGradientStop(part));
   }
   return false;
 }

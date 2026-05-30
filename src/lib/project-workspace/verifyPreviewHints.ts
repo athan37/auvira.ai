@@ -1,5 +1,7 @@
 /** Shared hint extraction for preview-first edit verification. */
 
+import { isGradientBackgroundRequest } from '@/lib/project-workspace/website-edit-agent/preset/presetUtils';
+
 const COLOR_NAMES = [
   'green',
   'yellow',
@@ -63,6 +65,9 @@ export function isTextColorEditRequest(ownerMessage: string): boolean {
 
 /** True when the prompt targets visible background / generic color styling. */
 export function isBackgroundColorEditRequest(ownerMessage: string): boolean {
+  if (isGradientBackgroundRequest(ownerMessage)) {
+    return true;
+  }
   const lower = ownerMessage.toLowerCase();
   const hasColor = COLOR_NAMES.some((c) => messageHasKeyword(lower, c));
   if (!hasColor || isTextColorEditRequest(ownerMessage)) {

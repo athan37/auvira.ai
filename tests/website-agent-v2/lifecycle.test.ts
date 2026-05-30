@@ -9,6 +9,14 @@ import {
   verifyEditRun,
 } from '../../src/lib/project-workspace/website-edit-agent-v2/lifecycle';
 import type { EditPlan } from '../../src/lib/project-workspace/website-edit-agent-v2';
+import { executePlan } from '../../src/lib/project-workspace/website-edit-agent-v2/executor';
+import { planEdit } from '../../src/lib/project-workspace/website-edit-agent-v2/planner';
+import { computeWorkspaceHashes } from '../../src/lib/project-workspace/workspaceEditShared';
+import {
+  createSyntheticWorkspace,
+  destroySyntheticWorkspace,
+  readSyntheticFile,
+} from '../support/syntheticSiteWorkspace';
 
 async function createWorkspace(): Promise<string> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ws-v2-life-'));
@@ -75,6 +83,39 @@ describe('Website Agent V2 lifecycle', () => {
     expect(siteConfig).toContain('555-0100');
 
     await fs.rm(dir, { recursive: true, force: true });
+  });
+
+  it('does not overwrite gradient presentation during repair (quoted JSON keys)', async () => {
+    const msg =
+      'change this section "Get Started Today" background to a blue color gradient';
+    const workspacePath = await createSyntheticWorkspace({
+      site: {
+        sections: [
+          { type: 'services', title: 'Our Services' },
+          { type: 'contact', title: 'Get Started Today' },
+        ],
+      },
+      pageMode: 'wired',
+      tailwind: 'canonical',
+    });
+    const options = {
+      workspacePath,
+      ownerMessage: msg,
+      projectId: 'v2-life-gradient',
+      mode: 'gitlab' as const,
+      infraBaselineReady: true,
+    };
+    const beforeHashes = await computeWorkspaceHashes(workspacePath);
+    const plan = await planEdit(options);
+    const result = await executePlan(plan, options, beforeHashes);
+
+    expect(result.ok, result.error).toBe(true);
+
+    const siteConfig = await readSyntheticFile(workspacePath, 'src/lib/siteConfig.ts');
+    expect(siteConfig).toMatch(/gradient/);
+    expect(siteConfig).not.toContain('"backgroundClass": "bg-blue-600"');
+
+    await destroySyntheticWorkspace(workspacePath);
   });
 });
 

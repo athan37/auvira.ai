@@ -12,6 +12,7 @@ import {
   assertSectionColorEditReady,
   applySectionBackgroundColorEdit,
   enforceSectionColorEditReadyAfterApply,
+  findSectionIndexWithBackgroundClassChange,
 } from '@/lib/project-workspace/sectionPresentationEdit';
 import {
   createSyntheticWorkspace,
@@ -21,6 +22,8 @@ import {
 } from '../support/syntheticSiteWorkspace';
 import { rendererComponentForSectionType } from '@/lib/project-workspace/website-edit-agent/legacySectionPresentation';
 import { colorNameToBackgroundClass } from '@/lib/builder/sectionPresentation';
+import { updateSectionPresentationInSource } from '@/lib/project-workspace/website-edit-agent-v2/siteConfigMutations';
+import { buildBlackWhiteGradientBackgroundClass } from '@/lib/builder/gradientBuilder';
 
 describe('agent contracts: section background color (generic)', () => {
   it.each(GENERIC_SECTION_COLOR_SCENARIOS.map((s) => [s.name, s] as const))(
@@ -157,6 +160,70 @@ describe('agent contracts: section background color (generic)', () => {
     expect(await readSyntheticFile(workspacePath, 'src/app/page.tsx')).toContain(
       'resolveSectionBackground(section, preset)'
     );
+
+    await destroySyntheticWorkspace(workspacePath);
+  });
+
+  it('color gate keeps agent summary instead of guessing last section title', async () => {
+    const workspacePath = await createSyntheticWorkspace({
+      site: {
+        sections: [
+          { type: 'generic', title: 'Features' },
+          { type: 'contact', title: "hleoo' im david" },
+          { type: 'contact', title: 'Get Started Today' },
+        ],
+      },
+      pageMode: 'wired',
+      tailwind: 'canonical',
+    });
+    const siteConfig = await readSyntheticFile(workspacePath, 'src/lib/siteConfig.ts');
+    const gradientClass = buildBlackWhiteGradientBackgroundClass();
+    const beforeSite = siteConfig;
+    let afterSite = updateSectionPresentationInSource(beforeSite, 1, {
+      backgroundClass: gradientClass,
+    })!;
+    afterSite = updateSectionPresentationInSource(afterSite, 2, {
+      backgroundClass: 'bg-black',
+    })!;
+
+    const { writeFile } = await import('fs/promises');
+    const { join } = await import('path');
+    await writeFile(join(workspacePath, 'src/lib/siteConfig.ts'), afterSite, 'utf-8');
+
+    expect(findSectionIndexWithBackgroundClassChange(beforeSite, afterSite)).toBeNull();
+
+    const agentSummary =
+      'We updated the background of "hleoo\' im david" to a color gradient.';
+    const gate = await enforceSectionColorEditReadyAfterApply({
+      workspace: {
+        workspacePath,
+        ownerMessage:
+          'change this section "hleoo\' im david" background to back and white color gradient',
+      },
+      projectInfraStatus: { infraBaselineReady: true },
+      strategy: 'section_style',
+      agentSummary,
+      beforeSiteConfig: beforeSite,
+      sectionIndex: 1,
+    });
+
+    expect(gate.ok).toBe(true);
+    expect(gate.summary).toBeUndefined();
+
+    const gateWithoutAgentSummary = await enforceSectionColorEditReadyAfterApply({
+      workspace: {
+        workspacePath,
+        ownerMessage:
+          'change this section "hleoo\' im david" background to back and white color gradient',
+      },
+      projectInfraStatus: { infraBaselineReady: true },
+      strategy: 'section_style',
+      beforeSiteConfig: beforeSite,
+      sectionIndex: 1,
+    });
+
+    expect(gateWithoutAgentSummary.summary).toContain("hleoo' im david");
+    expect(gateWithoutAgentSummary.summary).not.toContain('Get Started Today');
 
     await destroySyntheticWorkspace(workspacePath);
   });

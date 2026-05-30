@@ -108,8 +108,13 @@ export function extractSectionTitleCandidates(message: string): string[] {
     /\bto\s+["']/i.test(message);
 
   if (!copyValueEdit) {
-    for (const match of message.matchAll(/["']([^"']{3,120})["']/g)) {
-      candidates.push(match[1].trim());
+    for (const match of message.matchAll(/"([^"\\]|\\.)*"/g)) {
+      const inner = match[0].slice(1, -1).trim();
+      if (inner.length >= 3) candidates.push(inner);
+    }
+    for (const match of message.matchAll(/'([^'\\]|\\.)*'/g)) {
+      const inner = match[0].slice(1, -1).trim();
+      if (inner.length >= 3) candidates.push(inner);
     }
   }
 

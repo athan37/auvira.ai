@@ -1,5 +1,6 @@
 import {
   colorNameToCardClass,
+  resolveSectionBackgroundClassForEdit,
 } from '@/lib/builder/sectionPresentation';
 import { parseSiteConfigSource } from '@/lib/site-manager/siteConfigParser';
 import {
@@ -81,15 +82,25 @@ async function repairMissingSectionPresentation(
   if (!stylePlanned && !detectScopedStyleRequest(options.ownerMessage)) {
     return null;
   }
-  if (/presentation\s*:\s*\{/.test(content)) {
-    return null;
-  }
 
   const siteModel = await buildSiteModel(options);
   const sectionIndex = resolveSectionIndexFromMessage(options.ownerMessage, siteModel.sections);
+  if (sectionIndex == null) {
+    return null;
+  }
+
+  const parsed = parseSiteConfigSource(content);
+  const existingSection = parsed?.sections?.[sectionIndex] as
+    | { presentation?: { backgroundClass?: string; cardClass?: string } }
+    | undefined;
+  const existingPresentation = existingSection?.presentation;
+  if (existingPresentation?.backgroundClass?.trim() || existingPresentation?.cardClass?.trim()) {
+    return null;
+  }
+
   const colors = extractColorsFromMessage(options.ownerMessage);
   const color = colors.at(-1);
-  if (sectionIndex == null || !color) {
+  if (!color) {
     return null;
   }
 
@@ -108,17 +119,35 @@ async function repairMissingSectionPresentation(
   }
 
   const section = siteModel.sections.find((s) => s.index === sectionIndex);
-  const pipeline = await applySectionBackgroundEdit(
-    sectionBackgroundEditFromAgentOptions(
-      options,
-      {
-        sectionIndex,
-        sectionType: section?.type ?? 'generic',
-        title: section?.title,
-      },
-      color
-    )
-  );
+  const backgroundClass = resolveSectionBackgroundClassForEdit(options.ownerMessage);
+  const pipeline = backgroundClass
+    ? await applySectionBackgroundEdit({
+        workspace: {
+          workspacePath: options.workspacePath,
+          gateway: options.gateway,
+          ownerMessage: options.ownerMessage,
+        },
+        sectionTarget: {
+          sectionIndex,
+          sectionType: section?.type ?? 'generic',
+          title: section?.title,
+        },
+        backgroundClass,
+        projectInfraStatus: {
+          infraBaselineReady: options.infraBaselineReady === true,
+        },
+      })
+    : await applySectionBackgroundEdit(
+        sectionBackgroundEditFromAgentOptions(
+          options,
+          {
+            sectionIndex,
+            sectionType: section?.type ?? 'generic',
+            title: section?.title,
+          },
+          color
+        )
+      );
   if (!pipeline.ok) return null;
 
   return {

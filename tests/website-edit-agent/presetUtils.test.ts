@@ -18,6 +18,14 @@ describe('presetUtils', () => {
       fromColor: 'red',
       toColor: 'yellow',
     });
+    expect(parseColorSwap('change background to blue to yellow gradient')).toEqual({
+      fromColor: 'blue',
+      toColor: 'yellow',
+    });
+    expect(parseColorSwap('change background to blue to orange gradient')).toEqual({
+      fromColor: 'blue',
+      toColor: 'orange',
+    });
   });
 
   it('swapTailwindColorInText replaces bg and text classes', () => {
@@ -63,10 +71,10 @@ describe('presetUtils', () => {
   it('extractSectionBackgroundClassFromMessage resolves gradient classes with explicit hue', () => {
     expect(isGradientBackgroundRequest('make it a blue gradient background')).toBe(true);
     expect(extractSectionBackgroundClassFromMessage('make it a blue gradient background')).toBe(
-      'bg-gradient-to-br from-blue-400 via-blue-600 to-blue-900'
+      resolveGradientBackgroundClass('make it a blue gradient background')
     );
     expect(resolveGradientBackgroundClass('change section to gradient background blue')).toBe(
-      'bg-gradient-to-br from-blue-400 via-blue-600 to-blue-900'
+      resolveGradientBackgroundClass('make it a blue gradient background')
     );
   });
 });

@@ -286,9 +286,23 @@ export function extractBackgroundColorFromMessage(message: string): string | nul
   return colors.length > 0 ? colors[colors.length - 1] : null;
 }
 
-/** Parse "red to yellow" / "from red to yellow" style swaps. */
+/** Parse "red to yellow" / "from red to yellow" / "blue to yellow gradient" color pairs. */
 export function parseColorSwap(message: string): { fromColor: string; toColor: string } | null {
-  const lower = message.toLowerCase();
+  const lower = stripQuotedSpans(message).toLowerCase();
+
+  const gradientPair = lower.match(/\b([a-z]+)\s+to\s+([a-z]+)\s+gradient\b/);
+  if (gradientPair) {
+    const from = gradientPair[1]!;
+    const to = gradientPair[2]!;
+    if (
+      isKnownBackgroundColorWord(from) &&
+      isKnownBackgroundColorWord(to) &&
+      from !== to
+    ) {
+      return { fromColor: from, toColor: to };
+    }
+  }
+
   const explicit = lower.match(/\bfrom\s+(\w+)\s+to\s+(\w+)\b/);
   if (explicit) {
     const from = explicit[1];

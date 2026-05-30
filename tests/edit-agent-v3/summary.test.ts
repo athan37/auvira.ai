@@ -16,9 +16,7 @@ describe('summarize_actual_changes', () => {
     };
 
     const result = await summarizeActualChangesTool(toolCtx);
-    expect(result.summary).toBe(
-      'Changed background of "Grow" to bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600.'
-    );
+    expect(result.summary).toBe('We updated the background of "Grow" to a color gradient.');
     expect(result.summary).not.toContain('LLM');
   });
 });

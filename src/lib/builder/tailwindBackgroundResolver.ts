@@ -4,6 +4,7 @@
  */
 
 import { isEmitableTailwindBackgroundClass } from './tailwindPresentationSupport';
+import { BACKGROUND_STYLING_META_WORDS } from '@/lib/project-workspace/website-edit-agent/preset/presetUtils';
 import {
   BACKGROUND_SHADES,
   buildBackgroundPalette,
@@ -263,7 +264,7 @@ export function resolveTailwindBackgroundClass(
   }
 
   const colorName = normalized.replace(/[^a-z]/g, '');
-  if (!colorName) return 'bg-gray-600';
+  if (!colorName || BACKGROUND_STYLING_META_WORDS.has(colorName)) return '';
 
   const alias = COLOR_WORD_ALIASES[colorName];
   if (alias) {

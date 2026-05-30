@@ -4,6 +4,7 @@ import {
   resolveSectionTarget,
   findSectionObjectRanges,
   extractSectionComponentSource,
+  extractSectionTitleCandidates,
   titleMatchesIntent,
 } from '../../src/lib/project-workspace/website-edit-agent/resolveSectionTarget';
 
@@ -193,5 +194,11 @@ describe('resolveSectionTarget', () => {
     const block = extractSectionComponentSource(page, 'TestimonialsSection');
     expect(block?.content).toContain('function TestimonialsSection');
     expect(block?.content).not.toContain('function FaqSection');
+  });
+
+  it('extractSectionTitleCandidates parses mismatched inner quotes', () => {
+    const message =
+      'change this section "hleoo\' im david" background to back and white color gradient';
+    expect(extractSectionTitleCandidates(message)).toContain("hleoo' im david");
   });
 });

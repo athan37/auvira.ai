@@ -40,7 +40,7 @@ import {
   resolveExpectedPreviewPresentationClasses,
   waitForPresentationClassInPreview,
 } from '@/lib/project-workspace/previewReflectsSiteConfig';
-import { enforceSectionColorEditReadyAfterApply } from '@/lib/project-workspace/sectionPresentationEdit';
+import { enforceSectionColorEditReadyAfterApply, findSectionIndexWithBackgroundClassChange } from '@/lib/project-workspace/sectionPresentationEdit';
 import { isInfraBaselineReady } from '@/lib/project-workspace/infra/isInfraBaselineReady';
 import { resolveSiteWorkspace } from '@/lib/project-workspace/website-edit-agent/resolveSiteWorkspace';
 import {
@@ -634,6 +634,23 @@ export async function POST(
 
         if (mode === 'gitlab' && agentResult.strategy === 'section_style') {
           editTimer.start('section_color_gate');
+          let beforeSiteConfig: string | undefined;
+          if (snapshotPath) {
+            try {
+              beforeSiteConfig = await fs.readFile(
+                path.join(snapshotPath, 'src/lib/siteConfig.ts'),
+                'utf-8'
+              );
+            } catch {
+              /* snapshot may omit siteConfig on edge cases */
+            }
+          }
+          let afterSiteConfig: string | undefined;
+          try {
+            afterSiteConfig = (await activeGateway.readFile('src/lib/siteConfig.ts')) ?? undefined;
+          } catch {
+            /* best effort */
+          }
           const colorGate = await enforceSectionColorEditReadyAfterApply({
             workspace: {
               workspacePath,
@@ -648,6 +665,13 @@ export async function POST(
             },
             strategy: agentResult.strategy,
             ownerMessage: message,
+            agentSummary: agentResult.summary,
+            beforeSiteConfig,
+            sectionIndex:
+              beforeSiteConfig && afterSiteConfig
+                ? findSectionIndexWithBackgroundClassChange(beforeSiteConfig, afterSiteConfig) ??
+                  undefined
+                : undefined,
           });
           await appendTimedEditJobLog(
             jobId,

@@ -1,5 +1,4 @@
-import { extractSectionBackgroundClassFromMessage } from '@/lib/builder/sectionPresentation';
-import { colorNameToBackgroundClass } from '@/lib/builder/sectionPresentation';
+import { extractSectionBackgroundClassFromMessage, resolveSectionBackgroundClassForEdit } from '@/lib/builder/sectionPresentation';
 import {
   applySectionBackgroundEdit,
   sectionBackgroundEditFromAgentOptions,
@@ -28,11 +27,13 @@ export async function applySectionBackgroundTool(
   }
 
   const section = ctx.editContext.sections.find((s) => s.index === sectionIndex);
-  const backgroundClass =
-    (typeof params.backgroundClass === 'string' && params.backgroundClass.trim()) ||
-    (typeof params.backgroundColor === 'string' && params.backgroundColor.trim()
-      ? colorNameToBackgroundClass(params.backgroundColor, ctx.editContext.effectiveMessage)
-      : extractSectionBackgroundClassFromMessage(ctx.editContext.effectiveMessage));
+  const backgroundClass = resolveSectionBackgroundClassForEdit(ctx.editContext.effectiveMessage, {
+    backgroundClass:
+      typeof params.backgroundClass === 'string' ? params.backgroundClass : undefined,
+    backgroundColor:
+      typeof params.backgroundColor === 'string' ? params.backgroundColor : undefined,
+    color: typeof params.color === 'string' ? params.color : undefined,
+  });
 
   if (!backgroundClass) {
     return {

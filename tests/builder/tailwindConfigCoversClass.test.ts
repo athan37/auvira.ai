@@ -3,6 +3,7 @@ import {
   isEmitableTailwindBackgroundClass,
   tailwindConfigCoversBackgroundClass,
 } from '@/lib/builder/tailwindPresentationSupport';
+import { buildBlackWhiteGradientBackgroundClass } from '@/lib/builder/gradientBuilder';
 
 describe('tailwindConfigCoversBackgroundClass', () => {
   const canonical = `module.exports = {
@@ -35,5 +36,16 @@ describe('tailwindConfigCoversBackgroundClass', () => {
     expect(isEmitableTailwindBackgroundClass('bg-black-600')).toBe(false);
     expect(isEmitableTailwindBackgroundClass('bg-white-600')).toBe(false);
     expect(tailwindConfigCoversBackgroundClass(canonical, 'bg-black-600')).toBe(false);
+  });
+
+  it('rejects invalid gradient stops on flat colors', () => {
+    expect(
+      isEmitableTailwindBackgroundClass(
+        'bg-gradient-to-br from-white-400 via-white-600 to-white-900'
+      )
+    ).toBe(false);
+    expect(
+      isEmitableTailwindBackgroundClass(buildBlackWhiteGradientBackgroundClass())
+    ).toBe(true);
   });
 });

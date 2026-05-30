@@ -89,9 +89,20 @@ import {
   extractBackgroundColorFromMessage,
   extractColorsFromMessage,
   isGradientBackgroundRequest,
+  parseColorSwap,
   stripQuotedSpans,
 } from '@/lib/project-workspace/website-edit-agent/preset/presetUtils';
-import { resolveTailwindBackgroundClass } from './tailwindBackgroundResolver';
+import {
+  resolveTailwindBackgroundClass,
+  normalizeTailwindBackgroundClass,
+} from './tailwindBackgroundResolver';
+import { isEmitableTailwindBackgroundClass } from './tailwindPresentationSupport';
+import {
+  buildBlackWhiteGradientBackgroundClass,
+  buildDefaultGradientBackgroundClass,
+  buildTonalGradientBackgroundClass,
+  buildTwoColorGradientBackgroundClass,
+} from './gradientBuilder';
 
 /** Tailwind background utilities without shade suffixes (not bg-black-600). */
 export const FLAT_BACKGROUND_COLOR_NAMES = ['black', 'white'] as const;
@@ -112,18 +123,97 @@ export function colorNameToBackgroundClass(
   return resolveTailwindBackgroundClass(color, ownerMessage);
 }
 
+/** Flat black/white tokens in gradient requests (includes common "back" typo for black). */
+function flatGradientColorsFromMessage(message: string): FlatBackgroundColorName[] {
+  const lower = stripQuotedSpans(message).toLowerCase();
+  const found: FlatBackgroundColorName[] = [];
+  if (/\bblack\b/.test(lower) || /\bback\b/.test(lower)) found.push('black');
+  if (/\bwhite\b/.test(lower)) found.push('white');
+  return found;
+}
+
+/** Valid Tailwind gradient for black ↔ white (RGB stops, no invalid shade tokens). */
+export function blackWhiteGradientBackgroundClass(): string {
+  return buildBlackWhiteGradientBackgroundClass();
+}
+
+/** Two-hue gradient from owner phrasing (e.g. blue → yellow). */
+export function twoColorGradientBackgroundClass(fromColor: string, toColor: string): string {
+  return buildTwoColorGradientBackgroundClass(fromColor, toColor);
+}
+
 /**
  * Resolve a gradient background class from owner phrasing.
- * Uses an explicit hue when present; otherwise a multi-color default gradient.
+ * Uses explicit from→to hues when present; single hue uses a tonal gradient; black/white use flat stops.
  */
 export function resolveGradientBackgroundClass(ownerMessage?: string): string {
-  const colors = extractColorsFromMessage(stripQuotedSpans(ownerMessage ?? ''));
+  const message = ownerMessage ?? '';
+  const flatColors = flatGradientColorsFromMessage(message);
+  if (flatColors.length >= 2) {
+    return blackWhiteGradientBackgroundClass();
+  }
+
+  const swap = parseColorSwap(message);
+  if (swap && swap.fromColor !== swap.toColor) {
+    if (
+      isFlatBackgroundColorName(swap.fromColor) &&
+      isFlatBackgroundColorName(swap.toColor)
+    ) {
+      return blackWhiteGradientBackgroundClass();
+    }
+    return twoColorGradientBackgroundClass(swap.fromColor, swap.toColor);
+  }
+
+  if (flatColors.length === 1) {
+    return flatColors[0] === 'white'
+      ? buildTonalGradientBackgroundClass('white')
+      : buildTonalGradientBackgroundClass('black');
+  }
+
+  const colors = extractColorsFromMessage(stripQuotedSpans(message));
   const family = colors[0] ?? null;
   if (family) {
     const normalized = family === 'grey' ? 'gray' : family;
-    return `bg-gradient-to-br from-${normalized}-400 via-${normalized}-600 to-${normalized}-900`;
+    if (isFlatBackgroundColorName(normalized)) {
+      return buildTonalGradientBackgroundClass(normalized);
+    }
+    return buildTonalGradientBackgroundClass(normalized);
   }
-  return 'bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600';
+  return buildDefaultGradientBackgroundClass();
+}
+
+/**
+ * Normalize gradient background utilities; repairs invalid flat-color shades (e.g. from-white-400).
+ */
+export function normalizeGradientBackgroundClass(
+  className: string,
+  ownerMessage?: string
+): string {
+  const trimmed = className.trim();
+  if (!trimmed.includes('gradient')) {
+    return normalizeTailwindBackgroundClass(trimmed, ownerMessage);
+  }
+  if (isEmitableTailwindBackgroundClass(trimmed)) {
+    return trimmed;
+  }
+  if (/\bfrom-(?:black|white)-\d{2,3}\b/i.test(trimmed)) {
+    const fromMessage = ownerMessage ? resolveGradientBackgroundClass(ownerMessage) : '';
+    if (fromMessage && isEmitableTailwindBackgroundClass(fromMessage)) {
+      return fromMessage;
+    }
+    if (/\bwhite\b/i.test(trimmed) && /\bblack\b/i.test(trimmed)) {
+      return blackWhiteGradientBackgroundClass();
+    }
+    if (/\bwhite\b/i.test(trimmed)) {
+      return buildTonalGradientBackgroundClass('white');
+    }
+    return buildTonalGradientBackgroundClass('black');
+  }
+  const fromMessage = ownerMessage ? resolveGradientBackgroundClass(ownerMessage) : '';
+  if (fromMessage && isEmitableTailwindBackgroundClass(fromMessage)) {
+    return fromMessage;
+  }
+  return trimmed;
 }
 
 /**
@@ -137,6 +227,62 @@ export function extractSectionBackgroundClassFromMessage(message: string): strin
   if (!color) return null;
   return colorNameToBackgroundClass(color, message);
 }
+
+/** Owner-facing summary for section background edits (human-readable for gradients). */
+export function formatSectionBackgroundChangeSummary(
+  sectionTitle: string,
+  backgroundClass: string,
+  ownerMessage?: string
+): string {
+  if (
+    backgroundClass.includes('gradient') ||
+    (ownerMessage ? isGradientBackgroundRequest(ownerMessage) : false)
+  ) {
+    return `We updated the background of "${sectionTitle}" to a color gradient.`;
+  }
+  return `Changed background of "${sectionTitle}" to ${backgroundClass}.`;
+}
+
+const BACKGROUND_COLOR_META = new Set([
+  'color',
+  'colour',
+  'gradient',
+  'gradients',
+  'background',
+  'bg',
+]);
+
+/**
+ * Resolve the background class for a section edit — owner message wins over planner/LLM args.
+ */
+export function resolveSectionBackgroundClassForEdit(
+  ownerMessage: string,
+  overrides?: {
+    backgroundClass?: string | null;
+    backgroundColor?: string | null;
+    color?: string | null;
+  }
+): string | null {
+  const fromMessage = extractSectionBackgroundClassFromMessage(ownerMessage);
+  if (fromMessage) return fromMessage;
+
+  const explicitClass = overrides?.backgroundClass?.trim();
+  if (explicitClass) {
+    const normalized = explicitClass.includes('gradient')
+      ? normalizeGradientBackgroundClass(explicitClass, ownerMessage)
+      : normalizeTailwindBackgroundClass(explicitClass, ownerMessage);
+    return normalized || null;
+  }
+
+  const colorWord = (overrides?.backgroundColor ?? overrides?.color)?.trim().toLowerCase();
+  if (colorWord && !BACKGROUND_COLOR_META.has(colorWord)) {
+    return colorNameToBackgroundClass(colorWord, ownerMessage);
+  }
+
+  return null;
+}
+
+export { isGradientBackgroundRequest } from '@/lib/project-workspace/website-edit-agent/preset/presetUtils';
 
 /** Map a color name to Tailwind classes for cards in a section. */
 export function colorNameToCardClass(color: string): string {

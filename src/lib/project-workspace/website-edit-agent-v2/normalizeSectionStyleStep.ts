@@ -1,9 +1,10 @@
 import {
   colorNameToBackgroundClass,
   colorNameToCardClass,
+  resolveGradientBackgroundClass,
   type SiteSectionPresentation,
 } from '@/lib/builder/sectionPresentation';
-import { extractColorsFromMessage } from '../website-edit-agent/preset/presetUtils';
+import { extractColorsFromMessage, isGradientBackgroundRequest } from '../website-edit-agent/preset/presetUtils';
 import type { SiteModel, SiteModelSection } from './siteModel';
 import type { EditPlan, EditPlanStep } from './editPlanSchema';
 
@@ -110,7 +111,15 @@ export function normalizeSectionStyleStep(
 
   let presentation = asRecord(record.presentation) as Partial<SiteSectionPresentation>;
 
-  if (wantsCardStyle(ownerMessage) && color && !presentation.cardClass) {
+  if (isGradientBackgroundRequest(ownerMessage) && wantsBackgroundStyle(ownerMessage)) {
+    presentation = {
+      ...presentation,
+      backgroundClass:
+        presentation.backgroundClass ?? resolveGradientBackgroundClass(ownerMessage),
+    };
+    delete args.backgroundColor;
+    delete args.color;
+  } else if (wantsCardStyle(ownerMessage) && color && !presentation.cardClass) {
     presentation = { ...presentation, cardClass: colorNameToCardClass(color) };
   }
 
@@ -118,7 +127,8 @@ export function normalizeSectionStyleStep(
     (wantsBackgroundStyle(ownerMessage) || /\b(background|section)\b/i.test(ownerMessage)) &&
     color &&
     !presentation.backgroundClass &&
-    !readString(record, 'backgroundColor')
+    !readString(record, 'backgroundColor') &&
+    !isGradientBackgroundRequest(ownerMessage)
   ) {
     args.backgroundColor = color;
   }

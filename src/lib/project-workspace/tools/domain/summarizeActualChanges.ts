@@ -1,4 +1,5 @@
 import { parseSiteConfigSource } from '@/lib/site-manager/siteConfigParser';
+import { formatSectionBackgroundChangeSummary } from '@/lib/builder/sectionPresentation';
 import { summarizeActualChanges } from '@/lib/project-workspace/website-edit-agent/verifyEditApplied';
 import type { DomainToolContext, DomainToolResult } from './types';
 
@@ -32,7 +33,11 @@ export async function summarizeActualChangesTool(
         return {
           ok: true,
           changedFiles: [],
-          summary: `Changed background of "${title}" to ${afterBg}.`,
+          summary: formatSectionBackgroundChangeSummary(
+            title,
+            afterBg,
+            ctx.editContext.effectiveMessage ?? ctx.editContext.ownerMessage
+          ),
         };
       }
     }

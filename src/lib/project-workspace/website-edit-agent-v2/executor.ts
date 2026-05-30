@@ -24,6 +24,7 @@ import {
 } from './siteConfigMutations';
 import {
   colorNameToCardClass,
+  resolveSectionBackgroundClassForEdit,
   type SiteSectionPresentation,
 } from '@/lib/builder/sectionPresentation';
 import { buildSiteModel } from './siteModel';
@@ -199,9 +200,44 @@ export async function executeSkill(
         ? (presentationArg as Partial<SiteSectionPresentation>)
         : {};
 
+    const resolvedBackgroundClass = resolveSectionBackgroundClassForEdit(options.ownerMessage, {
+      backgroundClass: presentation.backgroundClass,
+      backgroundColor,
+      color: backgroundColor,
+    });
+
     const cardColor = getStringArg(normalizedStep, 'cardColor');
     if (cardColor && !presentation.cardClass) {
       presentation.cardClass = colorNameToCardClass(cardColor);
+    }
+
+    if (resolvedBackgroundClass) {
+      const section = siteModel.sections.find((s) => s.index === sectionIndex);
+      const pipeline = await applySectionBackgroundEdit({
+        workspace: {
+          workspacePath: options.workspacePath,
+          gateway: options.gateway,
+          ownerMessage: options.ownerMessage,
+        },
+        sectionTarget: {
+          sectionIndex,
+          sectionType: section?.type ?? 'generic',
+          title: section?.title,
+        },
+        backgroundClass: resolvedBackgroundClass,
+        projectInfraStatus: {
+          infraBaselineReady: options.infraBaselineReady === true,
+        },
+      });
+      return {
+        ok: pipeline.ok,
+        skill: step.skill,
+        changed: pipeline.changedFiles.length > 0,
+        summary: pipeline.ok ? pipeline.summary : undefined,
+        error: pipeline.ok
+          ? undefined
+          : pipeline.invariantErrors.join('; ') || 'No section presentation change was applied.',
+      };
     }
 
     if (backgroundColor) {
