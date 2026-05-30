@@ -13,23 +13,28 @@ import {
   createPresentationTestWorkspace,
   readWorkspaceSiteConfig,
 } from '../../website-agent-v2/presentationWorkspace';
+import { defaultMultiSectionSiteSpec } from '../../support/syntheticSiteWorkspace';
 
+const SYNTHETIC_SECTIONS = defaultMultiSectionSiteSpec().sections;
 const GALLERY_INDEX = 2;
 const TESTIMONIALS_INDEX = 3;
 const RED_BG_CLASS = colorNameToBackgroundClass('red');
+const TESTIMONIALS_TITLE = SYNTHETIC_SECTIONS[TESTIMONIALS_INDEX].title!;
 
 const SECTION_LIST_CLARIFICATION =
   'Which section should I change? Reply with the number:\n\n' +
-  '1. [0] services — "Services"\n' +
-  '2. [1] about — "About Us"\n' +
-  '3. [2] gallery — "Hello"\n' +
-  '4. [3] testimonials — "What Our Customers Say"';
+  SYNTHETIC_SECTIONS.slice(0, 4)
+    .map(
+      (section, index) =>
+        `${index + 1}. [${index}] ${section.type} — "${section.title ?? `Section ${index + 1}`}"`
+    )
+    .join('\n');
 
 const STYLE_SCOPE_CLARIFICATION =
   'This sounds like a color or style change, not new section content — can you confirm what you want to restyle (e.g. card backgrounds, text color, or the whole section background)?';
 
 const TESTIMONIAL_CARD_CLARIFICATION =
-  'I can change something in "What Our Customers Say" to red, but I need one detail:\n\n' +
+  `I can change something in "${TESTIMONIALS_TITLE}" to red, but I need one detail:\n\n` +
   '1. Background of **all** testimonial cards\n' +
   '2. Background of **one** card (paste the customer name or quote)\n' +
   '3. **Text** color in that section\n\n' +
@@ -135,7 +140,7 @@ describeRunLlmIntegration('chat history edit (hard LLM integration)', () => {
     const turns = history(
       {
         role: 'user',
-        content: 'change the card below to red in the section what our customers say to red',
+        content: `change the card below to red in the section ${TESTIMONIALS_TITLE} to red`,
       },
       { role: 'assistant', content: TESTIMONIAL_CARD_CLARIFICATION }
     );

@@ -82,7 +82,7 @@ export function genericColorWouldPassButExactClassMissing(
   return genericColorHintMatchesHtml(html, ownerMessage);
 }
 
-/** Sections with presentation.backgroundClass whose renderer ignores siteConfig. */
+/** Sections whose renderer ignores siteConfig.presentation (preset.* fallback still wired). */
 export function presentationWiringIssues(
   siteConfigContent: string,
   pageContent: string
@@ -94,10 +94,11 @@ export function presentationWiringIssues(
   for (const section of parsed.sections) {
     const bg = (section as { presentation?: { backgroundClass?: string } }).presentation
       ?.backgroundClass;
-    if (!bg?.trim()) continue;
     const type = String((section as { type?: string }).type ?? '');
     const component = rendererComponentForSectionType(type);
-    if (!sectionRendererUsesPresentationResolver(pageContent, component)) {
+    const usesResolver = sectionRendererUsesPresentationResolver(pageContent, component);
+    if (usesResolver) continue;
+    if (bg?.trim() || type === 'contact' || type === 'gallery' || type === 'about') {
       issues.push(`${component} does not use resolveSectionBackground`);
     }
   }

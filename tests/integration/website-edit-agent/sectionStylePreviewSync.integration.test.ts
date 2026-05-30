@@ -16,8 +16,9 @@ import {
   readWorkspacePage,
   readWorkspaceSiteConfig,
 } from '../../website-agent-v2/presentationWorkspace';
+import { defaultMultiSectionSiteSpec } from '../../support/syntheticSiteWorkspace';
 
-const PROMPT = 'Change the testimonials section background to red';
+const PROMPT = `Change the ${defaultMultiSectionSiteSpec().sections[3].title} section background to red`;
 const EXPECTED_CLASS = colorNameToBackgroundClass('red');
 
 describeRunLlmIntegration(
@@ -61,8 +62,8 @@ describeRunLlmIntegration(
       expect(siteConfig).toContain(SITECONFIG_PRESENTATION_SYNC_EXPORT);
 
       const htmlNoise = [
-        '<button class="bg-red-600">x</button>',
-        '<p class="text-red-500">red</p>',
+        '<button class="bg-blue-600">x</button>',
+        '<p class="text-blue-500">blue</p>',
         'x'.repeat(2_000),
       ].join('');
 

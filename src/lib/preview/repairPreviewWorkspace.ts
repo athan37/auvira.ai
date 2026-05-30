@@ -2,6 +2,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { repairPageTsxStructure } from '@/lib/project-workspace/repairPageTsxStructure';
 import { repairSiteConfigTypesInWorkspace } from '@/lib/preview/repairSiteConfigTypes';
+import { repairSectionPresentationWiringInWorkspace } from '@/lib/project-workspace/website-edit-agent/legacySectionPresentation';
 
 /**
  * Fix common template / agent-edit mismatches so `next dev` can render the preview.
@@ -11,6 +12,7 @@ export async function repairPreviewWorkspace(workspacePath: string): Promise<voi
   await repairPageToSiteConfigSchema(workspacePath);
   await ensureSiteConfigNavigation(workspacePath);
   await ensureHeroCtasInSiteConfig(workspacePath);
+  await repairSectionPresentationWiringInWorkspace(workspacePath);
 
   const pagePath = path.join(workspacePath, 'src/app/page.tsx');
   try {

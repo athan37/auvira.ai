@@ -49,8 +49,8 @@ const TESTIMONIALS_PLAN: NonNullable<WebsiteEditAgentOptions['editTargetPlan']> 
 
 function htmlNoiseWithoutExactClass(): string {
   return [
-    '<button class="bg-red-600">x</button>',
-    '<p class="text-red-500">red</p>',
+    '<button class="bg-blue-600">x</button>',
+    '<p class="text-blue-500">blue</p>',
     'x'.repeat(2_000),
   ].join('');
 }
@@ -84,7 +84,7 @@ describe('section style preview sync e2e (no LLM)', () => {
     expect(hints.colors).toContain('red');
   });
 
-  it('section_style writes bg-red-200, sync export, and only siteConfig', async () => {
+  it('section_style writes bg-red-600, sync export, and only siteConfig', async () => {
     const hashes: Record<string, string> = {
       'src/lib/siteConfig.ts': 'cfg-0',
       'src/app/page.tsx': 'page-0',

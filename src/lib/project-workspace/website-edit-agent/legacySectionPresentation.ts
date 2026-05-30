@@ -1,8 +1,10 @@
 import { SECTION_PRESENTATION_RUNTIME } from '@/lib/builder/sectionPresentationRuntime';
 import { extractSectionComponentSource } from './resolveSectionTarget';
-import { normalizeCustomerSiteTailwindConfig } from '@/lib/builder/tailwindPresentationSupport';
+import { normalizeCustomerSiteTailwindConfig, repairTailwindConfigInWorkspace } from '@/lib/builder/tailwindPresentationSupport';
+import { sanitizeSourceForPublish } from '@/lib/site-manager/siteConfigAgentMarkers';
 import {
   PAGE_TSX,
+  SITE_CONFIG,
   TAILWIND_CONFIG,
   readWorkspaceRel,
   writeWorkspaceRel,
@@ -117,6 +119,96 @@ export async function ensureLegacyPageReadsPresentation(
   const upgraded = upgradeSectionComponentToPresentationResolver(pageContent, componentName);
   if (!upgraded.patched) return changed;
 
-  await writeWorkspaceRel(options, PAGE_TSX, upgraded.content);
+  await writeWorkspaceRel(
+    options,
+    PAGE_TSX,
+    sanitizeSourceForPublish(PAGE_TSX, upgraded.content)
+  );
   return true;
+}
+
+/**
+ * Wire all section renderers in page.tsx that still use preset backgrounds,
+ * and repair tailwind.config.js safelist. Used on preview bootstrap and after style edits.
+ */
+export async function repairSectionPresentationWiringInWorkspace(
+  workspacePath: string,
+  readWrite?: {
+    read: (rel: string) => Promise<string | null>;
+    write: (rel: string, content: string) => Promise<void>;
+  }
+): Promise<string[]> {
+  const { promises: fs } = await import('fs');
+  const path = await import('path');
+  const { parseSiteConfigSource } = await import('@/lib/site-manager/siteConfigParser');
+  const repaired: string[] = [];
+
+  const readRel = async (rel: string): Promise<string | null> => {
+    if (readWrite) return readWrite.read(rel);
+    try {
+      return await fs.readFile(path.join(workspacePath, rel), 'utf-8');
+    } catch {
+      return null;
+    }
+  };
+  const writeRel = async (rel: string, content: string): Promise<void> => {
+    if (readWrite) {
+      await readWrite.write(rel, content);
+      return;
+    }
+    const dest = path.join(workspacePath, rel);
+    await fs.mkdir(path.dirname(dest), { recursive: true });
+    await fs.writeFile(dest, content, 'utf-8');
+  };
+
+  const tailwindChanged = readWrite
+    ? await (async () => {
+        const tailwind = await readRel(TAILWIND_CONFIG);
+        if (!tailwind) return false;
+        const { content: patched, changed } = normalizeCustomerSiteTailwindConfig(tailwind);
+        if (!changed) return false;
+        await writeRel(TAILWIND_CONFIG, patched);
+        return true;
+      })()
+    : await repairTailwindConfigInWorkspace(workspacePath);
+  if (tailwindChanged) repaired.push('tailwind.config.js');
+
+  let pageContent = await readRel(PAGE_TSX);
+  const siteConfig = await readRel(SITE_CONFIG);
+  if (!pageContent || !siteConfig) {
+    return repaired;
+  }
+
+  const parsed = parseSiteConfigSource(siteConfig);
+  const sectionTypes = new Set(
+    (parsed?.sections ?? []).map((s) => String((s as { type?: string }).type ?? ''))
+  );
+  if (sectionTypes.size === 0) {
+    sectionTypes.add('gallery');
+    sectionTypes.add('services');
+    sectionTypes.add('testimonials');
+    sectionTypes.add('about');
+    sectionTypes.add('contact');
+  }
+
+  let pageChanged = false;
+  for (const type of sectionTypes) {
+    if (!type) continue;
+    const component = rendererComponentForSectionType(type);
+    const upgraded = upgradeSectionComponentToPresentationResolver(pageContent, component);
+    if (upgraded.patched) {
+      pageContent = upgraded.content;
+      pageChanged = true;
+    }
+  }
+
+  if (pageChanged) {
+    await writeRel(
+      PAGE_TSX,
+      sanitizeSourceForPublish(PAGE_TSX, pageContent)
+    );
+    repaired.push('src/app/page.tsx');
+  }
+
+  return repaired;
 }

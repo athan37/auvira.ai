@@ -25,7 +25,7 @@ import {
 } from '@/lib/project-workspace/previewReflectsSiteConfig';
 
 const PROMPT = 'change testimonials section background to red';
-const EXPECTED_CLASS = 'bg-red-200';
+const EXPECTED_CLASS = 'bg-red-600';
 
 const SITE_CONFIG = `export const siteConfig = {
   sections: [
@@ -44,7 +44,7 @@ const PAGE_WIRED = `function TestimonialsSection({ section }) {
 function htmlWithUnrelatedRedOnly(): string {
   return [
     '<!doctype html><html><body>',
-    '<button class="bg-red-600">Buy</button>',
+    '<button class="bg-red-200">Buy</button>',
     '<p class="text-red-500">This product is red hot</p>',
     '<span>red</span>',
     'x'.repeat(2_000),

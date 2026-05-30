@@ -20,7 +20,7 @@ export const LEGACY_TAILWIND_CONTENT_GLOBS = [
 export const CUSTOMER_SITE_TAILWIND_SAFELIST = `  safelist: [
     {
       pattern:
-        /^bg-(red|yellow|blue|green|orange|purple|pink|teal|cyan|indigo|gray|grey|brown|black|white)-(50|100|200|300|400|500)$/,
+        /^bg-(red|yellow|blue|green|orange|purple|pink|teal|cyan|indigo|gray|grey|brown|black|white)-(50|100|200|300|400|500|600|700|800|900)$/,
     },
     {
       pattern:
@@ -37,6 +37,35 @@ export const CUSTOMER_SITE_TAILWIND_SAFELIST = `  safelist: [
       pattern: /^to-(red|yellow|blue|green|orange|purple|pink|teal|cyan|indigo|gray|grey)-(50|100|200|300|400|500)$/,
     },
   ],`;
+
+/** True when tailwind.config.js can emit a runtime presentation background class. */
+export function tailwindConfigCoversBackgroundClass(
+  tailwindContent: string,
+  className: string
+): boolean {
+  const normalized = className.trim();
+  if (!normalized || !tailwindContent.includes('module.exports')) {
+    return false;
+  }
+
+  // Full src scan picks up class strings in siteConfig.ts at build/dev time.
+  if (tailwindContent.includes('./src/**/*')) {
+    return true;
+  }
+
+  if (!/\bsafelist\s*:/.test(tailwindContent)) {
+    return false;
+  }
+
+  const standardBg = normalized.match(/^bg-([a-z]+)-(\d{2,3})$/i);
+  if (standardBg) {
+    const safelistBgPattern =
+      /^bg-(red|yellow|blue|green|orange|purple|pink|teal|cyan|indigo|gray|grey|brown|black|white)-(50|100|200|300|400|500|600|700|800|900)$/;
+    return safelistBgPattern.test(normalized);
+  }
+
+  return tailwindContent.includes(normalized);
+}
 
 function buildCanonicalContentBlock(existingContent?: string): string {
   const globs = new Set<string>([...LEGACY_TAILWIND_CONTENT_GLOBS, CUSTOMER_SITE_TAILWIND_CONTENT_GLOB]);
@@ -98,7 +127,17 @@ export function normalizeCustomerSiteTailwindConfig(content: string): {
   }
 
   if (!/\bsafelist\s*:/.test(next)) {
-    next = next.replace(/\n(\s*theme:\s*\{)/, `\n${CUSTOMER_SITE_TAILWIND_SAFELIST}\n$1`);
+    if (/\btheme\s*:\s*\{/.test(next)) {
+      next = next.replace(/\n(\s*theme:\s*\{)/, `\n${CUSTOMER_SITE_TAILWIND_SAFELIST}\n$1`);
+    } else {
+      const closingBrace = next.lastIndexOf('}');
+      if (closingBrace >= 0) {
+        const before = next.slice(0, closingBrace).trimEnd();
+        const after = next.slice(closingBrace);
+        const needsComma = before.length > 0 && !before.endsWith(',') && !before.endsWith('{');
+        next = `${before}${needsComma ? ',' : ''}\n${CUSTOMER_SITE_TAILWIND_SAFELIST}\n${after}`;
+      }
+    }
     changed = true;
   }
 

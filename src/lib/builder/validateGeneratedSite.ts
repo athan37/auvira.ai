@@ -53,6 +53,8 @@ const REQUIRED_FILES = [
 ];
 
 const PAGE_TSX_BAD_PATTERNS = [
+  '__siteAgentPageGallerySync',
+  'export const __site',
   '${escapedSiteSpec}',
   'escapedSiteSpec',
   'Cannot find name',

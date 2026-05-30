@@ -3,6 +3,7 @@ import type { GeneratedFile } from './types';
 import { pickBackgroundColor, extractCssColor } from './cssColor';
 import { SITE_CONFIG_TYPE_BLOCK } from './siteConfigTypes';
 import { instrumentGeneratedFiles } from '@/lib/analytics/generated-sites/instrumentGeneratedSite';
+import { tailwindContentPathsForGeneratedSite } from './tailwindPresentationSupport';
 
 // Hardcoded premium theme presets by industry
 // These are SAFE, PREDEFINED themes - no LLM arbitrary classes
@@ -345,11 +346,7 @@ export function generateTailwindConfig(designBrief?: DesignBrief): string {
 
   return `/** @type {import('tailwindcss').Config} */
 module.exports = {
-  content: [
-    './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
-    './src/components/**/*.{js,ts,jsx,tsx,mdx}',
-    './src/app/**/*.{js,ts,jsx,tsx,mdx}',
-  ],
+${tailwindContentPathsForGeneratedSite()}
   theme: {
     extend: {
       colors: {

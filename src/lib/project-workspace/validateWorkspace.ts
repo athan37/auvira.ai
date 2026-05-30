@@ -5,6 +5,7 @@ import path from 'path';
 import { repairTailwindConfigInWorkspace } from '@/lib/builder/tailwindPresentationSupport';
 import { repairSiteConfigTypesInWorkspace } from '@/lib/preview/repairSiteConfigTypes';
 import { sanitizeAgentMarkerFilesInWorkspace } from '@/lib/site-manager/siteConfigAgentMarkers';
+import { isPreviewSafeEdit } from './previewSafeValidation';
 import { validateChangedSourceSyntax } from './validateTsxSyntax';
 import { repairPageTsxStructure } from './repairPageTsxStructure';
 
@@ -100,17 +101,7 @@ export async function validateWorkspace(
     changed.has('yarn.lock') ||
     changed.has('pnpm-lock.yaml');
 
-  /** Preview uses `next dev` — skip slow/flaky production build for presentation/style edits. */
-  const isPreviewSafePath = (f: string): boolean => {
-    if (f === 'tailwind.config.js' || f === 'tailwind.config.ts') return true;
-    return (
-      f.startsWith('src/') && /\.(css|scss|sass|less|tsx|jsx|ts|js|json)$/i.test(f)
-    );
-  };
-  const previewSafeEdit =
-    changedList.length > 0 &&
-    !lockChanged &&
-    changedList.every(isPreviewSafePath);
+  const previewSafeEdit = !lockChanged && isPreviewSafeEdit(changedList);
 
   if (previewSafeEdit) {
     logs.push(

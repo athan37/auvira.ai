@@ -21,6 +21,30 @@ describe('validateWorkspace', () => {
     await fs.rm(dir, { recursive: true, force: true });
   });
 
+  it('strips legacy page sync exports and skips build for tailwind-only edits', async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ws-'));
+    await fs.writeFile(
+      path.join(dir, 'package.json'),
+      JSON.stringify({ name: 'test', scripts: { build: 'next build' } })
+    );
+    await fs.writeFile(
+      path.join(dir, 'tailwind.config.js'),
+      'module.exports = { content: ["./src/**/*"] };\n'
+    );
+    await fs.mkdir(path.join(dir, 'src/app'), { recursive: true });
+    await fs.writeFile(
+      path.join(dir, 'src/app/page.tsx'),
+      `export default function Home() { return null; }\nexport const __siteAgentPageGallerySync = 1;\n`
+    );
+
+    const result = await validateWorkspace(dir, { changedFiles: ['tailwind.config.js'] });
+    expect(result.ok).toBe(true);
+    const page = await fs.readFile(path.join(dir, 'src/app/page.tsx'), 'utf-8');
+    expect(page).not.toContain('__siteAgentPageGallerySync');
+    expect(result.buildLog).toContain('skipping npm run build');
+    await fs.rm(dir, { recursive: true, force: true });
+  });
+
   it('detects package.json and skips build when no build script', async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'ws-'));
     await fs.writeFile(

@@ -15,7 +15,7 @@ describe('section style config-first path', () => {
   it('updates siteConfig presentation without requiring page.tsx changes', () => {
     const updated = updateSectionBackgroundColorInSource(SITE_CONFIG, 0, 'yellow');
     expect(updated).toBeTruthy();
-    expect(updated).toContain('bg-yellow-200');
+    expect(updated).toContain('bg-yellow-600');
     expect(updated).not.toContain('YELLOW_BG');
     expect(PAGE).not.toContain('bg-yellow');
   });

@@ -1,4 +1,5 @@
 import ts from 'typescript';
+import { hasInvalidNextJsPageExports } from '@/lib/site-manager/siteConfigAgentMarkers';
 
 /**
  * Fast TS/TSX syntax check (catches broken JSX before preview dev server fails).
@@ -42,6 +43,16 @@ export async function validateChangedSourceSyntax(
     if (!/\.(tsx|jsx|ts|js)$/i.test(rel)) continue;
     const content = await readFile(rel);
     if (!content) continue;
+    const normalized = rel.replace(/\\/g, '/');
+    if (
+      (normalized === 'src/app/page.tsx' || normalized.endsWith('/src/app/page.tsx')) &&
+      hasInvalidNextJsPageExports(content)
+    ) {
+      errors.push(
+        `${rel}: contains invalid Next.js page export (legacy agent sync stamp); rebuild preview or re-run edit`
+      );
+      continue;
+    }
     const ext = rel.split('.').pop()?.toLowerCase() ?? 'tsx';
     const fileName = `file.${ext}`;
     for (const msg of checkTsxSyntax(content, fileName)) {

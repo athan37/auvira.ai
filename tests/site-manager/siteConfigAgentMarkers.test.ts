@@ -2,9 +2,11 @@ import { describe, it, expect } from 'vitest';
 import {
   appendSiteConfigGallerySyncExport,
   appendSiteConfigPresentationSyncExport,
+  hasInvalidNextJsPageExports,
   SITECONFIG_PRESENTATION_SYNC_EXPORT,
   sanitizeSourceForPublish,
   stripAgentSyncMarkers,
+  stripInvalidNextJsPageExports,
 } from '../../src/lib/site-manager/siteConfigAgentMarkers';
 import {
   parseSiteConfigSource,
@@ -74,6 +76,12 @@ describe('siteConfigAgentMarkers', () => {
     expect(cleanPage).not.toContain('page gallery sync');
     expect(cleanCfg).not.toContain(SITECONFIG_PRESENTATION_SYNC_EXPORT);
     expect(parseSiteConfigSource(cleanCfg)?.sections).toHaveLength(2);
+  });
+
+  it('hasInvalidNextJsPageExports detects legacy page stamps', () => {
+    const dirty = 'export default function Home() {}\nexport const __siteAgentPageGallerySync = 1;\n';
+    expect(hasInvalidNextJsPageExports(dirty)).toBe(true);
+    expect(hasInvalidNextJsPageExports(stripInvalidNextJsPageExports(dirty))).toBe(false);
   });
 
   it('sanitizeSourceForPublish removes legacy __siteAgentPageGallerySync export from page.tsx', () => {

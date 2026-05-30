@@ -258,9 +258,10 @@ export function updateSectionPresentationInSource(
 export function updateSectionBackgroundColorInSource(
   content: string,
   sectionIndex: number,
-  colorName: string
+  colorName: string,
+  ownerMessage?: string
 ): string | null {
-  const backgroundClass = colorNameToBackgroundClass(colorName);
+  const backgroundClass = colorNameToBackgroundClass(colorName, ownerMessage);
   return updateSectionPresentationInSource(content, sectionIndex, { backgroundClass });
 }
 
