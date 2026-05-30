@@ -72,13 +72,16 @@ Verifies GitLab commit visibility, SHA-pinned Vercel deploy, and production HTML
 
 ### Testing
 
+See **[`AGENTS.md`](AGENTS.md)** for agent workflow: local keys live in **`.env` / `.env.local`** (from `.env.example`); **run LLM integration tests locally** (`npm run test:llm` or `npm run test:all`) before merging edit-agent changes for best coverage.
+
 | Command | What runs | Typical time |
 | -------- | ---------- | ------------- |
 | `npm test` | Unit + integration tests (**excludes** `*.llm.test.ts` and live LLM integration files) | ~5–15s |
 | `npm run test:llm` | Live MiniMax planner/E2E tests (requires `MINIMAX_API_KEY` in `.env`) | ~100s |
 | `npm run test:llm:presentation` | Section presentation token LLM suite only | ~80s |
 | `npm run test:all` | `npm test` then `npm run test:llm` | ~2 min |
-| `npm run test:integration` | SiteModel fixture integration (no LLM) | &lt;5s |
+| `npm run test:contracts` | Section color contracts + classifier/strategy (deterministic) | ~1–2s |
+| `npm run test:llm:contracts` | LLM smoke: 3 synthetic section-color cases (needs `MINIMAX_API_KEY` in `.env`) | ~5–30s |
 
 LLM suites use a **120s** per-test timeout (`tests/llmTestGate.ts`). Default unit tests use **5s** so hung tests fail fast.
 
