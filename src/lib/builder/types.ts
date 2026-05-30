@@ -7,6 +7,9 @@ export interface GeneratedFile {
 
 export interface GenerateWebsiteFilesResult {
   files: GeneratedFile[];
+  analytics?: {
+    publicSiteKey: string;
+  };
   summary: {
     fileCount: number;
     sections: string[];

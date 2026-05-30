@@ -14,6 +14,8 @@ export interface ParsedSiteConfig {
   };
   businessName?: string;
   sections: Array<{
+    id?: string;
+    analyticsId?: string;
     type?: string;
     title?: string;
     body?: string;

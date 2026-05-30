@@ -18,6 +18,7 @@ import { cleanGeneratedCopy } from './cleanGeneratedCopy';
 import { normalizeSiteSpec } from './normalizeSiteSpec';
 import { pickBackgroundColor } from './cssColor';
 import type { TemplateSelection } from '../agent/selectTemplateAgent';
+import { instrumentGeneratedFiles } from '@/lib/analytics/generated-sites/instrumentGeneratedSite';
 
 export function generateWebsiteFiles(
   siteSpec: SiteSpec,
@@ -85,10 +86,15 @@ export function generateWebsiteFiles(
     },
   ];
 
+  const instrumented = instrumentGeneratedFiles(files);
+
   return {
-    files,
+    files: instrumented.files,
+    analytics: {
+      publicSiteKey: instrumented.publicSiteKey,
+    },
     summary: {
-      fileCount: files.length,
+      fileCount: instrumented.files.length,
       sections: cleanedSiteSpec.sections.map(s => s.title),
     },
   };
