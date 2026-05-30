@@ -126,32 +126,41 @@ export function ensureSiteConfigTypesSupportGallery(content: string): string {
   return ensureSiteConfigTypesSupportPresentation(out);
 }
 
+/** True when siteConfig references presentation styling but omits the type definition. */
+export function siteConfigHasPresentationTypeDefinition(content: string): boolean {
+  return /export type SiteSectionPresentation\s*=\s*\{[\s\S]*?\n\};/.test(content);
+}
+
 /** True when siteConfig data uses presentation but types omit SiteSectionPresentation. */
 export function siteConfigNeedsPresentationTypeUpgrade(content: string): boolean {
-  if (!/presentation\s*:/.test(content)) {
-    const block = content.match(SITE_SECTION_BLOCK_PATTERN)?.[0];
-    return Boolean(block && !block.includes('presentation?:'));
-  }
-  return !content.includes('SiteSectionPresentation');
+  if (siteConfigHasPresentationTypeDefinition(content)) return false;
+
+  const block = content.match(SITE_SECTION_BLOCK_PATTERN)?.[0] ?? '';
+  if (block.includes('presentation?:')) return true;
+  if (/"presentation"\s*:/.test(content)) return true;
+  return false;
 }
 
 /**
  * Ensure SiteSection includes optional presentation tokens in generated types.
  */
 export function ensureSiteConfigTypesSupportPresentation(content: string): string {
-  let out = content;
+  if (!siteConfigNeedsPresentationTypeUpgrade(content)) {
+    return content;
+  }
 
-  if (!out.includes('SiteSectionPresentation') && SITE_SECTION_BLOCK_PATTERN.test(out)) {
-    const block = out.match(SITE_SECTION_BLOCK_PATTERN)?.[0] ?? '';
-    if (!block.includes('presentation?:')) {
-      const sectionStart = out.indexOf('export type SiteSection');
-      if (sectionStart >= 0) {
-        out =
-          out.slice(0, sectionStart) +
-          `${SITE_SECTION_PRESENTATION_TYPE}\n\n` +
-          out.slice(sectionStart).replace(SITE_SECTION_BLOCK_PATTERN, SITE_SECTION_TYPE_BLOCK);
-      }
-    }
+  let out = content;
+  const sectionStart = out.indexOf('export type SiteSection');
+  if (sectionStart >= 0 && !siteConfigHasPresentationTypeDefinition(out)) {
+    out =
+      out.slice(0, sectionStart) +
+      `${SITE_SECTION_PRESENTATION_TYPE}\n\n` +
+      out.slice(sectionStart);
+  }
+
+  const block = out.match(SITE_SECTION_BLOCK_PATTERN)?.[0] ?? '';
+  if (!block.includes('presentation?:') && SITE_SECTION_BLOCK_PATTERN.test(out)) {
+    out = out.replace(SITE_SECTION_BLOCK_PATTERN, SITE_SECTION_TYPE_BLOCK);
   }
 
   return out;

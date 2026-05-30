@@ -3,6 +3,7 @@ import path from 'path';
 import {
   ensureSiteConfigTypesSupportGallery,
   siteConfigNeedsGalleryTypeUpgrade,
+  siteConfigNeedsPresentationTypeUpgrade,
 } from '@/lib/builder/siteConfigTypes';
 
 const SITE_CONFIG_DATA_NAV = /"navigation"\s*:\s*\[/;
@@ -25,7 +26,11 @@ export function repairSiteConfigTypesContent(content: string): {
   content: string;
   repaired: boolean;
 } {
-  if (!siteConfigNeedsGalleryTypeUpgrade(content) && !siteConfigNeedsNavigationTypeUpgrade(content)) {
+  if (
+    !siteConfigNeedsGalleryTypeUpgrade(content) &&
+    !siteConfigNeedsNavigationTypeUpgrade(content) &&
+    !siteConfigNeedsPresentationTypeUpgrade(content)
+  ) {
     return { content, repaired: false };
   }
   const next = ensureSiteConfigTypesSupportGallery(content);

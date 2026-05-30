@@ -8,6 +8,7 @@ import mongoose from 'mongoose';
 import { WebsiteProject } from '../src/models/WebsiteProject';
 import { ensureGitWorkspace } from '../src/lib/project-workspace/gitWorkspaceManager';
 import { generateWebsiteAnalyticsSource } from '../src/lib/analytics/generated-sites/analyticsSourceTemplates';
+import { repairSiteConfigTypesInWorkspace } from '../src/lib/preview/repairSiteConfigTypes';
 
 const projectId = process.argv[2] || '6a135ba264e7672599597ea1';
 const ANALYTICS_PATH = 'src/components/analytics/WebsiteAnalytics.tsx';
@@ -28,6 +29,10 @@ async function main() {
 
   await fs.writeFile(target, generateWebsiteAnalyticsSource(), 'utf-8');
   console.log('Patched', target);
+
+  const repaired = await repairSiteConfigTypesInWorkspace(workspace.workspacePath);
+  console.log('repairSiteConfigTypesInWorkspace:', repaired);
+
   console.log('Running npm run build in customer repo...');
 
   execSync('npm run build', {
