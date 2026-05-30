@@ -1,6 +1,7 @@
 /**
  * Owner website edit orchestrator.
- * Default: Website Edit Agent V3 (gitlab workspaces). Legacy V1 via env flag; static HTML uses V1.
+ * Default: Website Edit Agent V3 (gitlab workspaces). Static HTML keeps legacy V1.
+ * WEBSITE_AGENT_V1=true forces V1 for gitlab only when you explicitly need the old tool-loop agent.
  */
 
 import { promises as fs } from 'fs';

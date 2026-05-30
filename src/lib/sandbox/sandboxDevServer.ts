@@ -24,6 +24,35 @@ export async function startSandboxDevServerDetached(sandbox: Sandbox): Promise<v
   });
 }
 
+const LOCK_FILES = new Set([
+  'package.json',
+  'package-lock.json',
+  'yarn.lock',
+  'pnpm-lock.yaml',
+]);
+
+function normalizeChangedPath(filePath: string): string {
+  return filePath.replace(/\\/g, '/');
+}
+
+/**
+ * Whether sandbox `next dev` must restart after an edit (deps, framework config, or page routes).
+ */
+export function shouldRestartSandboxDevServer(changedFiles: string[]): boolean {
+  if (changedFiles.length === 0) return false;
+
+  return changedFiles.some((raw) => {
+    const path = normalizeChangedPath(raw);
+    if (LOCK_FILES.has(path)) return true;
+    if (/^next\.config\.(js|mjs|cjs|ts)$/.test(path)) return true;
+    if (/^postcss\.config\.(js|mjs|cjs)$/.test(path)) return true;
+    if (path === 'tailwind.config.js' || path === 'tailwind.config.ts') return true;
+    if (path === 'src/app/page.tsx') return true;
+    if (/^src\/app\/.+\/page\.tsx$/.test(path)) return true;
+    return false;
+  });
+}
+
 /**
  * Fresh `next dev` after edits — production build artifacts in .next break the dev bundler.
  */

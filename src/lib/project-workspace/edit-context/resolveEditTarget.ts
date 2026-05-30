@@ -1,5 +1,6 @@
 import { resolveEffectiveEditMessage } from '@/lib/chat/conversationContextForEdit';
 import { classifyEditWhat } from '@/lib/project-workspace/website-edit-agent/buildGroundedEditContext';
+import { resolveSectionWithCatalogLLM } from '@/lib/project-workspace/website-edit-agent/resolveSectionWithCatalogLLM';
 import type { ConversationTurn } from '@/lib/project-workspace/website-edit-agent/editAmbiguity';
 import {
   extractSectionTitleCandidates,
@@ -44,6 +45,16 @@ function heroTarget(confidence: 'high' | 'medium' | 'low', reason: string): Edit
  * Resolve edit target from message + catalog. Quoted titles beat deictic "this section".
  */
 export function resolveEditTarget(
+  message: string,
+  siteModel: SiteModel,
+  catalog: SiteSectionCatalog,
+  history: ConversationTurn[] = []
+): EditTarget {
+  return resolveEditTargetSync(message, siteModel, catalog, history);
+}
+
+/** Sync resolver (no LLM). Prefer {@link resolveEditTargetAsync} for V3 planning. */
+export function resolveEditTargetSync(
   message: string,
   siteModel: SiteModel,
   catalog: SiteSectionCatalog,
@@ -178,5 +189,65 @@ export function resolveEditTarget(
     candidates: [],
     needsClarification: false,
     reason: 'Site-wide or unresolved target',
+  };
+}
+
+function styleEditNeedsSectionTarget(message: string): boolean {
+  const what = classifyEditWhat(message);
+  return what === 'style_background' || what === 'style_text' || what === 'style_card';
+}
+
+/**
+ * Resolve edit target with optional catalog LLM when deterministic matching fails (SECTION_TARGET_LLM=1).
+ */
+export async function resolveEditTargetAsync(
+  message: string,
+  siteModel: SiteModel,
+  catalog: SiteSectionCatalog,
+  history: ConversationTurn[] = []
+): Promise<EditTarget> {
+  const target = resolveEditTarget(message, siteModel, catalog, history);
+  const effectiveMessage = resolveEffectiveEditMessage(message, history);
+
+  const needsLlm =
+    styleEditNeedsSectionTarget(effectiveMessage) &&
+    (target.needsClarification ||
+      target.kind !== 'section' ||
+      target.sectionIndex == null ||
+      target.confidence !== 'high');
+
+  if (!needsLlm) {
+    return target;
+  }
+
+  const llmPick = await resolveSectionWithCatalogLLM(effectiveMessage, catalog);
+  if (!llmPick || llmPick.confidence === 'low') {
+    return target;
+  }
+
+  const section = catalog.sections.find((s) => s.index === llmPick.sectionIndex);
+  if (!section) {
+    return target;
+  }
+
+  return {
+    kind: 'section',
+    sectionIndex: section.index,
+    sectionType: section.type,
+    title: section.title,
+    rendererComponent: section.rendererComponent,
+    confidence: llmPick.confidence === 'high' ? 'high' : 'medium',
+    candidates: [
+      toCandidate(
+        'section',
+        section.index,
+        section.type,
+        section.title,
+        llmPick.confidence === 'high' ? 'high' : 'medium',
+        llmPick.reason
+      ),
+    ],
+    needsClarification: false,
+    reason: llmPick.reason,
   };
 }

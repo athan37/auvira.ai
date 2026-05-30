@@ -51,9 +51,33 @@ function messageHasKeyword(message: string, keyword: string): boolean {
   return new RegExp(`\\b${escaped}\\b`, 'i').test(message);
 }
 
+function matchParaphraseSection(
+  message: string,
+  sections: EnrichedSectionSummary[]
+): EnrichedSectionSummary | null {
+  const lower = message.toLowerCase();
+  const customerSignal = /\bcustomers?\b/i.test(message);
+  const storySignal = /\b(growth|testimonial|review|quote|say|talk)\b/i.test(lower);
+  if (!customerSignal || !storySignal) {
+    return null;
+  }
+  const testimonials = sections.filter((s) => s.type === 'testimonials');
+  return testimonials.length === 1 ? testimonials[0]! : null;
+}
+
 function extractSectionTypeKeyword(message: string): string | null {
   const lower = message.toLowerCase();
   for (const t of SECTION_TYPE_KEYWORDS) {
+    if (t === 'about') {
+      // "talk about growth" is not the about section — require explicit about-us phrasing.
+      if (
+        /\babout\s+(us|our|company|the company)\b/i.test(message) ||
+        /\babout\s+section\b/i.test(lower)
+      ) {
+        return 'about';
+      }
+      continue;
+    }
     if (messageHasKeyword(lower, t)) {
       return t === 'testimonial' ? 'testimonials' : t;
     }
@@ -246,6 +270,11 @@ export function matchSectionFromMessage(
         suggestedReplies: candidates.map((m, i) => `${i + 1} — ${m.title}`),
       };
     }
+  }
+
+  const paraphrase = matchParaphraseSection(effectiveMessage, sections);
+  if (paraphrase) {
+    return sectionTarget(paraphrase, 'high', 'Paraphrase match: customer stories / testimonials');
   }
 
   const stripped = stripColorWordsFromMessage(effectiveMessage);

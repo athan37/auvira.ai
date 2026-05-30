@@ -5,7 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOwnerProject, getServerUserId } from '@/lib/api/projectAccess';
 import { repairPreviewWorkspace } from '@/lib/preview/repairPreviewWorkspace';
-import { restartSandboxDevServer } from '@/lib/sandbox/sandboxDevServer';
+import { restartSandboxDevServer, shouldRestartSandboxDevServer } from '@/lib/sandbox/sandboxDevServer';
 import { checkPreviewHealthy } from '@/lib/project-workspace/bootstrapProjectPreview';
 import { connectMongoDB } from '@/lib/mongodb';
 import { WebsiteProject } from '@/models/WebsiteProject';
@@ -758,25 +758,27 @@ export async function POST(
 
         let sandboxPreviewUrl: string | null = null;
         if (isSandbox) {
-          emit('step', { id: 'validate', label: 'Restarting preview server', status: 'active' });
-          editTimer.start('preview_restart');
-          await appendEditJobLog(jobId, 'preview_restart_started', 'Restarting sandbox dev server');
-          try {
-            sandboxPreviewUrl = await restartSandboxDevServer(projectId, {
-              skipRepair: agentResult.strategy === 'image_gallery',
-            });
-            await appendTimedEditJobLog(
-              jobId,
-              'preview_restarted',
-              'Sandbox dev server restarted',
-              editTimer.finish('preview_restart'),
-              { previewUrl: sandboxPreviewUrl, phase: 'preview_restart' }
-            );
-          } catch (restartErr) {
-            const msg = restartErr instanceof Error ? restartErr.message : String(restartErr);
-            await appendTimedEditJobLog(
-              jobId,
-              'preview_restart_failed',
+          const needsRestart = shouldRestartSandboxDevServer(changedPaths);
+          if (needsRestart) {
+            emit('step', { id: 'validate', label: 'Restarting preview server', status: 'active' });
+            editTimer.start('preview_restart');
+            await appendEditJobLog(jobId, 'preview_restart_started', 'Restarting sandbox dev server');
+            try {
+              sandboxPreviewUrl = await restartSandboxDevServer(projectId, {
+                skipRepair: agentResult.strategy === 'image_gallery',
+              });
+              await appendTimedEditJobLog(
+                jobId,
+                'preview_restarted',
+                'Sandbox dev server restarted',
+                editTimer.finish('preview_restart'),
+                { previewUrl: sandboxPreviewUrl, phase: 'preview_restart' }
+              );
+            } catch (restartErr) {
+              const msg = restartErr instanceof Error ? restartErr.message : String(restartErr);
+              await appendTimedEditJobLog(
+                jobId,
+                'preview_restart_failed',
               msg,
               editTimer.finish('preview_restart'),
               { phase: 'preview_restart' }
@@ -792,7 +794,14 @@ export async function POST(
             );
             return;
           }
-          emit('step', { id: 'validate', label: 'Restarting preview server', status: 'completed' });
+          } else {
+            await appendEditJobLog(
+              jobId,
+              'preview_restart_skipped',
+              'Skipped sandbox dev restart (src-only edit; HMR applies changes)',
+              { changedPaths }
+            );
+          }
         }
 
         const previewPort = project.preview?.port;

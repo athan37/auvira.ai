@@ -14,6 +14,50 @@ import { PageContainer } from '@/components/ui/PageContainer';
 import { Spinner } from '@/components/ui/Spinner';
 import type { TemplateGalleryEntry } from '@/lib/builder/templateGallery';
 
+type ScratchProgressStage = 'idle' | 'planning' | 'building' | 'saving';
+
+const SCRATCH_PROGRESS_STEPS: Array<{ key: ScratchProgressStage; label: string }> = [
+  { key: 'planning', label: 'Planning' },
+  { key: 'building', label: 'Building' },
+  { key: 'saving', label: 'Saving' },
+];
+
+function ScratchProgressSteps({ stage }: { stage: ScratchProgressStage }) {
+  if (stage === 'idle') return null;
+
+  const stageOrder: ScratchProgressStage[] = ['planning', 'building', 'saving'];
+  const activeIndex = stageOrder.indexOf(stage);
+
+  return (
+    <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 space-y-3">
+      <p className="text-sm font-medium text-zinc-800">Creating your website</p>
+      <ol className="space-y-2">
+        {SCRATCH_PROGRESS_STEPS.map((step, index) => {
+          const done = index < activeIndex;
+          const active = step.key === stage;
+          return (
+            <li key={step.key} className="flex items-center gap-2 text-sm">
+              <span
+                className={`flex h-5 w-5 items-center justify-center rounded-full text-xs font-semibold ${
+                  done
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : active
+                    ? 'bg-zinc-900 text-white'
+                    : 'bg-zinc-200 text-zinc-500'
+                }`}
+              >
+                {done ? '✓' : index + 1}
+              </span>
+              <span className={active ? 'font-medium text-zinc-900' : 'text-zinc-600'}>{step.label}</span>
+              {active && <Spinner size="sm" />}
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
+}
+
 export default function NewScratchPage() {
   const { status } = useSession();
   const router = useRouter();
@@ -26,6 +70,7 @@ export default function NewScratchPage() {
   const [email, setEmail] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateGalleryEntry | null>(null);
   const [loading, setLoading] = useState(false);
+  const [progressStage, setProgressStage] = useState<ScratchProgressStage>('idle');
   const [error, setError] = useState<string | null>(null);
 
   if (status === 'unauthenticated') {
@@ -47,6 +92,7 @@ export default function NewScratchPage() {
 
     setLoading(true);
     setError(null);
+    setProgressStage('planning');
 
     try {
       const proposeRes = await fetch('/api/projects/scratch/propose', {
@@ -65,8 +111,11 @@ export default function NewScratchPage() {
       const proposeData = await proposeRes.json();
       if (!proposeData.ok) {
         setError(proposeData.error || 'Failed to create plan');
+        setProgressStage('idle');
         return;
       }
+
+      setProgressStage('building');
 
       const plan = proposeData.websitePlan as Record<string, unknown>;
       if (selectedTemplate) {
@@ -100,6 +149,7 @@ export default function NewScratchPage() {
       });
       const buildData = await buildRes.json();
       if (buildData.ok && buildData.projectId) {
+        setProgressStage('saving');
         if (buildData.warning) {
           sessionStorage.setItem(
             `project-warning-${buildData.projectId}`,
@@ -109,9 +159,11 @@ export default function NewScratchPage() {
         router.push(`/projects/${buildData.projectId}`);
       } else {
         setError(buildData.error || 'Failed to build website');
+        setProgressStage('idle');
       }
     } catch {
       setError('Network error');
+      setProgressStage('idle');
     } finally {
       setLoading(false);
     }
@@ -137,6 +189,8 @@ export default function NewScratchPage() {
             </div>
 
             {error && <Alert variant="error">{error}</Alert>}
+
+            <ScratchProgressSteps stage={progressStage} />
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <Input

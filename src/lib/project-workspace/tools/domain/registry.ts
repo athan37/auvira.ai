@@ -1,6 +1,11 @@
 import { applySectionBackgroundTool } from './applySectionBackground';
 import { findSectionTool } from './findSection';
-import { addSectionTool, updateSectionListTool } from './updateSectionList';
+import {
+  addSectionTool,
+  removeSectionTool,
+  reorderSectionsTool,
+  updateSectionListTool,
+} from './updateSectionList';
 import { summarizeActualChangesTool } from './summarizeActualChanges';
 import { updateContactInfoTool } from './updateContactInfo';
 import { updateCopyFieldTool } from './updateCopyField';
@@ -17,6 +22,8 @@ const HANDLERS: Record<DomainToolName, DomainToolHandler> = {
   apply_section_background: applySectionBackgroundTool,
   update_theme: updateThemeTool,
   add_section: addSectionTool,
+  remove_section: removeSectionTool,
+  reorder_sections: reorderSectionsTool,
   replace_image: replaceImageTool,
   verify_source_invariants: (ctx) => verifySourceInvariantsTool(ctx),
   summarize_actual_changes: (ctx) => summarizeActualChangesTool(ctx),
@@ -32,6 +39,8 @@ export const SKILL_TO_DOMAIN_TOOL: Partial<Record<string, DomainToolName>> = {
   update_section_style: 'apply_section_background',
   add_section: 'add_section',
   add_service: 'update_section_list',
+  remove_section: 'update_section_list',
+  reorder_sections: 'update_section_list',
   replace_image: 'replace_image',
 };
 
@@ -66,6 +75,19 @@ export function paramsForSkill(
     };
   }
 
+  if (skill === 'update_section_copy') {
+    const field = (merged.field as string) ?? 'title';
+    return {
+      scope: 'section',
+      field,
+      sectionIndex:
+        typeof merged.sectionIndex === 'number'
+          ? merged.sectionIndex
+          : editContext.target.sectionIndex,
+      value: merged.value ?? merged[field],
+    };
+  }
+
   if (skill === 'update_section_style') {
     return {
       sectionIndex:
@@ -88,6 +110,26 @@ export function paramsForSkill(
       action: 'add_service',
       title: merged.title,
       description: merged.description,
+    };
+  }
+
+  if (skill === 'remove_section') {
+    return {
+      sectionIndex:
+        typeof merged.sectionIndex === 'number'
+          ? merged.sectionIndex
+          : editContext.target.sectionIndex,
+    };
+  }
+
+  if (skill === 'reorder_sections') {
+    const order = merged.order ?? merged.sectionOrder ?? merged.indices;
+    if (Array.isArray(order)) {
+      return { order };
+    }
+    return {
+      fromIndex: merged.fromIndex,
+      toIndex: merged.toIndex,
     };
   }
 

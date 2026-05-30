@@ -37,6 +37,7 @@ export function statusToBadgeTone(status: string | null | undefined): Tone {
     case 'deployed':
       return 'success';
     case 'failed':
+    case 'trigger_failed':
       return 'error';
     case 'incomplete':
     case 'validating':

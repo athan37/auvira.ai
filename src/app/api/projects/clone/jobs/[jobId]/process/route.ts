@@ -166,8 +166,14 @@ export async function POST(
 
     // Content fidelity check
     const fidelityResult = validateContentFidelity(proposedSiteSpec, job.factualSiteData as FactualSiteData);
-    job.contentFidelity = { passed: fidelityResult.passed, issues: fidelityResult.issues };
-    log(job, 'planning', `Content fidelity: ${fidelityResult.passed ? 'passed' : 'issues: ' + fidelityResult.issues.join(', ')}`);
+    job.contentFidelity = {
+      passed: fidelityResult.passed,
+      issues: fidelityResult.issues,
+      criticalIssues: fidelityResult.criticalIssues,
+      warnIssues: fidelityResult.warnIssues,
+      hasCriticalFailures: fidelityResult.hasCriticalFailures,
+    };
+    log(job, 'planning', `Content fidelity: ${fidelityResult.passed ? 'passed' : 'critical issues: ' + fidelityResult.criticalIssues.join(', ')}`);
 
     // Template: keep owner choice from clone start / review; otherwise AI suggestion
     const { isOwnerChosenTemplate } = await import('@/lib/builder/ownerTemplateSelection');

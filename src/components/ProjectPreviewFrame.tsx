@@ -5,6 +5,8 @@ import {
   cancelWorkspaceReleaseOnEnter,
   scheduleWorkspaceReleaseOnLeave,
 } from '@/lib/runtime/releaseWorkspaceOnLeave';
+import { usePageVisible } from '@/lib/hooks/usePageVisible';
+import { markEditorVital, recordIframeReload } from '@/lib/metrics/clientVitals';
 
 interface WorkspaceStatus {
   ok?: boolean;
@@ -70,9 +72,13 @@ export function ProjectPreviewFrame({
     const isReady = Boolean(status.ready);
     setPreviewReady(isReady);
     onReadyChangeRef.current?.(isReady);
-  }, []);
+    if (isReady) {
+      markEditorVital('editor.preview_ready', { projectId, stage: status.stage });
+    }
+  }, [projectId]);
   const bootstrapStarted = useRef(false);
   const pollCountRef = useRef(0);
+  const pageVisible = usePageVisible();
 
   const startBootstrap = useCallback(async (): Promise<boolean> => {
     try {
@@ -130,6 +136,7 @@ export function ProjectPreviewFrame({
       }
 
       pollTimer = setInterval(async () => {
+        if (!pageVisible) return;
         const status = await pollStatus();
         if (cancelled || !status) return;
         pollCountRef.current += 1;
@@ -177,7 +184,7 @@ export function ProjectPreviewFrame({
       cancelled = true;
       if (pollTimer) clearInterval(pollTimer);
     };
-  }, [projectId, pollStatus, applyStatus, startBootstrap]);
+  }, [projectId, pollStatus, applyStatus, startBootstrap, pageVisible]);
 
   useEffect(() => {
     cancelWorkspaceReleaseOnEnter(projectId);
@@ -185,6 +192,12 @@ export function ProjectPreviewFrame({
       scheduleWorkspaceReleaseOnLeave(projectId);
     };
   }, [projectId]);
+
+  useEffect(() => {
+    if (previewRefreshKey > 0) {
+      recordIframeReload(projectId);
+    }
+  }, [previewRefreshKey, projectId]);
 
   const handleRefresh = () => {
     setIframeLoading(true);

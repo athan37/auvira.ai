@@ -14,6 +14,7 @@ import { ProjectEditorSidebar } from '@/components/project/ProjectEditorSidebar'
 import { UnpublishedChangesBadge } from '@/components/UnpublishedChangesBadge';
 import { ownerProjectStatusLabel } from '@/lib/owner/ownerCopy';
 import { Badge, statusToBadgeTone } from '@/components/ui/Badge';
+import { Alert } from '@/components/ui/Alert';
 import { Spinner } from '@/components/ui/Spinner';
 
 interface Deployment {
@@ -68,7 +69,21 @@ export default function ProjectPage() {
   const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
   const [previewReady, setPreviewReady] = useState(false);
   const [editInProgress, setEditInProgress] = useState(false);
+  const [scratchWarning, setScratchWarning] = useState<string | null>(null);
   const previewReloadCancelRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    try {
+      const key = `project-warning-${projectId}`;
+      const warning = sessionStorage.getItem(key);
+      if (warning) {
+        setScratchWarning(warning);
+        sessionStorage.removeItem(key);
+      }
+    } catch {
+      /* sessionStorage unavailable */
+    }
+  }, [projectId]);
 
   useEffect(() => {
     return () => {
@@ -174,6 +189,11 @@ export default function ProjectPage() {
         </div>
       }
     >
+      {scratchWarning && (
+        <div className="px-3 lg:px-4 pt-3">
+          <Alert variant="warning">{scratchWarning}</Alert>
+        </div>
+      )}
       <div className="flex flex-col lg:flex-row flex-1 min-h-0 h-[calc(100vh-3.5rem)] p-3 lg:p-4 gap-3 lg:gap-4">
         <div className="flex-1 min-h-[320px] lg:min-h-0 min-w-0 flex flex-col">
           <ProjectPreviewFrame

@@ -14,6 +14,8 @@ import { join } from 'path';
 import mongoose from 'mongoose';
 import { getNpmPath } from '@/lib/runtime/nodeRuntime';
 import { isVercelServerless } from '@/lib/runtime/isVercelServerless';
+import { isCloneSandboxPreviewEnabled } from '@/lib/runtime/isCloneSandboxPreviewEnabled';
+import { hasCriticalFidelityFailures } from '@/lib/agent/validateContentFidelity';
 import type { TemplateSelection } from '@/lib/agent/selectTemplateAgent';
 
 export const runtime = 'nodejs';
@@ -139,6 +141,16 @@ export async function POST(
       ok: false,
       error: `Cannot build preview — job is in '${job.status}' state, expected 'review_ready'.`,
       status: job.status,
+    }, { status: 400 });
+  }
+
+  if (job.contentFidelity && hasCriticalFidelityFailures(job.contentFidelity)) {
+    const critical = job.contentFidelity.criticalIssues ?? job.contentFidelity.issues ?? [];
+    return NextResponse.json({
+      ok: false,
+      error: `Content fidelity check failed: ${critical.join('; ')}`,
+      stage: 'content_fidelity_failed',
+      contentFidelity: job.contentFidelity,
     }, { status: 400 });
   }
 
@@ -293,7 +305,22 @@ export async function POST(
       throw new Error(errMsg);
     }
     await CloneJob.updateOne({ _id: jobId }, {
-      $set: { generatedSiteValidation: { ok: buildResult.ok, logs: buildResult.logs, errors: buildResult.errors, durationMs: buildResult.durationMs } },
+      $set: {
+        generatedSiteValidation: {
+          ok: buildResult.ok,
+          logs: buildResult.logs,
+          errors: buildResult.errors,
+          durationMs: buildResult.durationMs,
+          buildGateSkipped: buildResult.buildGateSkipped ?? false,
+        },
+        buildValidation: {
+          ok: buildResult.ok,
+          logs: buildResult.logs,
+          errors: buildResult.errors,
+          durationMs: buildResult.durationMs,
+          buildGateSkipped: buildResult.buildGateSkipped ?? false,
+        },
+      },
     });
     await markPreviewStepDone(jobId, 'quality_check');
     await markSummaryDone(jobId, 'quality', buildResult.ok ? 'Website passed quality checks' : 'Quality checks failed');
@@ -323,31 +350,54 @@ export async function POST(
     });
 
     if (isVercelServerless()) {
+      let previewUrl: string | null = null;
+      let sandboxNote: string | undefined;
+
+      if (isCloneSandboxPreviewEnabled()) {
+        try {
+          const { bootstrapCloneJobSandbox } = await import('@/lib/sandbox/bootstrapCloneJobSandbox');
+          const sandboxResult = await bootstrapCloneJobSandbox(params.jobId, generated.files);
+          previewUrl = sandboxResult.previewUrl;
+          sandboxNote = 'Ephemeral sandbox preview';
+        } catch (sandboxError) {
+          const errMsg = sandboxError instanceof Error ? sandboxError.message : 'Sandbox preview failed';
+          console.error(`[preview] clone sandbox bootstrap failed: ${errMsg}`);
+          sandboxNote = `Sandbox preview unavailable: ${errMsg}. Deploy to Vercel to preview.`;
+        }
+      } else {
+        sandboxNote = 'Live preview runs on local dev only. Review the build summary and deploy to see your site on Vercel.';
+      }
+
       await CloneJob.updateOne({ _id: jobId }, {
         $set: {
           preview: {
             status: 'ready',
-            url: null,
-            port: null,
+            url: previewUrl,
+            port: previewUrl ? 3000 : null,
             startedAt: new Date(),
-            note: 'Live preview runs on local dev only. Review the build summary and deploy to see your site on Vercel.',
+            note: sandboxNote,
+            previewMode: previewUrl ? 'sandbox' : undefined,
           },
           previewSiteSpec: siteSpec,
           status: 'preview_ready',
-          currentStageLabel: 'Ready to deploy (cloud preview unavailable)',
-          progressPercent: 75,
+          currentStageLabel: previewUrl ? 'Preview is ready!' : 'Ready to deploy (cloud preview unavailable)',
+          progressPercent: previewUrl ? 75 : 75,
         },
       });
       await markPreviewStepDone(jobId, 'start_preview');
-      await markSummaryDone(jobId, 'preview', 'Code generated — deploy to Vercel to preview');
+      await markSummaryDone(
+        jobId,
+        'preview',
+        previewUrl ? 'Sandbox preview is ready to review' : 'Code generated — deploy to Vercel to preview'
+      );
       await setBuildSummaryStatus(jobId, 'ready');
 
       return NextResponse.json({
         ok: true,
         jobId: job._id.toString(),
         status: 'preview_ready',
-        preview: { status: 'ready', url: null, hostedPreview: false },
-        buildGateSkipped: true,
+        preview: { status: 'ready', url: previewUrl, hostedPreview: Boolean(previewUrl) },
+        buildGateSkipped: buildResult.buildGateSkipped ?? false,
       });
     }
 

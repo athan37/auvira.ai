@@ -73,6 +73,15 @@ export interface ITechnicalBuild {
   }>;
   validationLogs?: string;
   previewServerPid?: number;
+  buildGateSkipped?: boolean;
+}
+
+export interface IBuildValidation {
+  ok: boolean;
+  logs?: string;
+  errors?: string[];
+  durationMs?: number;
+  buildGateSkipped?: boolean;
 }
 
 export interface IBuildSummaryItem {
@@ -115,8 +124,12 @@ export interface ICloneJob extends Document {
   contentFidelity?: {
     passed: boolean;
     issues: string[];
+    criticalIssues?: string[];
+    warnIssues?: string[];
+    hasCriticalFailures?: boolean;
   };
   generatedSiteValidation?: Record<string, unknown>;
+  buildValidation?: IBuildValidation;
   deployment?: IDeployment;
   preview?: IPreview;
   previewSiteSpec?: Record<string, unknown>;
@@ -182,6 +195,7 @@ const CloneJobSchema = new Schema<ICloneJob>(
     },
     contentFidelity: { type: Schema.Types.Mixed },
     generatedSiteValidation: { type: Schema.Types.Mixed },
+    buildValidation: { type: Schema.Types.Mixed },
     deployment: { type: Schema.Types.Mixed },
     preview: { type: Schema.Types.Mixed },
     previewSiteSpec: { type: Schema.Types.Mixed },

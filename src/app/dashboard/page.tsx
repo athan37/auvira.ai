@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { AppShell } from '@/components/layout/AppShell';
 import { OwnerGettingStartedChecklist } from '@/components/owner/OwnerGettingStartedChecklist';
+import { Alert } from '@/components/ui/Alert';
 import { Badge, statusToBadgeTone } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -40,6 +41,7 @@ interface ActiveCloneJob {
 function ProjectCard({ project }: { project: Project }) {
   const status = project.deploymentStatus || project.status;
   const tone = statusToBadgeTone(status);
+  const vercelTriggerFailed = project.deploymentStatus === 'trigger_failed';
 
   return (
     <Card className="p-5 hover:border-zinc-300 hover:shadow-card-hover transition-all h-full flex flex-col">
@@ -54,6 +56,11 @@ function ProjectCard({ project }: { project: Project }) {
           </div>
           <span className="text-xs text-zinc-400 capitalize shrink-0">{project.mode}</span>
         </div>
+        {vercelTriggerFailed && (
+          <Alert variant="warning" className="mb-2 text-xs">
+            Vercel deployment was not triggered. Open the project to retry publish or check GitLab/Vercel setup.
+          </Alert>
+        )}
         {project.siteTitle && (
           <p className="text-sm text-zinc-600 mb-2 line-clamp-2">{project.siteTitle}</p>
         )}

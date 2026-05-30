@@ -44,15 +44,6 @@ export async function executeStep(
     };
   }
 
-  if (step.skill === 'remove_section' || step.skill === 'reorder_sections') {
-    return {
-      ok: false,
-      skill: step.skill,
-      changedFiles: [],
-      error: `${step.skill} is not implemented in V3 yet`,
-    };
-  }
-
   const domainTool = skillToDomainTool(step.skill);
   if (!domainTool) {
     return {

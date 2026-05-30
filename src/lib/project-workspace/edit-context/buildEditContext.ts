@@ -4,7 +4,7 @@ import { buildEnrichedSiteStructure } from '@/lib/project-workspace/website-edit
 import { buildSiteSectionCatalog } from '@/lib/project-workspace/website-edit-agent/siteSectionCatalog';
 import { getSiteModel } from '@/lib/project-workspace/site-model/getSiteModel';
 import { buildVerificationContract } from './buildVerificationContract';
-import { resolveEditTarget } from './resolveEditTarget';
+import { resolveEditTargetAsync } from './resolveEditTarget';
 import { selectRelevantContext } from './selectRelevantContext';
 import type {
   BuildEditContextInput,
@@ -138,7 +138,7 @@ export async function buildEditContext(
     input.conversationHistory ?? []
   );
 
-  const target = resolveEditTarget(
+  const target = await resolveEditTargetAsync(
     input.ownerMessage,
     siteModel,
     sectionCatalog,

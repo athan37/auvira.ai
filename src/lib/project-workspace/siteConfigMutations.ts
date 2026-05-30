@@ -281,6 +281,67 @@ function subtitleStyleMarkerToColor(subtitle: string): string | null {
 }
 
 /**
+ * Update section title or body copy in siteConfig.ts source.
+ */
+export function updateSectionCopyInSource(
+  content: string,
+  sectionIndex: number,
+  field: string,
+  value: string
+): string | null {
+  const allowed = new Set(['title', 'body']);
+  if (!allowed.has(field) || !value.trim() || sectionIndex < 0) return null;
+
+  return mutateSiteConfigSource(content, (config) => {
+    const sections = Array.isArray(config.sections)
+      ? (config.sections as Array<Record<string, unknown>>)
+      : [];
+    const section = sections[sectionIndex];
+    if (!section) return false;
+    if (section[field] === value) return false;
+    section[field] = value;
+    return true;
+  });
+}
+
+/**
+ * Remove a section by index from siteConfig.ts source.
+ */
+export function removeSectionFromSource(content: string, sectionIndex: number): string | null {
+  if (sectionIndex < 0) return null;
+
+  return mutateSiteConfigSource(content, (config) => {
+    const sections = Array.isArray(config.sections)
+      ? (config.sections as Array<Record<string, unknown>>)
+      : [];
+    if (sectionIndex >= sections.length) return false;
+    sections.splice(sectionIndex, 1);
+    config.sections = sections;
+    return true;
+  });
+}
+
+/**
+ * Reorder sections in siteConfig.ts source (indices refer to positions before reorder).
+ */
+export function reorderSectionsInSource(content: string, order: number[]): string | null {
+  if (order.length === 0) return null;
+
+  return mutateSiteConfigSource(content, (config) => {
+    const sections = Array.isArray(config.sections)
+      ? (config.sections as Array<Record<string, unknown>>)
+      : [];
+    if (order.length !== sections.length) return false;
+    if (order.some((i) => i < 0 || i >= sections.length || !Number.isInteger(i))) return false;
+    if (new Set(order).size !== order.length) return false;
+
+    const reordered = order.map((i) => sections[i]!);
+    config.sections = reordered;
+    return true;
+  });
+}
+
+/**
  * Migrate legacy subtitle style markers (e.g. "YELLOW_BG") to presentation.backgroundClass.
  */
 export function migrateSubtitleStyleMarkersInSource(content: string): string | null {

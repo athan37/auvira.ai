@@ -27,6 +27,8 @@ interface Props {
   lastPublishedAt?: string | null;
   gitlabWebUrl?: string | null;
   onDeploymentUpdate?: () => void;
+  /** When false, skip deployment status polling (e.g. tab not visible). Default true. */
+  pollingEnabled?: boolean;
 }
 
 const POLL_INTERVAL_MS = 5000;
@@ -54,6 +56,7 @@ export function PublishedStatusCard({
   lastPublishedAt,
   gitlabWebUrl,
   onDeploymentUpdate,
+  pollingEnabled = true,
 }: Props) {
   const onUpdateRef = useRef(onDeploymentUpdate);
   onUpdateRef.current = onDeploymentUpdate;
@@ -84,6 +87,7 @@ export function PublishedStatusCard({
   const isBuilding = isInProgressStatus(displayStatus) || (displayStatus === 'ready' && !commitVerified);
 
   useEffect(() => {
+    if (!pollingEnabled) return;
     if (!hasVercel) return;
     if (commitVerified && liveUrl) return;
 
@@ -136,7 +140,7 @@ export function PublishedStatusCard({
       cancelled = true;
       clearInterval(interval);
     };
-  }, [projectId, hasVercel, deployment?.status, deployment?.liveUrl, commitVerified, liveUrl]);
+  }, [projectId, hasVercel, deployment?.status, deployment?.liveUrl, commitVerified, liveUrl, pollingEnabled]);
 
   return (
     <Card>

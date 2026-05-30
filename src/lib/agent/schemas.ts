@@ -437,8 +437,12 @@ export interface FactualSiteData {
 }
 
 export interface ContentFidelityResult {
+  /** True when there are no critical fidelity failures (warnings may remain). */
   passed: boolean;
   issues: string[];
+  criticalIssues: string[];
+  warnIssues: string[];
+  hasCriticalFailures: boolean;
   details?: Record<string, string>;
 }
 

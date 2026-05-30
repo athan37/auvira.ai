@@ -41,5 +41,8 @@ jobs:
       - name: Test (unit only; live LLM requires MINIMAX_API_KEY — run npm run test:llm locally)
         run: npm run test
 
+      - name: Contract tests
+        run: npm run test:contracts
+
       - name: Build
         run: npm run build

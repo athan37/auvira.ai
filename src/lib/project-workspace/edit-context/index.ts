@@ -1,6 +1,6 @@
 export { buildEditContext } from './buildEditContext';
 export { buildVerificationContract } from './buildVerificationContract';
-export { resolveEditTarget } from './resolveEditTarget';
+export { resolveEditTarget, resolveEditTargetAsync } from './resolveEditTarget';
 export { selectRelevantContext } from './selectRelevantContext';
 export type {
   BuildEditContextInput,

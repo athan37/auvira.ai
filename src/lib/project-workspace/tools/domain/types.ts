@@ -11,6 +11,8 @@ export const DOMAIN_TOOL_NAMES = [
   'apply_section_background',
   'update_theme',
   'add_section',
+  'remove_section',
+  'reorder_sections',
   'replace_image',
   'verify_source_invariants',
   'summarize_actual_changes',

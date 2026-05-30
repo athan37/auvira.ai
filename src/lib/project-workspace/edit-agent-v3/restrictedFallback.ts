@@ -3,7 +3,12 @@ import { getProfileForMode } from '@/lib/project-workspace/website-edit-agent/pr
 import type { ToolContext } from '@/lib/project-workspace/website-edit-agent/types';
 import type { EditContext } from '@/lib/project-workspace/edit-context/types';
 
-const MAX_ITERATIONS = 8;
+const DEFAULT_MAX_ITERATIONS = 4;
+
+function maxFallbackIterations(): number {
+  const raw = parseInt(process.env.WEBSITE_EDIT_MAX_ITERATIONS || '', 10);
+  return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_MAX_ITERATIONS;
+}
 const MAX_CHANGED_FILES = 3;
 
 export interface RestrictedFallbackResult {
@@ -54,7 +59,7 @@ export async function runRestrictedCustomCodeEdit(
     `${ownerMessage}\n\nAllowed write paths: ${editContext.allowedWritePaths.join(', ')}\nYou must read_file before write_file on each path.`,
   ];
 
-  for (let i = 0; i < MAX_ITERATIONS; i++) {
+  for (let i = 0; i < maxFallbackIterations(); i++) {
     const { getLLMClient } = await import('@/lib/llm/llmClient');
     const llm = getLLMClient();
     const result = await llm.generateJSON<{ thought?: string; action?: { tool: string; args: Record<string, unknown> } }>({

@@ -9,6 +9,7 @@ import {
 } from './editPlan.schema';
 import { buildPlanEditSystemPrompt, buildPlanEditUserPrompt } from './planEditPrompt';
 import { buildDeterministicPlan } from '@/lib/project-workspace/edit-agent-v3/deterministicPlan';
+import { guardUnsupportedPlanSkills } from './validatePlanSkills';
 
 const PLAN_MAX_TOKENS = parseInt(process.env.WEBSITE_EDIT_MAX_TOKENS || '4096', 10);
 
@@ -16,6 +17,7 @@ export interface PlanEditInput {
   editContext: EditContext;
   userPrompt: string;
   deterministicOnly?: boolean;
+  hasAttachments?: boolean;
 }
 
 /** @deprecated Prefer editContext — builds minimal context from siteModel for legacy tests. */
@@ -55,12 +57,14 @@ export async function planEdit(input: PlanEditInputUnion): Promise<PlanEditResul
   const editContext = await resolveEditContext(input);
   const userPrompt = isLegacyInput(input) ? input.userPrompt : input.userPrompt;
   const deterministicOnly = !isLegacyInput(input) ? input.deterministicOnly : false;
+  const hasAttachments = !isLegacyInput(input) ? (input.hasAttachments ?? false) : false;
+  const skillGuardOptions = { hasAttachments };
 
   const deterministic = buildDeterministicPlan(editContext);
   if (deterministic) {
     const parsed = EditPlanSchema.safeParse(deterministic);
     if (parsed.success) {
-      return { ok: true, plan: parsed.data };
+      return { ok: true, plan: guardUnsupportedPlanSkills(parsed.data, skillGuardOptions) };
     }
   }
 
@@ -95,7 +99,7 @@ export async function planEdit(input: PlanEditInputUnion): Promise<PlanEditResul
 
     const parsed = EditPlanSchema.safeParse(result.data);
     if (parsed.success) {
-      return { ok: true, plan: parsed.data };
+      return { ok: true, plan: guardUnsupportedPlanSkills(parsed.data, skillGuardOptions) };
     }
 
     lastError = parsed.error.issues.map((i) => i.message).join('; ');

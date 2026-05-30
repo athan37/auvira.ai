@@ -2,17 +2,13 @@ import { hasExplicitEditTarget } from './enrichEditPrompt';
 import { wantsNewImageSection } from './imagePlacementIntent';
 import type { ConversationTurn } from './editAmbiguity';
 import { resolveEffectiveEditMessage } from '@/lib/chat/conversationContextForEdit';
+import { buildEditContext } from '@/lib/project-workspace/edit-context/buildEditContext';
+import { resolveEditTargetAsync } from '@/lib/project-workspace/edit-context/resolveEditTarget';
+import type { EditTarget } from '@/lib/project-workspace/edit-context/types';
+import type { SiteModel } from '@/lib/project-workspace/site-model/types';
 import { extractEditCodeContext, formatCodeContextBlocks } from './extractEditCodeContext';
-import {
-  buildEnrichedSiteStructure,
-  resolveSectionTarget,
-} from './resolveSectionTarget';
-import {
-  applyCatalogMatchToTarget,
-  buildSiteSectionCatalog,
-  matchSectionFromMessage,
-} from './siteSectionCatalog';
-import { resolveSectionWithCatalogLLM } from './resolveSectionWithCatalogLLM';
+import { buildEnrichedSiteStructure } from './resolveSectionTarget';
+import { buildSiteSectionCatalog } from './siteSectionCatalog';
 import type { SiteWorkspaceSnapshot } from './resolveSiteWorkspace';
 import {
   isBackgroundColorEditRequest,
@@ -153,8 +149,66 @@ function needsWhatClarification(what: EditWhatKind, message: string): GroundedEd
   return null;
 }
 
+function siteModelFromSnapshot(
+  snap: SiteWorkspaceSnapshot,
+  workspacePath: string
+): SiteModel {
+  const siteConfigContent = snap.siteConfigContent ?? '';
+  const pageContent = snap.pageContent ?? '';
+  let structure = null;
+  if (siteConfigContent && pageContent) {
+    try {
+      structure = buildEnrichedSiteStructure(siteConfigContent, pageContent);
+    } catch {
+      structure = null;
+    }
+  }
+
+  return {
+    workspacePath,
+    mode: 'gitlab',
+    archetype: snap.archetype,
+    siteConfigPath: snap.siteConfigPath,
+    pagePath: snap.pagePath,
+    indexHtmlPath: snap.indexHtmlPath,
+    siteJsonPath: snap.siteJsonPath,
+    stylesPath: snap.stylesPath,
+    siteConfigContent,
+    pageContent,
+    indexHtmlContent: snap.indexHtmlContent,
+    siteJsonContent: snap.siteJsonContent,
+    parsedConfig: null,
+    structure,
+    errors: [],
+  };
+}
+
+function editTargetToSectionWhere(target: EditTarget): SectionTargetResult {
+  if (target.kind === 'hero') {
+    return { confidence: target.confidence, kind: 'hero', reason: target.reason };
+  }
+  if (target.kind === 'nav') {
+    return { confidence: target.confidence, kind: 'nav', reason: target.reason };
+  }
+  if (target.kind === 'footer') {
+    return { confidence: target.confidence, kind: 'footer', reason: target.reason };
+  }
+
+  return {
+    confidence: target.confidence,
+    kind: 'section',
+    sectionIndex: target.sectionIndex,
+    sectionType: target.sectionType,
+    title: target.title,
+    rendererComponent: target.rendererComponent,
+    clarificationMessage: target.clarificationMessage,
+    suggestedReplies: target.suggestedReplies,
+    reason: target.reason,
+  };
+}
+
 /**
- * Pre-flight grounding: section map, target resolution, code block extraction.
+ * Pre-flight grounding for legacy V1: delegates target resolution to {@link buildEditContext}.
  */
 export async function buildGroundedEditContext(
   snap: SiteWorkspaceSnapshot | null,
@@ -172,11 +226,48 @@ export async function buildGroundedEditContext(
     return { plan: undefined };
   }
 
-  const enriched = buildEnrichedSiteStructure(siteConfigContent, pageContent);
   const sectionCatalog = buildSiteSectionCatalog(siteConfigContent, pageContent);
   const structureBrief = sectionCatalog.textBlock;
-  const effectiveMessage = resolveEffectiveEditMessage(message, history);
-  let where = resolveSectionTarget(message, history, enriched, sectionCatalog);
+
+  let effectiveMessage: string;
+  let where: SectionTargetResult;
+
+  if (workspacePath) {
+    const built = await buildEditContext({
+      workspacePath,
+      mode: 'gitlab',
+      ownerMessage: message,
+      conversationHistory: history,
+    });
+
+    effectiveMessage = built.context.effectiveMessage;
+
+    if (built.needsClarification && built.clarificationMessage) {
+      return {
+        needsClarification: true,
+        clarificationMessage: built.clarificationMessage,
+        suggestedReplies: built.suggestedReplies ?? sectionCatalog.numberedReplies,
+        sectionCatalog,
+      };
+    }
+
+    where = editTargetToSectionWhere(built.context.target);
+  } else {
+    effectiveMessage = resolveEffectiveEditMessage(message, history);
+    const siteModel = siteModelFromSnapshot(snap, '/tmp/grounded-edit');
+    const target = await resolveEditTargetAsync(message, siteModel, sectionCatalog, history);
+
+    if (target.needsClarification && target.clarificationMessage) {
+      return {
+        needsClarification: true,
+        clarificationMessage: target.clarificationMessage,
+        suggestedReplies: target.suggestedReplies ?? sectionCatalog.numberedReplies,
+        sectionCatalog,
+      };
+    }
+
+    where = editTargetToSectionWhere(target);
+  }
 
   if (
     where.clarificationMessage &&
@@ -192,62 +283,12 @@ export async function buildGroundedEditContext(
   }
 
   const what = classifyEditWhat(effectiveMessage);
-
-  if (
-    (what === 'style_background' || what === 'style_text' || what === 'style_card') &&
-    where.kind === 'section' &&
-    where.sectionIndex == null
-  ) {
-    const catalogMatch = matchSectionFromMessage(effectiveMessage, sectionCatalog, { history });
-    if (catalogMatch?.sectionIndex != null && catalogMatch.confidence === 'high') {
-      where = applyCatalogMatchToTarget(where, catalogMatch);
-    } else if (catalogMatch?.confidence === 'low' && catalogMatch.clarificationMessage) {
-      return {
-        needsClarification: true,
-        clarificationMessage: catalogMatch.clarificationMessage,
-        suggestedReplies: catalogMatch.suggestedReplies ?? sectionCatalog.numberedReplies,
-        sectionCatalog,
-      };
-    } else {
-      const llmPick = await resolveSectionWithCatalogLLM(effectiveMessage, sectionCatalog);
-      if (llmPick && llmPick.confidence !== 'low') {
-        const section = sectionCatalog.sections.find((s) => s.index === llmPick.sectionIndex);
-        if (section) {
-          where = applyCatalogMatchToTarget(where, {
-            confidence: llmPick.confidence === 'high' ? 'high' : 'medium',
-            kind: 'section',
-            sectionIndex: section.index,
-            sectionType: section.type,
-            title: section.title,
-            rendererComponent: section.rendererComponent,
-            configLineRange: section.configLineRange ?? undefined,
-            pageComponentRange: section.pageComponentRange ?? undefined,
-            reason: llmPick.reason,
-            matches: [],
-          });
-        }
-      }
-    }
-
-    if (where.kind === 'section' && where.sectionIndex == null) {
-      return {
-        needsClarification: true,
-        clarificationMessage:
-          where.clarificationMessage ??
-          'Which section should I update? Reply with the number:\n\n' +
-            sectionCatalog.sections
-              .map((s, i) => `${i + 1}. [${s.index}] ${s.type} — "${s.title}"`)
-              .join('\n'),
-        suggestedReplies: where.suggestedReplies ?? sectionCatalog.numberedReplies,
-        sectionCatalog,
-      };
-    }
-  }
   const whatClarification = needsWhatClarification(what, effectiveMessage);
   if (whatClarification) {
-    return whatClarification;
+    return { ...whatClarification, sectionCatalog };
   }
 
+  const enriched = buildEnrichedSiteStructure(siteConfigContent, pageContent);
   const codeBlocks = await extractEditCodeContext({
     target: where,
     siteConfigContent,

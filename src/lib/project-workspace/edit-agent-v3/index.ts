@@ -1,5 +1,6 @@
 import { buildEditContext } from '@/lib/project-workspace/edit-context/buildEditContext';
 import { planEdit } from '@/lib/project-workspace/planner/planEdit';
+import { routeAttachmentEdits } from '@/lib/project-workspace/website-edit-agent/attachmentRouter';
 import { computeWorkspaceHashes } from '@/lib/project-workspace/workspaceEditShared';
 import type { AgentStepEvent, WebsiteEditAgentOptions, WebsiteEditAgentResult } from '@/lib/project-workspace/website-edit-agent/types';
 import { executePlan } from './executePlan';
@@ -21,6 +22,21 @@ export async function runWebsiteEditAgentV3(
   onStep?: (event: AgentStepEvent) => void
 ): Promise<WebsiteEditAgentResult> {
   emitStep(onStep, 'v3_context', 'Understanding your site', 'active');
+
+  let beforeHashes: Record<string, string>;
+  try {
+    beforeHashes = options.gateway
+      ? await options.gateway.computeHashes()
+      : await computeWorkspaceHashes(options.workspacePath);
+  } catch {
+    beforeHashes = {};
+  }
+
+  const attachmentResult = await routeAttachmentEdits(options, beforeHashes);
+  if (attachmentResult) {
+    emitStep(onStep, 'v3_context', 'Understanding your site', 'completed');
+    return attachmentResult;
+  }
 
   const contextResult = await buildEditContext({
     workspacePath: options.workspacePath,
@@ -59,18 +75,10 @@ export async function runWebsiteEditAgentV3(
 
   emitStep(onStep, 'v3_plan', 'Planning the edit', 'active');
 
-  let beforeHashes: Record<string, string>;
-  try {
-    beforeHashes = options.gateway
-      ? await options.gateway.computeHashes()
-      : await computeWorkspaceHashes(options.workspacePath);
-  } catch {
-    beforeHashes = {};
-  }
-
   const planResult = await planEdit({
     editContext: contextResult.context,
     userPrompt: options.ownerMessage,
+    hasAttachments: (options.attachments?.length ?? 0) > 0,
   });
 
   if (!planResult.ok || !planResult.plan) {

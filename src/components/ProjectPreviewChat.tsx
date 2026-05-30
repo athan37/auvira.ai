@@ -1,12 +1,14 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { Alert } from '@/components/ui/Alert';
 import { Button } from '@/components/ui/Button';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { cn } from '@/lib/cn';
 import EditErrorTrace from '@/components/project/EditErrorTrace';
+import { markEditorVital } from '@/lib/metrics/clientVitals';
 
 import {
   MAX_IMAGES_PER_UPLOAD,
@@ -31,6 +33,7 @@ type PendingImage = {
 };
 
 type ChatMessage = {
+  id: string;
   role: 'user' | 'assistant';
   content: string;
   imagePreviews?: string[];
@@ -45,10 +48,32 @@ type ChatMessage = {
   errorJobId?: string;
 };
 
+type ChatHistoryApiMessage = Omit<ChatMessage, 'id'> & {
+  timestamp?: string | Date;
+};
+
 type ChatHistoryResponse = {
   ok: boolean;
-  messages?: ChatMessage[];
+  messages?: ChatHistoryApiMessage[];
 };
+
+function createMessageId(seed: string): string {
+  return seed || crypto.randomUUID();
+}
+
+/** Assign stable ids for virtualization keys when loading persisted history. */
+function hydrateHistoryMessages(raw: ChatHistoryApiMessage[]): ChatMessage[] {
+  return raw.map((msg, index) => {
+    const timestamp = msg.timestamp ? new Date(msg.timestamp).getTime() : undefined;
+    const id = createMessageId(
+      timestamp != null && Number.isFinite(timestamp)
+        ? `${timestamp}-${index}`
+        : `history-${index}-${msg.content.slice(0, 32)}`
+    );
+    const { timestamp: _ts, ...rest } = msg;
+    return { ...rest, id };
+  });
+}
 
 interface ProjectPreviewChatProps {
   projectId: string;
@@ -219,6 +244,77 @@ function ChevronButton({
   );
 }
 
+function ChatMessageBubble({
+  msg,
+  sending,
+  previewReady,
+  onApplyPrompt,
+}: {
+  msg: ChatMessage;
+  sending: boolean;
+  previewReady: boolean;
+  onApplyPrompt: (text: string) => void;
+}) {
+  return (
+    <div className={cn('flex', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
+      <div
+        className={cn(
+          'max-w-[85%] rounded-lg px-3 py-2 text-sm',
+          msg.role === 'user'
+            ? 'bg-zinc-950 text-white'
+            : msg.isClarification
+              ? 'bg-sky-50 border border-sky-200 text-sky-950 shadow-sm'
+              : msg.isError
+                ? 'bg-red-50 border border-red-200 text-red-900 shadow-sm'
+                : 'bg-white border border-zinc-200 text-zinc-800 shadow-sm'
+        )}
+      >
+        {msg.isClarification && (
+          <p className="text-xs font-semibold uppercase tracking-wide text-sky-800 mb-1">
+            Quick question
+          </p>
+        )}
+        {msg.isError && !msg.isClarification && (
+          <p className="text-xs font-semibold uppercase tracking-wide text-red-700 mb-1">
+            Edit failed
+          </p>
+        )}
+        <p className="whitespace-pre-wrap">{msg.content}</p>
+        {msg.isClarification && msg.suggestedReplies && msg.suggestedReplies.length > 0 && (
+          <div className="mt-2 flex flex-col gap-1.5">
+            {msg.suggestedReplies.map((reply) => (
+              <button
+                key={reply}
+                type="button"
+                disabled={sending || !previewReady}
+                onClick={() => onApplyPrompt(reply)}
+                className="text-left text-xs px-2.5 py-1.5 rounded-md border border-sky-200 bg-white text-sky-900 hover:bg-sky-100/80 transition-colors disabled:opacity-50"
+              >
+                {reply}
+              </button>
+            ))}
+          </div>
+        )}
+        {msg.isError && msg.errorTrace && (
+          <EditErrorTrace trace={msg.errorTrace} jobId={msg.errorJobId} stage={msg.errorStage} />
+        )}
+        {msg.imagePreviews && msg.imagePreviews.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {msg.imagePreviews.map((src) => (
+              <img
+                key={src}
+                src={src}
+                alt=""
+                className="h-14 w-14 rounded-md object-cover border border-white/20"
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function AgentStepNavigator({
   steps,
   failed,
@@ -286,13 +382,14 @@ export function ProjectPreviewChat({
   const [sending, setSending] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyError, setHistoryError] = useState<string | null>(null);
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [agentSteps, setAgentSteps] = useState<AgentStep[]>([]);
   const [showSteps, setShowSteps] = useState(false);
   const [stepViewIndex, setStepViewIndex] = useState(0);
   const manualStepNavRef = useRef(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const virtuosoRef = useRef<VirtuosoHandle>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const inputDisabled = disabled || !previewReady || sending;
@@ -308,6 +405,7 @@ export function ProjectPreviewChat({
     const controller = new AbortController();
     async function loadHistory() {
       setHistoryLoading(true);
+      setHistoryError(null);
       try {
         const res = await fetch(`/api/projects/${projectId}/messages?limit=100`, {
           signal: controller.signal,
@@ -315,10 +413,18 @@ export function ProjectPreviewChat({
         if (!res.ok) throw new Error('Failed to load chat history');
         const data = (await res.json()) as ChatHistoryResponse;
         if (!active) return;
-        setMessages(Array.isArray(data.messages) ? data.messages : []);
-      } catch {
+        setMessages(
+          hydrateHistoryMessages(Array.isArray(data.messages) ? data.messages : [])
+        );
+        markEditorVital('editor.chat_history_loaded', {
+          projectId,
+          count: Array.isArray(data.messages) ? data.messages.length : 0,
+        });
+      } catch (err) {
         if (!active) return;
         setMessages([]);
+        if (err instanceof Error && err.name === 'AbortError') return;
+        setHistoryError('Could not load chat history. Try refreshing the page.');
       } finally {
         if (active) setHistoryLoading(false);
       }
@@ -329,10 +435,6 @@ export function ProjectPreviewChat({
       controller.abort();
     };
   }, [projectId]);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, showSteps, pendingImages]);
 
   useEffect(() => {
     if (!showSteps || agentSteps.length === 0 || manualStepNavRef.current) return;
@@ -424,6 +526,7 @@ export function ProjectPreviewChat({
     setMessages((prev) => [
       ...prev,
       {
+        id: crypto.randomUUID(),
         role: 'user',
         content: userMsg,
         imagePreviews: pendingImages.map((img) => img.previewUrl),
@@ -572,6 +675,7 @@ export function ProjectPreviewChat({
       setMessages((prev) => [
         ...prev,
         {
+          id: crypto.randomUUID(),
           role: 'assistant',
           content: finalOwnerMessage,
           isError: editFailed,
@@ -615,6 +719,7 @@ export function ProjectPreviewChat({
       setMessages((prev) => [
         ...prev,
         {
+          id: crypto.randomUUID(),
           role: 'assistant',
           content: message,
           isError: true,
@@ -630,9 +735,23 @@ export function ProjectPreviewChat({
     }
   };
 
-  const applyPrompt = (text: string) => {
+  const applyPrompt = useCallback((text: string) => {
     setInput(text);
-  };
+  }, []);
+
+  const renderMessage = useCallback(
+    (index: number, msg: ChatMessage) => (
+      <div className={cn('px-4', index === 0 ? 'pt-4' : '', 'pb-3')}>
+        <ChatMessageBubble
+          msg={msg}
+          sending={sending}
+          previewReady={previewReady}
+          onApplyPrompt={applyPrompt}
+        />
+      </div>
+    ),
+    [applyPrompt, previewReady, sending]
+  );
 
   const stepsFailed = agentSteps.some((s) => s.status === 'failed');
 
@@ -670,101 +789,69 @@ export function ProjectPreviewChat({
       </CardHeader>
 
       <CardBody className="flex-1 flex flex-col min-h-0 p-0">
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          {!previewReady && (
-            <Alert variant="info">Starting your preview… You can edit once it is ready.</Alert>
-          )}
-
-          {historyLoading && !showSteps && (
-            <p className="text-sm text-zinc-500 text-center py-4">Loading chat history…</p>
-          )}
-
-          {!historyLoading && messages.length === 0 && !showSteps && previewReady && (
-            <div className="space-y-3">
-              <p className="text-sm text-zinc-500 text-center py-4">
-                Try a quick change, attach photos, or describe what you want.
-              </p>
-              <div className="flex flex-wrap gap-2 justify-center">
-                {SUGGESTED_PROMPTS.map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => applyPrompt(p)}
-                    className="text-xs px-3 py-1.5 rounded-md border border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50 transition-colors"
-                  >
-                    {p}
-                  </button>
-                ))}
-              </div>
+        <div className="flex-1 min-h-0 flex flex-col">
+          {historyError && (
+            <div className="px-4 pt-4">
+              <Alert variant="error">{historyError}</Alert>
             </div>
           )}
 
-          {messages.map((msg, i) => (
-            <div
-              key={i}
-              className={cn('flex', msg.role === 'user' ? 'justify-end' : 'justify-start')}
-            >
-              <div
-                className={cn(
-                  'max-w-[85%] rounded-lg px-3 py-2 text-sm',
-                  msg.role === 'user'
-                    ? 'bg-zinc-950 text-white'
-                    : msg.isClarification
-                      ? 'bg-sky-50 border border-sky-200 text-sky-950 shadow-sm'
-                      : msg.isError
-                        ? 'bg-red-50 border border-red-200 text-red-900 shadow-sm'
-                        : 'bg-white border border-zinc-200 text-zinc-800 shadow-sm'
-                )}
-              >
-                {msg.isClarification && (
-                  <p className="text-xs font-semibold uppercase tracking-wide text-sky-800 mb-1">
-                    Quick question
+          {historyLoading && !showSteps && !historyError && (
+            <p className="text-sm text-zinc-500 text-center py-4 px-4">Loading chat history…</p>
+          )}
+
+          {!historyLoading && messages.length === 0 && !showSteps && (
+            <div className="space-y-3 p-4 overflow-y-auto">
+              {!previewReady && (
+                <Alert variant="info">
+                  Starting your preview… You can edit once it is ready.
+                </Alert>
+              )}
+              {previewReady && (
+                <>
+                  <p className="text-sm text-zinc-500 text-center py-4">
+                    Try a quick change, attach photos, or describe what you want.
                   </p>
-                )}
-                {msg.isError && !msg.isClarification && (
-                  <p className="text-xs font-semibold uppercase tracking-wide text-red-700 mb-1">
-                    Edit failed
-                  </p>
-                )}
-                <p className="whitespace-pre-wrap">{msg.content}</p>
-                {msg.isClarification && msg.suggestedReplies && msg.suggestedReplies.length > 0 && (
-                  <div className="mt-2 flex flex-col gap-1.5">
-                    {msg.suggestedReplies.map((reply) => (
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    {SUGGESTED_PROMPTS.map((p) => (
                       <button
-                        key={reply}
+                        key={p}
                         type="button"
-                        disabled={sending || !previewReady}
-                        onClick={() => applyPrompt(reply)}
-                        className="text-left text-xs px-2.5 py-1.5 rounded-md border border-sky-200 bg-white text-sky-900 hover:bg-sky-100/80 transition-colors disabled:opacity-50"
+                        onClick={() => applyPrompt(p)}
+                        className="text-xs px-3 py-1.5 rounded-md border border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50 transition-colors"
                       >
-                        {reply}
+                        {p}
                       </button>
                     ))}
                   </div>
-                )}
-                {msg.isError && msg.errorTrace && (
-                  <EditErrorTrace
-                    trace={msg.errorTrace}
-                    jobId={msg.errorJobId}
-                    stage={msg.errorStage}
-                  />
-                )}
-                {msg.imagePreviews && msg.imagePreviews.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {msg.imagePreviews.map((src) => (
-                      <img
-                        key={src}
-                        src={src}
-                        alt=""
-                        className="h-14 w-14 rounded-md object-cover border border-white/20"
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
+                </>
+              )}
             </div>
-          ))}
-          <div ref={messagesEndRef} aria-hidden />
+          )}
+
+          {messages.length > 0 && (
+            <Virtuoso
+              ref={virtuosoRef}
+              className="flex-1 min-h-0"
+              data={messages}
+              computeItemKey={(_, msg) => msg.id}
+              followOutput="smooth"
+              initialTopMostItemIndex={Math.max(0, messages.length - 1)}
+              increaseViewportBy={{ top: 200, bottom: 200 }}
+              components={{
+                Header: () =>
+                  !previewReady ? (
+                    <div className="px-4 pt-4">
+                      <Alert variant="info">
+                        Starting your preview… You can edit once it is ready.
+                      </Alert>
+                    </div>
+                  ) : null,
+                Footer: () => <div className="h-1" aria-hidden />,
+              }}
+              itemContent={renderMessage}
+            />
+          )}
         </div>
 
         <form onSubmit={handleSubmit} className="p-3 border-t border-zinc-200/80 shrink-0 space-y-2">

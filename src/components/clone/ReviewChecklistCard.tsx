@@ -12,6 +12,9 @@ interface ReviewChecklist {
 interface ContentFidelity {
   passed: boolean;
   issues: string[];
+  criticalIssues?: string[];
+  warnIssues?: string[];
+  hasCriticalFailures?: boolean;
 }
 
 interface Props {
@@ -39,6 +42,12 @@ export default function ReviewChecklistCard({
   blockingIssues,
 }: Props) {
   const hasBlocking = blockingIssues.length > 0;
+  const criticalFidelity = contentFidelity?.criticalIssues?.length
+    ? contentFidelity.criticalIssues
+    : contentFidelity?.hasCriticalFailures
+    ? contentFidelity.issues
+    : [];
+  const warnFidelity = contentFidelity?.warnIssues ?? [];
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -87,19 +96,35 @@ export default function ReviewChecklistCard({
           </div>
         )}
 
-        {/* Content fidelity */}
-        {contentFidelity && !contentFidelity.passed && (
+        {/* Critical content fidelity */}
+        {criticalFidelity.length > 0 && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+            <p className="text-xs font-semibold text-red-700">Critical content fidelity issues — build blocked:</p>
+            {criticalFidelity.map((issue, i) => (
+              <p key={i} className="text-xs text-red-700">• {issue}</p>
+            ))}
+          </div>
+        )}
+
+        {/* Warn-only content fidelity */}
+        {warnFidelity.length > 0 && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-            <p className="text-xs font-semibold text-yellow-700">Content fidelity issues:</p>
-            {contentFidelity.issues.map((issue, i) => (
+            <p className="text-xs font-semibold text-yellow-700">Content fidelity warnings:</p>
+            {warnFidelity.map((issue, i) => (
               <p key={i} className="text-xs text-yellow-700">• {issue}</p>
             ))}
           </div>
         )}
 
-        {contentFidelity?.passed && (
+        {contentFidelity?.passed && contentFidelity.issues.length === 0 && (
           <div className="bg-green-50 border border-green-200 rounded-lg p-3">
             <p className="text-xs text-green-700">✓ Content fidelity passed</p>
+          </div>
+        )}
+
+        {contentFidelity?.passed && contentFidelity.issues.length > 0 && warnFidelity.length > 0 && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+            <p className="text-xs text-green-700">✓ No critical fidelity issues — you may build with warnings above</p>
           </div>
         )}
 

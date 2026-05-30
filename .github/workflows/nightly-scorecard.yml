@@ -1,0 +1,36 @@
+name: Nightly accuracy scorecard
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run test:contracts
+
+  llm-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: github.repository == 'athan37/la-mue-site-builder'
+    env:
+      MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: LLM contract smoke
+        if: env.MINIMAX_API_KEY != ''
+        run: npm run test:llm:contracts

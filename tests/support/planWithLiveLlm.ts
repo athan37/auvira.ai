@@ -70,6 +70,8 @@ export async function planWithLiveLlm(
 ): Promise<EditPlan> {
   const ownsWorkspace = siteSpec !== BASE_SITE_SPEC;
   const workspacePath = await resolveWorkspacePath(ownsWorkspace ? siteSpec : undefined);
+  const prevSectionTargetLlm = process.env.SECTION_TARGET_LLM;
+  process.env.SECTION_TARGET_LLM = '1';
 
   try {
     const ctx = await buildEditContext({
@@ -90,6 +92,11 @@ export async function planWithLiveLlm(
     }
     return result.plan;
   } finally {
+    if (prevSectionTargetLlm === undefined) {
+      delete process.env.SECTION_TARGET_LLM;
+    } else {
+      process.env.SECTION_TARGET_LLM = prevSectionTargetLlm;
+    }
     if (ownsWorkspace) {
       await destroySyntheticWorkspace(workspacePath);
     }

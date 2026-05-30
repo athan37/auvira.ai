@@ -3,9 +3,7 @@ import {
   readWorkspaceRel,
   writeWorkspaceRel,
 } from '@/lib/project-workspace/website-edit-agent/strategyContext';
-import {
-  updateHeroFieldInSource,
-} from '@/lib/project-workspace/siteConfigMutations';
+import { updateHeroFieldInSource, updateSectionCopyInSource } from '@/lib/project-workspace/siteConfigMutations';
 import type { DomainToolContext, DomainToolResult } from './types';
 
 /**
@@ -58,10 +56,43 @@ export async function updateCopyFieldTool(
     };
   }
 
+  if (scope === 'section') {
+    const sectionIndex =
+      typeof params.sectionIndex === 'number'
+        ? params.sectionIndex
+        : ctx.editContext.target.sectionIndex;
+    const copyField = field === 'body' || field === 'title' ? field : 'title';
+    if (sectionIndex == null || sectionIndex < 0) {
+      return {
+        ok: false,
+        changedFiles: [],
+        summary: '',
+        invariantErrors: ['Section copy update requires sectionIndex'],
+      };
+    }
+    const updated = updateSectionCopyInSource(content, sectionIndex, copyField, value);
+    if (!updated || updated === content) {
+      return {
+        ok: false,
+        changedFiles: [],
+        summary: '',
+        invariantErrors: [`No section ${copyField} change applied`],
+      };
+    }
+    await writeWorkspaceRel(ctx.agentOptions, SITE_CONFIG, updated);
+    ctx.afterFiles[SITE_CONFIG] = updated;
+    return {
+      ok: true,
+      changedFiles: [SITE_CONFIG],
+      summary: `Updated section ${copyField}.`,
+      evidence: { field: copyField, value, sectionIndex: String(sectionIndex) },
+    };
+  }
+
   return {
     ok: false,
     changedFiles: [],
     summary: '',
-    invariantErrors: [`Section copy updates not yet implemented for field ${field}`],
+    invariantErrors: [`Section copy updates not yet implemented for scope ${scope}`],
   };
 }

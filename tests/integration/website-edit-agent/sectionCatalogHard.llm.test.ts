@@ -11,6 +11,7 @@ import { runWebsiteEditAgent } from '@/lib/project-workspace/website-edit-agent'
 import {
   colorNameToBackgroundClass,
   extractSectionBackgroundClassFromMessage,
+  resolveGradientBackgroundClass,
 } from '@/lib/builder/sectionPresentation';
 import { extractSiteConfigObjectLiteral } from '@/lib/site-manager/siteConfigParser';
 import {
@@ -613,7 +614,7 @@ describeRunLlmIntegration('section catalog hard scenarios (LLM integration)', ()
       const aboutTitle = spec.sections[aboutIndex].title!;
       const ownerMessage = `make "${aboutTitle}" a blue gradient background`;
       const expectedClass = extractSectionBackgroundClassFromMessage(ownerMessage)!;
-      expect(expectedClass).toMatch(/gradient.*blue/i);
+      expect(expectedClass).toBe(resolveGradientBackgroundClass(ownerMessage));
 
       const result = await runWebsiteEditAgent({
         workspacePath,

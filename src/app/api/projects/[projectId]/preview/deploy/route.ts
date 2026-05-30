@@ -24,7 +24,7 @@ function writeFilesToDisk(files: Array<{ filePath: string; content: string }>, w
   }
 }
 
-/** @deprecated Owner deploy uses POST /code-agent/deploy. */
+/** @deprecated Legacy preview deploy path — owner deploy uses POST /api/projects/[projectId]/code-agent/deploy instead. */
 export async function POST(
   _request: NextRequest,
   { params }: { params: { projectId: string } }

@@ -5,9 +5,12 @@ import {
 } from '@/lib/project-workspace/previewSafeValidation';
 
 describe('previewSafeValidation', () => {
-  it('treats tailwind.config.js as preview-safe', () => {
+  it('treats tailwind and next/postcss config as preview-safe', () => {
     expect(isPreviewSafeChangedFile('tailwind.config.js')).toBe(true);
     expect(isPreviewSafeChangedFile('tailwind.config.ts')).toBe(true);
+    expect(isPreviewSafeChangedFile('postcss.config.js')).toBe(true);
+    expect(isPreviewSafeChangedFile('next.config.js')).toBe(true);
+    expect(isPreviewSafeChangedFile('next.config.mjs')).toBe(true);
   });
 
   it('treats src TSX/CSS as preview-safe', () => {

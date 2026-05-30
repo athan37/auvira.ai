@@ -45,9 +45,10 @@ describeRunLlmIntegration('edit-agent-v3 hard (LLM)', () => {
     }
   });
 
-  it.skip(
-    'planner paraphrase: customers talk about growth → testimonials (V3 catalog LLM parity pending)',
+  it(
+    'planner paraphrase: customers talk about growth → testimonials (V3 catalog LLM)',
     async () => {
+      process.env.SECTION_TARGET_LLM = '1';
       const spec = confusingTitlesSiteSpec();
       workspacePath = await createSyntheticWorkspace({
         site: spec,

@@ -3,8 +3,9 @@
 import { useSession } from 'next-auth/react';
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState, useCallback } from 'react';
-import CrawlProgressCard from '@/components/clone/CrawlProgressCard';
+import { hasCriticalFidelityFailures } from '@/lib/agent/validateContentFidelity';
 import ExtractedFactsCard from '@/components/clone/ExtractedFactsCard';
+import CrawlProgressCard from '@/components/clone/CrawlProgressCard';
 import ProposedPlanCard from '@/components/clone/ProposedPlanCard';
 import ReviewChecklistCard from '@/components/clone/ReviewChecklistCard';
 import BuildDeployProgressCard from '@/components/clone/BuildDeployProgressCard';
@@ -129,6 +130,9 @@ interface ReviewChecklist {
 interface ContentFidelity {
   passed: boolean;
   issues: string[];
+  criticalIssues?: string[];
+  warnIssues?: string[];
+  hasCriticalFailures?: boolean;
 }
 
 interface CloneJob {
@@ -531,6 +535,12 @@ export default function CloneJobPage() {
               if (!checklist.businessNameFound) {
                 blocking.push('Business name not found. Without it we cannot generate an accurate site.');
               }
+              const hasCriticalFidelity = job.contentFidelity
+                ? hasCriticalFidelityFailures(job.contentFidelity)
+                : false;
+              if (hasCriticalFidelity) {
+                blocking.push('Critical content fidelity issues must be resolved before building preview.');
+              }
               const hasBlocking = blocking.length > 0;
               const hasWarnings = checklist.requiredWarnings.length > 0 || checklist.optionalWarnings.length > 0;
               const confidenceMessage = hasBlocking
@@ -604,7 +614,9 @@ export default function CloneJobPage() {
 
             {/* Review ready — approval buttons */}
             {isReviewReady && job.reviewChecklist && (() => {
-              const hasBlocking = !job.reviewChecklist.businessNameFound;
+              const hasBlocking =
+                !job.reviewChecklist.businessNameFound ||
+                (job.contentFidelity ? hasCriticalFidelityFailures(job.contentFidelity) : false);
               return (
               <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
                 <div className="px-4 py-3 border-t-4 border-green-500">
