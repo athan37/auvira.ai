@@ -219,7 +219,12 @@ export async function executeSkill(
 
     if (backgroundColor) {
       const changed = await updateSiteConfig(options, (content) =>
-        updateSectionBackgroundColorInSource(content, sectionIndex, backgroundColor)
+        updateSectionBackgroundColorInSource(
+          content,
+          sectionIndex,
+          backgroundColor,
+          options.ownerMessage
+        )
       );
       if (changed) {
         await wireSectionPresentationPreview(options, sectionIndex, siteModel);
@@ -242,7 +247,12 @@ export async function executeSkill(
         presentation.cardClass = colorNameToCardClass(fallbackColor);
       } else if (fallbackColor) {
         const changed = await updateSiteConfig(options, (content) =>
-          updateSectionBackgroundColorInSource(content, sectionIndex, fallbackColor)
+          updateSectionBackgroundColorInSource(
+            content,
+            sectionIndex,
+            fallbackColor,
+            options.ownerMessage
+          )
         );
         if (changed) {
           await wireSectionPresentationPreview(options, sectionIndex, siteModel);

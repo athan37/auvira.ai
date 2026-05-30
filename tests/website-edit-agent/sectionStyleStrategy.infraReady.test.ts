@@ -57,7 +57,7 @@ describe('runSectionStyleStrategy with infra baseline ready', () => {
     files.set('src/app/page.tsx', LEGACY_PAGE);
     files.set('tailwind.config.js', TAILWIND);
     vi.spyOn(legacyPresentation, 'ensureTailwindPresentationSupport');
-    vi.spyOn(legacyPresentation, 'ensureLegacyPageReadsPresentation');
+    vi.spyOn(legacyPresentation, 'repairSectionPresentationWiringInWorkspace');
   });
 
   it('updates siteConfig and wires legacy page even when infra baseline is ready', async () => {
@@ -73,12 +73,9 @@ describe('runSectionStyleStrategy with infra baseline ready', () => {
 
     const result = await runSectionStyleStrategy(options, {});
     expect(result?.ok).toBe(true);
-    expect(legacyPresentation.ensureLegacyPageReadsPresentation).toHaveBeenCalledWith(
-      options,
-      'GallerySection'
-    );
+    expect(legacyPresentation.repairSectionPresentationWiringInWorkspace).toHaveBeenCalled();
 
-    expect(files.get('src/lib/siteConfig.ts')).toContain('bg-yellow-200');
+    expect(files.get('src/lib/siteConfig.ts')).toContain('bg-yellow-600');
     expect(files.get('src/lib/siteConfig.ts')).toContain(SITECONFIG_PRESENTATION_SYNC_EXPORT);
     expect(files.get('src/app/page.tsx')).toContain('resolveSectionBackground(section, preset)');
 

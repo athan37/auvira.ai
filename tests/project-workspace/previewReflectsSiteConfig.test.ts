@@ -29,7 +29,7 @@ describe('previewReflectsSiteConfig', () => {
       expectedBackgroundClassesFromMessage(
         'change background of Trusted by Over 400,000 to red'
       )
-    ).toEqual(['bg-red-200']);
+    ).toEqual(['bg-red-600']);
   });
 
   it('prefers siteConfig class over generic color in message', () => {

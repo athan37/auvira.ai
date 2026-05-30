@@ -61,8 +61,8 @@ describeRunLlmIntegration(
       expect(siteConfig).toContain(SITECONFIG_PRESENTATION_SYNC_EXPORT);
 
       const htmlNoise = [
-        '<button class="bg-red-600">x</button>',
-        '<p class="text-red-500">red</p>',
+        '<button class="bg-blue-600">x</button>',
+        '<p class="text-blue-500">blue</p>',
         'x'.repeat(2_000),
       ].join('');
 

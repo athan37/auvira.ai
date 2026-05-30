@@ -14,6 +14,7 @@ import { extractSectionComponentSource } from '../resolveSectionTarget';
 import {
   ensureLegacyPageReadsPresentation,
   ensureTailwindPresentationSupport,
+  repairSectionPresentationWiringInWorkspace,
 } from '../legacySectionPresentation';
 import { updateSectionBackgroundColorInSource } from '../../website-edit-agent-v2/siteConfigMutations';
 import { appendSiteConfigPresentationSyncExport } from '@/lib/site-manager/siteConfigAgentMarkers';
@@ -42,7 +43,12 @@ async function tryConfigPresentationUpdate(
   const siteConfigContent = await readWorkspaceRel(options, SITE_CONFIG);
   if (!siteConfigContent) return false;
 
-  const updated = updateSectionBackgroundColorInSource(siteConfigContent, sectionIndex, toColor);
+  const updated = updateSectionBackgroundColorInSource(
+    siteConfigContent,
+    sectionIndex,
+    toColor,
+    options.ownerMessage
+  );
   if (!updated || updated === siteConfigContent) return false;
 
   const stamped = appendSiteConfigPresentationSyncExport(updated);
@@ -137,8 +143,17 @@ export async function runSectionStyleStrategy(
 
   const configUpdated = await tryConfigPresentationUpdate(options, sectionIndex, toColor);
 
-  if (configUpdated && componentName) {
-    await ensureLegacyPageReadsPresentation(options, componentName);
+  if (configUpdated) {
+    const readWrite = options.gateway
+      ? {
+          read: (rel: string) =>
+            options.gateway!.readFile(rel).catch(() => null),
+          write: (rel: string, content: string) =>
+            options.gateway!.writeFile(rel, content),
+        }
+      : undefined;
+    await repairSectionPresentationWiringInWorkspace(options.workspacePath, readWrite);
+    await ensureTailwindPresentationSupport(options);
   }
 
   const skipInfraInlineRepair = options.infraBaselineReady === true;

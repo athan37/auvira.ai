@@ -20,7 +20,7 @@ export const LEGACY_TAILWIND_CONTENT_GLOBS = [
 export const CUSTOMER_SITE_TAILWIND_SAFELIST = `  safelist: [
     {
       pattern:
-        /^bg-(red|yellow|blue|green|orange|purple|pink|teal|cyan|indigo|gray|grey|brown|black|white)-(50|100|200|300|400|500)$/,
+        /^bg-(red|yellow|blue|green|orange|purple|pink|teal|cyan|indigo|gray|grey|brown|black|white)-(50|100|200|300|400|500|600|700|800|900)$/,
     },
     {
       pattern:

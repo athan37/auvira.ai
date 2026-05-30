@@ -8,8 +8,12 @@ import {
 
 describe('sectionPresentation', () => {
   it('maps color names to Tailwind background classes', () => {
-    expect(colorNameToBackgroundClass('yellow')).toBe('bg-yellow-200');
+    expect(colorNameToBackgroundClass('yellow')).toBe('bg-yellow-600');
+    expect(colorNameToBackgroundClass('yellow', 'use a light yellow background')).toBe(
+      'bg-yellow-200'
+    );
     expect(colorNameToBackgroundClass('bg-blue-500')).toBe('bg-blue-500');
+    expect(colorNameToBackgroundClass('red-600')).toBe('bg-red-600');
   });
 
   it('uses per-type preset keys when presentation is unset', () => {

@@ -66,7 +66,7 @@ describe('runSectionStyleStrategy legacy page wiring', () => {
     expect(result?.summary).not.toContain('from yellow to yellow');
 
     const siteConfig = files.get('src/lib/siteConfig.ts')!;
-    expect(siteConfig).toContain('bg-yellow-200');
+    expect(siteConfig).toContain('bg-yellow-600');
 
     const page = files.get('src/app/page.tsx')!;
     expect(page).toContain('resolveSectionBackground(section, preset)');

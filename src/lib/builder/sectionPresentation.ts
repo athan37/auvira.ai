@@ -86,10 +86,27 @@ export function resolveSectionBodyClass(section: SectionLike, preset: PresetLike
 }
 
 /** Map a color name from owner chat to a Tailwind background utility class. */
-export function colorNameToBackgroundClass(color: string): string {
+export function colorNameToBackgroundClass(
+  color: string,
+  ownerMessage?: string
+): string {
   const normalized = color.trim().toLowerCase();
   if (normalized.startsWith('bg-')) return normalized;
-  return `bg-${normalized}-200`;
+
+  const explicitShade = normalized.match(/^([a-z]+)-(\d{2,3})$/);
+  if (explicitShade) {
+    return `bg-${explicitShade[1]}-${explicitShade[2]}`;
+  }
+
+  const colorName = normalized.replace(/[^a-z]/g, '');
+  const msg = (ownerMessage ?? '').toLowerCase();
+  if (/\b(light|pale|soft|pastel)\b/.test(msg)) {
+    return `bg-${colorName}-200`;
+  }
+  if (/\b(dark|deep|rich)\b/.test(msg)) {
+    return `bg-${colorName}-800`;
+  }
+  return `bg-${colorName}-600`;
 }
 
 /** Map a color name to Tailwind classes for cards in a section. */

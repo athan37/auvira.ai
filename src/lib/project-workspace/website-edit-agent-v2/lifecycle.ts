@@ -95,7 +95,12 @@ async function repairMissingSectionPresentation(
     ? updateSectionPresentationInSource(content, sectionIndex, {
         cardClass: colorNameToCardClass(color),
       })
-    : updateSectionBackgroundColorInSource(content, sectionIndex, color);
+    : updateSectionBackgroundColorInSource(
+        content,
+        sectionIndex,
+        color,
+        options.ownerMessage
+      );
 
   if (!updated || updated === content) {
     return null;

@@ -30,6 +30,11 @@ export function resolveSectionIndexFromMessage(
 ): number | null {
   const lower = message.toLowerCase();
 
+  if (/\blast\s+section\b/.test(lower)) {
+    const last = sections[sections.length - 1];
+    return last?.index ?? sections.length - 1;
+  }
+
   if (/\bfirst section\b/.test(lower)) {
     return sections[0]?.index ?? 0;
   }
@@ -61,6 +66,11 @@ export function resolveSectionIndexFromMessage(
   if (/\bservices\b/.test(lower)) {
     const services = sections.find((s) => s.type === 'services');
     if (services) return services.index;
+  }
+
+  if (/\bcontact\b/.test(lower)) {
+    const contact = sections.find((s) => s.type === 'contact');
+    if (contact) return contact.index;
   }
 
   return null;

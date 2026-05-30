@@ -17,7 +17,7 @@ describe('siteConfigMutations presentation', () => {
   it('sets presentation.backgroundClass from color name', () => {
     const updated = updateSectionBackgroundColorInSource(SAMPLE, 0, 'yellow');
     expect(updated).toContain('presentation');
-    expect(updated).toContain('bg-yellow-200');
+    expect(updated).toContain('bg-yellow-600');
     expect(updated).not.toContain('YELLOW_BG');
   });
 
@@ -37,7 +37,7 @@ describe('siteConfigMutations presentation', () => {
 };`;
     const updated = migrateSubtitleStyleMarkersInSource(withSubtitleMarker);
     expect(updated).toContain('"presentation"');
-    expect(updated).toContain('"bg-yellow-200"');
+    expect(updated).toContain('"bg-yellow-600"');
     expect(updated).not.toContain('"YELLOW_BG"');
   });
 });

@@ -10,6 +10,35 @@ import type { WebsiteEditAgentOptions } from '@/lib/project-workspace/website-ed
 
 const RED_CLASS = colorNameToBackgroundClass('red');
 
+const LEGACY_CONTACT_PAGE = `import { siteConfig } from "../lib/siteConfig";
+
+const preset = { contactBg: "bg-[#14532D]", surfaceBg: "bg-white", card: "border bg-white" };
+
+function ContactSection({ section }) {
+  return <section id="contact" className={"px-4 py-20 " + preset.contactBg}>{section.title}</section>;
+}
+
+function SectionRenderer({ section }) {
+  if (section.type === "contact") return <ContactSection section={section} />;
+  return null;
+}
+
+export default function Home() {
+  return <main>{siteConfig.sections.map((s, i) => <SectionRenderer key={i} section={s} />)}</main>;
+}`;
+
+const CONTACT_SITE_CONFIG = `export const siteConfig = {
+  businessName: 'Jobber',
+  sections: [
+    {
+      type: 'contact',
+      title: 'Get Started Today',
+      body: 'Contact us',
+      items: [],
+    },
+  ],
+};`;
+
 const LEGACY_GALLERY_PAGE = `import { siteConfig } from "../lib/siteConfig";
 
 const preset = { mutedBg: "bg-blue-200", surfaceBg: "bg-white", card: "border bg-white" };
@@ -144,5 +173,47 @@ describe('section style legacy preview wiring e2e', () => {
       );
       expect(siteConfig).toContain(`"backgroundClass": "${expected}"`);
     }
+  });
+
+  it('wires contact section and applies solid red background for last-section edit', async () => {
+    await fs.writeFile(path.join(workspacePath, 'src/app/page.tsx'), LEGACY_CONTACT_PAGE, 'utf-8');
+    await fs.writeFile(path.join(workspacePath, 'src/lib/siteConfig.ts'), CONTACT_SITE_CONFIG, 'utf-8');
+
+    const plan: WebsiteEditAgentOptions['editTargetPlan'] = {
+      what: 'style_background',
+      valueExplicit: true,
+      structureBrief: '',
+      codeBlocks: [],
+      where: {
+        kind: 'section',
+        confidence: 'high',
+        sectionIndex: 0,
+        sectionType: 'contact',
+        title: 'Get Started Today',
+        rendererComponent: 'ContactSection',
+        matches: [],
+      },
+    };
+
+    const result = await runSectionStyleStrategy(
+      {
+        workspacePath,
+        ownerMessage: 'change background color of the last section to red',
+        projectId: 'legacy-contact-red',
+        mode: 'gitlab',
+        editTargetPlan: plan,
+        infraBaselineReady: true,
+      },
+      {}
+    );
+
+    expect(result?.ok).toBe(true);
+
+    const siteConfig = await fs.readFile(path.join(workspacePath, 'src/lib/siteConfig.ts'), 'utf-8');
+    const page = await fs.readFile(path.join(workspacePath, 'src/app/page.tsx'), 'utf-8');
+
+    expect(siteConfig).toContain('"backgroundClass": "bg-red-600"');
+    expect(page).toContain('resolveSectionBackground(section, preset)');
+    expect(presentationWiringIssues(siteConfig, page)).toEqual([]);
   });
 });
