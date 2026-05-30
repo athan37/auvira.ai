@@ -8,6 +8,7 @@ import {
   type EditPlan,
 } from './editPlan.schema';
 import { buildPlanEditSystemPrompt, buildPlanEditUserPrompt } from './planEditPrompt';
+import { normalizeEditPlanPayload } from './normalizeEditPlan';
 import { buildDeterministicPlan } from '@/lib/project-workspace/edit-agent-v3/deterministicPlan';
 import { guardUnsupportedPlanSkills } from './validatePlanSkills';
 
@@ -97,7 +98,7 @@ export async function planEdit(input: PlanEditInputUnion): Promise<PlanEditResul
       continue;
     }
 
-    const parsed = EditPlanSchema.safeParse(result.data);
+    const parsed = EditPlanSchema.safeParse(normalizeEditPlanPayload(result.data));
     if (parsed.success) {
       return { ok: true, plan: guardUnsupportedPlanSkills(parsed.data, skillGuardOptions) };
     }

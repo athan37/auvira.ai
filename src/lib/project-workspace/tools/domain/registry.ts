@@ -75,6 +75,14 @@ export function paramsForSkill(
     };
   }
 
+  if (skill === 'update_business_name') {
+    return {
+      scope: 'business',
+      field: 'businessName',
+      value: merged.value ?? merged.businessName,
+    };
+  }
+
   if (skill === 'update_section_copy') {
     const field = (merged.field as string) ?? 'title';
     return {

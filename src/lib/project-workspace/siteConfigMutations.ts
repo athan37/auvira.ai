@@ -119,6 +119,19 @@ export function updateHeroFieldInSource(
 }
 
 /**
+ * Update siteConfig businessName.
+ */
+export function updateBusinessNameInSource(content: string, value: string): string | null {
+  if (!value.trim()) return null;
+
+  return mutateSiteConfigSource(content, (config) => {
+    if (config.businessName === value) return false;
+    config.businessName = value;
+    return true;
+  });
+}
+
+/**
  * Update a contact field in siteConfig.ts source.
  */
 export function updateContactFieldInSource(

@@ -3,7 +3,7 @@ import {
   readWorkspaceRel,
   writeWorkspaceRel,
 } from '@/lib/project-workspace/website-edit-agent/strategyContext';
-import { updateHeroFieldInSource, updateSectionCopyInSource } from '@/lib/project-workspace/siteConfigMutations';
+import { updateHeroFieldInSource, updateSectionCopyInSource, updateBusinessNameInSource } from '@/lib/project-workspace/siteConfigMutations';
 import type { DomainToolContext, DomainToolResult } from './types';
 
 /**
@@ -53,6 +53,26 @@ export async function updateCopyFieldTool(
       changedFiles: [SITE_CONFIG],
       summary: `Updated hero ${field}.`,
       evidence: { field, value },
+    };
+  }
+
+  if (scope === 'business' || field === 'businessName') {
+    const updated = updateBusinessNameInSource(content, value);
+    if (!updated || updated === content) {
+      return {
+        ok: false,
+        changedFiles: [],
+        summary: '',
+        invariantErrors: ['No business name change applied'],
+      };
+    }
+    await writeWorkspaceRel(ctx.agentOptions, SITE_CONFIG, updated);
+    ctx.afterFiles[SITE_CONFIG] = updated;
+    return {
+      ok: true,
+      changedFiles: [SITE_CONFIG],
+      summary: 'Updated business name.',
+      evidence: { field: 'businessName', value },
     };
   }
 

@@ -34,7 +34,7 @@ export type EditPlanIntent = (typeof EDIT_INTENT_NAMES)[number];
 export const RISK_LEVELS = ['low', 'medium', 'high'] as const;
 
 export const EditTargetSchema = z.object({
-  kind: z.enum(['section', 'hero', 'nav', 'footer', 'site']).optional(),
+  kind: z.enum(['section', 'hero', 'nav', 'footer', 'site', 'businessName']).optional(),
   sectionIndex: z.number().optional(),
   sectionTitle: z.string().optional(),
   sectionType: z.string().optional(),
@@ -121,7 +121,10 @@ export const EDIT_PLAN_JSON_SCHEMA: object = {
       items: {
         type: 'object',
         properties: {
-          kind: { type: 'string' },
+          kind: {
+            type: 'string',
+            enum: ['section', 'hero', 'nav', 'footer', 'site', 'businessName'],
+          },
           sectionIndex: { type: 'number' },
           sectionTitle: { type: 'string' },
           sectionType: { type: 'string' },

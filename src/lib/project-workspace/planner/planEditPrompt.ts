@@ -14,6 +14,9 @@ Rules:
 - update_section_style → section background/card via params.backgroundColor or params.presentation.backgroundClass.
 - update_contact → params phone, email, or address with exact user value.
 - update_hero → params headline, subheadline, or tagline.
+- update_business_name → params value (siteConfig businessName only).
+- Target kind must be one of: section, hero, nav, footer, site, businessName.
+- When the owner updates both business name and hero headline to the same text, emit update_business_name and update_hero steps (same value).
 - When EditContext already resolved a section target, use that sectionIndex in target/params.
 - If ambiguous or missing value, set needsClarification true, steps [], clarificationQuestion, suggestedReplies (2+).
 - Do not invent business facts.`;
