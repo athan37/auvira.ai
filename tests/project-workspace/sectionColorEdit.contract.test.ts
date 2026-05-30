@@ -9,6 +9,8 @@ import {
 } from '../support/sectionColorEditContract';
 import {
   assertSectionColorEditInvariants,
+  assertSectionColorEditReady,
+  applySectionBackgroundColorEdit,
 } from '@/lib/project-workspace/sectionPresentationEdit';
 import {
   createSyntheticWorkspace,
@@ -67,6 +69,62 @@ describe('agent contracts: section background color (generic)', () => {
     });
 
     expect(errors.some((e) => e.includes('resolveSectionBackground'))).toBe(true);
+    await destroySyntheticWorkspace(workspacePath);
+  });
+
+  it('post-edit gate fails on siteConfig-only write then passes after pipeline repair', async () => {
+    const workspacePath = await createSyntheticWorkspace({
+      site: { sections: [{ type: 'gallery', title: 'Section 1 (gallery)' }] },
+      pageMode: 'legacy',
+      tailwind: 'canonical',
+    });
+    const expectedClass = colorNameToBackgroundClass('red');
+    const siteConfigBefore = await readSyntheticFile(workspacePath, 'src/lib/siteConfig.ts');
+    const pageBefore = await readSyntheticFile(workspacePath, 'src/app/page.tsx');
+    const tailwind = await readSyntheticFile(workspacePath, 'tailwind.config.js');
+
+    const siteConfigOnly = siteConfigBefore.replace(
+      'items: []',
+      `items: [], presentation: { backgroundClass: "${expectedClass}" }`
+    );
+
+    expect(() =>
+      assertSectionColorEditReady({
+        siteConfigContent: siteConfigOnly,
+        pageContent: pageBefore,
+        tailwindContent: tailwind,
+        sectionIndex: 0,
+        rendererComponent: 'GallerySection',
+        expectedBackgroundClass: expectedClass,
+        infraBaselineReady: true,
+        changedFiles: ['src/lib/siteConfig.ts'],
+      })
+    ).toThrow(/resolveSectionBackground/);
+
+    const pipeline = await applySectionBackgroundColorEdit({
+      workspace: { workspacePath, ownerMessage: 'change gallery background to red' },
+      sectionTarget: {
+        sectionIndex: 0,
+        sectionType: 'gallery',
+        title: 'Section 1 (gallery)',
+        rendererComponent: 'GallerySection',
+      },
+      colorName: 'red',
+      projectInfraStatus: { infraBaselineReady: true },
+    });
+
+    expect(pipeline.ok, pipeline.invariantErrors.join('; ')).toBe(true);
+    assertSectionColorEditReady({
+      siteConfigContent: await readSyntheticFile(workspacePath, 'src/lib/siteConfig.ts'),
+      pageContent: await readSyntheticFile(workspacePath, 'src/app/page.tsx'),
+      tailwindContent: await readSyntheticFile(workspacePath, 'tailwind.config.js'),
+      sectionIndex: 0,
+      rendererComponent: 'GallerySection',
+      expectedBackgroundClass: expectedClass,
+      infraBaselineReady: true,
+      changedFiles: pipeline.changedFiles,
+    });
+
     await destroySyntheticWorkspace(workspacePath);
   });
 });

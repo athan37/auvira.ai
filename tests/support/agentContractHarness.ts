@@ -26,3 +26,9 @@ export {
   type SectionColorEditScenario,
   type SectionColorEditContractResult,
 } from './sectionColorEditContract';
+
+export {
+  applySectionBackgroundColorEdit,
+  assertSectionColorEditReady,
+  assertSectionColorEditInvariants,
+} from '@/lib/project-workspace/sectionPresentationEdit';

@@ -5,7 +5,7 @@
 
 import { colorNameToBackgroundClass } from '@/lib/builder/sectionPresentation';
 import { tailwindConfigCoversBackgroundClass } from '@/lib/builder/tailwindPresentationSupport';
-import { appendSiteConfigPresentationSyncExport, sanitizeSourceForPublish } from '@/lib/site-manager/siteConfigAgentMarkers';
+import { appendSiteConfigPresentationSyncExport, hasInvalidNextJsPageExports, sanitizeSourceForPublish } from '@/lib/site-manager/siteConfigAgentMarkers';
 import { parseSiteConfigSource } from '@/lib/site-manager/siteConfigParser';
 import {
   updateSectionBackgroundColorInSource,
@@ -139,6 +139,10 @@ export function assertSectionColorEditInvariants(
     errors.push(`${rendererComponent} does not use resolveSectionBackground`);
   }
 
+  if (hasInvalidNextJsPageExports(pageContent)) {
+    errors.push('page.tsx contains invalid Next.js agent export stubs (must be sanitized)');
+  }
+
   if (tailwindContent && !tailwindConfigCoversBackgroundClass(tailwindContent, expectedBackgroundClass)) {
     errors.push(`tailwind.config.js does not cover class "${expectedBackgroundClass}"`);
   }
@@ -168,6 +172,14 @@ export function assertSectionColorEditInvariants(
   }
 
   return errors;
+}
+
+/** Plan alias: hard gate — throws when source invariants are not satisfied. */
+export function assertSectionColorEditReady(input: AssertSectionColorEditInvariantsInput): void {
+  const errors = assertSectionColorEditInvariants(input);
+  if (errors.length > 0) {
+    throw new Error(errors.join('; '));
+  }
 }
 
 async function wireTargetSectionOnly(
@@ -375,3 +387,6 @@ export function sectionBackgroundEditFromAgentOptions(
     },
   };
 }
+
+/** Plan alias for unified section background pipeline entrypoint. */
+export const applySectionBackgroundColorEdit = applySectionBackgroundEdit;

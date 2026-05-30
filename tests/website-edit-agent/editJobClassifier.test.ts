@@ -132,6 +132,34 @@ describe('editJobClassifier', () => {
     expect(plan.primaryStrategy).toBe('section_style');
     expect(plan.tier).toBe('L0');
     expect(plan.primaryStrategy).not.toBe('preset_theme');
+    expect(plan.tryOrder).not.toContain('preset_theme');
+  });
+
+  it('routes section background to section_style only (no preset_theme fallback)', () => {
+    const editTargetPlan = {
+      where: {
+        confidence: 'high' as const,
+        kind: 'section' as const,
+        sectionIndex: 0,
+        sectionType: 'gallery',
+        title: 'Gallery',
+        rendererComponent: 'GallerySection',
+      },
+      what: 'style_background' as const,
+      valueExplicit: true,
+      codeBlocks: [],
+      structureBrief: '',
+    };
+    const plan = classifyEditJob(
+      'change gallery section background to red',
+      [],
+      { mode: 'gitlab' } as never,
+      [],
+      editTargetPlan
+    );
+    expect(plan.primaryStrategy).toBe('section_style');
+    expect(plan.tryOrder).not.toContain('preset_theme');
+    expect(plan.tryOrder?.[0]).toBe('section_style');
   });
 
   it('routes grounded section copy with value to section_copy_field', () => {

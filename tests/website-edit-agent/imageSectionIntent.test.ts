@@ -4,6 +4,7 @@ import { planImagePlacementFallback } from '../../src/lib/project-workspace/webs
 import { analyzeSiteStructureForImages } from '../../src/lib/project-workspace/website-edit-agent/siteStructureAnalysis';
 import { stampSiteConfigForGalleryPreviewReload } from '../../src/lib/project-workspace/website-edit-agent/gallerySiteConfig';
 import { validateGalleryInSiteConfigSource } from '../../src/lib/project-workspace/website-edit-agent/validateGallerySiteConfig';
+import { SITECONFIG_PRESENTATION_SYNC_EXPORT } from '@/lib/site-manager/siteConfigAgentMarkers';
 import { parseSiteConfigSource } from '../../src/lib/site-manager/siteConfigParser';
 import { isHeroImageRequest } from '../../src/lib/project-workspace/website-edit-agent/heroImageStrategy';
 
@@ -91,7 +92,7 @@ describe('imageSectionIntent', () => {
       'add image'
     );
     const stamped = stampSiteConfigForGalleryPreviewReload(out);
-    expect(stamped).toContain('__siteAgentGallerySync');
+    expect(stamped).toContain(SITECONFIG_PRESENTATION_SYNC_EXPORT);
     expect(parseSiteConfigSource(stamped)?.sections.length).toBeGreaterThan(0);
     const check = validateGalleryInSiteConfigSource(stamped, attachments);
     expect(check.ok).toBe(true);

@@ -149,7 +149,7 @@ function routeFromGroundedPlan(
       intents: ['style', 'section'],
       tier: 'L0',
       primaryStrategy: 'section_style',
-      tryOrder: buildTryOrder('section_style', ['preset_theme']),
+      tryOrder: buildTryOrder('section_style', []),
       confidence: where.confidence,
       verifyProfile: 'color',
       applyLabel: 'Updating section background',
