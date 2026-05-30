@@ -17,10 +17,13 @@ import type { EditPlan } from './editPlanSchema';
 import { buildSiteModel } from './siteModel';
 import { resolveSectionIndexFromMessage } from './normalizeSectionStyleStep';
 import {
-  updateSectionBackgroundColorInSource,
   migrateSubtitleStyleMarkersInSource,
   updateSectionPresentationInSource,
 } from './siteConfigMutations';
+import {
+  applySectionBackgroundEdit,
+  sectionBackgroundEditFromAgentOptions,
+} from '../sectionPresentationEdit';
 
 const SNAPSHOT_PATHS = [SITE_CONFIG, PAGE_TSX, GLOBALS_CSS] as const;
 
@@ -91,26 +94,37 @@ async function repairMissingSectionPresentation(
   }
 
   const wantsCard = /\bcard(s)?\b/i.test(options.ownerMessage);
-  const updated = wantsCard
-    ? updateSectionPresentationInSource(content, sectionIndex, {
-        cardClass: colorNameToCardClass(color),
-      })
-    : updateSectionBackgroundColorInSource(
-        content,
-        sectionIndex,
-        color,
-        options.ownerMessage
-      );
-
-  if (!updated || updated === content) {
-    return null;
+  if (wantsCard) {
+    const updated = updateSectionPresentationInSource(content, sectionIndex, {
+      cardClass: colorNameToCardClass(color),
+    });
+    if (!updated || updated === content) return null;
+    await writeWorkspaceRel(options, SITE_CONFIG, updated);
+    return {
+      ok: true,
+      action: 'repaired',
+      reason: 'Applied section.presentation card tokens after style edit.',
+    };
   }
 
-  await writeWorkspaceRel(options, SITE_CONFIG, updated);
+  const section = siteModel.sections.find((s) => s.index === sectionIndex);
+  const pipeline = await applySectionBackgroundEdit(
+    sectionBackgroundEditFromAgentOptions(
+      options,
+      {
+        sectionIndex,
+        sectionType: section?.type ?? 'generic',
+        title: section?.title,
+      },
+      color
+    )
+  );
+  if (!pipeline.ok) return null;
+
   return {
     ok: true,
     action: 'repaired',
-    reason: 'Applied section.presentation tokens after style edit.',
+    reason: pipeline.summary || 'Applied section.presentation tokens after style edit.',
   };
 }
 

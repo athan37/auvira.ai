@@ -20,7 +20,6 @@ import {
   addServiceToSource,
   updateContactFieldInSource,
   updateHeroFieldInSource,
-  updateSectionBackgroundColorInSource,
   updateSectionPresentationInSource,
 } from './siteConfigMutations';
 import {
@@ -30,21 +29,9 @@ import {
 import { buildSiteModel } from './siteModel';
 import { normalizeSectionStyleStep } from './normalizeSectionStyleStep';
 import {
-  ensureLegacyPageReadsPresentation,
-  rendererComponentForSectionType,
-} from '../website-edit-agent/legacySectionPresentation';
-import type { SiteModel } from './siteModel';
-
-async function wireSectionPresentationPreview(
-  options: WebsiteEditAgentOptions,
-  sectionIndex: number,
-  siteModel: SiteModel
-): Promise<void> {
-  const section = siteModel.sections.find((s) => s.index === sectionIndex);
-  if (!section?.type) return;
-  const componentName = rendererComponentForSectionType(section.type);
-  await ensureLegacyPageReadsPresentation(options, componentName);
-}
+  applySectionBackgroundEdit,
+  sectionBackgroundEditFromAgentOptions,
+} from '../sectionPresentationEdit';
 
 export interface ExecuteSkillResult {
   ok: boolean;
@@ -218,25 +205,26 @@ export async function executeSkill(
     }
 
     if (backgroundColor) {
-      const changed = await updateSiteConfig(options, (content) =>
-        updateSectionBackgroundColorInSource(
-          content,
-          sectionIndex,
-          backgroundColor,
-          options.ownerMessage
+      const section = siteModel.sections.find((s) => s.index === sectionIndex);
+      const pipeline = await applySectionBackgroundEdit(
+        sectionBackgroundEditFromAgentOptions(
+          options,
+          {
+            sectionIndex,
+            sectionType: section?.type ?? 'generic',
+            title: section?.title,
+          },
+          backgroundColor
         )
       );
-      if (changed) {
-        await wireSectionPresentationPreview(options, sectionIndex, siteModel);
-      }
       return {
-        ok: changed,
+        ok: pipeline.ok,
         skill: step.skill,
-        changed,
-        summary: changed
-          ? `Set section ${sectionIndex} background to ${backgroundColor}.`
-          : undefined,
-        error: changed ? undefined : 'No section presentation change was applied.',
+        changed: pipeline.changedFiles.length > 0,
+        summary: pipeline.ok ? pipeline.summary : undefined,
+        error: pipeline.ok
+          ? undefined
+          : pipeline.invariantErrors.join('; ') || 'No section presentation change was applied.',
       };
     }
 
@@ -246,25 +234,26 @@ export async function executeSkill(
       if (fallbackColor && /\bcard/.test(options.ownerMessage.toLowerCase())) {
         presentation.cardClass = colorNameToCardClass(fallbackColor);
       } else if (fallbackColor) {
-        const changed = await updateSiteConfig(options, (content) =>
-          updateSectionBackgroundColorInSource(
-            content,
-            sectionIndex,
-            fallbackColor,
-            options.ownerMessage
+        const section = siteModel.sections.find((s) => s.index === sectionIndex);
+        const pipeline = await applySectionBackgroundEdit(
+          sectionBackgroundEditFromAgentOptions(
+            options,
+            {
+              sectionIndex,
+              sectionType: section?.type ?? 'generic',
+              title: section?.title,
+            },
+            fallbackColor
           )
         );
-        if (changed) {
-          await wireSectionPresentationPreview(options, sectionIndex, siteModel);
-        }
         return {
-          ok: changed,
+          ok: pipeline.ok,
           skill: step.skill,
-          changed,
-          summary: changed
-            ? `Set section ${sectionIndex} background to ${fallbackColor}.`
-            : undefined,
-          error: changed ? undefined : 'No section presentation change was applied.',
+          changed: pipeline.changedFiles.length > 0,
+          summary: pipeline.ok ? pipeline.summary : undefined,
+          error: pipeline.ok
+            ? undefined
+            : pipeline.invariantErrors.join('; ') || 'No section presentation change was applied.',
         };
       }
       return {
@@ -274,12 +263,37 @@ export async function executeSkill(
       };
     }
 
+    if (presentation.backgroundClass) {
+      const section = siteModel.sections.find((s) => s.index === sectionIndex);
+      const pipeline = await applySectionBackgroundEdit({
+        workspace: {
+          workspacePath: options.workspacePath,
+          gateway: options.gateway,
+          ownerMessage: options.ownerMessage,
+        },
+        sectionTarget: {
+          sectionIndex,
+          sectionType: section?.type ?? 'generic',
+          title: section?.title,
+        },
+        backgroundClass: presentation.backgroundClass,
+        projectInfraStatus: {
+          infraBaselineReady: options.infraBaselineReady === true,
+        },
+      });
+      if (pipeline.ok) {
+        return {
+          ok: true,
+          skill: step.skill,
+          changed: pipeline.changedFiles.length > 0,
+          summary: pipeline.summary,
+        };
+      }
+    }
+
     const changed = await updateSiteConfig(options, (content) =>
       updateSectionPresentationInSource(content, sectionIndex, presentation)
     );
-    if (changed) {
-      await wireSectionPresentationPreview(options, sectionIndex, siteModel);
-    }
     return {
       ok: changed,
       skill: step.skill,
