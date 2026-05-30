@@ -11,6 +11,7 @@ import type { ConversationTurn } from '@/lib/project-workspace/website-edit-agen
 import {
   cleanupPresentationWorkspace,
   createPresentationTestWorkspace,
+  readWorkspacePage,
   readWorkspaceSiteConfig,
 } from '../../website-agent-v2/presentationWorkspace';
 import { defaultMultiSectionSiteSpec } from '../../support/syntheticSiteWorkspace';
@@ -135,7 +136,7 @@ describeRunLlmIntegration('chat history edit (hard LLM integration)', () => {
     expect(siteConfig).toMatch(/type: 'gallery'[\s\S]*backgroundClass.*bg-red/i);
   });
 
-  it('V1 agent: testimonial card option "1" routes with history and updates presentation', async () => {
+  it('V1 agent: testimonial card option "1" routes with history and updates page preset.card', async () => {
     workspacePath = await createPresentationTestWorkspace();
     const turns = history(
       {
@@ -160,9 +161,15 @@ describeRunLlmIntegration('chat history edit (hard LLM integration)', () => {
     }
 
     expect(result.ok, result.error ?? result.ownerMessage ?? JSON.stringify(result)).toBe(true);
+    expect(result.strategy).toBe('preset_card_color');
+    expect(result.changedFiles ?? []).toContain('src/app/page.tsx');
+
+    const page = await readWorkspacePage(workspacePath);
+    expect(page).toMatch(/"card"\s*:\s*"[^"]*border-red[^"]*bg-red[^"]*"/i);
+
     const siteConfig = await readWorkspaceSiteConfig(workspacePath);
-    expect(siteConfig).toMatch(/presentation|cardClass|backgroundClass/i);
-    expect(siteConfig.indexOf('"type": \'testimonials\'') < siteConfig.length).toBe(true);
+    expect(siteConfig).toContain("type: 'testimonials'");
+    expect(siteConfig).not.toMatch(/presentation|cardClass|backgroundClass/i);
   });
 
   it('V2 planner: testimonial style follow-up chooses section background scope', async () => {
