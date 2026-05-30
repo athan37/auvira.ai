@@ -4,7 +4,6 @@
  */
 
 export {
-  buildSyntheticSiteModel,
   createSyntheticWorkspace,
   destroySyntheticWorkspace,
   readSyntheticFile,

@@ -12,7 +12,7 @@ import type { WebsiteEditAgentOptions } from '@/lib/project-workspace/website-ed
 import {
   PAGE_SOURCE,
   SITE_CONFIG_SOURCE,
-} from '../website-agent-v2/presentationWorkspace';
+} from '../support/presentationWorkspace';
 
 vi.mock('@/lib/project-workspace/verifyEditVisibleInPreview', () => ({
   verifyEditVisibleInPreview: vi.fn().mockResolvedValue({

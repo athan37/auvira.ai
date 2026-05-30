@@ -49,7 +49,9 @@ npm run typecheck && npm run build
 |------|------|
 | Unified section color pipeline | `src/lib/project-workspace/sectionPresentationEdit.ts` |
 | V1 section style strategy | `src/lib/project-workspace/website-edit-agent/strategies/sectionStyleStrategy.ts` |
-| V2 executor | `src/lib/project-workspace/website-edit-agent-v2/executor.ts` |
+| V3 edit agent (default gitlab) | `src/lib/project-workspace/edit-agent-v3/index.ts` |
+| siteConfig mutations | `src/lib/project-workspace/siteConfigMutations.ts` |
+| Edit run snapshot / rollback | `src/lib/project-workspace/editRunSnapshot.ts` |
 | Edit classifier | `src/lib/project-workspace/website-edit-agent/editJobClassifier.ts` |
 | Synthetic test harness | `tests/support/syntheticSiteWorkspace.ts`, `tests/support/sectionColorEditContract.ts` |
 | LLM test gate | `tests/llmTestGate.ts` |

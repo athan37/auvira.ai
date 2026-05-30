@@ -53,7 +53,7 @@ import {
   appendTimedEditJobLog,
   logEditTimingSummary,
 } from '@/lib/project-workspace/editTiming';
-import { migrateSubtitleStyleMarkersInSource } from '@/lib/project-workspace/website-edit-agent-v2/siteConfigMutations';
+import { migrateSubtitleStyleMarkersInSource } from '@/lib/project-workspace/siteConfigMutations';
 import { promises as fs } from 'fs';
 import path from 'path';
 import crypto from 'crypto';

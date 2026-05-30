@@ -3,7 +3,7 @@ import {
   migrateSubtitleStyleMarkersInSource,
   updateSectionBackgroundColorInSource,
   updateSectionPresentationInSource,
-} from '@/lib/project-workspace/website-edit-agent-v2/siteConfigMutations';
+} from '@/lib/project-workspace/siteConfigMutations';
 
 const SAMPLE = `export type SiteSection = { type: string; title: string; presentation?: { backgroundClass?: string } };
 export const siteConfig = {

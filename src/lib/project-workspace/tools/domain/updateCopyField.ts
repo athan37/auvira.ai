@@ -5,7 +5,7 @@ import {
 } from '@/lib/project-workspace/website-edit-agent/strategyContext';
 import {
   updateHeroFieldInSource,
-} from '@/lib/project-workspace/website-edit-agent-v2/siteConfigMutations';
+} from '@/lib/project-workspace/siteConfigMutations';
 import type { DomainToolContext, DomainToolResult } from './types';
 
 /**

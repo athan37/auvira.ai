@@ -1,26 +1,41 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { runWebsiteEdit } from '@/lib/project-workspace/websiteEditRunner';
+import {
+  resolveWebsiteEditAgentMode,
+  runWebsiteEdit,
+} from '@/lib/project-workspace/websiteEditRunner';
 
-describe('WEBSITE_AGENT_V3 flag', () => {
+describe('website edit agent routing', () => {
+  const originalV1 = process.env.WEBSITE_AGENT_V1;
   const originalV3 = process.env.WEBSITE_AGENT_V3;
-  const originalV2 = process.env.WEBSITE_AGENT_V2;
 
   beforeEach(() => {
-    delete process.env.WEBSITE_AGENT_V2;
+    delete process.env.WEBSITE_AGENT_V1;
+    delete process.env.WEBSITE_AGENT_V3;
   });
 
   afterEach(() => {
+    if (originalV1 === undefined) delete process.env.WEBSITE_AGENT_V1;
+    else process.env.WEBSITE_AGENT_V1 = originalV1;
     if (originalV3 === undefined) delete process.env.WEBSITE_AGENT_V3;
     else process.env.WEBSITE_AGENT_V3 = originalV3;
-    if (originalV2 === undefined) delete process.env.WEBSITE_AGENT_V2;
-    else process.env.WEBSITE_AGENT_V2 = originalV2;
   });
 
-  it('routes to ts-v3 when flag is set', async () => {
-    process.env.WEBSITE_AGENT_V3 = 'true';
+  it('defaults to ts-v3 for gitlab workspaces', () => {
+    expect(resolveWebsiteEditAgentMode({ mode: 'gitlab' })).toBe('ts-v3');
+  });
 
+  it('uses legacy ts for static workspaces', () => {
+    expect(resolveWebsiteEditAgentMode({ mode: 'static' })).toBe('ts');
+  });
+
+  it('routes to ts-v1 when WEBSITE_AGENT_V1=true', () => {
+    process.env.WEBSITE_AGENT_V1 = 'true';
+    expect(resolveWebsiteEditAgentMode({ mode: 'gitlab' })).toBe('ts');
+  });
+
+  it('runWebsiteEdit reports ts-v3 by default on gitlab', async () => {
     const result = await runWebsiteEdit({
-      workspacePath: '/nonexistent-path-for-v3-flag-test',
+      workspacePath: '/nonexistent-path-for-v3-default-test',
       ownerMessage: 'test',
       projectId: 'flag-test',
       mode: 'gitlab',
@@ -28,19 +43,5 @@ describe('WEBSITE_AGENT_V3 flag', () => {
 
     expect(result.agent).toBe('ts-v3');
     expect(result.ok).toBe(false);
-  });
-
-  it('V3 takes precedence over V2', async () => {
-    process.env.WEBSITE_AGENT_V3 = 'true';
-    process.env.WEBSITE_AGENT_V2 = 'true';
-
-    const result = await runWebsiteEdit({
-      workspacePath: '/nonexistent-path-for-v3-flag-test',
-      ownerMessage: 'test',
-      projectId: 'flag-test',
-      mode: 'gitlab',
-    });
-
-    expect(result.agent).toBe('ts-v3');
   });
 });

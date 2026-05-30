@@ -19,7 +19,6 @@ import {
 } from '@/lib/project-workspace/website-edit-agent/siteSectionCatalog';
 import { resolveSectionWithCatalogLLM } from '@/lib/project-workspace/website-edit-agent/resolveSectionWithCatalogLLM';
 import {
-  buildSyntheticSiteModel,
   createSyntheticWorkspace,
   destroySyntheticWorkspace,
   readSyntheticFile,
@@ -31,7 +30,9 @@ import {
 import { assertExactSectionBackgroundInSiteConfig } from '../../support/sectionColorEditContract';
 import {
   planWithLiveLlm,
-} from '../../website-agent-v2/llmIntegrationHarness';
+  styleStepBackgroundHint,
+  styleStepSectionIndex,
+} from '../../support/planWithLiveLlm';
 import type { ConversationTurn } from '@/lib/project-workspace/website-edit-agent/types';
 
 function parseSections(siteConfig: string): Array<Record<string, unknown>> {
@@ -228,33 +229,28 @@ describeRunLlmIntegration('section catalog hard scenarios (LLM integration)', ()
   );
 
   it(
-    'V2 planner: paraphrase "customers say about growth" picks testimonials not services',
+    'V3 planner: paraphrase "customers say about growth" picks testimonials not services',
     async () => {
       const spec = confusingTitlesSiteSpec();
-      const siteModel = buildSyntheticSiteModel(spec);
 
       const plan = await planWithLiveLlm(
         'Make the section where customers talk about growth have a purple background',
-        siteModel
+        spec
       );
 
       expect(plan.needsClarification, JSON.stringify(plan)).not.toBe(true);
       const styleStep = plan.steps.find((step) => step.skill === 'update_section_style');
       expect(styleStep, JSON.stringify(plan.steps)).toBeTruthy();
-      expect(styleStep?.args?.sectionIndex).toBe(3);
-      const presentation = styleStep?.args?.presentation as { backgroundClass?: unknown } | undefined;
-      expect(
-        String(styleStep?.args?.backgroundColor ?? presentation?.backgroundClass ?? '')
-      ).toMatch(/purple/i);
+      expect(styleStepSectionIndex(styleStep)).toBe(3);
+      expect(styleStepBackgroundHint(styleStep)).toMatch(/purple/i);
     },
     LLM_TEST_TIMEOUT_MS
   );
 
   it(
-    'V2 planner: recency override when owner revises target section mid-thread',
+    'V3 planner: recency override when owner revises target section mid-thread',
     async () => {
       const spec = confusingTitlesSiteSpec();
-      const siteModel = buildSyntheticSiteModel(spec);
       const growTitle = spec.sections[0].title!;
       const contactTitle = spec.sections[4].title!;
 
@@ -270,12 +266,12 @@ describeRunLlmIntegration('section catalog hard scenarios (LLM integration)', ()
         }
       );
 
-      const plan = await planWithLiveLlm(turns[2].content, siteModel, turns);
+      const plan = await planWithLiveLlm(turns[2].content, spec, turns);
 
       expect(plan.needsClarification, JSON.stringify(plan)).not.toBe(true);
       const styleStep = plan.steps.find((step) => step.skill === 'update_section_style');
       expect(styleStep, JSON.stringify(plan.steps)).toBeTruthy();
-      expect(styleStep?.args?.sectionIndex).toBe(0);
+      expect(styleStepSectionIndex(styleStep)).toBe(0);
     },
     LLM_TEST_TIMEOUT_MS
   );
@@ -689,29 +685,27 @@ describeRunLlmIntegration('section catalog hard scenarios (LLM integration)', ()
   );
 
   it(
-    'V2 planner: hero vs first section color targets first content section when named',
+    'V3 planner: hero vs first section color targets first content section when named',
     async () => {
       const spec = confusingTitlesSiteSpec();
-      const siteModel = buildSyntheticSiteModel(spec);
 
       const plan = await planWithLiveLlm(
         'Change the first content section (not the hero) background to teal — the one titled Everything You Need to Grow Your Business',
-        siteModel
+        spec
       );
 
       expect(plan.needsClarification, JSON.stringify(plan)).not.toBe(true);
       const styleStep = plan.steps.find((step) => step.skill === 'update_section_style');
       expect(styleStep, JSON.stringify(plan.steps)).toBeTruthy();
-      expect(styleStep?.args?.sectionIndex).toBe(0);
+      expect(styleStepSectionIndex(styleStep)).toBe(0);
     },
     LLM_TEST_TIMEOUT_MS
   );
 
   it(
-    'V2 planner: card color vs section background — whole section after scope clarification',
+    'V3 planner: card color vs section background — whole section after scope clarification',
     async () => {
       const spec = confusingTitlesSiteSpec();
-      const siteModel = buildSyntheticSiteModel(spec);
       const testimonialsTitle = spec.sections[3].title!;
 
       const styleScopeClarification =
@@ -722,12 +716,12 @@ describeRunLlmIntegration('section catalog hard scenarios (LLM integration)', ()
         { role: 'assistant', content: styleScopeClarification }
       );
 
-      const plan = await planWithLiveLlm('whole section background', siteModel, turns);
+      const plan = await planWithLiveLlm('whole section background', spec, turns);
 
       expect(plan.needsClarification, JSON.stringify(plan)).not.toBe(true);
       const styleStep = plan.steps.find((step) => step.skill === 'update_section_style');
       expect(styleStep, JSON.stringify(plan.steps)).toBeTruthy();
-      expect(styleStep?.args?.sectionIndex).toBe(3);
+      expect(styleStepSectionIndex(styleStep)).toBe(3);
     },
     LLM_TEST_TIMEOUT_MS
   );
