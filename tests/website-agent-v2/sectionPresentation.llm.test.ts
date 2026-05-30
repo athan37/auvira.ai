@@ -28,6 +28,11 @@ import {
   readWorkspacePage,
   readWorkspaceSiteConfig,
 } from './presentationWorkspace';
+import { defaultMultiSectionSiteSpec } from '../support/syntheticSiteWorkspace';
+
+const SYNTHETIC_SECTIONS = defaultMultiSectionSiteSpec().sections;
+const ABOUT_TITLE = SYNTHETIC_SECTIONS[1].title!;
+const TESTIMONIALS_TITLE = SYNTHETIC_SECTIONS[3].title!;
 
 type PlannerCase = {
   name: string;
@@ -50,21 +55,20 @@ type E2eCase = {
 
 const PLANNER_CASES: PlannerCase[] = [
   {
-    name: 'gallery Hello section → yellow background',
-    message: 'Change the Hello gallery section background to yellow',
+    name: 'gallery section → yellow background',
+    message: `Change the gallery section background to yellow`,
     color: 'yellow',
     sectionIndex: 2,
   },
   {
-    name: 'About Us section → blue background',
-    message: 'Change the About Us section background to blue',
+    name: 'about section → blue background',
+    message: `Change the "${ABOUT_TITLE}" section background to blue`,
     color: 'blue',
     sectionIndex: 1,
   },
   {
     name: 'testimonials cards → red',
-    message:
-      'Make the testimonial cards red in the What Our Customers Say section',
+    message: `Make the testimonial cards red in the ${TESTIMONIALS_TITLE} section`,
     color: 'red',
     sectionIndex: 3,
   },
@@ -89,20 +93,20 @@ const PLANNER_CASES: PlannerCase[] = [
 
 const E2E_CASES: E2eCase[] = [
   {
-    name: 'gallery Hello → yellow via V2 executor',
-    message: 'Change the Hello gallery section background to yellow',
+    name: 'gallery → yellow via V2 executor',
+    message: 'Change the gallery section background to yellow',
     color: 'yellow',
     field: 'backgroundClass',
   },
   {
-    name: 'About Us → blue background',
-    message: 'Change the About Us section background to blue',
+    name: 'about → blue background',
+    message: `Change the "${ABOUT_TITLE}" section background to blue`,
     color: 'blue',
     field: 'backgroundClass',
   },
   {
     name: 'testimonials cards → red cardClass',
-    message: 'Make the cards red in the What Our Customers Say testimonials section',
+    message: `Make the cards red in the ${TESTIMONIALS_TITLE} testimonials section`,
     color: 'red',
     field: 'cardClass',
   },
@@ -230,7 +234,7 @@ llmDescribe('Section presentation tokens — live LLM suite', () => {
         try {
           const result = await runWebsiteEdit({
             workspacePath,
-            ownerMessage: 'Change the Hello gallery section background to yellow',
+            ownerMessage: 'Change the gallery section background to yellow',
             projectId: 'llm-presentation-router-v2',
             mode: 'gitlab',
           });
@@ -261,7 +265,7 @@ llmDescribe('Section presentation tokens — live LLM suite', () => {
         try {
           const result = await runWebsiteEditAgent({
             workspacePath,
-            ownerMessage: 'Change the Hello gallery section background to yellow',
+            ownerMessage: 'Change the gallery section background to yellow',
             projectId: 'llm-presentation-v1',
             mode: 'gitlab',
           });
@@ -292,17 +296,17 @@ llmDescribe('Section presentation tokens — live LLM suite', () => {
     const PLANNER_INTEGRATION_CASES = [
       {
         name: 'plans update_section_style for gallery yellow',
-        message: 'Change the Hello gallery section background to yellow',
+        message: 'Change the gallery section background to yellow',
         color: 'yellow',
       },
       {
         name: 'plans update_section_style for about blue',
-        message: 'Change the About Us section background to blue',
+        message: `Change the "${ABOUT_TITLE}" section background to blue`,
         color: 'blue',
       },
       {
         name: 'plans update_section_style for testimonial cards',
-        message: 'Make the testimonial cards red in What Our Customers Say',
+        message: `Make the testimonial cards red in ${TESTIMONIALS_TITLE}`,
         color: 'red',
       },
     ];
@@ -335,7 +339,7 @@ llmDescribe('Section presentation tokens — live LLM suite', () => {
 
         const result = await runWebsiteEditAgentV2({
           workspacePath,
-          ownerMessage: 'Change the Hello gallery section background to yellow',
+          ownerMessage: 'Change the gallery section background to yellow',
           projectId: 'llm-planner-executor',
           mode: 'gitlab',
         });
