@@ -6,7 +6,6 @@ import {
 import {
   buildStrategyResult,
   PAGE_TSX,
-  SITE_CONFIG,
   readWorkspaceRel,
   writeWorkspaceRel,
 } from '../strategyContext';
@@ -14,46 +13,15 @@ import { extractSectionComponentSource } from '../resolveSectionTarget';
 import {
   ensureLegacyPageReadsPresentation,
   ensureTailwindPresentationSupport,
-  repairSectionPresentationWiringInWorkspace,
 } from '../legacySectionPresentation';
-import { updateSectionBackgroundColorInSource } from '../../website-edit-agent-v2/siteConfigMutations';
-import { appendSiteConfigPresentationSyncExport } from '@/lib/site-manager/siteConfigAgentMarkers';
+import {
+  applySectionBackgroundEdit,
+  sectionBackgroundEditFromAgentOptions,
+} from '../../sectionPresentationEdit';
 import type { WebsiteEditAgentOptions, WebsiteEditAgentResult } from '../types';
-
-function buildSectionStyleSummary(
-  sectionLabel: string,
-  toColor: string,
-  swap: ReturnType<typeof parseColorSwap>
-): string {
-  if (swap && swap.fromColor !== swap.toColor) {
-    return `Changed background of "${sectionLabel}" from ${swap.fromColor} to ${swap.toColor}.`;
-  }
-  return `Changed background of "${sectionLabel}" to ${toColor}.`;
-}
 
 function tailwindBgClass(color: string): string {
   return `bg-${color}-100`;
-}
-
-async function tryConfigPresentationUpdate(
-  options: WebsiteEditAgentOptions,
-  sectionIndex: number,
-  toColor: string
-): Promise<boolean> {
-  const siteConfigContent = await readWorkspaceRel(options, SITE_CONFIG);
-  if (!siteConfigContent) return false;
-
-  const updated = updateSectionBackgroundColorInSource(
-    siteConfigContent,
-    sectionIndex,
-    toColor,
-    options.ownerMessage
-  );
-  if (!updated || updated === siteConfigContent) return false;
-
-  const stamped = appendSiteConfigPresentationSyncExport(updated);
-  await writeWorkspaceRel(options, SITE_CONFIG, stamped);
-  return true;
 }
 
 async function tryPageComponentPatch(
@@ -115,7 +83,7 @@ async function tryPageComponentPatch(
 }
 
 /**
- * L0: section-scoped background via siteConfig.presentation first, page.tsx patch as fallback.
+ * L0: section-scoped background via unified presentation pipeline.
  */
 export async function runSectionStyleStrategy(
   options: WebsiteEditAgentOptions,
@@ -138,46 +106,60 @@ export async function runSectionStyleStrategy(
   if (!toColor) return null;
 
   const sectionIndex = plan.where.sectionIndex;
-  const sectionLabel = plan.where.title ?? `section ${sectionIndex}`;
   const componentName = plan.where.rendererComponent;
 
-  const configUpdated = await tryConfigPresentationUpdate(options, sectionIndex, toColor);
+  const pipelineResult = await applySectionBackgroundEdit(
+    sectionBackgroundEditFromAgentOptions(
+      options,
+      {
+        sectionIndex,
+        sectionType: plan.where.sectionType ?? 'generic',
+        title: plan.where.title,
+        rendererComponent: componentName,
+      },
+      toColor
+    )
+  );
 
-  if (configUpdated) {
-    const readWrite = options.gateway
-      ? {
-          read: (rel: string) =>
-            options.gateway!.readFile(rel).catch(() => null),
-          write: (rel: string, content: string) =>
-            options.gateway!.writeFile(rel, content),
-        }
-      : undefined;
-    await repairSectionPresentationWiringInWorkspace(options.workspacePath, readWrite);
-    await ensureTailwindPresentationSupport(options);
+  if (pipelineResult.ok) {
+    return buildStrategyResult(
+      options,
+      beforeHashes,
+      'section_style',
+      'L0',
+      pipelineResult.summary,
+      { confidence: 'high' }
+    );
   }
 
-  const skipInfraInlineRepair = options.infraBaselineReady === true;
-  const tailwindPatched =
-    configUpdated || skipInfraInlineRepair
-      ? false
-      : await ensureTailwindPresentationSupport(options);
+  if (options.infraBaselineReady === true) {
+    return {
+      ok: false,
+      error: pipelineResult.invariantErrors.join('; ') || 'Section color edit failed invariants',
+      summary: pipelineResult.summary,
+      ownerMessage: pipelineResult.summary,
+      strategy: 'section_style',
+      tier: 'L0',
+      confidence: 'high',
+      changedFiles: pipelineResult.changedFiles,
+    };
+  }
+
+  const tailwindPatched = await ensureTailwindPresentationSupport(options);
   const pageUpgraded =
-    configUpdated || skipInfraInlineRepair || componentName == null
+    componentName == null
       ? false
       : await ensureLegacyPageReadsPresentation(options, componentName);
 
-  if (configUpdated) {
-    const summary = buildSectionStyleSummary(sectionLabel, toColor, swap);
-    return buildStrategyResult(options, beforeHashes, 'section_style', 'L0', summary, {
-      confidence: 'high',
-    });
-  }
-
   if (pageUpgraded || tailwindPatched) {
-    const summary = buildSectionStyleSummary(sectionLabel, toColor, swap);
-    return buildStrategyResult(options, beforeHashes, 'section_style', 'L0', summary, {
-      confidence: 'medium',
-    });
+    return buildStrategyResult(
+      options,
+      beforeHashes,
+      'section_style',
+      'L0',
+      pipelineResult.summary || `Changed section ${sectionIndex} background to ${toColor}.`,
+      { confidence: 'medium' }
+    );
   }
 
   if (!componentName) return null;
