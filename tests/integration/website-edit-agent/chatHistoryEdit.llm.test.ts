@@ -4,16 +4,18 @@ import { runWebsiteEditAgent } from '@/lib/project-workspace/website-edit-agent'
 import { colorNameToBackgroundClass } from '@/lib/builder/sectionPresentation';
 import { describeRunLlmIntegration } from '../../llmTestGate';
 import {
-  BASE_SITE_MODEL,
+  BASE_SITE_SPEC,
   planWithLiveLlm,
-} from '../../website-agent-v2/llmIntegrationHarness';
+  styleStepBackgroundHint,
+  styleStepSectionIndex,
+} from '../../support/planWithLiveLlm';
 import type { ConversationTurn } from '@/lib/project-workspace/website-edit-agent/types';
 import {
   cleanupPresentationWorkspace,
   createPresentationTestWorkspace,
   readWorkspacePage,
   readWorkspaceSiteConfig,
-} from '../../website-agent-v2/presentationWorkspace';
+} from '../../support/presentationWorkspace';
 import { defaultMultiSectionSiteSpec } from '../../support/syntheticSiteWorkspace';
 
 const SYNTHETIC_SECTIONS = defaultMultiSectionSiteSpec().sections;
@@ -53,35 +55,35 @@ describeRunLlmIntegration('chat history edit (hard LLM integration)', () => {
     }
   });
 
-  it('V2 planner: section number follow-up targets gallery after deictic first turn', async () => {
+  it('V3 planner: section number follow-up targets gallery after deictic first turn', async () => {
     const turns = history(
       { role: 'user', content: 'Change the background color of this section to red' },
       { role: 'assistant', content: SECTION_LIST_CLARIFICATION }
     );
 
-    const plan = await planWithLiveLlm('3', BASE_SITE_MODEL, turns);
+    const plan = await planWithLiveLlm('3', BASE_SITE_SPEC, turns);
 
     expect(plan.needsClarification, JSON.stringify(plan)).not.toBe(true);
     const styleStep = plan.steps.find((step) => step.skill === 'update_section_style');
     expect(styleStep, JSON.stringify(plan.steps)).toBeTruthy();
-    expect(styleStep?.args?.sectionIndex).toBe(GALLERY_INDEX);
+    expect(styleStepSectionIndex(styleStep)).toBe(GALLERY_INDEX);
   });
 
-  it('V2 planner: style-scope follow-up applies gallery background after clarification', async () => {
+  it('V3 planner: style-scope follow-up applies gallery background after clarification', async () => {
     const turns = history(
       { role: 'user', content: 'Make the gallery section background red' },
       { role: 'assistant', content: STYLE_SCOPE_CLARIFICATION }
     );
 
-    const plan = await planWithLiveLlm('whole section background', BASE_SITE_MODEL, turns);
+    const plan = await planWithLiveLlm('whole section background', BASE_SITE_SPEC, turns);
 
     expect(plan.needsClarification, JSON.stringify(plan)).not.toBe(true);
     const styleStep = plan.steps.find((step) => step.skill === 'update_section_style');
     expect(styleStep, JSON.stringify(plan.steps)).toBeTruthy();
-    expect(styleStep?.args?.sectionIndex).toBe(GALLERY_INDEX);
+    expect(styleStepSectionIndex(styleStep)).toBe(GALLERY_INDEX);
   });
 
-  it('V2 planner: recency wins when owner revises color in latest message', async () => {
+  it('V3 planner: recency wins when owner revises color in latest message', async () => {
     const turns = history(
       { role: 'user', content: 'Change the gallery section background to red' },
       { role: 'assistant', content: 'Updated gallery background to red.' },
@@ -90,20 +92,15 @@ describeRunLlmIntegration('chat history edit (hard LLM integration)', () => {
 
     const plan = await planWithLiveLlm(
       'Actually make the gallery section background blue instead',
-      BASE_SITE_MODEL,
+      BASE_SITE_SPEC,
       turns
     );
 
     expect(plan.needsClarification, JSON.stringify(plan)).not.toBe(true);
     const styleStep = plan.steps.find((step) => step.skill === 'update_section_style');
     expect(styleStep, JSON.stringify(plan.steps)).toBeTruthy();
-    expect(styleStep?.args?.sectionIndex).toBe(GALLERY_INDEX);
-    const presentation = styleStep?.args?.presentation as
-      | { backgroundClass?: unknown }
-      | undefined;
-    expect(
-      String(styleStep?.args?.backgroundColor ?? presentation?.backgroundClass ?? '')
-    ).toMatch(/blue/i);
+    expect(styleStepSectionIndex(styleStep)).toBe(GALLERY_INDEX);
+    expect(styleStepBackgroundHint(styleStep)).toMatch(/blue/i);
   });
 
   it('V1 agent: section number follow-up writes gallery presentation class to siteConfig', async () => {
@@ -170,17 +167,17 @@ describeRunLlmIntegration('chat history edit (hard LLM integration)', () => {
     expect(siteConfig).not.toMatch(/presentation|cardClass|backgroundClass/i);
   });
 
-  it('V2 planner: testimonial style follow-up chooses section background scope', async () => {
+  it('V3 planner: testimonial style follow-up chooses section background scope', async () => {
     const turns = history(
       { role: 'user', content: 'Make the testimonials section background red' },
       { role: 'assistant', content: STYLE_SCOPE_CLARIFICATION }
     );
 
-    const plan = await planWithLiveLlm('whole section background', BASE_SITE_MODEL, turns);
+    const plan = await planWithLiveLlm('whole section background', BASE_SITE_SPEC, turns);
 
     expect(plan.needsClarification, JSON.stringify(plan)).not.toBe(true);
     const styleStep = plan.steps.find((step) => step.skill === 'update_section_style');
     expect(styleStep, JSON.stringify(plan.steps)).toBeTruthy();
-    expect(styleStep?.args?.sectionIndex).toBe(TESTIMONIALS_INDEX);
+    expect(styleStepSectionIndex(styleStep)).toBe(TESTIMONIALS_INDEX);
   });
 });

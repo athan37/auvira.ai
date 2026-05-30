@@ -15,7 +15,7 @@ import {
   createPresentationTestWorkspace,
   readWorkspacePage,
   readWorkspaceSiteConfig,
-} from '../../website-agent-v2/presentationWorkspace';
+} from '../../support/presentationWorkspace';
 import { defaultMultiSectionSiteSpec } from '../../support/syntheticSiteWorkspace';
 
 const PROMPT = `Change the ${defaultMultiSectionSiteSpec().sections[3].title} section background to red`;

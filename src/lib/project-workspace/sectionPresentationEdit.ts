@@ -16,7 +16,7 @@ import { parseSiteConfigSource } from '@/lib/site-manager/siteConfigParser';
 import {
   updateSectionBackgroundColorInSource,
   updateSectionPresentationInSource,
-} from './website-edit-agent-v2/siteConfigMutations';
+} from './siteConfigMutations';
 import {
   ensureLegacyPageReadsPresentation,
   ensureTailwindPresentationSupport,
@@ -543,6 +543,9 @@ function resolveGateSummaryTarget(
     index: t.sectionIndex,
     title: t.title,
     type: t.sectionType,
+    hasImageItems: false,
+    imageItemCount: 0,
+    itemCount: 0,
   }));
   const best = findBestSectionTitleMatch(titleCandidates, catalogSections);
   if (best) {

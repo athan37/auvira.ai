@@ -6,7 +6,7 @@ import {
 import {
   addSectionToSource,
   addServiceToSource,
-} from '@/lib/project-workspace/website-edit-agent-v2/siteConfigMutations';
+} from '@/lib/project-workspace/siteConfigMutations';
 import type { DomainToolContext, DomainToolResult } from './types';
 
 /** Add a section or service item to siteConfig. */

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { updateSectionBackgroundColorInSource } from '@/lib/project-workspace/website-edit-agent-v2/siteConfigMutations';
+import { updateSectionBackgroundColorInSource } from '@/lib/project-workspace/siteConfigMutations';
 
 const SITE_CONFIG = `export const siteConfig = {
   sections: [

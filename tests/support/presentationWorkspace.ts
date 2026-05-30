@@ -6,7 +6,7 @@ import {
   buildSyntheticSiteConfigSource,
   createSyntheticWorkspace,
   defaultMultiSectionSiteSpec,
-} from '../support/syntheticSiteWorkspace';
+} from './syntheticSiteWorkspace';
 
 /** @deprecated Use readSyntheticFile from syntheticSiteWorkspace */
 export async function readWorkspaceSiteConfig(workspacePath: string): Promise<string> {

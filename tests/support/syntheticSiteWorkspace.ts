@@ -6,7 +6,6 @@
 import path from 'path';
 import { promises as fs } from 'fs';
 import { randomUUID } from 'crypto';
-import type { SiteModel } from '@/lib/project-workspace/website-edit-agent-v2';
 import { SECTION_PRESENTATION_RUNTIME } from '@/lib/builder/sectionPresentationRuntime';
 import { defaultSectionBackgroundKey } from '@/lib/builder/sectionPresentation';
 import { rendererComponentForSectionType } from '@/lib/project-workspace/website-edit-agent/legacySectionPresentation';
@@ -216,32 +215,4 @@ export async function readSyntheticFile(
 
 export async function destroySyntheticWorkspace(workspacePath: string): Promise<void> {
   await fs.rm(workspacePath, { recursive: true, force: true });
-}
-
-/** Map synthetic site spec to V2 SiteModel for planner LLM tests. */
-export function buildSyntheticSiteModel(
-  spec: SyntheticSiteSpec = defaultMultiSectionSiteSpec()
-): SiteModel {
-  const businessName = spec.businessName ?? 'Synthetic Site';
-  return {
-    mode: 'gitlab',
-    businessName,
-    hero: { headline: 'Synthetic hero', subheadline: 'Synthetic tagline' },
-    contact: {},
-    sections: spec.sections.map((section, index) => ({
-      index,
-      type: String(section.type),
-      title: section.title ?? defaultTitle(String(section.type), index),
-      body: 'Synthetic body',
-      itemCount: 0,
-      items: [],
-    })),
-    files: [],
-    capabilities: {
-      hasSiteConfig: true,
-      hasPage: true,
-      hasGlobalsCss: true,
-      supportsConfigSkills: true,
-    },
-  };
 }

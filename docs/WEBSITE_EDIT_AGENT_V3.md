@@ -5,7 +5,7 @@
 | Layer | Path | Function |
 |-------|------|----------|
 | HTTP | `src/app/api/projects/[projectId]/code-agent/edit/stream/route.ts` | `POST` → `runWebsiteEdit()` |
-| Runner | `src/lib/project-workspace/websiteEditRunner.ts` | `WEBSITE_AGENT_V3` > V2 > V1 |
+| Runner | `src/lib/project-workspace/websiteEditRunner.ts` | V3 default (gitlab); `WEBSITE_AGENT_V1` for legacy |
 | V3 | `src/lib/project-workspace/edit-agent-v3/index.ts` | `runWebsiteEditAgentV3()` |
 
 ## V3 pipeline

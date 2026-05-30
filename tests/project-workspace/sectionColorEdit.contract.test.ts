@@ -22,7 +22,7 @@ import {
 } from '../support/syntheticSiteWorkspace';
 import { rendererComponentForSectionType } from '@/lib/project-workspace/website-edit-agent/legacySectionPresentation';
 import { colorNameToBackgroundClass } from '@/lib/builder/sectionPresentation';
-import { updateSectionPresentationInSource } from '@/lib/project-workspace/website-edit-agent-v2/siteConfigMutations';
+import { updateSectionPresentationInSource } from '@/lib/project-workspace/siteConfigMutations';
 import { buildBlackWhiteGradientBackgroundClass } from '@/lib/builder/gradientBuilder';
 
 describe('agent contracts: section background color (generic)', () => {

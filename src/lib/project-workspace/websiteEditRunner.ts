@@ -1,17 +1,30 @@
 /**
  * Owner website edit orchestrator.
- * Default: TypeScript WebsiteEditAgent (router + single-shot + tool loop).
+ * Default: Website Edit Agent V3 (gitlab workspaces). Legacy V1 via env flag; static HTML uses V1.
  */
 
 import { promises as fs } from 'fs';
 import { runWebsiteEditAgent } from './website-edit-agent';
-import { runWebsiteEditAgentV2 } from './website-edit-agent-v2';
 import { runWebsiteEditAgentV3 } from './edit-agent-v3';
 import type { AgentStepEvent } from './website-edit-agent/types';
 import { isAllowedWorkspacePath } from './workspaceEditShared';
 import { isInfraBaselineReady } from './infra/isInfraBaselineReady';
 
-export type WebsiteEditAgentMode = 'ts' | 'ts-v2' | 'ts-v3';
+export type WebsiteEditAgentMode = 'ts' | 'ts-v3';
+
+/** Resolve which edit agent entrypoint to use (V3 default for gitlab). */
+export function resolveWebsiteEditAgentMode(options: {
+  mode: 'gitlab' | 'static';
+}): WebsiteEditAgentMode {
+  if (process.env.WEBSITE_AGENT_V1 === 'true') {
+    return 'ts';
+  }
+  // V3 is gitlab-only; static HTML workspaces keep the legacy tool-loop agent.
+  if (options.mode === 'static') {
+    return 'ts';
+  }
+  return 'ts-v3';
+}
 
 export interface WebsiteEditResult {
   ok: boolean;
@@ -55,12 +68,11 @@ export async function runWebsiteEdit(
   onStep?: (event: AgentStepEvent) => void
 ): Promise<WebsiteEditResult> {
   if (!options.gateway && !isAllowedWorkspacePath(options.workspacePath)) {
-    const useV3 = process.env.WEBSITE_AGENT_V3 === 'true';
-    const useV2 = !useV3 && process.env.WEBSITE_AGENT_V2 === 'true';
+    const agentMode = resolveWebsiteEditAgentMode({ mode: options.mode });
     return {
       ok: false,
       error: 'Workspace path is not in an allowed directory.',
-      agent: useV3 ? 'ts-v3' : useV2 ? 'ts-v2' : 'ts',
+      agent: agentMode,
     };
   }
 
@@ -75,8 +87,7 @@ export async function runWebsiteEdit(
     }
   }
 
-  const useV3 = process.env.WEBSITE_AGENT_V3 === 'true';
-  const useV2 = !useV3 && process.env.WEBSITE_AGENT_V2 === 'true';
+  const agentMode = resolveWebsiteEditAgentMode({ mode: options.mode });
   const infraBaselineReady = isInfraBaselineReady({
     infraStatus: options.infraStatus,
     infraVersion: options.infraVersion,
@@ -91,11 +102,9 @@ export async function runWebsiteEdit(
     conversationHistory: options.conversationHistory,
     infraBaselineReady,
   };
-  const result = await (useV3
+  const result = await (agentMode === 'ts-v3'
     ? runWebsiteEditAgentV3
-    : useV2
-      ? runWebsiteEditAgentV2
-      : runWebsiteEditAgent)(agentOptions, onStep);
+    : runWebsiteEditAgent)(agentOptions, onStep);
 
   return {
     ok: result.ok,
@@ -103,7 +112,7 @@ export async function runWebsiteEdit(
     ownerMessage: result.ownerMessage,
     error: result.error,
     changedFiles: result.changedFiles,
-    agent: useV3 ? 'ts-v3' : useV2 ? 'ts-v2' : 'ts',
+    agent: agentMode,
     strategy: result.strategy,
     tier: result.tier,
     confidence: result.confidence,

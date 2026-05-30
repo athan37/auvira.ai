@@ -3,7 +3,7 @@ import {
   readWorkspaceRel,
   writeWorkspaceRel,
 } from '@/lib/project-workspace/website-edit-agent/strategyContext';
-import { updateContactFieldInSource } from '@/lib/project-workspace/website-edit-agent-v2/siteConfigMutations';
+import { updateContactFieldInSource } from '@/lib/project-workspace/siteConfigMutations';
 import type { DomainToolContext, DomainToolResult } from './types';
 
 /**

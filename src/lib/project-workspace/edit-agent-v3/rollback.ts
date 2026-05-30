@@ -2,7 +2,7 @@ import {
   captureEditRunSnapshot,
   rollbackEditRun,
   type EditRunSnapshot,
-} from '@/lib/project-workspace/website-edit-agent-v2/lifecycle';
+} from '@/lib/project-workspace/editRunSnapshot';
 import type { WebsiteEditAgentOptions } from '@/lib/project-workspace/website-edit-agent/types';
 
 export { captureEditRunSnapshot, rollbackEditRun };

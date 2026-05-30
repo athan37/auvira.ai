@@ -9,10 +9,9 @@
  * Run: npm run test:llm:gradients
  */
 import '../../llmTestGate';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { describeRunLlmIntegration, LLM_TEST_TIMEOUT_MS } from '../../llmTestGate';
 import { runWebsiteEditAgent } from '@/lib/project-workspace/website-edit-agent';
-import { runWebsiteEditAgentV2 } from '@/lib/project-workspace/website-edit-agent-v2';
 import { runWebsiteEditAgentV3 } from '@/lib/project-workspace/edit-agent-v3';
 import { planEdit } from '@/lib/project-workspace/planner/planEdit';
 import { buildEditContext } from '@/lib/project-workspace/edit-context/buildEditContext';
@@ -32,17 +31,6 @@ const AGENTS: Array<{ label: string; run: GradientAgentRunner }> = [
     label: 'v1',
     run: async ({ workspacePath, ownerMessage, projectId }) =>
       runWebsiteEditAgent({
-        workspacePath,
-        ownerMessage,
-        projectId,
-        mode: 'gitlab',
-        infraBaselineReady: true,
-      }),
-  },
-  {
-    label: 'v2',
-    run: async ({ workspacePath, ownerMessage, projectId }) =>
-      runWebsiteEditAgentV2({
         workspacePath,
         ownerMessage,
         projectId,
