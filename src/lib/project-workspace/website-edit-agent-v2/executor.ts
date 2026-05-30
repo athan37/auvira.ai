@@ -41,7 +41,7 @@ async function wireSectionPresentationPreview(
   siteModel: SiteModel
 ): Promise<void> {
   const section = siteModel.sections.find((s) => s.index === sectionIndex);
-  if (!section) return;
+  if (!section?.type) return;
   const componentName = rendererComponentForSectionType(section.type);
   await ensureLegacyPageReadsPresentation(options, componentName);
 }
