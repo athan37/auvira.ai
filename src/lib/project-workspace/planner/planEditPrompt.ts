@@ -1,56 +1,72 @@
+import type { EditContext } from '@/lib/project-workspace/edit-context/types';
 import { formatStructureMap } from '@/lib/project-workspace/website-edit-agent/resolveSectionTarget';
 import { EDIT_SKILL_NAMES } from './editPlan.schema';
-import type { SiteModel } from '../site-model/types';
 
-const PLANNER_SYSTEM = `You are a website edit planner for small business sites driven by siteConfig.ts and a section-loop page.tsx.
+const PLANNER_SYSTEM = `You are Website Edit Agent V3 planner for small business sites (siteConfig.ts + section-loop page.tsx).
 
-Return ONLY valid JSON matching the schema. No markdown fences.
+Return ONLY valid JSON matching the schema. planVersion should be "website-agent-v3".
 
-Skills (use the smallest set that satisfies the request):
+Domain skills (executor maps these to typed tools — never use write_file for common edits):
 ${EDIT_SKILL_NAMES.map((s) => `- ${s}`).join('\n')}
 
 Rules:
-- Prefer config skills (update_hero, update_contact, update_business_name, update_section_copy) over custom_code_edit.
-- update_section_copy: target sectionIndex or section type/title; params hold new copy, items, or fields.
-- update_section_style: target sectionIndex; params.presentation or params.backgroundColor (color name → bg-{color}-200). Never use subtitle for styling.
-- update_hero: params may include headline, subheadline, ctaLabel.
-- update_contact: params phone, email, address.
-- If the user request is vague, ambiguous, or could refer to multiple sections, set needsClarification true, steps [], clarificationQuestion, and suggestedReplies (2+ concrete options referencing section titles/types).
-- When needsClarification is false, steps must be non-empty unless the request is impossible (then clarify instead).
-- Do not invent facts not implied by the user message.`;
+- Prefer config skills over custom_code_edit.
+- update_section_style → section background/card via params.backgroundColor or params.presentation.backgroundClass.
+- update_contact → params phone, email, or address with exact user value.
+- update_hero → params headline, subheadline, or tagline.
+- When EditContext already resolved a section target, use that sectionIndex in target/params.
+- If ambiguous or missing value, set needsClarification true, steps [], clarificationQuestion, suggestedReplies (2+).
+- Do not invent business facts.`;
 
 export function buildPlanEditSystemPrompt(): string {
   return PLANNER_SYSTEM;
 }
 
-export function buildPlanEditUserPrompt(siteModel: SiteModel, userPrompt: string): string {
+export function buildPlanEditUserPrompt(editContext: EditContext, userPrompt: string): string {
+  const { siteModel, target, sectionCatalog, riskFlags, verificationContract } = editContext;
   const structureMap =
     siteModel.structure != null
       ? formatStructureMap(siteModel.structure)
-      : '(structure map unavailable)';
+      : sectionCatalog.textBlock;
 
-  const businessName = siteModel.parsedConfig?.businessName ?? '(unknown)';
-  const sectionSummaries = (siteModel.structure?.sections ?? [])
+  const resolvedTarget =
+    target.sectionIndex != null
+      ? `Resolved section [${target.sectionIndex}] "${target.title ?? ''}" (${target.confidence})`
+      : target.kind === 'hero'
+        ? 'Resolved target: hero'
+        : 'Target unresolved — clarify if needed';
+
+  const sectionSummaries = editContext.sections
     .map(
       (s) =>
-        `[${s.index}] type=${s.type} title="${s.title}" renderer=${s.rendererComponent} items=${s.itemCount}`
+        `[${s.index}] type=${s.type} title="${s.title}" bg=${s.presentation?.backgroundClass ?? 'preset'}`
     )
     .join('\n');
 
-  const contact = siteModel.parsedConfig?.contact;
-  const contactLine = contact
-    ? `phone=${contact.phone ?? '—'} email=${contact.email ?? '—'} address=${contact.address ?? '—'}`
-    : '(no contact parsed)';
+  const snippetBlock =
+    editContext.selectedSnippets.length > 0
+      ? editContext.selectedSnippets
+          .map((s) => `--- ${s.path} (${s.label}) ---\n${s.content.slice(0, 2000)}`)
+          .join('\n\n')
+      : '(no snippets)';
 
-  return `Business: ${businessName}
+  return `Business: ${siteModel.parsedConfig?.businessName ?? '(unknown)'}
 Archetype: ${siteModel.archetype}
-Contact: ${contactLine}
+Risk: ${riskFlags.level} (${riskFlags.reasons.join('; ') || 'none'})
+
+${resolvedTarget}
 
 Sections:
 ${sectionSummaries || '(none)'}
 
 Structure map:
 ${structureMap}
+
+Verification hints:
+${JSON.stringify(verificationContract.checks)}
+
+Context snippets:
+${snippetBlock}
 
 User request:
 ${userPrompt.trim()}`;

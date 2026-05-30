@@ -6,11 +6,12 @@
 import { promises as fs } from 'fs';
 import { runWebsiteEditAgent } from './website-edit-agent';
 import { runWebsiteEditAgentV2 } from './website-edit-agent-v2';
+import { runWebsiteEditAgentV3 } from './edit-agent-v3';
 import type { AgentStepEvent } from './website-edit-agent/types';
 import { isAllowedWorkspacePath } from './workspaceEditShared';
 import { isInfraBaselineReady } from './infra/isInfraBaselineReady';
 
-export type WebsiteEditAgentMode = 'ts' | 'ts-v2';
+export type WebsiteEditAgentMode = 'ts' | 'ts-v2' | 'ts-v3';
 
 export interface WebsiteEditResult {
   ok: boolean;
@@ -27,6 +28,7 @@ export interface WebsiteEditResult {
   needsClarification?: boolean;
   suggestedReplies?: string[];
   v2Meta?: import('./website-edit-agent/types').WebsiteEditAgentResult['v2Meta'];
+  v3Meta?: import('./website-edit-agent/types').WebsiteEditAgentResult['v3Meta'];
 }
 
 import type { WorkspaceGateway } from './workspaceGateway';
@@ -53,7 +55,13 @@ export async function runWebsiteEdit(
   onStep?: (event: AgentStepEvent) => void
 ): Promise<WebsiteEditResult> {
   if (!options.gateway && !isAllowedWorkspacePath(options.workspacePath)) {
-    return { ok: false, error: 'Workspace path is not in an allowed directory.' };
+    const useV3 = process.env.WEBSITE_AGENT_V3 === 'true';
+    const useV2 = !useV3 && process.env.WEBSITE_AGENT_V2 === 'true';
+    return {
+      ok: false,
+      error: 'Workspace path is not in an allowed directory.',
+      agent: useV3 ? 'ts-v3' : useV2 ? 'ts-v2' : 'ts',
+    };
   }
 
   if (!options.gateway) {
@@ -67,24 +75,27 @@ export async function runWebsiteEdit(
     }
   }
 
-  const useV2 = process.env.WEBSITE_AGENT_V2 === 'true';
+  const useV3 = process.env.WEBSITE_AGENT_V3 === 'true';
+  const useV2 = !useV3 && process.env.WEBSITE_AGENT_V2 === 'true';
   const infraBaselineReady = isInfraBaselineReady({
     infraStatus: options.infraStatus,
     infraVersion: options.infraVersion,
   });
-  const result = await (useV2 ? runWebsiteEditAgentV2 : runWebsiteEditAgent)(
-    {
-      workspacePath: options.workspacePath,
-      ownerMessage: options.ownerMessage,
-      projectId: options.projectId,
-      mode: options.mode,
-      attachments: options.attachments,
-      gateway: options.gateway,
-      conversationHistory: options.conversationHistory,
-      infraBaselineReady,
-    },
-    onStep
-  );
+  const agentOptions = {
+    workspacePath: options.workspacePath,
+    ownerMessage: options.ownerMessage,
+    projectId: options.projectId,
+    mode: options.mode,
+    attachments: options.attachments,
+    gateway: options.gateway,
+    conversationHistory: options.conversationHistory,
+    infraBaselineReady,
+  };
+  const result = await (useV3
+    ? runWebsiteEditAgentV3
+    : useV2
+      ? runWebsiteEditAgentV2
+      : runWebsiteEditAgent)(agentOptions, onStep);
 
   return {
     ok: result.ok,
@@ -92,7 +103,7 @@ export async function runWebsiteEdit(
     ownerMessage: result.ownerMessage,
     error: result.error,
     changedFiles: result.changedFiles,
-    agent: useV2 ? 'ts-v2' : 'ts',
+    agent: useV3 ? 'ts-v3' : useV2 ? 'ts-v2' : 'ts',
     strategy: result.strategy,
     tier: result.tier,
     confidence: result.confidence,
@@ -100,5 +111,6 @@ export async function runWebsiteEdit(
     needsClarification: result.needsClarification,
     suggestedReplies: result.suggestedReplies,
     v2Meta: result.v2Meta,
+    v3Meta: result.v3Meta,
   };
 }

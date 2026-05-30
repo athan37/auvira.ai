@@ -1,18 +1,30 @@
 import { getLLMClient } from './llmClient';
+import { buildEditContext } from '@/lib/project-workspace/edit-context/buildEditContext';
+import type { EditContext } from '@/lib/project-workspace/edit-context/types';
+import type { SiteModel } from '@/lib/project-workspace/site-model/types';
 import {
   EDIT_PLAN_JSON_SCHEMA,
   EditPlanSchema,
   type EditPlan,
 } from './editPlan.schema';
 import { buildPlanEditSystemPrompt, buildPlanEditUserPrompt } from './planEditPrompt';
-import type { SiteModel } from '../site-model/types';
+import { buildDeterministicPlan } from '@/lib/project-workspace/edit-agent-v3/deterministicPlan';
 
 const PLAN_MAX_TOKENS = parseInt(process.env.WEBSITE_EDIT_MAX_TOKENS || '4096', 10);
 
 export interface PlanEditInput {
+  editContext: EditContext;
+  userPrompt: string;
+  deterministicOnly?: boolean;
+}
+
+/** @deprecated Prefer editContext — builds minimal context from siteModel for legacy tests. */
+export interface LegacyPlanEditInput {
   siteModel: SiteModel;
   userPrompt: string;
 }
+
+export type PlanEditInputUnion = PlanEditInput | LegacyPlanEditInput;
 
 export interface PlanEditResult {
   ok: boolean;
@@ -20,13 +32,45 @@ export interface PlanEditResult {
   error?: string;
 }
 
+function isLegacyInput(input: PlanEditInputUnion): input is LegacyPlanEditInput {
+  return 'siteModel' in input && !('editContext' in input);
+}
+
+async function resolveEditContext(input: PlanEditInputUnion): Promise<EditContext> {
+  if (!isLegacyInput(input)) {
+    return input.editContext;
+  }
+  const built = await buildEditContext({
+    workspacePath: input.siteModel.workspacePath,
+    mode: input.siteModel.mode,
+    ownerMessage: input.userPrompt,
+  });
+  return built.context;
+}
+
 /**
- * LLM planner: structured EditPlan with Zod validation and one retry on parse failure.
+ * LLM planner with deterministic fast-path for high-confidence edits.
  */
-export async function planEdit(input: PlanEditInput): Promise<PlanEditResult> {
+export async function planEdit(input: PlanEditInputUnion): Promise<PlanEditResult> {
+  const editContext = await resolveEditContext(input);
+  const userPrompt = isLegacyInput(input) ? input.userPrompt : input.userPrompt;
+  const deterministicOnly = !isLegacyInput(input) ? input.deterministicOnly : false;
+
+  const deterministic = buildDeterministicPlan(editContext);
+  if (deterministic) {
+    const parsed = EditPlanSchema.safeParse(deterministic);
+    if (parsed.success) {
+      return { ok: true, plan: parsed.data };
+    }
+  }
+
+  if (deterministicOnly) {
+    return { ok: false, error: 'No deterministic plan available' };
+  }
+
   const llm = getLLMClient();
   const system = buildPlanEditSystemPrompt();
-  const basePrompt = buildPlanEditUserPrompt(input.siteModel, input.userPrompt);
+  const basePrompt = buildPlanEditUserPrompt(editContext, userPrompt);
 
   let lastError = 'Planner returned invalid plan';
 

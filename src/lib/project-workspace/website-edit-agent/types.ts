@@ -218,6 +218,11 @@ export interface WebsiteEditAgentResult {
     };
     rolledBack?: boolean;
   };
+  v3Meta?: {
+    planVersion?: string;
+    intent?: string;
+    skills?: string[];
+  };
 }
 
 export interface RouterDecision {
