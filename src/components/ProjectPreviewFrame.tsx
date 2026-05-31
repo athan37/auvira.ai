@@ -7,6 +7,7 @@ import {
 } from '@/lib/runtime/releaseWorkspaceOnLeave';
 import { usePageVisible } from '@/lib/hooks/usePageVisible';
 import { markEditorVital, recordIframeReload } from '@/lib/metrics/clientVitals';
+import { PREVIEW_IFRAME_SETTLE_MS } from '@/lib/project-workspace/previewReloadAfterEdit';
 
 interface WorkspaceStatus {
   ok?: boolean;
@@ -26,6 +27,8 @@ interface Props {
   codeWorkspaceVersion?: number;
   /** Bumped by parent after a successful edit to force iframe reload (Next dev HMR can miss some CSS). */
   previewRefreshKey?: number;
+  /** When true, defer iframe remount until edit completes and dev server settles. */
+  editInProgress?: boolean;
   onReadyChange?: (ready: boolean) => void;
 }
 
@@ -43,6 +46,7 @@ export function ProjectPreviewFrame({
   projectId,
   codeWorkspaceVersion = 1,
   previewRefreshKey = 0,
+  editInProgress = false,
   onReadyChange,
 }: Props) {
   const onReadyChangeRef = useRef(onReadyChange);
@@ -55,6 +59,17 @@ export function ProjectPreviewFrame({
   const [livePreviewUrl, setLivePreviewUrl] = useState<string | null>(null);
   const [iframeLoading, setIframeLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [mountedVersion, setMountedVersion] = useState(codeWorkspaceVersion);
+  const chunkRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const chunkRetryCountRef = useRef(0);
+
+  useEffect(() => {
+    if (editInProgress) return;
+    const timer = setTimeout(() => {
+      setMountedVersion(codeWorkspaceVersion);
+    }, PREVIEW_IFRAME_SETTLE_MS);
+    return () => clearTimeout(timer);
+  }, [codeWorkspaceVersion, editInProgress]);
 
   const applyStatus = useCallback((status: WorkspaceStatus) => {
     setSetupStage(status.stage);
@@ -199,6 +214,28 @@ export function ProjectPreviewFrame({
     }
   }, [previewRefreshKey, projectId]);
 
+  useEffect(() => {
+    function onMessage(event: MessageEvent) {
+      if (event.origin !== window.location.origin) return;
+      const data = event.data as { type?: string } | null;
+      if (data?.type !== 'preview-chunk-error') return;
+      if (editInProgress || chunkRetryCountRef.current >= 2) return;
+
+      chunkRetryCountRef.current += 1;
+      if (chunkRetryTimerRef.current) clearTimeout(chunkRetryTimerRef.current);
+      chunkRetryTimerRef.current = setTimeout(() => {
+        setIframeLoading(true);
+        setRefreshKey((prev) => prev + 1);
+      }, PREVIEW_IFRAME_SETTLE_MS);
+    }
+
+    window.addEventListener('message', onMessage);
+    return () => {
+      window.removeEventListener('message', onMessage);
+      if (chunkRetryTimerRef.current) clearTimeout(chunkRetryTimerRef.current);
+    };
+  }, [editInProgress]);
+
   const handleRefresh = () => {
     setIframeLoading(true);
     setRefreshKey((prev) => prev + 1);
@@ -208,9 +245,9 @@ export function ProjectPreviewFrame({
     ? previewMode === 'live' && livePreviewUrl
       ? (() => {
           const sep = livePreviewUrl.includes('?') ? '&' : '?';
-          return `${livePreviewUrl}${sep}v=${codeWorkspaceVersion}&_=${refreshKey}&pr=${previewRefreshKey}`;
+          return `${livePreviewUrl}${sep}v=${mountedVersion}&_=${refreshKey}&pr=${previewRefreshKey}`;
         })()
-      : `/api/projects/${projectId}/preview/proxy/?v=${codeWorkspaceVersion}&_=${refreshKey}&pr=${previewRefreshKey}`
+      : `/api/projects/${projectId}/preview/proxy/?v=${mountedVersion}&_=${refreshKey}&pr=${previewRefreshKey}`
     : null;
 
   const showSetupOverlay = !previewReady || setupError;
@@ -307,10 +344,13 @@ export function ProjectPreviewFrame({
 
         {previewUrl && (
           <iframe
-            key={`${projectId}-${codeWorkspaceVersion}-${refreshKey}`}
+            key={`${projectId}-${mountedVersion}-${refreshKey}-${previewRefreshKey}`}
             src={previewUrl}
             className="w-full h-full border-0"
-            onLoad={() => setIframeLoading(false)}
+            onLoad={() => {
+              setIframeLoading(false);
+              chunkRetryCountRef.current = 0;
+            }}
             title="Website Preview"
             sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups"
           />

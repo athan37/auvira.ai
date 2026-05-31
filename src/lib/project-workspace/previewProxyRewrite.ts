@@ -1,3 +1,17 @@
+const PREVIEW_REWRITE_CONTENT_TYPES = [
+  'text/html',
+  'text/css',
+  'application/javascript',
+  'text/javascript',
+  'application/x-javascript',
+] as const;
+
+/** True when proxied response body should rewrite absolute /_next/ asset paths. */
+export function isPreviewRewriteableContentType(contentType: string): boolean {
+  const ct = contentType.toLowerCase();
+  return PREVIEW_REWRITE_CONTENT_TYPES.some((kind) => ct.includes(kind));
+}
+
 function shouldSkipPath(path: string, proxyBase: string): boolean {
   return (
     path.startsWith('//') ||
@@ -53,6 +67,47 @@ export function rewritePreviewAssetPaths(content: string, projectId: string): st
   });
 
   return content;
+}
+
+const CHUNK_ERROR_RECOVERY_SCRIPT = `<script>(function(){var retried=false;function notify(){try{window.parent.postMessage({type:"preview-chunk-error"},"*");}catch(e){}}function isChunkErr(m){return typeof m==="string"&&(m.indexOf("ChunkLoadError")>=0||m.indexOf("Loading chunk")>=0);}window.addEventListener("error",function(e){if(isChunkErr(e.message)||isChunkErr(String(e.error||"")))notify();});window.addEventListener("unhandledrejection",function(e){var r=e.reason;var m=r&&r.message?r.message:String(r||"");if(isChunkErr(m))notify();});})();</script>`;
+
+/** Inject parent-frame chunk error recovery hook into proxied HTML. */
+export function injectPreviewChunkErrorRecovery(html: string): string {
+  if (html.includes('preview-chunk-error')) return html;
+  if (html.includes('</head>')) {
+    return html.replace('</head>', `${CHUNK_ERROR_RECOVERY_SCRIPT}</head>`);
+  }
+  return `${CHUNK_ERROR_RECOVERY_SCRIPT}${html}`;
+}
+
+/** Rewrite proxied workspace response when content type carries absolute asset paths. */
+export function rewritePreviewResponseBody(
+  body: Buffer,
+  contentType: string,
+  projectId: string
+): { body: Buffer | string; rewritten: boolean; contentType: string } {
+  if (!isPreviewRewriteableContentType(contentType) || body.length === 0) {
+    return { body, rewritten: false, contentType };
+  }
+
+  const text = body.toString('utf8');
+  let rewritten = rewritePreviewAssetPaths(text, projectId);
+  if (contentType.includes('text/html')) {
+    rewritten = injectPreviewChunkErrorRecovery(rewritten);
+  }
+  if (rewritten === text) {
+    return { body, rewritten: false, contentType };
+  }
+
+  const normalizedType = contentType.includes('text/html')
+    ? 'text/html; charset=utf-8'
+    : contentType.includes('text/css')
+      ? 'text/css; charset=utf-8'
+      : contentType.includes('javascript')
+        ? 'application/javascript; charset=utf-8'
+        : contentType;
+
+  return { body: rewritten, rewritten: true, contentType: normalizedType };
 }
 
 /** @deprecated Use rewritePreviewAssetPaths */

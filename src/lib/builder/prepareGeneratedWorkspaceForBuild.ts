@@ -39,3 +39,26 @@ export async function prepareGeneratedWorkspaceForBuild(
 
   return { repaired };
 }
+
+/** Remove dev-server `.next` output so `next build` starts from a clean production cache. */
+export async function cleanStaleNextBuildCache(workspacePath: string): Promise<boolean> {
+  const dotNext = path.join(workspacePath, '.next');
+  try {
+    await fs.access(dotNext);
+  } catch {
+    return false;
+  }
+  await fs.rm(dotNext, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 });
+  return true;
+}
+
+/** Env for customer-site production builds (never inherit dev NODE_ENV from the parent app). */
+export function customerSiteProductionBuildEnv(
+  base: NodeJS.ProcessEnv = process.env
+): NodeJS.ProcessEnv {
+  return {
+    ...base,
+    CI: 'true',
+    NODE_ENV: 'production',
+  };
+}

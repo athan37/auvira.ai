@@ -9,12 +9,30 @@ const PREVIEW_RELOAD_PATHS = [
   'tailwind.config.js',
 ] as const;
 
-/** Delays after edit when server says preview is still syncing (dev compile lag). */
-const SYNC_SETTLE_DELAYS_MS = [2_500, 7_000] as const;
+/** Wait for workspace next dev to finish recompiling before first iframe reload. */
+export const PREVIEW_IFRAME_SETTLE_MS = 2_000;
+
+/** Delays after settle when server says preview is still syncing (dev compile lag). */
+const SYNC_RELOAD_DELAYS_MS = [2_500, 7_000] as const;
 
 export type PreviewReloadSchedule = {
   cancel: () => void;
 };
+
+export type PreviewReloadOptions = {
+  changedPaths?: string[];
+  previewSynced?: boolean;
+  /** When true, skip immediate reload scheduling (parent defers iframe remount). */
+  deferReload?: boolean;
+  /** Extra delay before first reload bump (defaults to PREVIEW_IFRAME_SETTLE_MS). */
+  settleMs?: number;
+};
+
+/** Delays used by schedulePreviewIframeReloads (settle + sync reloads). */
+export function getPreviewReloadDelaysMs(options: Pick<PreviewReloadOptions, 'settleMs'> = {}): number[] {
+  const settleMs = options.settleMs ?? PREVIEW_IFRAME_SETTLE_MS;
+  return [settleMs, ...SYNC_RELOAD_DELAYS_MS.map((d) => settleMs + d)];
+}
 
 /** True when changed files affect the editable preview bundle (not just copy in JSON). */
 export function workspaceEditNeedsPreviewReload(changedPaths: string[]): boolean {
@@ -30,7 +48,7 @@ export function workspaceEditNeedsPreviewReload(changedPaths: string[]): boolean
  */
 export function schedulePreviewIframeReloads(
   bump: () => void,
-  options: { changedPaths?: string[]; previewSynced?: boolean }
+  options: PreviewReloadOptions
 ): PreviewReloadSchedule {
   const timers: ReturnType<typeof setTimeout>[] = [];
   const cancel = () => {
@@ -40,6 +58,10 @@ export function schedulePreviewIframeReloads(
     timers.length = 0;
   };
 
+  if (options.deferReload) {
+    return { cancel };
+  }
+
   if (options.previewSynced !== false) {
     return { cancel };
   }
@@ -48,7 +70,7 @@ export function schedulePreviewIframeReloads(
     return { cancel };
   }
 
-  for (const delayMs of SYNC_SETTLE_DELAYS_MS) {
+  for (const delayMs of getPreviewReloadDelaysMs({ settleMs: options.settleMs })) {
     timers.push(setTimeout(() => bump(), delayMs));
   }
 

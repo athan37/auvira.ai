@@ -4,6 +4,10 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { repairTailwindConfigInWorkspace } from '@/lib/builder/tailwindPresentationSupport';
 import { repairSiteConfigTypesInWorkspace } from '@/lib/preview/repairSiteConfigTypes';
+import {
+  cleanStaleNextBuildCache,
+  customerSiteProductionBuildEnv,
+} from '@/lib/builder/prepareGeneratedWorkspaceForBuild';
 import { sanitizeAgentMarkerFilesInWorkspace } from '@/lib/site-manager/siteConfigAgentMarkers';
 import { isPreviewSafeEdit } from './previewSafeValidation';
 import { validateChangedSourceSyntax } from './validateTsxSyntax';
@@ -173,12 +177,17 @@ export async function validateWorkspace(
 
   if (scripts.build) {
     try {
+      const removedNext = await cleanStaleNextBuildCache(resolved);
+      if (removedNext) {
+        logs.push('Removed stale .next cache from preview dev before production build');
+      }
+
       logs.push('> npm run build');
       const { stdout, stderr } = await execFileAsync('npm', ['run', 'build'], {
         cwd: resolved,
         timeout: 300000,
         maxBuffer: 10 * 1024 * 1024,
-        env: { ...process.env, CI: 'true' },
+        env: customerSiteProductionBuildEnv(),
       });
       if (stdout) logs.push(stdout);
       if (stderr) logs.push(stderr);

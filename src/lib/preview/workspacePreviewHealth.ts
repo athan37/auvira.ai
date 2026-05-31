@@ -35,6 +35,32 @@ export async function fetchPreviewHtml(port: number, timeoutMs = 8000): Promise<
   }
 }
 
+/** Extract first Next.js chunk/script path from dev server HTML. */
+export function extractPreviewChunkPath(html: string): string | null {
+  const match = html.match(/(?:src|href)=["'](\/_next\/static\/[^"']+)["']/);
+  return match?.[1] ?? null;
+}
+
+/** True when a representative workspace chunk responds (dev compile finished). */
+export async function checkWorkspacePreviewChunksReady(
+  port: number,
+  html: string,
+  timeoutMs = 8000
+): Promise<boolean> {
+  const chunkPath = extractPreviewChunkPath(html);
+  if (!chunkPath) return true;
+
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}${chunkPath}`, {
+      cache: 'no-store',
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * True when something is listening and it looks like this project's workspace site,
  * not the Site Agent app on the main dev port.
@@ -54,6 +80,11 @@ export async function checkWorkspacePreviewHealthy(
   }
 
   if (isSiteAgentShellHtml(html)) {
+    return false;
+  }
+
+  const chunksReady = await checkWorkspacePreviewChunksReady(port, html, timeoutMs);
+  if (!chunksReady) {
     return false;
   }
 

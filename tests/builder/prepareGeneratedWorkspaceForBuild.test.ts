@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { prepareGeneratedWorkspaceForBuild } from '@/lib/builder/prepareGeneratedWorkspaceForBuild';
+import { prepareGeneratedWorkspaceForBuild, cleanStaleNextBuildCache } from '@/lib/builder/prepareGeneratedWorkspaceForBuild';
 import { generateWebsiteFiles } from '@/lib/builder/generateWebsiteFiles';
 import { getDefaultDesignBrief } from '@/lib/agent/generateDesignBriefAgent';
 import type { SiteSpec } from '@/lib/agent/schemas';
@@ -46,5 +46,15 @@ describe('prepareGeneratedWorkspaceForBuild', () => {
 
     const tailwind = await fs.readFile(path.join(workspacePath, 'tailwind.config.js'), 'utf-8');
     expect(tailwind).toMatch(/\],\s*\n\s*safelist:/);
+  });
+
+  it('cleanStaleNextBuildCache removes .next directory', async () => {
+    workspacePath = scratchPath('generated-sites', `clean-next-${Date.now()}`);
+    await fs.mkdir(path.join(workspacePath, '.next', 'cache'), { recursive: true });
+    await fs.writeFile(path.join(workspacePath, '.next', 'BUILD_ID'), 'dev-stale');
+
+    const removed = await cleanStaleNextBuildCache(workspacePath);
+    expect(removed).toBe(true);
+    await expect(fs.access(path.join(workspacePath, '.next'))).rejects.toThrow();
   });
 });

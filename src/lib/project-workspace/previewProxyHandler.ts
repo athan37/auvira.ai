@@ -6,7 +6,7 @@ import {
   isReservedWorkspacePreviewPort,
 } from '@/lib/preview/workspacePreviewHealth';
 import { buildPreviewLoadingHtml } from '@/lib/project-workspace/codePreviewServe';
-import { rewritePreviewAssetPaths } from '@/lib/project-workspace/previewProxyRewrite';
+import { rewritePreviewResponseBody } from '@/lib/project-workspace/previewProxyRewrite';
 
 export { rewriteHtmlAssetPaths } from '@/lib/project-workspace/previewProxyRewrite';
 
@@ -162,22 +162,17 @@ export async function handlePreviewProxyGet(
       });
       const buffer = Buffer.from(await res.arrayBuffer());
       const ct = res.headers.get('content-type') || '';
-      const isHtml = ct.includes('text/html');
-      const isCss = ct.includes('text/css');
+      const rewrite = rewritePreviewResponseBody(buffer, ct, projectId);
 
-      if ((isHtml || isCss) && buffer.length > 0) {
-        const text = buffer.toString('utf8');
-        const rewritten = rewritePreviewAssetPaths(text, projectId);
-        if (rewritten !== text) {
-          return new NextResponse(rewritten, {
-            status: res.status,
-            headers: {
-              'content-type': isHtml ? 'text/html; charset=utf-8' : 'text/css; charset=utf-8',
-              'cache-control': 'no-store',
-              'x-frame-options': 'SAMEORIGIN',
-            },
-          });
-        }
+      if (rewrite.rewritten) {
+        return new NextResponse(rewrite.body as unknown as BodyInit, {
+          status: res.status,
+          headers: {
+            'content-type': rewrite.contentType,
+            'cache-control': 'no-store',
+            'x-frame-options': 'SAMEORIGIN',
+          },
+        });
       }
 
       const headers = new Headers();
@@ -244,33 +239,21 @@ export async function handlePreviewProxyGet(
 
     const contentType = result.headers['content-type'];
     const ctStr = Array.isArray(contentType) ? contentType[0] : contentType || '';
-    const isHtml = ctStr.includes('text/html');
-    const isCss = ctStr.includes('text/css');
+    const rewrite = rewritePreviewResponseBody(result.body, ctStr, projectId);
 
-    if ((isHtml || isCss) && result.body.length > 0) {
-      try {
-        const text = result.body.toString('utf8');
-        const rewritten = rewritePreviewAssetPaths(text, projectId);
-        if (rewritten !== text) {
-          filteredHeaders.delete('content-length');
-          filteredHeaders.delete('content-encoding');
-          filteredHeaders.delete('etag');
-          filteredHeaders.delete('last-modified');
-          filteredHeaders.set(
-            'content-type',
-            isHtml ? 'text/html; charset=utf-8' : 'text/css; charset=utf-8'
-          );
-          filteredHeaders.set('cache-control', 'no-store');
-          filteredHeaders.set('x-frame-options', 'SAMEORIGIN');
-          filteredHeaders.delete('content-security-policy');
-          return new NextResponse(rewritten, {
-            status: result.status,
-            headers: filteredHeaders,
-          });
-        }
-      } catch {
-        /* fall through */
-      }
+    if (rewrite.rewritten) {
+      filteredHeaders.delete('content-length');
+      filteredHeaders.delete('content-encoding');
+      filteredHeaders.delete('etag');
+      filteredHeaders.delete('last-modified');
+      filteredHeaders.set('content-type', rewrite.contentType);
+      filteredHeaders.set('cache-control', 'no-store');
+      filteredHeaders.set('x-frame-options', 'SAMEORIGIN');
+      filteredHeaders.delete('content-security-policy');
+      return new NextResponse(rewrite.body as unknown as BodyInit, {
+        status: result.status,
+        headers: filteredHeaders,
+      });
     }
 
     filteredHeaders.set('x-frame-options', 'SAMEORIGIN');

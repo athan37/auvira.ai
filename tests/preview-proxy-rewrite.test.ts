@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { rewriteHtmlAssetPaths } from '../src/lib/project-workspace/previewProxyRewrite';
+import {
+  injectPreviewChunkErrorRecovery,
+  isPreviewRewriteableContentType,
+  rewriteHtmlAssetPaths,
+  rewritePreviewResponseBody,
+} from '../src/lib/project-workspace/previewProxyRewrite';
 
 describe('rewriteHtmlAssetPaths', () => {
   const projectId = 'abc123';
@@ -30,5 +35,31 @@ describe('rewriteHtmlAssetPaths', () => {
     const css = '.hero { background-image: url(/uploads/banner.png); }';
     const out = rewriteHtmlAssetPaths(css, projectId);
     expect(out).toContain(`url(${base}/uploads/banner.png)`);
+  });
+
+  it('rewrites webpack chunk paths in JavaScript bundles', () => {
+    const js =
+      '__webpack_require__.u=function(e){return"/_next/static/chunks/"+e+".js"};';
+    const out = rewritePreviewResponseBody(
+      Buffer.from(js),
+      'application/javascript',
+      projectId
+    );
+    expect(out.rewritten).toBe(true);
+    expect(String(out.body)).toContain(`${base}/_next/static/chunks/`);
+    expect(String(out.body)).not.toContain('"/_next/static/chunks/');
+  });
+
+  it('detects rewriteable JavaScript content types', () => {
+    expect(isPreviewRewriteableContentType('application/javascript')).toBe(true);
+    expect(isPreviewRewriteableContentType('text/javascript; charset=utf-8')).toBe(true);
+    expect(isPreviewRewriteableContentType('image/png')).toBe(false);
+  });
+
+  it('injects chunk error recovery script into HTML', () => {
+    const html = '<html><head></head><body></body></html>';
+    const out = injectPreviewChunkErrorRecovery(html);
+    expect(out).toContain('preview-chunk-error');
+    expect(out).toContain('</head>');
   });
 });

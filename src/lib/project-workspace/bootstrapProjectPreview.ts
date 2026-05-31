@@ -12,6 +12,8 @@ import { startWorkspaceDevServer } from '@/lib/preview/startWorkspaceDevServer';
 import { stopPreviewServerByPort } from '@/lib/preview/stopPreviewServer';
 import {
   checkWorkspacePreviewHealthy,
+  checkWorkspacePreviewChunksReady,
+  fetchPreviewHtml,
   isReservedWorkspacePreviewPort,
 } from '@/lib/preview/workspacePreviewHealth';
 import { getNpmPath } from '@/lib/runtime/nodeRuntime';
@@ -202,6 +204,20 @@ async function bootstrapGitlabProject(
   const port = allocatePort();
   const previewUrl = `http://127.0.0.1:${port}`;
   await startWorkspaceDevServer(resolvedWorkspacePath, port, { timeoutMs: 180_000 });
+
+  const chunkDeadline = Date.now() + 60_000;
+  let chunksReady = false;
+  while (Date.now() < chunkDeadline) {
+    const html = await fetchPreviewHtml(port, 8000);
+    if (html && (await checkWorkspacePreviewChunksReady(port, html, 8000))) {
+      chunksReady = true;
+      break;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+  }
+  if (!chunksReady) {
+    console.warn(`[bootstrap] Preview chunks not ready within 60s for ${projectId}`);
+  }
 
   await WebsiteProject.updateOne(
     { _id: projectId },
