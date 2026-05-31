@@ -162,7 +162,7 @@ export default async function Home() {
                 See how it works
               </LandingLink>
             </div>
-            <dl className="mt-10 grid max-w-2xl grid-cols-3 gap-4 border-t border-zinc-200 pt-6">
+            <dl className="mt-10 grid max-w-2xl grid-cols-1 gap-4 border-t border-zinc-200 pt-6 sm:grid-cols-3">
               {[
                 ['2', 'ways to start'],
                 ['4', 'guided steps'],
