@@ -183,6 +183,38 @@ function mergeSectionNumberReply(message: string, history: ConversationTurn[]): 
   return `${message.trim()} for section index ${pickInfo.sectionIndex} ("${pickInfo.title}")`;
 }
 
+function mergeHeroStyleFollowUp(message: string, history: ConversationTurn[]): string | null {
+  const trimmed = message.trim();
+  const hasStyleDetail =
+    /gradient|#[0-9a-f]{3,8}\b|linear|rgba?\(/i.test(trimmed) ||
+    /\b(entire|whole)\s+hero\b/i.test(trimmed) ||
+    /\bhero\s+at\s+the\s+top\b/i.test(trimmed);
+
+  if (!hasStyleDetail) return null;
+
+  const heroConfirmed = history.some(
+    (turn) => turn.role === 'user' && /\bhero\b/i.test(turn.content)
+  );
+
+  for (let i = history.length - 1; i >= 0; i--) {
+    const turn = history[i];
+    if (turn.role !== 'user') continue;
+    if (turn.content.trim() === trimmed) continue;
+    if (!/\b(background|gradient|color|colour)\b/i.test(turn.content)) continue;
+
+    const refersToHero =
+      /\bhero\b/i.test(turn.content) ||
+      /section'?s background/i.test(turn.content) ||
+      heroConfirmed;
+
+    if (refersToHero) {
+      return `${turn.content} — follow-up: ${trimmed}`;
+    }
+  }
+
+  return null;
+}
+
 function mergeDeicticFollowUp(message: string, history: ConversationTurn[]): string | null {
   const trimmed = message.trim();
   const isDeictic =
@@ -210,6 +242,7 @@ export function resolveEffectiveEditMessage(
   return (
     mergeTestimonialOptionReply(message, recent) ??
     mergeSectionNumberReply(message, recent) ??
+    mergeHeroStyleFollowUp(message, recent) ??
     mergeStyleFollowUp(message, recent) ??
     mergeDeicticFollowUp(message, recent) ??
     message

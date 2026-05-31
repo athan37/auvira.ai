@@ -9,12 +9,21 @@ export async function updateThemeTool(
   ctx: DomainToolContext,
   params: Record<string, unknown>
 ): Promise<DomainToolResult> {
-  void params;
+  const scope = typeof params.scope === 'string' ? params.scope.trim() : '';
+  const ownerMessage =
+    scope === 'hero'
+      ? `hero background ${ctx.agentOptions.ownerMessage}`
+      : ctx.agentOptions.ownerMessage;
+
   const beforeHashes = ctx.agentOptions.gateway
     ? await ctx.agentOptions.gateway.computeHashes()
     : await computeWorkspaceHashes(ctx.agentOptions.workspacePath);
 
-  const result = await runStrategyById('preset_theme', ctx.agentOptions, beforeHashes);
+  const result = await runStrategyById(
+    'preset_theme',
+    { ...ctx.agentOptions, ownerMessage },
+    beforeHashes
+  );
 
   if (!result?.ok) {
     return {

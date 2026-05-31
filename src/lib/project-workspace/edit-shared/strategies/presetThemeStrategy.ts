@@ -4,10 +4,12 @@ import {
   parseColorSwap,
   replacePresetInPageContent,
   setPresetCardBackground,
+  setPresetHeroBackground,
   swapColorsInPresetJson,
   swapTailwindColorInText,
   type PresetScope,
 } from '../preset/presetUtils';
+import { extractSectionBackgroundClassFromMessage } from '@/lib/builder/sectionPresentation';
 import {
   buildStrategyResult,
   GLOBALS_CSS,
@@ -61,6 +63,17 @@ export async function runPresetThemeStrategy(
     const toColor = targetColors[targetColors.length - 1];
     newPresetJson = setPresetCardBackground(presetJson, toColor);
     summary = `Changed testimonial card backgrounds to ${toColor}.`;
+  } else if (scope === 'hero') {
+    const bgClass = extractSectionBackgroundClassFromMessage(options.ownerMessage);
+    if (bgClass) {
+      newPresetJson = setPresetHeroBackground(presetJson, bgClass);
+      summary = 'Updated hero background.';
+    } else if (swap) {
+      newPresetJson = swapColorsInPresetJson(presetJson, swap.fromColor, swap.toColor, scope);
+      summary = `Changed hero colors from ${swap.fromColor} to ${swap.toColor}.`;
+    } else {
+      return null;
+    }
   } else if (swap) {
     newPresetJson = swapColorsInPresetJson(presetJson, swap.fromColor, swap.toColor, scope);
     summary = `Changed site colors from ${swap.fromColor} to ${swap.toColor}.`;

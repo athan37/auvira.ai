@@ -148,6 +148,12 @@ export function setPresetCardBackground(presetJson: string, toColor: string): st
   });
 }
 
+/** Replace preset.heroBg with an explicit Tailwind background class (solid or gradient). */
+export function setPresetHeroBackground(presetJson: string, backgroundClass: string): string {
+  const re = /("heroBg"\s*:\s*")([^"]*)(")/gi;
+  return presetJson.replace(re, `$1${backgroundClass}$3`);
+}
+
 /** Set text-* preset keys to a target text color class. */
 export function setPresetTextColorKeys(
   presetJson: string,

@@ -97,4 +97,15 @@ describe('conversationContextForEdit', () => {
   it('uses eight turns by default for edit context', () => {
     expect(DEFAULT_EDIT_CONTEXT_TURNS).toBe(8);
   });
+
+  it('merges hero gradient follow-up with prior background request', () => {
+    const heroMsg =
+      'change color of the "Your HVAC Website Should Work as Hard as You Do" section\'s background from red to green color gradient';
+    const merged = resolveEffectiveEditMessage('Linear gradient from #16a34a to #15803d (top to bottom)', [
+      { role: 'user', content: heroMsg },
+      { role: 'assistant', content: 'Which green gradient?' },
+    ]);
+    expect(merged).toContain('Your HVAC Website Should Work as Hard as You Do');
+    expect(merged).toContain('#16a34a');
+  });
 });

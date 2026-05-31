@@ -1,3 +1,7 @@
+import {
+  DEFAULT_EDIT_CONTEXT_TURNS,
+  formatWeightedConversationForPrompt,
+} from '@/lib/chat/conversationContextForEdit';
 import type { EditContext } from '@/lib/project-workspace/edit-context/types';
 import { formatStructureMap } from '@/lib/project-workspace/edit-shared/resolveSectionTarget';
 import { resolveDuplicateCopyTarget } from '@/lib/project-workspace/edit-context/resolveDuplicateCopyTarget';
@@ -66,22 +70,16 @@ export function buildPlanEditUserPrompt(editContext: EditContext, userPrompt: st
           .join('\n')}\n`
       : '';
 
-  const history = editContext.conversationHistory ?? [];
-  const lastAssistant = [...history].reverse().find((t) => t.role === 'assistant');
-  const lastUserBeforeCurrent = [...history]
-    .reverse()
-    .filter((t) => t.role === 'user')
-    .find((t) => t.content.trim() !== userPrompt.trim());
-  const clarificationBlock =
-    lastAssistant || lastUserBeforeCurrent
-      ? `Recent clarification:\n${lastAssistant ? `Assistant asked: ${lastAssistant.content.slice(0, 400)}\n` : ''}${lastUserBeforeCurrent ? `User chose: ${lastUserBeforeCurrent.content.slice(0, 200)}\n` : ''}`
-      : '';
+  const historyBlock = formatWeightedConversationForPrompt(
+    editContext.conversationHistory,
+    DEFAULT_EDIT_CONTEXT_TURNS
+  );
 
   return `Business: ${siteModel.parsedConfig?.businessName ?? '(unknown)'}
 Archetype: ${siteModel.archetype}
 Risk: ${riskFlags.level} (${riskFlags.reasons.join('; ') || 'none'})
 
-${duplicateBlock}${clarificationBlock}
+${duplicateBlock}${historyBlock}
 ${resolvedTarget}
 
 Sections:

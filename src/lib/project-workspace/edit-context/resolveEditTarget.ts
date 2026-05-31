@@ -44,6 +44,34 @@ function heroTarget(confidence: 'high' | 'medium' | 'low', reason: string): Edit
   };
 }
 
+function readHeroHeadline(siteConfigContent: string): string | undefined {
+  const quotedKey = siteConfigContent.match(/"headline"\s*:\s*"([^"]*)"/)?.[1]?.trim();
+  if (quotedKey) return quotedKey;
+  return siteConfigContent.match(/\bheadline\s*:\s*"([^"]*)"/)?.[1]?.trim();
+}
+
+/** Style edits quoting the hero headline (often labeled "section" by owners) → hero target. */
+function heroStyleTargetFromQuotedHeadline(
+  effectiveMessage: string,
+  siteModel: SiteModel
+): EditTarget | null {
+  const what = classifyEditWhat(effectiveMessage);
+  if (what !== 'style_background' && what !== 'style_text' && what !== 'style_card') {
+    return null;
+  }
+
+  const headline = readHeroHeadline(siteModel.siteConfigContent ?? '');
+  if (!headline) return null;
+
+  const quotedTitles = extractSectionTitleCandidates(effectiveMessage);
+  const matchesHeadline = quotedTitles.some(
+    (title) => title.trim() === headline || scoreTitleMatch(headline, title) >= 85
+  );
+  if (!matchesHeadline) return null;
+
+  return heroTarget('high', `Quoted title matches hero headline "${headline}"`);
+}
+
 /**
  * Resolve edit target from message + catalog. Quoted titles beat deictic "this section".
  */
@@ -68,6 +96,11 @@ export function resolveEditTargetSync(
 
   if (/\b(hero|headline|tagline|subheadline)\b/i.test(lower) && !/\bsection\b/i.test(lower)) {
     return heroTarget('high', 'Hero keyword match');
+  }
+
+  const heroFromQuotedHeadline = heroStyleTargetFromQuotedHeadline(effectiveMessage, siteModel);
+  if (heroFromQuotedHeadline) {
+    return heroFromQuotedHeadline;
   }
 
   if (/\b(phone|email|address)\b/i.test(lower) && /\b(contact|call|reach)\b/i.test(lower)) {
@@ -236,10 +269,13 @@ export async function resolveEditTargetAsync(
     return target;
   }
 
+  if (target.kind === 'hero' || target.kind === 'nav' || target.kind === 'footer') {
+    return target;
+  }
+
   const needsLlm =
     styleEditNeedsSectionTarget(effectiveMessage) &&
-    (target.needsClarification ||
-      target.kind !== 'section' ||
+    (target.kind !== 'section' ||
       target.sectionIndex == null ||
       target.confidence !== 'high');
 

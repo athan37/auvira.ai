@@ -1,6 +1,9 @@
 import { classifyEditWhat } from '@/lib/project-workspace/edit-context/classifyEditWhat';
 import { extractSectionBackgroundClassFromMessage } from '@/lib/builder/sectionPresentation';
-import { extractBackgroundColorFromMessage } from '@/lib/project-workspace/edit-shared/preset/presetUtils';
+import {
+  extractBackgroundColorFromMessage,
+  parseColorSwap,
+} from '@/lib/project-workspace/edit-shared/preset/presetUtils';
 import {
   extractSectionPickFromListReply,
   lastSectionListAssistantTurn,
@@ -161,6 +164,35 @@ function planNumberedSectionFollowUp(editContext: EditContext): EditPlan | null 
   };
 }
 
+function planHeroBackgroundStyle(editContext: EditContext): EditPlan | null {
+  if (editContext.target.kind !== 'hero') return null;
+
+  const message = editContext.effectiveMessage;
+  const what = classifyEditWhat(message);
+  if (what !== 'style_background') return null;
+
+  const swap = parseColorSwap(message);
+  const bgClass = extractSectionBackgroundClassFromMessage(message);
+  const color = extractBackgroundColorFromMessage(message);
+
+  if (!swap && !bgClass && !color) return null;
+
+  return {
+    planVersion: 'website-agent',
+    needsClarification: false,
+    intent: 'theme',
+    targets: [{ kind: 'hero' }],
+    verification: [{ kind: 'generic' }],
+    risk: { level: editContext.riskFlags.level, reasons: editContext.riskFlags.reasons },
+    steps: [
+      {
+        skill: 'update_theme',
+        params: { scope: 'hero' },
+      },
+    ],
+  };
+}
+
 /**
  * Rule-based plan for high-confidence requests (no LLM).
  */
@@ -183,6 +215,9 @@ export function buildDeterministicPlan(editContext: EditContext): EditPlan | nul
 
   const numbered = planNumberedSectionFollowUp(editContext);
   if (numbered) return numbered;
+
+  const heroStyle = planHeroBackgroundStyle(editContext);
+  if (heroStyle) return heroStyle;
 
   const sectionCopy = parseSectionTitleCopyEdit(message);
   if (

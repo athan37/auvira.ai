@@ -1,4 +1,5 @@
 import { parseSiteConfigSource } from '@/lib/site-manager/siteConfigParser';
+import { classifyEditWhat } from '@/lib/project-workspace/edit-context/classifyEditWhat';
 import { parseSectionTitleCopyEdit } from '@/lib/project-workspace/edit-shared/resolveSectionTarget';
 import type { ConversationTurn } from '@/lib/project-workspace/edit-shared/editAmbiguity';
 
@@ -129,6 +130,11 @@ export function resolveDuplicateCopyTarget(
   conversationHistory: ConversationTurn[] = []
 ): DuplicateCopyResolution | null {
   if (isSectionScopedCopyEdit(message)) {
+    return null;
+  }
+
+  const editKind = classifyEditWhat(message);
+  if (editKind.startsWith('style_')) {
     return null;
   }
 
