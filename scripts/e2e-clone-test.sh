@@ -58,11 +58,22 @@ echo ""
 
 PREVIEW_URL=$(echo "$BUILD" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('preview',{}).get('url',''))" 2>/dev/null || true)
 OK=$(echo "$BUILD" | python3 -c "import sys,json; print(json.load(sys.stdin).get('ok',False))" 2>/dev/null || echo "False")
+PROJECT_ID=$(echo "$BUILD" | python3 -c "import sys,json; print(json.load(sys.stdin).get('projectId',''))" 2>/dev/null || true)
+AUTO_SAVE_OK=$(echo "$BUILD" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('autoSave',{}).get('ok', d.get('projectId') is not None))" 2>/dev/null || echo "False")
 
 if [ "$OK" != "True" ]; then
   echo "FAILED: build-preview returned ok=$OK"
   exit 1
 fi
+
+if [ -z "$PROJECT_ID" ]; then
+  echo "FAILED: build-preview did not return projectId (auto-handoff)"
+  echo "$BUILD" | python3 -m json.tool 2>/dev/null | head -40 || echo "$BUILD"
+  exit 1
+fi
+
+echo "Auto-handoff projectId: $PROJECT_ID (autoSave ok=$AUTO_SAVE_OK)"
+echo "Editor path: /projects/$PROJECT_ID"
 
 echo "5) Health check preview: $PREVIEW_URL"
 HTTP=$(curl -s -o /dev/null -w "%{http_code}" "$PREVIEW_URL" || echo "000")
