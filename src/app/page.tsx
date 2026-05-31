@@ -204,7 +204,7 @@ export default async function Home() {
               <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Chat edit</p>
                 <p className="mt-2 text-sm text-zinc-700">
-                  "Make the hero warmer and add financing details."
+                  &quot;Make the hero warmer and add financing details.&quot;
                 </p>
               </div>
               <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
