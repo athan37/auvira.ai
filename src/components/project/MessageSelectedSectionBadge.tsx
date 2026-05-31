@@ -27,6 +27,7 @@ export function MessageSelectedSectionBadge({
 
   return (
     <div
+      data-section-chat-label
       className={`inline-flex max-w-full items-center gap-1.5 rounded-md border px-2 py-1 text-xs text-blue-900 ${
         interactive
           ? active

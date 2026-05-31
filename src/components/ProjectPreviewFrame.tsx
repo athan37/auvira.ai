@@ -5,6 +5,7 @@ import {
   buildSiteSectionClearMessage,
   buildSiteSectionFocusMessage,
   buildSiteSectionHighlightMessage,
+  parseSiteSectionDismissMessage,
   parseSiteSectionDragStartMessage,
   type ParentToIframeSectionMessage,
   type SelectedSection,
@@ -45,6 +46,7 @@ interface Props {
   focusSectionNonce?: number;
   onSelectedSectionChange?: (section: SelectedSection | null) => void;
   onSectionDragStart?: (payload: SiteSectionContextPayload, screenX: number, screenY: number) => void;
+  onSectionHighlightDismiss?: () => void;
 }
 
 const SECTION_HINT_STORAGE_KEY = 'editor-section-hint-dismissed';
@@ -79,6 +81,7 @@ export function ProjectPreviewFrame({
   focusSectionNonce = 0,
   onSelectedSectionChange,
   onSectionDragStart,
+  onSectionHighlightDismiss,
 }: Props) {
   const onReadyChangeRef = useRef(onReadyChange);
   onReadyChangeRef.current = onReadyChange;
@@ -94,7 +97,7 @@ export function ProjectPreviewFrame({
   const chunkRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const chunkRetryCountRef = useRef(0);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const lastHighlightIdRef = useRef<string | null>(null);
+  const lastHighlightRef = useRef<{ id: string | null; hover: boolean }>({ id: null, hover: false });
   const [showSectionHint, setShowSectionHint] = useState(false);
 
   const selectionAvailable = previewMode !== 'live';
@@ -117,15 +120,17 @@ export function ProjectPreviewFrame({
 
   useEffect(() => {
     if (!selectionAvailable) return;
-    const highlightId = hoverSectionId ?? focusSectionId ?? selectedSection?.sectionId ?? null;
-    if (lastHighlightIdRef.current === highlightId) return;
-    lastHighlightIdRef.current = highlightId;
+    const highlightId = hoverSectionId ?? focusSectionId ?? null;
+    const hover = Boolean(highlightId && hoverSectionId === highlightId);
+    const prev = lastHighlightRef.current;
+    if (prev.id === highlightId && prev.hover === hover) return;
+    lastHighlightRef.current = { id: highlightId, hover };
     if (highlightId) {
-      postToIframe(buildSiteSectionHighlightMessage(highlightId));
+      postToIframe(buildSiteSectionHighlightMessage(highlightId, hover));
     } else {
       postToIframe(buildSiteSectionClearMessage());
     }
-  }, [hoverSectionId, focusSectionId, selectedSection?.sectionId, selectionAvailable, postToIframe]);
+  }, [hoverSectionId, focusSectionId, selectionAvailable, postToIframe]);
 
   useEffect(() => {
     if (!selectionAvailable || !focusSectionId) return;
@@ -327,6 +332,12 @@ export function ProjectPreviewFrame({
           rect.left + dragStart.payload.clientX,
           rect.top + dragStart.payload.clientY
         );
+        return;
+      }
+
+      const dismiss = parseSiteSectionDismissMessage(event.data);
+      if (dismiss && selectionAvailable) {
+        onSectionHighlightDismiss?.();
       }
     }
 
@@ -335,7 +346,7 @@ export function ProjectPreviewFrame({
       window.removeEventListener('message', onMessage);
       if (chunkRetryTimerRef.current) clearTimeout(chunkRetryTimerRef.current);
     };
-  }, [editInProgress, onSectionDragStart, selectionAvailable]);
+  }, [editInProgress, onSectionDragStart, onSectionHighlightDismiss, selectionAvailable]);
 
   const handleRefresh = () => {
     setIframeLoading(true);
@@ -473,11 +484,13 @@ export function ProjectPreviewFrame({
             onLoad={() => {
               setIframeLoading(false);
               chunkRetryCountRef.current = 0;
-              lastHighlightIdRef.current = null;
+              lastHighlightRef.current = { id: null, hover: false };
               if (selectionAvailable) {
-                const highlightId = hoverSectionId ?? focusSectionId ?? selectedSection?.sectionId;
+                const highlightId = hoverSectionId ?? focusSectionId ?? null;
+                const hover = Boolean(highlightId && hoverSectionId === highlightId);
                 if (highlightId) {
-                  postToIframe(buildSiteSectionHighlightMessage(highlightId));
+                  lastHighlightRef.current = { id: highlightId, hover };
+                  postToIframe(buildSiteSectionHighlightMessage(highlightId, hover));
                 }
               }
             }}

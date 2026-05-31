@@ -23,7 +23,7 @@ describe('injectPreviewSectionSelection', () => {
     const legacy = `<html><head><script id="preview-section-selection" src="/api/projects/${projectId}/preview/section-bridge?v=1" defer></script></head><body></body></html>`;
     const upgraded = injectPreviewSectionSelection(legacy, projectId);
     expect(upgraded).toContain(`section-bridge?v=${PREVIEW_SECTION_SELECTION_VERSION}`);
-    expect(upgraded).not.toContain('section-bridge?v=1');
+    expect(upgraded).not.toMatch(/section-bridge\?v=1"/);
     expect((upgraded.match(/<script id="preview-section-selection"/g) ?? []).length).toBe(1);
   });
 

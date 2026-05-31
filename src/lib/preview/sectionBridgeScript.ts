@@ -2,13 +2,14 @@
  * Preview iframe bridge script (served externally to avoid inline-script CSP blocks).
  */
 
-export const PREVIEW_SECTION_BRIDGE_VERSION = 8;
+export const PREVIEW_SECTION_BRIDGE_VERSION = 14;
 
 const HIGHLIGHT_CLASS = 'site-editor-section-highlight';
+const HOVER_CLASS = 'site-editor-section-hover';
 
 /** CSS injected into proxied preview HTML alongside the external bridge script. */
 export const PREVIEW_SECTION_SELECTION_STYLES = `<style id="preview-section-selection-styles">
-.${HIGHLIGHT_CLASS}{outline:3px solid #2563eb!important;outline-offset:3px!important;box-shadow:0 0 0 6px rgba(37,99,235,0.35)!important}
+.${HIGHLIGHT_CLASS},.${HOVER_CLASS}{outline:3px solid #2563eb!important;outline-offset:3px!important;box-shadow:0 0 0 1px #2563eb,inset 0 0 0 9999px rgba(59,130,246,0.28)!important}
 .site-editor-preview-bridge section,.site-editor-preview-bridge section[id],.site-editor-preview-bridge [data-site-section-id],.site-editor-preview-bridge [data-analytics-id]{cursor:grab!important}
 .site-editor-preview-bridge.site-editor-dragging section,.site-editor-preview-bridge.site-editor-dragging section[id],.site-editor-preview-bridge.site-editor-dragging [data-site-section-id],.site-editor-preview-bridge.site-editor-dragging [data-analytics-id]{cursor:grabbing!important}
 </style>`;
@@ -16,10 +17,12 @@ export const PREVIEW_SECTION_SELECTION_STYLES = `<style id="preview-section-sele
 /** JavaScript body for the preview section selection bridge (no script tags). */
 export function buildSectionBridgeScriptBody(): string {
   return `(function(){
-var MSG={DRAG_START:"SITE_SECTION_DRAG_START",READY:"SITE_SECTION_BRIDGE_READY",HIGHLIGHT:"SITE_SECTION_HIGHLIGHT",FOCUS:"SITE_SECTION_FOCUS",CLEAR:"SITE_SECTION_CLEAR_SELECTION"};
+var MSG={DRAG_START:"SITE_SECTION_DRAG_START",READY:"SITE_SECTION_BRIDGE_READY",HIGHLIGHT:"SITE_SECTION_HIGHLIGHT",FOCUS:"SITE_SECTION_FOCUS",DISMISS:"SITE_SECTION_DISMISS",CLEAR:"SITE_SECTION_CLEAR_SELECTION"};
 var HIGHLIGHT="${HIGHLIGHT_CLASS}";
+var HOVER="${HOVER_CLASS}";
 var DRAG_THRESHOLD=6;
 var selectedId=null;
+var selectedHover=false;
 var dragState=null;
 var lastDragEndedAt=0;
 var parentOrigin=window.location.origin;
@@ -57,20 +60,27 @@ function readPayload(el){
 }
 
 function clearHighlight(){
-  document.querySelectorAll("."+HIGHLIGHT).forEach(function(node){node.classList.remove(HIGHLIGHT);});
+  document.querySelectorAll("."+HIGHLIGHT+","+"."+HOVER).forEach(function(node){
+    node.classList.remove(HIGHLIGHT);
+    node.classList.remove(HOVER);
+  });
 }
 
-function applyHighlight(sectionId){
+function applyHighlight(sectionId,hover){
   clearHighlight();
-  if(!sectionId){selectedId=null;return;}
+  if(!sectionId){selectedId=null;selectedHover=false;return;}
   var el=findSectionNode(sectionId);
-  if(el)el.classList.add(HIGHLIGHT);
+  if(el){
+    el.classList.add(HIGHLIGHT);
+    if(hover)el.classList.add(HOVER);
+  }
   selectedId=sectionId;
+  selectedHover=Boolean(hover);
 }
 
 function focusSection(sectionId){
   if(!sectionId)return;
-  applyHighlight(sectionId);
+  applyHighlight(sectionId,false);
   var el=findSectionNode(sectionId);
   if(!el)return;
   try{el.scrollIntoView({behavior:'smooth',block:'center',inline:'nearest'});}
@@ -112,16 +122,24 @@ document.addEventListener("mouseup",function(){
   dragState=null;
 },true);
 
+document.addEventListener("mousedown",function(e){
+  if(e.button!==0||dragState)return;
+  if(findSectionEl(e.target))return;
+  notify(MSG.DISMISS,{});
+},true);
+
 window.addEventListener("message",function(event){
   if(event.source!==window.parent)return;
   if(event.origin!==parentOrigin&&event.origin!==window.location.origin)return;
   var data=event.data;
   if(!data||typeof data.type!=="string")return;
-  if(data.type===MSG.CLEAR){clearHighlight();selectedId=null;}
+  if(data.type===MSG.CLEAR){clearHighlight();selectedId=null;selectedHover=false;}
   else if(data.type===MSG.FOCUS&&data.payload&&data.payload.sectionId){focusSection(data.payload.sectionId);}
   else if(data.type===MSG.HIGHLIGHT&&data.payload&&data.payload.sectionId){
-    if(data.payload.sectionId===selectedId)return;
-    applyHighlight(data.payload.sectionId);
+    var sid=data.payload.sectionId;
+    var hover=Boolean(data.payload.hover);
+    if(sid===selectedId&&hover===selectedHover)return;
+    applyHighlight(sid,hover);
   }
 });
 

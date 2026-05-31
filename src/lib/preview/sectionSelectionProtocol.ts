@@ -7,6 +7,7 @@ export const PREVIEW_SECTION_MSG = {
   DRAG_START: 'SITE_SECTION_DRAG_START',
   HIGHLIGHT: 'SITE_SECTION_HIGHLIGHT',
   FOCUS: 'SITE_SECTION_FOCUS',
+  DISMISS: 'SITE_SECTION_DISMISS',
   CLEAR: 'SITE_SECTION_CLEAR_SELECTION',
   ENABLE_MODE: 'SITE_SECTION_ENABLE_SELECTION',
   DISABLE_MODE: 'SITE_SECTION_DISABLE_SELECTION',
@@ -50,12 +51,16 @@ export interface SiteSectionDragStartMessage {
 
 export interface SiteSectionHighlightMessage {
   type: typeof PREVIEW_SECTION_MSG.HIGHLIGHT;
-  payload: { sectionId: string };
+  payload: { sectionId: string; hover?: boolean };
 }
 
 export interface SiteSectionFocusMessage {
   type: typeof PREVIEW_SECTION_MSG.FOCUS;
   payload: { sectionId: string };
+}
+
+export interface SiteSectionDismissMessage {
+  type: typeof PREVIEW_SECTION_MSG.DISMISS;
 }
 
 export interface SiteSectionClearMessage {
@@ -79,7 +84,8 @@ export type ParentToIframeSectionMessage =
 
 export type IframeToParentSectionMessage =
   | SiteSectionSelectedMessage
-  | SiteSectionDragStartMessage;
+  | SiteSectionDragStartMessage
+  | SiteSectionDismissMessage;
 
 const ALLOWED_PARENT_TYPES = new Set<string>([
   PREVIEW_SECTION_MSG.HIGHLIGHT,
@@ -92,6 +98,7 @@ const ALLOWED_PARENT_TYPES = new Set<string>([
 const ALLOWED_IFRAME_TYPES = new Set<string>([
   PREVIEW_SECTION_MSG.SELECTED,
   PREVIEW_SECTION_MSG.DRAG_START,
+  PREVIEW_SECTION_MSG.DISMISS,
 ]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -165,13 +172,25 @@ export function selectedSectionFromPayload(payload: SelectedSectionPayload): Sel
 }
 
 /** Build parent → iframe highlight message. */
-export function buildSiteSectionHighlightMessage(sectionId: string): SiteSectionHighlightMessage {
-  return { type: PREVIEW_SECTION_MSG.HIGHLIGHT, payload: { sectionId } };
+export function buildSiteSectionHighlightMessage(
+  sectionId: string,
+  hover = false
+): SiteSectionHighlightMessage {
+  return {
+    type: PREVIEW_SECTION_MSG.HIGHLIGHT,
+    payload: hover ? { sectionId, hover: true } : { sectionId },
+  };
 }
 
 /** Build parent → iframe focus message (highlight + scroll into view). */
 export function buildSiteSectionFocusMessage(sectionId: string): SiteSectionFocusMessage {
   return { type: PREVIEW_SECTION_MSG.FOCUS, payload: { sectionId } };
+}
+
+/** Parse iframe → parent dismiss (click outside section in preview). */
+export function parseSiteSectionDismissMessage(data: unknown): SiteSectionDismissMessage | null {
+  if (!isRecord(data) || data.type !== PREVIEW_SECTION_MSG.DISMISS) return null;
+  return { type: PREVIEW_SECTION_MSG.DISMISS };
 }
 
 /** Build parent → iframe clear message. */

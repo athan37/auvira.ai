@@ -135,6 +135,11 @@ export default function ProjectPage() {
     setSelectedSection(null);
   }, []);
 
+  const handleSectionHighlightDismiss = useCallback(() => {
+    setFocusedHistorySectionId(null);
+    setHistoryHoverSectionId(null);
+  }, []);
+
   const handleHistorySectionClick = useCallback((sectionId: string) => {
     setFocusedHistorySectionId(sectionId);
     setHistoryFocusNonce((n) => n + 1);
@@ -199,6 +204,17 @@ export default function ProjectPage() {
     const timer = setTimeout(() => setSectionToast(null), 3500);
     return () => clearTimeout(timer);
   }, [sectionToast]);
+
+  useEffect(() => {
+    function handlePointerDown(event: MouseEvent) {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (target.closest('[data-section-chat-label]')) return;
+      handleSectionHighlightDismiss();
+    }
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, [handleSectionHighlightDismiss]);
 
   const handlePreviewReadyChange = useCallback((ready: boolean) => {
     setPreviewReady(ready);
@@ -315,6 +331,7 @@ export default function ProjectPage() {
             focusSectionNonce={historyFocusNonce}
             onSelectedSectionChange={handleSelectedSectionChange}
             onSectionDragStart={handleSectionDragStart}
+            onSectionHighlightDismiss={handleSectionHighlightDismiss}
           />
         </div>
 

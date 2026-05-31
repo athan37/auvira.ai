@@ -4,6 +4,7 @@ import {
   buildSiteSectionFocusMessage,
   buildSiteSectionHighlightMessage,
   isValidParentToIframeSectionMessage,
+  parseSiteSectionDismissMessage,
   parseSiteSectionDragStartMessage,
   parseSiteSectionSelectedMessage,
   selectedSectionFromPayload,
@@ -68,6 +69,10 @@ describe('sectionSelectionProtocol', () => {
       type: PREVIEW_SECTION_MSG.HIGHLIGHT,
       payload: { sectionId: 'hero' },
     });
+    expect(buildSiteSectionHighlightMessage('services', true)).toEqual({
+      type: PREVIEW_SECTION_MSG.HIGHLIGHT,
+      payload: { sectionId: 'services', hover: true },
+    });
     expect(buildSiteSectionFocusMessage('services')).toEqual({
       type: PREVIEW_SECTION_MSG.FOCUS,
       payload: { sectionId: 'services' },
@@ -88,5 +93,12 @@ describe('sectionSelectionProtocol', () => {
         payload: { sectionId: '' },
       })
     ).toBe(false);
+  });
+
+  it('parses SITE_SECTION_DISMISS from iframe', () => {
+    expect(parseSiteSectionDismissMessage({ type: PREVIEW_SECTION_MSG.DISMISS })).toEqual({
+      type: PREVIEW_SECTION_MSG.DISMISS,
+    });
+    expect(parseSiteSectionDismissMessage({ type: 'unknown' })).toBeNull();
   });
 });

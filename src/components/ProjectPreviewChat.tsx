@@ -955,6 +955,9 @@ export function ProjectPreviewChat({
                   selection={selectedSection}
                   onClear={onClearSelectedSection}
                   pulseKey={focusChatInputKey}
+                  interactive={previewReady}
+                  onHoverStart={() => onHistorySectionHover?.(selectedSection.sectionId)}
+                  onHoverEnd={() => onHistorySectionHover?.(null)}
                 />
                 <p className="text-[10px] text-zinc-500 mb-2">
                   Type your edit below — e.g. make it red
