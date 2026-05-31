@@ -138,7 +138,7 @@ export async function POST(
     await appendLog(jobId, 'building', 'Running build validation');
     await CloneJob.updateOne({ _id: jobId }, { $set: { currentStageLabel: 'Running local build gate...', progressPercent: 93 } });
 
-    const validationErrors = validateGeneratedFiles(siteSpec, uniqueName);
+    const validationErrors = validateGeneratedFiles(generated.files);
     if (validationErrors.length > 0) {
       const errMsg = 'Validation failed: ' + validationErrors.map(e => `${e.file}: ${e.error}`).join('; ');
       await markStepFailed(jobId, 'validate_build', errMsg);

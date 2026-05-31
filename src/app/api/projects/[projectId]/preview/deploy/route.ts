@@ -57,7 +57,7 @@ export async function POST(
     );
 
     // Validate (sync check)
-    const validationErrors = validateGeneratedFiles(spec as unknown as import('@/lib/agent/schemas').SiteSpec, project.name || 'deployed-site');
+    const validationErrors = validateGeneratedFiles(generated.files);
     if (validationErrors.length > 0) {
       return NextResponse.json({
         ok: false,
@@ -83,7 +83,7 @@ export async function POST(
     if (!existsSync(deployWorkspacePath)) {
       mkdirSync(deployWorkspacePath, { recursive: true });
     }
-    writeFilesToDisk(generated.files, deployWorkspacePath);
+    writeFilesToDisk(buildResult.files ?? generated.files, deployWorkspacePath);
 
     // Commit to GitLab
     let gitlabCommit;

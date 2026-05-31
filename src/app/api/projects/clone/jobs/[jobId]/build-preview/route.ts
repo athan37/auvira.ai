@@ -5,7 +5,6 @@ import { getLLMClient } from '@/lib/llm/llmClient';
 import { buildGenerateSiteSpecPrompt } from '@/lib/agent/prompts';
 import { generateDesignBriefAgent, getDefaultDesignBrief } from '@/lib/agent/generateDesignBriefAgent';
 import { generateWebsiteFiles } from '@/lib/builder/generateWebsiteFiles';
-import { validateGeneratedFiles } from '@/lib/builder/validateGeneratedFiles';
 import { validateGeneratedSite } from '@/lib/builder/validateGeneratedSite';
 import { waitForPreviewReady } from '@/lib/preview/waitForPreviewReady';
 import { spawn, ChildProcess } from 'child_process';
@@ -291,13 +290,6 @@ export async function POST(
     await markSummaryRunning(jobId, 'quality');
     await CloneJob.updateOne({ _id: jobId }, { $set: { currentStageLabel: 'Checking website quality...', progressPercent: 60 } });
 
-    const validationErrors = validateGeneratedFiles(siteSpec, uniqueName);
-    if (validationErrors.length > 0) {
-      const errMsg = 'Validation failed: ' + validationErrors.map(e => `${e.file}: ${e.error}`).join('; ');
-      await markPreviewStepFailed(jobId, 'quality_check', errMsg);
-      throw new Error(errMsg);
-    }
-
     const buildResult = await validateGeneratedSite({ files: generated.files, projectName: uniqueName });
     if (!buildResult.ok) {
       const errMsg = 'Build gate failed: ' + buildResult.errors.join('; ');
@@ -335,14 +327,14 @@ export async function POST(
       rmSync(workspacePath, { recursive: true, force: true });
     }
     mkdirSync(workspacePath, { recursive: true });
-    writeFilesToDisk(generated.files, workspacePath);
+    writeFilesToDisk(buildResult.files ?? generated.files, workspacePath);
 
     // Track files in technicalBuild
     await CloneJob.updateOne({ _id: jobId }, {
       $set: {
         technicalBuild: {
           workspacePath,
-          files: generated.files.map(f => ({ path: f.filePath, status: 'done' as const })),
+          files: (buildResult.files ?? generated.files).map(f => ({ path: f.filePath, status: 'done' as const })),
           validationLogs: buildResult.logs,
           buildGateSkipped: buildResult.buildGateSkipped ?? false,
         },
@@ -356,7 +348,7 @@ export async function POST(
       if (isCloneSandboxPreviewEnabled()) {
         try {
           const { bootstrapCloneJobSandbox } = await import('@/lib/sandbox/bootstrapCloneJobSandbox');
-          const sandboxResult = await bootstrapCloneJobSandbox(params.jobId, generated.files);
+          const sandboxResult = await bootstrapCloneJobSandbox(params.jobId, buildResult.files ?? generated.files);
           previewUrl = sandboxResult.previewUrl;
           sandboxNote = 'Ephemeral sandbox preview';
         } catch (sandboxError) {

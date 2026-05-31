@@ -174,7 +174,7 @@ function TestimonialsSection({ section }: { section: SiteSection }) {
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {section.items?.slice(0, 6).map((item, i) => (
             <div key={i} className={"rounded-3xl border p-7 shadow-sm " + resolveSectionCardClass(section, preset)}>
-              <p className="text-slate-600 italic">"{item.description || "Great service!"}"</p>
+              <p className="text-slate-600 italic">&ldquo;{item.description || 'Great service!'}&rdquo;</p>
               <p className="mt-4 font-semibold text-slate-950">- {item.title}</p>
             </div>
           ))}

@@ -113,7 +113,7 @@ export async function POST(
     const generated = generateWebsiteFiles(updatedSiteSpec as unknown as import('@/lib/agent/schemas').SiteSpec, uniqueName, designBrief, template);
 
     // Step 3: Validate files (sync only, skip full build for speed)
-    const validationErrors = validateGeneratedFiles(updatedSiteSpec, uniqueName);
+    const validationErrors = validateGeneratedFiles(generated.files);
     if (validationErrors.length > 0) {
       return NextResponse.json({
         ok: false,

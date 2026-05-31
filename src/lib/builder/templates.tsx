@@ -469,9 +469,11 @@ export function generateSiteConfig(siteSpec: SiteSpec): string {
       type: (sectionTypeMap[s.type] || 'generic') as 'services' | 'about' | 'features' | 'faq' | 'testimonials' | 'contact' | 'generic',
       title: s.title,
       body: s.body,
-      items: (s.items as unknown as Array<{title: string; description?: string}>).map(item => {
-        // SiteSpec items are strings, SiteConfig items are objects with title/description
+      items: (s.items as unknown as Array<{ title: string; description?: string }>).map((item) => {
         if (typeof item === 'string') {
+          if (s.type === 'testimonials') {
+            return { title: item, description: item };
+          }
           return { title: item };
         }
         return { title: item.title, description: item.description };

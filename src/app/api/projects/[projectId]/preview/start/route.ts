@@ -108,7 +108,7 @@ export async function POST(
 
     // Validate files
     const valStart = Date.now();
-    const validationErrors = validateGeneratedFiles(spec as unknown as import('@/lib/agent/schemas').SiteSpec, project.name || 'project-preview');
+    const validationErrors = validateGeneratedFiles(generated.files);
     if (validationErrors.length > 0) {
       const errMsg = 'Validation failed: ' + validationErrors.map(e => `${e.file}: ${e.error}`).join('; ');
       await WebsiteProject.updateOne({ _id: projectId }, {

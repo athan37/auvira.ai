@@ -6,9 +6,8 @@ import * as path from 'path';
 import { getNodeBinDir } from '@/lib/runtime/nodeRuntime';
 import { isVercelServerless } from '@/lib/runtime/isVercelServerless';
 import { scratchPath } from '@/lib/runtime/scratchDir';
-import { parseSiteConfigSource } from '@/lib/site-manager/siteConfigParser';
-import { rendererComponentForSectionType } from '@/lib/project-workspace/edit-shared/legacySectionPresentation';
-import { sectionRendererUsesPresentationResolver } from '@/lib/project-workspace/previewReflectsSiteConfig';
+import { prepareGeneratedWorkspaceForBuild } from '@/lib/builder/prepareGeneratedWorkspaceForBuild';
+import { validateGeneratedFiles, templateDistinctivenessCheck } from '@/lib/builder/validateGeneratedFiles';
 
 const execFileAsync = promisify(execFile);
 
@@ -28,6 +27,8 @@ export interface ValidateGeneratedSiteResult {
   logs: string;
   errors: string[];
   durationMs: number;
+  /** Repaired file set that passed the gate (synced from temp workspace). */
+  files?: GeneratedFile[];
   /** True when npm install/build was skipped (e.g. Vercel serverless). */
   buildGateSkipped?: boolean;
 }
@@ -55,11 +56,9 @@ const REQUIRED_FILES = [
   'README.md',
 ];
 
-const PAGE_TSX_BAD_PATTERNS = [
+const PAGE_TSX_RUNTIME_BAD_PATTERNS = [
   '__siteAgentPageGallerySync',
   'export const __site',
-  '${escapedSiteSpec}',
-  'escapedSiteSpec',
   'Cannot find name',
   "from '../agent",
   "from '../../agent",
@@ -67,43 +66,9 @@ const PAGE_TSX_BAD_PATTERNS = [
   'process.env',
   'require(',
   'import.meta',
-  // HTML injection patterns (forbidden approach)
-  'dangerouslySetInnerHTML',
-  'contentSectionsHtml',
-  'contactSectionHtml',
-  '__CONTENT_SECTIONS_HTML__',
-  '__CONTACT_SECTION_HTML__',
-  'htmlSection',
-  // Template placeholder tokens
-  '__THEME_PRESET_JSON__',
-  '__TEMPLATE_CATEGORY__',
-  '__TEMPLATE_VARIANT__',
-  // Broken JSX escape syntax
   "{'{'}",
   "{'}",
   "{'{'}$",
-];
-
-const SITE_CONFIG_BAD_PATTERNS = [
-  '${escapedSiteSpec}',
-  '\\${escapedSiteSpec}',
-  'contact@example',
-  '(555)',
-  'Sterling Immigration Law',
-];
-
-// Required content checks - data-driven page structure
-const PAGE_TSX_REQUIRED = [
-  'export default function Home',
-  'siteConfig',
-  'function SectionRenderer',
-  'siteConfig.sections.map',
-];
-
-const SITE_CONFIG_REQUIRED = [
-  'export const siteConfig',
-  'export type SiteConfig',
-  'export type SiteSection',
 ];
 
 function sanitizeProjectName(name: string): string {
@@ -120,34 +85,17 @@ function checkStringPatterns(content: string, patterns: string[], fileName: stri
   return errors;
 }
 
-/** Standard section renderers must read siteConfig.presentation via resolveSectionBackground. */
-function checkGeneratedSectionPresentationWiring(
-  pageContent: string,
-  siteConfigContent: string
-): string[] {
-  const parsed = parseSiteConfigSource(siteConfigContent);
-  const sectionTypes = new Set(
-    (parsed?.sections ?? []).map((section) =>
-      String((section as { type?: string }).type ?? 'generic').toLowerCase()
-    )
-  );
-  if (sectionTypes.size === 0) return [];
-
-  const errors: string[] = [];
-  for (const type of sectionTypes) {
-    const component = rendererComponentForSectionType(type);
-    if (!sectionRendererUsesPresentationResolver(pageContent, component)) {
-      errors.push(
-        `page.tsx: ${component} must use resolveSectionBackground(section, preset) for section presentation`
-      );
+async function syncWorkspaceFilesFromDisk(tempDir: string, files: GeneratedFile[]): Promise<void> {
+  for (const file of files) {
+    const abs = path.join(tempDir, file.filePath);
+    try {
+      file.content = await fs.promises.readFile(abs, 'utf-8');
+    } catch {
+      // keep in-memory content when file missing on disk
     }
   }
-  return errors;
 }
 
-/**
- * Auto-detects industry theme from page content based on structural patterns.
- */
 function detectIndustryFromContent(pageContent: string): string | null {
   const legalScore = (pageContent.match(/practice areas?|attorney|lawyer|free consultation/i) || []).length;
   const homeServicesScore = (pageContent.match(/service area|24\/7|emergency|licensed|insured|contractor|hvac|plumb/i) || []).length;
@@ -164,58 +112,6 @@ function detectIndustryFromContent(pageContent: string): string | null {
   return null;
 }
 
-/**
- * Validates that the generated page content matches structural expectations
- * for the industry template (hero style, required sections, trust signals).
- */
-function templateDistinctivenessCheck(
-  pageContent: string,
-  industryTheme: string
-): { ok: boolean; error?: string } {
-  const checks: Record<string, () => { ok: boolean; error?: string }> = {
-    'legal': () => {
-      const hasCredibilityBar = /years|experience|cases|free consultation/i.test(pageContent);
-      const hasPracticeAreas = /practice areas?|specialt/i.test(pageContent);
-      const hasAttorneySection = /attorney|lawyer|team|about our firm/i.test(pageContent);
-      if (!hasCredibilityBar) return { ok: false, error: 'Legal template missing credibility bar with experience/credentials' };
-      if (!hasPracticeAreas) return { ok: false, error: 'Legal template missing practice areas section' };
-      if (!hasAttorneySection) return { ok: false, error: 'Legal template missing firm/attorneys section' };
-      return { ok: true };
-    },
-    'home-services': () => {
-      const hasPhoneNumber = /\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/.test(pageContent);
-      const hasEmergencyBanner = /24\/7|emergency|same.day/i.test(pageContent);
-      const hasServiceArea = /service area|coverage|zip|serving/i.test(pageContent);
-      if (!hasPhoneNumber) return { ok: false, error: 'Home services template must have phone number prominently displayed' };
-      if (!hasEmergencyBanner) return { ok: false, error: 'Home services template missing 24/7 emergency messaging' };
-      if (!hasServiceArea) return { ok: false, error: 'Home services template missing service area section' };
-      return { ok: true };
-    },
-    'restaurant': () => {
-      const hasHours = /hours|open|closed|monday|tuesday|thursday|friday|saturday|sunday/i.test(pageContent);
-      const hasMenu = /menu|dishes|appetizer|entree|dessert|food/i.test(pageContent);
-      const hasReservationCta = /reserve|order|book/i.test(pageContent);
-      if (!hasHours) return { ok: false, error: 'Restaurant template missing hours information' };
-      if (!hasMenu) return { ok: false, error: 'Restaurant template missing menu or featured dishes section' };
-      if (!hasReservationCta) return { ok: false, error: 'Restaurant template missing reservation or order CTA' };
-      return { ok: true };
-    },
-    'healthcare': () => {
-      const hasAppointmentCta = /appointment|book|schedule|call today/i.test(pageContent);
-      const hasInsurance = /insurance|accepted|payment|coverage/i.test(pageContent);
-      const hasProviders = /doctor|physician|provider|nurse|medical team/i.test(pageContent);
-      if (!hasAppointmentCta) return { ok: false, error: 'Healthcare template must have prominent appointment CTA' };
-      if (!hasInsurance) return { ok: false, error: 'Healthcare template missing insurance or payment info' };
-      if (!hasProviders) return { ok: false, error: 'Healthcare template missing provider/staff section' };
-      return { ok: true };
-    },
-  };
-
-  const check = checks[industryTheme];
-  if (!check) return { ok: true }; // default/general-service skip
-  return check();
-}
-
 export async function validateGeneratedSite(
   input: ValidateGeneratedSiteInput
 ): Promise<ValidateGeneratedSiteResult> {
@@ -223,16 +119,25 @@ export async function validateGeneratedSite(
   const allErrors: string[] = [];
   const logs: string[] = [];
 
+  const preValidation = validateGeneratedFiles(input.files);
+  if (preValidation.length > 0) {
+    return {
+      ok: false,
+      tempDir: '',
+      logs: 'Pre-build file validation failed',
+      errors: preValidation.map((e) => `${e.file}: ${e.error}`),
+      durationMs: Date.now() - startTime,
+    };
+  }
+
   const safeName = sanitizeProjectName(input.projectName);
   const timestamp = Date.now().toString(36).slice(-6);
   const tempDir = scratchPath('generated-sites', `${safeName}-${timestamp}`);
 
   try {
-    // 1. Create temp directory
     await fs.promises.mkdir(tempDir, { recursive: true });
     logs.push(`Created temp directory: ${tempDir}`);
 
-    // 2. Write all files
     for (const file of input.files) {
       const filePath = path.join(tempDir, file.filePath);
       const dir = path.dirname(filePath);
@@ -241,7 +146,6 @@ export async function validateGeneratedSite(
     }
     logs.push(`Wrote ${input.files.length} files`);
 
-    // 3. Verify required files exist
     for (const required of REQUIRED_FILES) {
       const filePath = path.join(tempDir, required);
       try {
@@ -255,57 +159,43 @@ export async function validateGeneratedSite(
     }
     logs.push('All required files present');
 
-    // 4. Run string validation
+    const { repaired } = await prepareGeneratedWorkspaceForBuild(tempDir);
+    if (repaired.length > 0) {
+      logs.push(`Pre-build repairs: ${repaired.join(', ')}`);
+      await syncWorkspaceFilesFromDisk(tempDir, input.files);
+    }
+
+    const postRepairValidation = validateGeneratedFiles(input.files);
+    if (postRepairValidation.length > 0) {
+      allErrors.push(...postRepairValidation.map((e) => `${e.file}: ${e.error}`));
+      logs.push('Post-repair file validation failed');
+      return { ok: false, tempDir, logs: logs.join('\n'), errors: allErrors, durationMs: Date.now() - startTime };
+    }
+
     const pageTsxPath = path.join(tempDir, 'src/app/page.tsx');
-    const siteConfigPath = path.join(tempDir, 'src/lib/siteConfig.ts');
     const pageTsxContent = await fs.promises.readFile(pageTsxPath, 'utf-8');
-    const siteConfigContent = await fs.promises.readFile(siteConfigPath, 'utf-8');
+    allErrors.push(...checkStringPatterns(pageTsxContent, PAGE_TSX_RUNTIME_BAD_PATTERNS, 'page.tsx'));
 
-    // Check for unsafe patterns
-    const pageErrors = checkStringPatterns(pageTsxContent, PAGE_TSX_BAD_PATTERNS, 'page.tsx');
-    const configErrors = checkStringPatterns(siteConfigContent, SITE_CONFIG_BAD_PATTERNS, 'siteConfig.ts');
-    allErrors.push(...pageErrors, ...configErrors);
-
-    // Check for markdown heading artifacts in page.tsx string literals
     const markdownHeadingPattern = /^#{1,3}\s+\S/m;
     if (markdownHeadingPattern.test(pageTsxContent)) {
       allErrors.push('page.tsx: contains markdown heading artifact in string content');
     }
 
-    // Check for required content
-    for (const required of PAGE_TSX_REQUIRED) {
-      if (!pageTsxContent.includes(required)) {
-        allErrors.push(`page.tsx missing required content: "${required}"`);
-      }
-    }
-    for (const required of SITE_CONFIG_REQUIRED) {
-      if (!siteConfigContent.includes(required)) {
-        allErrors.push(`siteConfig.ts missing required content: "${required}"`);
-      }
-    }
-
-    allErrors.push(...checkGeneratedSectionPresentationWiring(pageTsxContent, siteConfigContent));
-
     if (allErrors.length > 0) {
-      logs.push('String validation failed');
+      logs.push('Runtime string validation failed');
       return { ok: false, tempDir, logs: logs.join('\n'), errors: allErrors, durationMs: Date.now() - startTime };
     }
-    logs.push('String validation passed');
+    logs.push('Runtime string validation passed');
 
-    // 4b. Template distinctiveness check
     const detectedIndustry = detectIndustryFromContent(pageTsxContent);
     if (detectedIndustry) {
       const templateResult = templateDistinctivenessCheck(pageTsxContent, detectedIndustry);
       if (!templateResult.ok) {
         allErrors.push(`Template distinctiveness check failed: ${templateResult.error}`);
         logs.push(`Template check failed for ${detectedIndustry}: ${templateResult.error}`);
-      } else {
-        logs.push(`Template distinctiveness check passed (${detectedIndustry})`);
+        return { ok: false, tempDir, logs: logs.join('\n'), errors: allErrors, durationMs: Date.now() - startTime };
       }
-    }
-
-    if (allErrors.length > 0) {
-      return { ok: false, tempDir, logs: logs.join('\n'), errors: allErrors, durationMs: Date.now() - startTime };
+      logs.push(`Template distinctiveness check passed (${detectedIndustry})`);
     }
 
     if (!shouldRunLocalNpmBuildGate()) {
@@ -319,15 +209,14 @@ export async function validateGeneratedSite(
         errors: [],
         durationMs: Date.now() - startTime,
         buildGateSkipped: true,
+        files: input.files,
       };
     }
 
-    // 5. Run npm install and build (local / long-running hosts only)
     const npmPath = path.join(getNodeBinDir(), 'npm');
 
     logs.push('Running npm install...');
     try {
-      // Clean any residual .next from parent environment
       const dotNext = path.join(tempDir, '.next');
       try {
         await fs.promises.rm(dotNext, { recursive: true, force: true });
@@ -381,7 +270,7 @@ export async function validateGeneratedSite(
     const durationMs = Date.now() - startTime;
     logs.push(`Validation passed in ${durationMs}ms`);
 
-    return { ok: true, tempDir, logs: logs.join('\n'), errors: [], durationMs };
+    return { ok: true, tempDir, logs: logs.join('\n'), errors: [], durationMs, files: input.files };
   } catch (err: unknown) {
     const e = err as Error;
     allErrors.push(`Validation error: ${e.message}`);

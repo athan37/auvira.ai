@@ -184,7 +184,7 @@ function runTemplateSelfTest(): void {
 
   // 8. Run validateGeneratedFiles
   console.log('\n7. Running validateGeneratedFiles...');
-  const validationErrors = validateGeneratedFiles(mockSiteSpec, 'test-template-self-check');
+  const validationErrors = validateGeneratedFiles(result.files);
   if (validationErrors.length > 0) {
     console.error('   FAIL: validateGeneratedFiles returned errors:');
     for (const err of validationErrors) {

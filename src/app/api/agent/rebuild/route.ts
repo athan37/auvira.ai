@@ -321,7 +321,7 @@ export async function POST(request: NextRequest) {
     // Validate generated files before committing to GitLab
     stageLogs.push(logStage('validate_files_start'));
 
-    const validationErrors = validateGeneratedFiles(siteSpec, uniqueName);
+    const validationErrors = validateGeneratedFiles(generated.files);
     if (validationErrors.length > 0) {
       stageLogs.push(logStage('validate_files_failed'));
       const errorList = validationErrors.map(e => `${e.file}: ${e.error}`).join('; ');
