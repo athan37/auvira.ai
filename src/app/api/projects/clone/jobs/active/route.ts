@@ -26,6 +26,7 @@ export async function GET() {
   const jobs = await CloneJob.find({
     ownerId: new mongoose.Types.ObjectId(authResult.userId),
     status: { $in: IN_PROGRESS_STATUSES },
+    createdProjectId: { $exists: false },
   })
     .select('_id sourceUrl projectName status currentStageLabel progressPercent updatedAt')
     .sort({ updatedAt: -1 })

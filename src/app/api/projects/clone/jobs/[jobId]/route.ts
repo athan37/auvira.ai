@@ -189,7 +189,7 @@ export async function GET(
                   'deployment.liveUrl': vercelStatus.liveUrl ?? null,
                   'deployment.deploymentUrl': vercelStatus.deploymentUrl ?? null,
                   'deployment.inspectorUrl': vercelStatus.inspectorUrl ?? null,
-                  ...(deployReady ? { status: 'active' } : {}),
+                  ...(deployReady ? { status: 'deployed' } : {}),
                 },
               }
             );

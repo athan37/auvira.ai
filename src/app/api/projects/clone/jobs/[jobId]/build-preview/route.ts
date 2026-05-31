@@ -16,6 +16,7 @@ import { isVercelServerless } from '@/lib/runtime/isVercelServerless';
 import { isCloneSandboxPreviewEnabled } from '@/lib/runtime/isCloneSandboxPreviewEnabled';
 import { hasCriticalFidelityFailures } from '@/lib/agent/validateContentFidelity';
 import type { TemplateSelection } from '@/lib/agent/selectTemplateAgent';
+import { ensureClonePreviewProject } from '@/lib/clone/persistClonePreview';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -94,6 +95,53 @@ function allocatePort(): number {
   return base;
 }
 
+type AutoHandoffResponseFields =
+  | {
+      projectId: string;
+      autoSave: { ok: true; created: boolean };
+    }
+  | {
+      autoSave: { ok: false; error: string };
+      recoverableAutoSaveError: string;
+    };
+
+async function ensurePreviewProjectResponseFields(
+  jobId: mongoose.Types.ObjectId,
+  userId: string
+): Promise<AutoHandoffResponseFields> {
+  try {
+    const latestJob = await CloneJob.findById(jobId);
+    if (!latestJob) throw new Error('Clone job not found after preview build.');
+
+    const result = await ensureClonePreviewProject(latestJob, userId);
+    return {
+      projectId: result.projectId,
+      autoSave: { ok: true, created: result.created },
+    };
+  } catch (error) {
+    const errMsg = error instanceof Error ? error.message : 'Unknown auto-save error';
+    await CloneJob.updateOne(
+      { _id: jobId },
+      {
+        $set: {
+          currentStageLabel: 'Preview ready — save backup needs retry',
+        },
+        $push: {
+          logs: {
+            timestamp: new Date(),
+            stage: 'auto_save_failed',
+            message: errMsg,
+          },
+        },
+      }
+    );
+    return {
+      autoSave: { ok: false, error: errMsg },
+      recoverableAutoSaveError: errMsg,
+    };
+  }
+}
+
 function startPreviewServer(workspacePath: string, port: number): { process: ChildProcess } {
   const npmPath = getNpmPath();
   const args = ['run', 'dev', '--', '-H', '0.0.0.0', '-p', String(port)];
@@ -133,6 +181,18 @@ export async function POST(
       { ok: false, stage: 'job_not_found', message: 'Clone job not found or you do not have access.' },
       { status: 404 }
     );
+  }
+
+  if (job.status === 'preview_ready') {
+    const handoff = await ensurePreviewProjectResponseFields(job._id, userId);
+    return NextResponse.json({
+      ok: true,
+      jobId: job._id.toString(),
+      status: 'preview_ready',
+      projectId: 'projectId' in handoff ? handoff.projectId : undefined,
+      preview: job.preview,
+      ...handoff,
+    });
   }
 
   if (job.status !== 'review_ready') {
@@ -384,12 +444,16 @@ export async function POST(
       );
       await setBuildSummaryStatus(jobId, 'ready');
 
+      const handoff = await ensurePreviewProjectResponseFields(jobId, userId);
+
       return NextResponse.json({
         ok: true,
         jobId: job._id.toString(),
         status: 'preview_ready',
+        projectId: 'projectId' in handoff ? handoff.projectId : undefined,
         preview: { status: 'ready', url: previewUrl, hostedPreview: Boolean(previewUrl) },
         buildGateSkipped: buildResult.buildGateSkipped ?? false,
+        ...handoff,
       });
     }
 
@@ -484,11 +548,15 @@ export async function POST(
     await markSummaryDone(jobId, 'preview', 'Preview is ready to review');
     await setBuildSummaryStatus(jobId, 'ready');
 
+    const handoff = await ensurePreviewProjectResponseFields(jobId, userId);
+
     return NextResponse.json({
       ok: true,
       jobId: job._id.toString(),
       status: 'preview_ready',
+      projectId: 'projectId' in handoff ? handoff.projectId : undefined,
       preview: { status: 'ready', url: previewUrl, port },
+      ...handoff,
     });
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : 'Unknown error';

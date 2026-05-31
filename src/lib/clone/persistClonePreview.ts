@@ -69,6 +69,13 @@ export interface SaveClonePreviewResult {
   repoUrl: string;
 }
 
+export interface EnsureClonePreviewProjectResult {
+  projectId: string;
+  created: boolean;
+}
+
+const ensurePreviewProjectLocks = new Map<string, Promise<EnsureClonePreviewProjectResult>>();
+
 async function appendJobLog(
   jobId: mongoose.Types.ObjectId,
   stage: string,
@@ -78,6 +85,54 @@ async function appendJobLog(
     { _id: jobId },
     { $push: { logs: { timestamp: new Date(), stage, message } } }
   );
+}
+
+function cloneJobProjectId(job: ICloneJob): string | null {
+  return job.createdProjectId ? job.createdProjectId.toString() : null;
+}
+
+async function lookupCreatedProjectId(jobId: mongoose.Types.ObjectId): Promise<string | null> {
+  const latestJob = await CloneJob.findById(jobId).select('createdProjectId').lean();
+  const projectId = (latestJob as { createdProjectId?: mongoose.Types.ObjectId | string } | null)
+    ?.createdProjectId;
+  return projectId ? projectId.toString() : null;
+}
+
+async function ensureClonePreviewProjectUncached(
+  job: ICloneJob,
+  userId: string
+): Promise<EnsureClonePreviewProjectResult> {
+  const existingProjectId = cloneJobProjectId(job) || await lookupCreatedProjectId(job._id);
+  if (existingProjectId) {
+    return { projectId: existingProjectId, created: false };
+  }
+
+  const result = await saveClonePreviewToGitLab(job, userId);
+  return { projectId: result.project._id.toString(), created: result.created };
+}
+
+/**
+ * Ensure a clone preview has a durable WebsiteProject before leaving the clone pipeline.
+ * Idempotent for repeated calls from the same job and reuses the existing save path.
+ */
+export async function ensureClonePreviewProject(
+  job: ICloneJob,
+  userId: string
+): Promise<EnsureClonePreviewProjectResult> {
+  const existingProjectId = cloneJobProjectId(job);
+  if (existingProjectId) {
+    return { projectId: existingProjectId, created: false };
+  }
+
+  const jobId = job._id.toString();
+  const activeLock = ensurePreviewProjectLocks.get(jobId);
+  if (activeLock) return activeLock;
+
+  const lock = ensureClonePreviewProjectUncached(job, userId).finally(() => {
+    ensurePreviewProjectLocks.delete(jobId);
+  });
+  ensurePreviewProjectLocks.set(jobId, lock);
+  return lock;
 }
 
 /**

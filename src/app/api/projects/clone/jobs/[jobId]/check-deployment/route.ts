@@ -126,7 +126,7 @@ export async function GET(
             'deployment.liveUrl': liveUrl ?? null,
             'deployment.deploymentUrl': deploymentUrl ?? null,
             'deployment.inspectorUrl': inspectorUrl ?? null,
-            ...(newStatus === 'completed' ? { status: 'active' } : {}),
+            ...(newStatus === 'completed' ? { status: 'deployed' } : {}),
           },
         }
       );

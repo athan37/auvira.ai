@@ -17,6 +17,7 @@ import { TemplateGalleryPicker } from '@/components/clone/TemplateGalleryPicker'
 import { CloneDeployInterstitial } from '@/components/clone/CloneDeployInterstitial';
 import { PublishActions } from '@/components/owner/PublishActions';
 import type { TemplateGalleryEntry } from '@/lib/builder/templateGallery';
+import { getClonePreviewProjectPath } from '@/lib/clone/cloneBuildPreviewResponse';
 
 interface CrawlPage {
   url: string;
@@ -340,6 +341,12 @@ export default function CloneJobPage() {
       const buildData = await buildRes.json();
       if (!buildRes.ok || !buildData.ok) {
         setError(buildData.error || 'Failed to build preview');
+      } else {
+        const projectPath = getClonePreviewProjectPath(buildData);
+        if (projectPath) {
+          router.replace(projectPath);
+          return;
+        }
       }
       await fetchJob();
     } catch {
