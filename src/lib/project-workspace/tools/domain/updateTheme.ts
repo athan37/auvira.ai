@@ -1,4 +1,4 @@
-import { runStrategyById } from '@/lib/project-workspace/website-edit-agent/strategyRegistry';
+import { runStrategyById } from '@/lib/project-workspace/edit-shared/strategyRegistry';
 import { computeWorkspaceHashes } from '@/lib/project-workspace/workspaceEditShared';
 import type { DomainToolContext, DomainToolResult } from './types';
 

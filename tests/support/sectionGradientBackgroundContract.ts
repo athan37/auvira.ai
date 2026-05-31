@@ -5,7 +5,7 @@
 import { expect } from 'vitest';
 import { extractSectionBackgroundClassFromMessage } from '@/lib/builder/sectionPresentation';
 import { extractSiteConfigObjectLiteral } from '@/lib/site-manager/siteConfigParser';
-import type { WebsiteEditAgentResult } from '@/lib/project-workspace/website-edit-agent/types';
+import type { WebsiteEditAgentResult } from '@/lib/project-workspace/edit-shared/types';
 import {
   createSyntheticWorkspace,
   destroySyntheticWorkspace,

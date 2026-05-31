@@ -194,7 +194,7 @@ Visit http://localhost:3000
 
 ### 8. Enable owner website edits (TypeScript agent)
 
-After a project is saved to GitLab, edits on `/projects/[projectId]` use the **TypeScript WebsiteEditAgent** in [`src/lib/project-workspace/website-edit-agent/`](src/lib/project-workspace/website-edit-agent/):
+After a project is saved to GitLab, edits on `/projects/[projectId]` use the **TypeScript WebsiteEditAgent** in [`src/lib/project-workspace/edit-shared/`](src/lib/project-workspace/edit-shared/):
 
 - **Router** picks single-shot (fast) vs tool loop (complex edits)
 - **Single-shot** for simple style/color requests (direct MiniMax API)

@@ -16,6 +16,7 @@ import { ownerProjectStatusLabel } from '@/lib/owner/ownerCopy';
 import { Badge, statusToBadgeTone } from '@/components/ui/Badge';
 import { Alert } from '@/components/ui/Alert';
 import { Spinner } from '@/components/ui/Spinner';
+import { projectSupportsV3Edits } from '@/lib/project-workspace/requireGitLabProject';
 
 interface Deployment {
   provider: string;
@@ -209,7 +210,7 @@ export default function ProjectPage() {
             projectId={projectId}
             previewReady={previewReady}
             needsSave={project.needsSave ?? project.hasUnpublishedChanges}
-            hasGitlab={Boolean(project.gitlab?.repoUrl)}
+            hasGitlab={projectSupportsV3Edits(project)}
             gitlabWebUrl={project.gitlab?.webUrl || project.gitlab?.repoUrl}
             latestJobId={latestJobId}
             diffRefreshKey={diffRefreshKey}

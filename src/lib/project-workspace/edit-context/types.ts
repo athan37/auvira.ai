@@ -1,7 +1,7 @@
 import type { SiteSectionPresentation } from '@/lib/builder/sectionPresentation';
-import type { ConversationTurn } from '@/lib/project-workspace/website-edit-agent/editAmbiguity';
-import type { SiteSectionCatalog } from '@/lib/project-workspace/website-edit-agent/siteSectionCatalog';
-import type { WorkspaceMode } from '@/lib/project-workspace/website-edit-agent/types';
+import type { ConversationTurn } from '@/lib/project-workspace/edit-shared/editAmbiguity';
+import type { SiteSectionCatalog } from '@/lib/project-workspace/edit-shared/siteSectionCatalog';
+import type { WorkspaceMode } from '@/lib/project-workspace/edit-shared/types';
 import type { SiteModel } from '@/lib/project-workspace/site-model/types';
 
 export type EditIntentKind =
@@ -57,6 +57,7 @@ export type VerificationCheckKind =
   | 'section_background'
   | 'contact_field'
   | 'hero_field'
+  | 'business_name'
   | 'copy_field'
   | 'theme'
   | 'generic';
@@ -91,7 +92,7 @@ export interface ContextSnippet {
   content: string;
 }
 
-/** Canonical pre-plan context for Website Edit Agent V3. */
+/** Canonical pre-plan context for Website Edit Agent. */
 export interface EditContext {
   workspacePath: string;
   mode: WorkspaceMode;

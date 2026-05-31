@@ -65,7 +65,7 @@ export async function applySectionBackgroundTool(
 
   if (result.ok && result.changedFiles.includes('src/lib/siteConfig.ts')) {
     const { readWorkspaceRel } = await import(
-      '@/lib/project-workspace/website-edit-agent/strategyContext'
+      '@/lib/project-workspace/edit-shared/strategyContext'
     );
     const fresh = await readWorkspaceRel(ctx.agentOptions, 'src/lib/siteConfig.ts');
     if (fresh) ctx.afterFiles['src/lib/siteConfig.ts'] = fresh;

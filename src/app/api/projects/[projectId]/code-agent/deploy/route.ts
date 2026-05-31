@@ -5,6 +5,10 @@ import { ProjectAction } from '@/models/ProjectAction';
 import { ProjectEditJob } from '@/models/ProjectEditJob';
 import { appendEditJobLog } from '@/lib/project-workspace/editJobLogger';
 import { saveWorkspaceToGitLab } from '@/lib/project-workspace/commitWorkspaceToGitLab';
+import { getGitWorkspacePath } from '@/lib/project-workspace/gitWorkspaceManager';
+import { validateWorkspace } from '@/lib/project-workspace/validateWorkspace';
+import { isSandboxPreviewEnabled } from '@/lib/runtime/isSandboxPreviewEnabled';
+import { validateSandboxWorkspace } from '@/lib/sandbox/validateSandboxWorkspace';
 import { ensureVercelProjectLinked } from '@/lib/vercel/ensureVercelProject';
 import { triggerVercelDeployment } from '@/lib/vercel/triggerVercelDeployment';
 import { hasVercelApiToken } from '@/lib/vercel/vercelEnv';
@@ -41,6 +45,17 @@ export async function POST(
     );
   }
 
+  if (project.codeWorkspace.lastValidationStatus === 'failed') {
+    return NextResponse.json(
+      {
+        ok: false,
+        error:
+          'Latest preview validation failed. Fix the workspace or run another edit before deploying.',
+      },
+      { status: 400 }
+    );
+  }
+
   if (!hasVercelApiToken()) {
     return NextResponse.json(
       {
@@ -66,6 +81,20 @@ export async function POST(
   }
 
   try {
+    const preDeployValidation = isSandboxPreviewEnabled()
+      ? await validateSandboxWorkspace(projectId)
+      : await validateWorkspace(getGitWorkspacePath(projectId), { forceFullBuild: true });
+
+    if (!preDeployValidation.ok) {
+      const detail =
+        preDeployValidation.errors[0] ||
+        'Workspace build check failed before deploy.';
+      if (editJobId) {
+        await appendEditJobLog(editJobId, 'deploy_failed', detail);
+      }
+      return NextResponse.json({ ok: false, error: detail }, { status: 400 });
+    }
+
     const syncResult = await saveWorkspaceToGitLab(project, projectId, {
       force: true,
       commitMessage:

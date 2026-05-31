@@ -4,7 +4,7 @@
  */
 
 import { isEmitableTailwindBackgroundClass } from './tailwindPresentationSupport';
-import { BACKGROUND_STYLING_META_WORDS } from '@/lib/project-workspace/website-edit-agent/preset/presetUtils';
+import { BACKGROUND_STYLING_META_WORDS } from '@/lib/project-workspace/edit-shared/preset/presetUtils';
 import {
   BACKGROUND_SHADES,
   buildBackgroundPalette,

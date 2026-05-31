@@ -1,13 +1,12 @@
 /**
- * Generic LLM contract: section background edit on a synthetic multi-section site.
- * Prompts and titles are structural, not tied to any real customer project.
+ * Generic LLM contract: section background edit on a synthetic multi-section site (V3).
  *
  * Run: npm run test:llm:contracts
  */
 import '../../llmTestGate';
 import { afterEach, expect, it, vi } from 'vitest';
 import { describeRunLlmIntegration } from '../../llmTestGate';
-import { runWebsiteEditAgent } from '@/lib/project-workspace/website-edit-agent';
+import { runWebsiteEditAgent } from '@/lib/project-workspace/edit-agent';
 import { colorNameToBackgroundClass } from '@/lib/builder/sectionPresentation';
 import { SITECONFIG_PRESENTATION_SYNC_EXPORT } from '@/lib/site-manager/siteConfigAgentMarkers';
 import {
@@ -17,10 +16,10 @@ import {
   readSyntheticFile,
 } from '../../support/syntheticSiteWorkspace';
 import { assertExactSectionBackgroundInSiteConfig } from '../../support/sectionColorEditContract';
+import { mustSucceed } from '../../support/llmEditScenario';
 
 type LlmColorScenario = {
   name: string;
-  /** Index into default multi-section site (last = length - 1). */
   sectionIndex: number;
   color: string;
   buildMessage: (title: string, index: number, total: number) => string;
@@ -48,7 +47,7 @@ const LLM_COLOR_SCENARIOS: LlmColorScenario[] = [
   },
 ];
 
-describeRunLlmIntegration('agent contracts: section color (generic LLM)', () => {
+describeRunLlmIntegration('agent contracts: section color (generic LLM, V3)', () => {
   let workspacePath: string | undefined;
 
   afterEach(async () => {
@@ -81,20 +80,15 @@ describeRunLlmIntegration('agent contracts: section color (generic LLM)', () => 
       const result = await runWebsiteEditAgent({
         workspacePath,
         ownerMessage,
-        projectId: 'synthetic-llm-contract',
+        projectId: 'synthetic-llm-contract-v3',
         mode: 'gitlab',
         infraBaselineReady: true,
       });
 
+      mustSucceed(result, result.error ?? result.summary);
+
       const siteConfig = await readSyntheticFile(workspacePath, 'src/lib/siteConfig.ts');
 
-      if (result.needsClarification) {
-        expect(result.ownerMessage?.trim().length).toBeGreaterThan(0);
-        return;
-      }
-
-      expect(result.ok, result.error ?? result.summary).toBe(true);
-      expect(result.strategy).toBe('section_style');
       assertExactSectionBackgroundInSiteConfig(siteConfig, sectionIndex, {
         type: String(section.type),
         title,

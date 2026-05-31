@@ -1,6 +1,7 @@
 import type { ValidateWorkspaceResult } from '@/lib/project-workspace/validateWorkspace';
 import { isPreviewSafeEdit } from '@/lib/project-workspace/previewSafeValidation';
 import { repairSiteConfigTypesViaGateway } from '@/lib/preview/repairSiteConfigTypes';
+import { repairPreviewSandbox } from '@/lib/sandbox/repairPreviewSandbox';
 import { validateChangedSourceSyntax } from '@/lib/project-workspace/validateTsxSyntax';
 import { sanitizeAgentMarkerFilesInWorkspace } from '@/lib/site-manager/siteConfigAgentMarkers';
 import { getProjectSandbox } from './sandboxClient';
@@ -50,6 +51,9 @@ export async function validateSandboxWorkspace(
     if (sanitizedMarkers.length > 0) {
       logs.push(`Removed dev-only agent sync markers from: ${sanitizedMarkers.join(', ')}`);
     }
+
+    await repairPreviewSandbox(projectId);
+    logs.push('Applied preview-safe workspace repairs (page/siteConfig parity)');
   } catch (e) {
     warnings.push(
       `siteConfig type repair skipped: ${e instanceof Error ? e.message : String(e)}`

@@ -1,7 +1,7 @@
-import type { ConversationTurn } from '@/lib/project-workspace/website-edit-agent/editAmbiguity';
+import type { ConversationTurn } from '@/lib/project-workspace/edit-shared/editAmbiguity';
 import {
   extractColorsFromMessage,
-} from '@/lib/project-workspace/website-edit-agent/preset/presetUtils';
+} from '@/lib/project-workspace/edit-shared/preset/presetUtils';
 
 export const DEFAULT_EDIT_CONTEXT_TURNS = 8;
 

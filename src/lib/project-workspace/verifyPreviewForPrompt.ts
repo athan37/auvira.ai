@@ -14,7 +14,7 @@ import {
 } from './verifyEditVisibleInPreview';
 import { verifyGalleryEditOnSandbox } from './verifySandboxGalleryPreview';
 import type { WorkspaceAssetAttachment } from './workspaceAssetTypes';
-import type { SiteWorkspaceSnapshot } from './website-edit-agent/resolveSiteWorkspace';
+import type { SiteWorkspaceSnapshot } from './edit-shared/resolveSiteWorkspace';
 import type { WorkspaceGateway } from './workspaceGateway';
 
 export type { VerifyPreviewResult };

@@ -39,8 +39,8 @@ export const SKILL_TO_DOMAIN_TOOL: Partial<Record<string, DomainToolName>> = {
   update_section_style: 'apply_section_background',
   add_section: 'add_section',
   add_service: 'update_section_list',
-  remove_section: 'update_section_list',
-  reorder_sections: 'update_section_list',
+  remove_section: 'remove_section',
+  reorder_sections: 'reorder_sections',
   replace_image: 'replace_image',
 };
 

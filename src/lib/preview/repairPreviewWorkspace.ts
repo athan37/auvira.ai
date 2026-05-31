@@ -2,7 +2,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { repairPageTsxStructure } from '@/lib/project-workspace/repairPageTsxStructure';
 import { repairSiteConfigTypesInWorkspace } from '@/lib/preview/repairSiteConfigTypes';
-import { repairSectionPresentationWiringInWorkspace } from '@/lib/project-workspace/website-edit-agent/legacySectionPresentation';
+import { repairSectionPresentationWiringInWorkspace } from '@/lib/project-workspace/edit-shared/legacySectionPresentation';
 
 /**
  * Fix common template / agent-edit mismatches so `next dev` can render the preview.

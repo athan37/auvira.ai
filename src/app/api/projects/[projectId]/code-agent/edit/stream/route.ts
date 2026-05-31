@@ -8,11 +8,14 @@ import { repairPreviewWorkspace } from '@/lib/preview/repairPreviewWorkspace';
 import { restartSandboxDevServer, shouldRestartSandboxDevServer } from '@/lib/sandbox/sandboxDevServer';
 import { checkPreviewHealthy } from '@/lib/project-workspace/bootstrapProjectPreview';
 import { connectMongoDB } from '@/lib/mongodb';
+import {
+  LEGACY_PROJECT_UNSUPPORTED_MESSAGE,
+  projectSupportsV3Edits,
+} from '@/lib/project-workspace/requireGitLabProject';
 import { WebsiteProject } from '@/models/WebsiteProject';
-import { createProjectWorkspace } from '@/lib/project-workspace/createProjectWorkspace';
 import { runWebsiteEdit } from '@/lib/project-workspace/websiteEditRunner';
 import { resolveWorkspaceForEdit } from '@/lib/project-workspace/resolveWorkspaceGateway';
-import { LocalFsGateway, type WorkspaceGateway } from '@/lib/project-workspace/workspaceGateway';
+import { type WorkspaceGateway } from '@/lib/project-workspace/workspaceGateway';
 import { validateSandboxWorkspace } from '@/lib/sandbox/validateSandboxWorkspace';
 import type { WorkspaceAssetAttachment } from '@/lib/project-workspace/workspaceAssetTypes';
 import { createDirectorySnapshot, restoreDirectorySnapshot } from '@/lib/project-workspace/snapshotManager';
@@ -42,7 +45,7 @@ import {
 } from '@/lib/project-workspace/previewReflectsSiteConfig';
 import { enforceSectionColorEditReadyAfterApply, findSectionIndexWithBackgroundClassChange } from '@/lib/project-workspace/sectionPresentationEdit';
 import { isInfraBaselineReady } from '@/lib/project-workspace/infra/isInfraBaselineReady';
-import { resolveSiteWorkspace } from '@/lib/project-workspace/website-edit-agent/resolveSiteWorkspace';
+import { resolveSiteWorkspace } from '@/lib/project-workspace/edit-shared/resolveSiteWorkspace';
 import {
   appendAssistantMessage,
   appendUserMessage,
@@ -123,6 +126,10 @@ export async function POST(
     return NextResponse.json({ detail: 'Unauthorized' }, { status: 401 });
   }
 
+  if (!projectSupportsV3Edits(project)) {
+    return NextResponse.json({ detail: LEGACY_PROJECT_UNSUPPORTED_MESSAGE }, { status: 409 });
+  }
+
   const body = await request.json();
   const { message, attachments: rawAttachments, clientMessageId } = body;
   if (!message || typeof message !== 'string') {
@@ -177,8 +184,8 @@ export async function POST(
       let snapshotPath: string | null = null;
       let workspacePath = '';
       let gateway: WorkspaceGateway | null = null;
-      let source: 'gitlab' | 'generated' = 'generated';
-      let mode: 'gitlab' | 'static' = 'static';
+      let source: 'gitlab' | 'generated' = 'gitlab';
+      let mode: 'gitlab' = 'gitlab';
       let isSandbox = false;
       let beforeHashes: Record<string, string> = {};
       const editTimer = new EditStepTimer();
@@ -326,39 +333,13 @@ export async function POST(
         await appendEditJobLog(jobId, 'workspace_prepare_started', 'Preparing workspace');
         editTimer.start('workspace_prepare');
 
-        const hasGitLab = Boolean(project.gitlab?.repoUrl);
-
-  if (hasGitLab) {
-          const resolved = await resolveWorkspaceForEdit(project, userId);
-          gateway = resolved.gateway;
-          workspacePath = resolved.workspacePath;
-          mode = resolved.mode;
-          source = resolved.source;
-          isSandbox = resolved.sandbox;
-          await markEditJobStatus(jobId, 'running', { workspacePath });
-  } else {
-    let wp = project.codeWorkspace?.workspacePath;
-    if (!wp || project.codeWorkspace?.status !== 'ready') {
-        const result = await createProjectWorkspace(project);
-        wp = result.workspacePath;
-        await WebsiteProject.updateOne(
-          { _id: projectId },
-          {
-            $set: {
-              'codeWorkspace.status': 'ready',
-              'codeWorkspace.workspacePath': wp,
-              'codeWorkspace.version': result.version,
-              'codeWorkspace.source': 'generated',
-                },
-              }
-            );
-    }
-    workspacePath = wp;
-    mode = 'static';
-    source = 'generated';
-          gateway = new LocalFsGateway(workspacePath);
-          await markEditJobStatus(jobId, 'running', { workspacePath });
-        }
+        const resolved = await resolveWorkspaceForEdit(project, userId);
+        gateway = resolved.gateway;
+        workspacePath = resolved.workspacePath;
+        mode = 'gitlab';
+        source = resolved.source;
+        isSandbox = resolved.sandbox;
+        await markEditJobStatus(jobId, 'running', { workspacePath });
 
         if (!gateway) {
           throw new Error('Workspace gateway not initialized');
@@ -584,10 +565,9 @@ export async function POST(
         }
 
         if (attachments.length > 0) {
-          const imageContentChanged =
-            mode === 'static'
-              ? changedPaths.some((p) => p === 'index.html' || p === 'site.json')
-              : changedPaths.some((p) => p.includes('siteConfig') || p.includes('page.tsx'));
+          const imageContentChanged = changedPaths.some(
+            (p) => p.includes('siteConfig') || p.includes('page.tsx')
+          );
           if (!imageContentChanged) {
             emit('step', { id: 'apply_change', label: 'Applying your requested change', status: 'failed' });
             emit('step', { id: 'validate', label: 'Checking the preview', status: 'failed' });
@@ -596,10 +576,7 @@ export async function POST(
               'Images were uploaded, but your homepage content was not updated. Please try again.',
               {
                 stage: 'agent_failed',
-                technicalMessage:
-                  mode === 'static'
-                    ? 'No index.html or site.json change after edit with attachments'
-                    : 'No siteConfig.ts or page.tsx change after edit with attachments',
+                technicalMessage: 'No siteConfig.ts or page.tsx change after edit with attachments',
                 extra: {
                   strategy: agentResult.strategy,
                   changedPaths,
@@ -868,16 +845,11 @@ export async function POST(
           editTimer.start('preview_verify');
           await appendEditJobLog(jobId, 'preview_verify_started', 'Verifying preview content');
           let workspaceSnap;
-          if (workspacePath && mode === 'gitlab') {
+          if (workspacePath) {
             workspaceSnap = await resolveSiteWorkspace({
               workspacePath,
-              mode,
+              mode: 'gitlab',
               gateway: activeGateway ?? undefined,
-            });
-          } else if (workspacePath && mode === 'static') {
-            workspaceSnap = await resolveSiteWorkspace({
-              workspacePath,
-              mode: 'static',
             });
           }
           previewVerify = await resolveEditPreviewVerification({

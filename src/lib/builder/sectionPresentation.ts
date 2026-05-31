@@ -91,7 +91,7 @@ import {
   isGradientBackgroundRequest,
   parseColorSwap,
   stripQuotedSpans,
-} from '@/lib/project-workspace/website-edit-agent/preset/presetUtils';
+} from '@/lib/project-workspace/edit-shared/preset/presetUtils';
 import {
   resolveTailwindBackgroundClass,
   normalizeTailwindBackgroundClass,
@@ -282,7 +282,7 @@ export function resolveSectionBackgroundClassForEdit(
   return null;
 }
 
-export { isGradientBackgroundRequest } from '@/lib/project-workspace/website-edit-agent/preset/presetUtils';
+export { isGradientBackgroundRequest } from '@/lib/project-workspace/edit-shared/preset/presetUtils';
 
 /** Map a color name to Tailwind classes for cards in a section. */
 export function colorNameToCardClass(color: string): string {

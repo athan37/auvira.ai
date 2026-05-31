@@ -9,8 +9,9 @@ import {
 } from './editPlan.schema';
 import { buildPlanEditSystemPrompt, buildPlanEditUserPrompt } from './planEditPrompt';
 import { normalizeEditPlanPayload } from './normalizeEditPlan';
-import { buildDeterministicPlan } from '@/lib/project-workspace/edit-agent-v3/deterministicPlan';
+import { buildDeterministicPlan } from '@/lib/project-workspace/edit-agent/deterministicPlan';
 import { guardUnsupportedPlanSkills } from './validatePlanSkills';
+import { guardEditPlanSemantics } from './validateEditPlanSemantics';
 
 const PLAN_MAX_TOKENS = parseInt(process.env.WEBSITE_EDIT_MAX_TOKENS || '4096', 10);
 
@@ -63,9 +64,10 @@ export async function planEdit(input: PlanEditInputUnion): Promise<PlanEditResul
 
   const deterministic = buildDeterministicPlan(editContext);
   if (deterministic) {
-    const parsed = EditPlanSchema.safeParse(deterministic);
+    const parsed = EditPlanSchema.safeParse(normalizeEditPlanPayload(deterministic));
     if (parsed.success) {
-      return { ok: true, plan: guardUnsupportedPlanSkills(parsed.data, skillGuardOptions) };
+      const guarded = guardUnsupportedPlanSkills(parsed.data, skillGuardOptions);
+      return { ok: true, plan: guardEditPlanSemantics(guarded, editContext) };
     }
   }
 
@@ -100,7 +102,8 @@ export async function planEdit(input: PlanEditInputUnion): Promise<PlanEditResul
 
     const parsed = EditPlanSchema.safeParse(normalizeEditPlanPayload(result.data));
     if (parsed.success) {
-      return { ok: true, plan: guardUnsupportedPlanSkills(parsed.data, skillGuardOptions) };
+      const guarded = guardUnsupportedPlanSkills(parsed.data, skillGuardOptions);
+      return { ok: true, plan: guardEditPlanSemantics(guarded, editContext) };
     }
 
     lastError = parsed.error.issues.map((i) => i.message).join('; ');

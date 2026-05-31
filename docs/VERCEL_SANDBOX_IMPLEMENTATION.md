@@ -234,7 +234,7 @@ const gateway = project.codeWorkspace?.sandboxWorkspace
   : new LocalFsGateway(workspacePath);
 ```
 
-Refactor `website-edit-agent` tools to accept `WorkspaceGateway` in `ToolContext` (minimal surface).
+Refactor `edit-shared` tools to accept `WorkspaceGateway` in `ToolContext` (minimal surface).
 
 ### `applyPatch` on sandbox
 
@@ -324,7 +324,7 @@ Set `SITE_AGENT_SANDBOX_ENABLED=0` → reverts to `bootstrapProjectPreviewHosted
 | `src/lib/project-workspace/bootstrapProjectPreview.ts` | Main switch local / hosted / **sandbox** |
 | `src/lib/project-workspace/gitWorkspaceManager.ts` | Local clone (keep for non-Vercel) |
 | `src/app/api/projects/[projectId]/code-agent/edit/stream/route.ts` | Edit entry |
-| `src/lib/project-workspace/website-edit-agent/tools/*.ts` | Tools to gateway |
+| `src/lib/project-workspace/edit-shared/tools/*.ts` | Tools to gateway |
 | `src/lib/gitlab/publishWorkspace.ts` | Publish (hash/status) |
 | `src/components/ProjectPreviewFrame.tsx` | iframe URL |
 | `src/lib/runtime/isVercelServerless.ts` | `VERCEL=1` detect |

@@ -1,6 +1,6 @@
-import { classifyEditWhat } from '@/lib/project-workspace/website-edit-agent/buildGroundedEditContext';
+import { classifyEditWhat } from '@/lib/project-workspace/edit-context/classifyEditWhat';
 import { extractSectionBackgroundClassFromMessage } from '@/lib/builder/sectionPresentation';
-import { extractBackgroundColorFromMessage } from '@/lib/project-workspace/website-edit-agent/preset/presetUtils';
+import { extractBackgroundColorFromMessage } from '@/lib/project-workspace/edit-shared/preset/presetUtils';
 import type { EditContext, VerificationCheck, VerificationContract } from './types';
 
 function parseContactField(message: string): { field: string; value?: string } | null {

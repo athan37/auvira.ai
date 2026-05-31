@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import { connectMongoDB } from '@/lib/mongodb';
-import type { ConversationTurn } from '@/lib/project-workspace/website-edit-agent/types';
+import type { ConversationTurn } from '@/lib/project-workspace/edit-shared/types';
 import type { WorkspaceAssetAttachment } from '@/lib/project-workspace/workspaceAssetTypes';
 import { ProjectMessage } from '@/models/ProjectMessage';
 import {

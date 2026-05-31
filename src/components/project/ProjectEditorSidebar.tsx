@@ -116,8 +116,9 @@ export function ProjectEditorSidebar({
         >
           <ProjectPreviewChat
             projectId={projectId}
-            disabled={!previewReady}
+            disabled={!previewReady || !hasGitlab}
             previewReady={previewReady}
+            legacyProject={!hasGitlab}
             onEditStart={onEditStart}
             onEditSuccess={onEditSuccess}
             onEditComplete={onEditComplete}

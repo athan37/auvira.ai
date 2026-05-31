@@ -2,12 +2,13 @@ import {
   GLOBALS_CSS,
   PAGE_TSX,
   SITE_CONFIG,
+  TAILWIND_CONFIG,
   readWorkspaceRel,
   writeWorkspaceRel,
-} from './website-edit-agent/strategyContext';
-import type { WebsiteEditAgentOptions } from './website-edit-agent/types';
+} from './edit-shared/strategyContext';
+import type { WebsiteEditAgentOptions } from './edit-shared/types';
 
-const SNAPSHOT_PATHS = [SITE_CONFIG, PAGE_TSX, GLOBALS_CSS] as const;
+const SNAPSHOT_PATHS = [SITE_CONFIG, PAGE_TSX, GLOBALS_CSS, TAILWIND_CONFIG] as const;
 
 export interface EditRunSnapshot {
   files: Record<string, string>;

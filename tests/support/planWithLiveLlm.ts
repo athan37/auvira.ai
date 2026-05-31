@@ -1,7 +1,7 @@
 import { buildEditContext } from '@/lib/project-workspace/edit-context/buildEditContext';
 import { planEdit } from '@/lib/project-workspace/planner/planEdit';
 import type { EditPlan, EditStep } from '@/lib/project-workspace/planner/editPlan.schema';
-import type { ConversationTurn } from '@/lib/project-workspace/website-edit-agent/types';
+import type { ConversationTurn } from '@/lib/project-workspace/edit-shared/types';
 import { hasLlmApiKey, llmDescribe } from '../llmTestGate';
 import {
   createSyntheticWorkspace,

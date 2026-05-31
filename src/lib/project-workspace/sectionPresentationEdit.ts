@@ -24,25 +24,25 @@ import {
   repairSectionPresentationWiringInWorkspace,
   upgradeSectionComponentToPresentationResolver,
   sectionComponentUsesPresetBackground,
-} from './website-edit-agent/legacySectionPresentation';
+} from './edit-shared/legacySectionPresentation';
 import {
   extractSectionTitleCandidates,
   findBestSectionTitleMatch,
   titleMatchesIntent,
-} from './website-edit-agent/resolveSectionTarget';
+} from './edit-shared/resolveSectionTarget';
 import {
   PAGE_TSX,
   SITE_CONFIG,
   TAILWIND_CONFIG,
   readWorkspaceRel,
   writeWorkspaceRel,
-} from './website-edit-agent/strategyContext';
+} from './edit-shared/strategyContext';
 import {
   presentationWiringIssues,
   sectionPresentationBackgroundClass,
   sectionRendererUsesPresentationResolver,
 } from './previewReflectsSiteConfig';
-import type { WebsiteEditAgentOptions } from './website-edit-agent/types';
+import type { WebsiteEditAgentOptions } from './edit-shared/types';
 
 /** Target section for a background presentation edit. */
 export interface SectionBackgroundTarget {

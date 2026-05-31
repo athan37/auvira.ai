@@ -20,6 +20,8 @@ export interface ValidateWorkspaceResult {
 
 export interface ValidateWorkspaceOptions {
   changedFiles?: string[];
+  /** When true, always run npm run build (skip preview-safe syntax-only shortcut). */
+  forceFullBuild?: boolean;
 }
 
 /** Auto-fix known ESLint/structure issues in page.tsx before build. */
@@ -101,7 +103,8 @@ export async function validateWorkspace(
     changed.has('yarn.lock') ||
     changed.has('pnpm-lock.yaml');
 
-  const previewSafeEdit = !lockChanged && isPreviewSafeEdit(changedList);
+  const previewSafeEdit =
+    !options.forceFullBuild && !lockChanged && isPreviewSafeEdit(changedList);
 
   if (previewSafeEdit) {
     logs.push(

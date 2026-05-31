@@ -1,9 +1,10 @@
 import { resolveEffectiveEditMessage } from '@/lib/chat/conversationContextForEdit';
 import { parseSiteConfigSource } from '@/lib/site-manager/siteConfigParser';
-import { buildEnrichedSiteStructure } from '@/lib/project-workspace/website-edit-agent/resolveSectionTarget';
-import { buildSiteSectionCatalog } from '@/lib/project-workspace/website-edit-agent/siteSectionCatalog';
+import { buildEnrichedSiteStructure } from '@/lib/project-workspace/edit-shared/resolveSectionTarget';
+import { buildSiteSectionCatalog } from '@/lib/project-workspace/edit-shared/siteSectionCatalog';
 import { getSiteModel } from '@/lib/project-workspace/site-model/getSiteModel';
 import { buildVerificationContract } from './buildVerificationContract';
+import { resolveDuplicateCopyTarget } from './resolveDuplicateCopyTarget';
 import { resolveEditTargetAsync } from './resolveEditTarget';
 import { selectRelevantContext } from './selectRelevantContext';
 import type {
@@ -22,7 +23,9 @@ const GITLAB_WRITE_PATHS = [
   'tailwind.config.js',
 ] as const;
 
-const STATIC_WRITE_PATHS = ['index.html', 'styles.css', 'site.json'] as const;
+function allowedWritePaths(): string[] {
+  return [...GITLAB_WRITE_PATHS];
+}
 
 function buildSections(context: {
   siteConfigContent: string | null;
@@ -112,11 +115,6 @@ function buildRiskFlags(
   };
 }
 
-function allowedWritePaths(mode: 'gitlab' | 'static'): string[] {
-  if (mode === 'static') return [...STATIC_WRITE_PATHS];
-  return [...GITLAB_WRITE_PATHS];
-}
-
 /**
  * Build canonical EditContext before planning or deterministic routing.
  */
@@ -158,7 +156,7 @@ export async function buildEditContext(
     sections,
     target,
     selectedSnippets: [],
-    allowedWritePaths: allowedWritePaths(input.mode),
+    allowedWritePaths: allowedWritePaths(),
     riskFlags: buildRiskFlags(
       effectiveMessage,
       target.confidence,
@@ -173,6 +171,22 @@ export async function buildEditContext(
 
   draftContext.selectedSnippets = selectRelevantContext(draftContext);
   draftContext.verificationContract = buildVerificationContract(draftContext);
+
+  if (!target.needsClarification && siteConfigContent) {
+    const duplicate = resolveDuplicateCopyTarget(
+      siteConfigContent,
+      effectiveMessage,
+      input.conversationHistory ?? []
+    );
+    if (duplicate?.needsClarification) {
+      return {
+        context: draftContext,
+        needsClarification: true,
+        clarificationMessage: duplicate.clarificationMessage,
+        suggestedReplies: duplicate.suggestedReplies,
+      };
+    }
+  }
 
   if (target.needsClarification && target.clarificationMessage) {
     return {

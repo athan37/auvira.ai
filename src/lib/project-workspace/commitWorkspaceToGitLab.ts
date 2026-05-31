@@ -13,6 +13,8 @@ import {
   repairSiteConfigTypesInWorkspace,
   repairSiteConfigTypesViaGateway,
 } from '@/lib/preview/repairSiteConfigTypes';
+import { repairPreviewWorkspace } from '@/lib/preview/repairPreviewWorkspace';
+import { runPublishBuildSmoke } from '@/lib/project-workspace/publishBuildSmoke';
 import { getSandboxGateway } from '@/lib/sandbox/sandboxWorkspaceGateway';
 import { sanitizeAgentMarkerFilesInWorkspace } from '@/lib/site-manager/siteConfigAgentMarkers';
 import { instrumentGeneratedSite } from '@/lib/analytics/generated-sites/instrumentGeneratedSite';
@@ -98,6 +100,7 @@ export async function commitWorkspaceToGitLab(
         workspacePath: gateway.getWorkspacePath(),
         gateway,
       });
+      await runPublishBuildSmoke(gateway.getWorkspacePath()).catch(() => {});
     } catch {
       /* non-fatal */
     }
@@ -106,6 +109,7 @@ export async function commitWorkspaceToGitLab(
     await repairSiteConfigTypesInWorkspace(workspacePath).catch(() => {});
     await sanitizeAgentMarkerFilesInWorkspace(workspacePath).catch(() => {});
     await instrumentAnalyticsBeforePublish(project, projectId, { workspacePath });
+    await runPublishBuildSmoke(workspacePath).catch(() => {});
   }
   const result = useSandbox
     ? await publishSandboxWorkspaceToGitLab({
@@ -185,10 +189,12 @@ export async function forceSyncWorkspaceToGitLab(
   if (isSandboxPreviewEnabled() && project.gitlab?.projectId) {
     try {
       const gateway = await getSandboxGateway(projectId);
+      await repairSiteConfigTypesViaGateway(gateway).catch(() => {});
       await instrumentAnalyticsBeforePublish(project, projectId, {
         workspacePath: gateway.getWorkspacePath(),
         gateway,
       });
+      await runPublishBuildSmoke(gateway.getWorkspacePath()).catch(() => {});
     } catch {
       /* non-fatal */
     }
@@ -206,7 +212,10 @@ export async function forceSyncWorkspaceToGitLab(
   }
 
   const workspacePath = getGitWorkspacePath(projectId);
+  await repairSiteConfigTypesInWorkspace(workspacePath).catch(() => {});
+  await repairPreviewWorkspace(workspacePath).catch(() => {});
   await instrumentAnalyticsBeforePublish(project, projectId, { workspacePath });
+  await runPublishBuildSmoke(workspacePath).catch(() => {});
   const result = await forcePublishWorkspaceToGitLab({
     workspacePath,
     gitlabProjectId: project.gitlab.projectId,

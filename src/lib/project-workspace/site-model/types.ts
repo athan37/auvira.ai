@@ -1,10 +1,10 @@
 import type { ParsedSiteConfig } from '@/lib/site-manager/siteConfigParser';
-import type { EnrichedSiteStructureSnapshot } from '@/lib/project-workspace/website-edit-agent/resolveSectionTarget';
+import type { EnrichedSiteStructureSnapshot } from '@/lib/project-workspace/edit-shared/resolveSectionTarget';
 import type {
   PageArchetype,
   SiteWorkspaceSnapshot,
-} from '@/lib/project-workspace/website-edit-agent/resolveSiteWorkspace';
-import type { WorkspaceMode } from '@/lib/project-workspace/website-edit-agent/types';
+} from '@/lib/project-workspace/edit-shared/resolveSiteWorkspace';
+import type { WorkspaceMode } from '@/lib/project-workspace/edit-shared/types';
 
 /** Deterministic view of a workspace homepage for V2 planning. */
 export interface SiteModel extends SiteWorkspaceSnapshot {

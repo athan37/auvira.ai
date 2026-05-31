@@ -3,6 +3,12 @@ set -e
 
 PORT="${PORT:-3000}"
 
+# Production `next build` writes BUILD_ID; a running dev server cannot reuse that output.
+if [ -f .next/BUILD_ID ]; then
+  echo "Removing stale production .next cache before dev..."
+  rm -rf .next
+fi
+
 if lsof -ti :"$PORT" >/dev/null 2>&1; then
   echo "Freeing port $PORT..."
   # Try a graceful shutdown first to avoid leaving Next/webpack output half-written.

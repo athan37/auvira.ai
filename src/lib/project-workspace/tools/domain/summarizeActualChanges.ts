@@ -1,6 +1,6 @@
 import { parseSiteConfigSource } from '@/lib/site-manager/siteConfigParser';
 import { formatSectionBackgroundChangeSummary } from '@/lib/builder/sectionPresentation';
-import { summarizeActualChanges } from '@/lib/project-workspace/website-edit-agent/verifyEditApplied';
+import { summarizeActualChanges } from '@/lib/project-workspace/edit-shared/verifyEditApplied';
 import type { DomainToolContext, DomainToolResult } from './types';
 
 /**

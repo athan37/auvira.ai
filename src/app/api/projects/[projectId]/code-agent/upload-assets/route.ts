@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOwnerProject, getProjectActorUserId } from '@/lib/api/projectAccess';
 import { WebsiteProject } from '@/models/WebsiteProject';
-import { createProjectWorkspace } from '@/lib/project-workspace/createProjectWorkspace';
 import { resolveWorkspaceForEdit } from '@/lib/project-workspace/resolveWorkspaceGateway';
+import {
+  LEGACY_PROJECT_UNSUPPORTED_MESSAGE,
+  projectSupportsV3Edits,
+} from '@/lib/project-workspace/requireGitLabProject';
 import { isSandboxPreviewEnabled } from '@/lib/runtime/isSandboxPreviewEnabled';
 import { ensureGitWorkspace } from '@/lib/project-workspace/gitWorkspaceManager';
 import {
@@ -22,41 +25,19 @@ import path from 'path';
 
 export const runtime = 'nodejs';
 
-async function resolveWorkspace(
+async function resolveGitLabWorkspace(
   project: NonNullable<Awaited<ReturnType<typeof getOwnerProject>>>,
   userId: string
-): Promise<{ workspacePath: string; mode: 'gitlab' | 'static'; sandbox: boolean }> {
-  if (project.gitlab?.repoUrl) {
-    if (isSandboxPreviewEnabled()) {
-      const resolved = await resolveWorkspaceForEdit(project, userId);
-      return {
-        workspacePath: resolved.workspacePath,
-        mode: 'gitlab',
-        sandbox: resolved.sandbox,
-      };
-    }
-    const gitInfo = await ensureGitWorkspace(project, userId);
-    return { workspacePath: gitInfo.workspacePath, mode: 'gitlab', sandbox: false };
+): Promise<{ workspacePath: string; sandbox: boolean }> {
+  if (isSandboxPreviewEnabled()) {
+    const resolved = await resolveWorkspaceForEdit(project, userId);
+    return {
+      workspacePath: resolved.workspacePath,
+      sandbox: resolved.sandbox,
+    };
   }
-
-  let workspacePath = project.codeWorkspace?.workspacePath;
-  if (!workspacePath || project.codeWorkspace?.status !== 'ready') {
-    const result = await createProjectWorkspace(project);
-    workspacePath = result.workspacePath;
-    await WebsiteProject.updateOne(
-      { _id: project._id },
-      {
-        $set: {
-          'codeWorkspace.status': 'ready',
-          'codeWorkspace.workspacePath': workspacePath,
-          'codeWorkspace.version': result.version,
-          'codeWorkspace.source': 'generated',
-        },
-      }
-    );
-  }
-
-  return { workspacePath, mode: 'static', sandbox: false };
+  const gitInfo = await ensureGitWorkspace(project, userId);
+  return { workspacePath: gitInfo.workspacePath, sandbox: false };
 }
 
 export async function POST(
@@ -68,6 +49,13 @@ export async function POST(
     return NextResponse.json(
       { ok: false, error: 'Project not found or you do not have access.' },
       { status: 404 }
+    );
+  }
+
+  if (!projectSupportsV3Edits(project)) {
+    return NextResponse.json(
+      { ok: false, error: LEGACY_PROJECT_UNSUPPORTED_MESSAGE },
+      { status: 409 }
     );
   }
 
@@ -103,7 +91,7 @@ export async function POST(
   }
 
   try {
-    const { workspacePath, mode, sandbox } = await resolveWorkspace(project, userId);
+    const { workspacePath, sandbox } = await resolveGitLabWorkspace(project, userId);
 
     if (sandbox) {
       const sb = await getProjectSandbox(params.projectId);
@@ -143,7 +131,7 @@ export async function POST(
 
     const attachments = await saveWorkspaceImages({
       workspacePath,
-      mode,
+      mode: 'gitlab',
       projectId: params.projectId,
       files,
     });

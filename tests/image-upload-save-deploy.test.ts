@@ -22,7 +22,6 @@ import {
 } from '../src/lib/project-workspace/workspaceEditShared';
 import { buildChangedFileDetails } from '../src/lib/project-workspace/workspaceDiff';
 import { saveWorkspaceImages } from '../src/lib/project-workspace/workspaceAssets';
-import { enrichEditPrompt } from '../src/lib/project-workspace/website-edit-agent/enrichEditPrompt';
 import type { WorkspaceAssetAttachment } from '../src/lib/project-workspace/workspaceAssetTypes';
 
 const PNG_BUFFER = Buffer.from(
@@ -162,37 +161,6 @@ describe('image upload save deploy flow', () => {
       expect(files.some((f) => f.filePath.includes('public/uploads/') && f.filePath.endsWith('.png'))).toBe(
         true
       );
-    } finally {
-      await fs.rm(workspacePath, { recursive: true, force: true });
-    }
-  });
-
-  it('passes attachment URLs into the edit agent prompt', async () => {
-    const workspacePath = await createGitWorkspace();
-    try {
-      const attachments: WorkspaceAssetAttachment[] = [
-        {
-          id: 'abc123',
-          path: 'public/uploads/hero-abc123.png',
-          publicUrl: '/uploads/hero-abc123.png',
-          previewUrl: '/api/projects/x/preview/proxy/uploads/hero-abc123.png',
-          originalName: 'hero.png',
-          mimeType: 'image/png',
-          size: 100,
-        },
-      ];
-
-      const enriched = await enrichEditPrompt(
-        workspacePath,
-        'gitlab',
-        'Add this photo to the hero section',
-        'section',
-        attachments
-      );
-
-      expect(enriched.agentPrompt).toContain('/uploads/hero-abc123.png');
-      expect(enriched.agentPrompt).toContain('OWNER ATTACHED IMAGES');
-      expect(enriched.agentPrompt).toContain('hero.png');
     } finally {
       await fs.rm(workspacePath, { recursive: true, force: true });
     }

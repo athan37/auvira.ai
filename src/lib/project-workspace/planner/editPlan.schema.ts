@@ -67,7 +67,7 @@ export type EditStep = z.infer<typeof EditStepSchema>;
 
 export const EditPlanSchema = z
   .object({
-    planVersion: z.literal('website-agent-v3').optional(),
+    planVersion: z.literal('website-agent').optional(),
     needsClarification: z.boolean(),
     clarificationQuestion: z.string().optional(),
     suggestedReplies: z.array(z.string()).optional(),
@@ -111,7 +111,7 @@ export const EDIT_PLAN_JSON_SCHEMA: object = {
   type: 'object',
   required: ['needsClarification', 'steps'],
   properties: {
-    planVersion: { type: 'string', const: 'website-agent-v3' },
+    planVersion: { type: 'string', const: 'website-agent' },
     needsClarification: { type: 'boolean' },
     clarificationQuestion: { type: 'string' },
     suggestedReplies: { type: 'array', items: { type: 'string' } },

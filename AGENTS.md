@@ -20,21 +20,49 @@ Do **not** commit `.env` or `.env.local`. Do **not** read or paste secret values
 |------|---------|------|
 | Fast deterministic | `npm run test:contracts` | Section color pipeline, classifier, strategy, synthetic fixtures (~1s) |
 | Full unit (no LLM) | `npm test` | CI default; excludes `*.llm.test.ts` (~5–15s) |
-| **Live LLM integration** | `npm run test:llm` | **Run before merge** for edit-agent / planner changes |
-| LLM smoke (contracts) | `npm run test:llm:contracts` | 3 synthetic section-color cases on real LLM |
-| Everything | `npm run test:all` | Unit + full LLM suite |
+| **Live LLM integration** | `npm run test:llm` | **Run before merge** for edit-agent / planner changes (~85+ tests) |
+| LLM edit-error suite | `npm run test:llm:edit-errors` | Copy, structural, planner guardrails (~14 cases) |
+| LLM smoke (contracts) | `npm run test:llm:contracts` | Section-color contract smoke (3 cases) |
+| Everything | `npm run test:all` | **Final gate** — unit + full LLM suite + LLM contract smoke |
 
 **For best results on agent/edit work, always run LLM integration tests locally** when `.env` has a valid `MINIMAX_API_KEY`. Unit and contract tests catch regressions in wiring and invariants; they do **not** replace live planner/routing behavior.
 
 LLM suites are gated by `VITEST_LLM_SUITE=1` (set automatically on `test:llm*` scripts). Default `npm test` skips them so CI stays fast and key-free.
 
-## Recommended pre-merge checklist (edit agent / section color)
+When running live LLM suites, Vitest retries failed tests **2 times** by default (3 attempts total). Override with `VITEST_LLM_RETRY=0` to disable or `VITEST_LLM_RETRY=3` for more tolerance.
+
+## Final test gate (required)
+
+**Before merge, push, or marking agent/edit work complete**, run the full suite:
 
 ```bash
-npm run test:contracts
-npm run test:llm:contracts    # quick LLM smoke
-npm run test:llm              # full planner + E2E integration (when touching routing/classifier)
+npm run test:all
+```
+
+`test:all` runs, in order:
+
+1. `npm test` — full unit suite (excludes `*.llm.test.ts`)
+2. `npm run test:llm` — live planner + edit-agent integration (catalog, gradients, copy, structural, report accuracy)
+3. `npm run test:llm:contracts` — LLM section-color contract smoke (3 cases)
+
+Do **not** treat `npm test` or `test:contracts` alone as sufficient for merge when touching the edit agent, planner, routing, or site mutations. Use faster tiers (`test:contracts`, `test:llm:contracts`) during iteration; **`test:all` is the final gate**.
+
+When types or build paths change, also run:
+
+```bash
 npm run typecheck && npm run build
+```
+
+## Iterative checklist (edit agent / section color)
+
+Use while developing; finish with `test:all` above:
+
+```bash
+npm run test:contracts          # fast deterministic (~1s)
+npm run test:llm:contracts      # quick LLM smoke
+npm run test:llm                # full planner + E2E (routing/classifier changes)
+npm run typecheck && npm run build
+npm run test:all                # final gate before merge/push
 ```
 
 ## Branch / PR conventions
@@ -48,10 +76,12 @@ npm run typecheck && npm run build
 | Area | Path |
 |------|------|
 | Unified section color pipeline | `src/lib/project-workspace/sectionPresentationEdit.ts` |
-| V1 section style strategy | `src/lib/project-workspace/website-edit-agent/strategies/sectionStyleStrategy.ts` |
-| V3 edit agent (default gitlab) | `src/lib/project-workspace/edit-agent-v3/index.ts` |
+| Edit agent (GitLab required) | `src/lib/project-workspace/edit-agent/index.ts` |
+| Edit runner | `src/lib/project-workspace/websiteEditRunner.ts` |
+| Legacy project purge | `scripts/purge-non-gitlab-projects.ts` |
 | siteConfig mutations | `src/lib/project-workspace/siteConfigMutations.ts` |
 | Edit run snapshot / rollback | `src/lib/project-workspace/editRunSnapshot.ts` |
-| Edit classifier | `src/lib/project-workspace/website-edit-agent/editJobClassifier.ts` |
-| Synthetic test harness | `tests/support/syntheticSiteWorkspace.ts`, `tests/support/sectionColorEditContract.ts` |
+| Shared edit utilities | `src/lib/project-workspace/edit-shared/` (catalog, attachments, toolRegistry) |
+| Synthetic test harness | `tests/support/syntheticSiteWorkspace.ts`, `tests/support/sectionColorEditContract.ts`, `tests/support/llmEditScenario.ts` |
+| LLM edit-error suites | `tests/edit-agent/copyEdit.llm.test.ts`, `structuralEdit.llm.test.ts`, `plannerGuards.llm.test.ts`, `reportAccuracy.llm.test.ts` |
 | LLM test gate | `tests/llmTestGate.ts` |

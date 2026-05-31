@@ -12,7 +12,7 @@ import {
   parseSiteConfigSource,
   replaceSiteConfigSectionsInSource,
 } from '../../src/lib/site-manager/siteConfigParser';
-import { stampSiteConfigForGalleryPreviewReload } from '../../src/lib/project-workspace/website-edit-agent/gallerySiteConfig';
+import { stampSiteConfigForGalleryPreviewReload } from '../../src/lib/project-workspace/edit-shared/gallerySiteConfig';
 
 const withHero = `export const siteConfig: SiteConfig = {
   "hero": { "headline": "Welcome", "subheadline": "Local pros" },

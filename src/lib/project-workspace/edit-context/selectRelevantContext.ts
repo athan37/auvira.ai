@@ -1,7 +1,7 @@
 import {
   extractSiteConfigSectionBlock,
   extractPageSectionBlock,
-} from '@/lib/project-workspace/website-edit-agent/extractEditCodeContext';
+} from '@/lib/project-workspace/edit-shared/extractEditCodeContext';
 import type { EditContext, ContextSnippet } from './types';
 
 const MAX_SNIPPET_CHARS = 12_000;

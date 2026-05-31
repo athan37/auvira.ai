@@ -3,12 +3,12 @@ import { readFileSync } from 'fs';
 import path from 'path';
 import {
   applyImagePlacementToSiteConfig,
-} from '../../src/lib/project-workspace/website-edit-agent/applyImagePlacementPlan';
+} from '../../src/lib/project-workspace/edit-shared/applyImagePlacementPlan';
 import {
   analyzeSiteStructureForImages,
   planImagePlacementFallback,
-} from '../../src/lib/project-workspace/website-edit-agent/siteStructureAnalysis';
-import { applyUniversalImageRenderer } from '../../src/lib/project-workspace/website-edit-agent/universalImageRenderer';
+} from '../../src/lib/project-workspace/edit-shared/siteStructureAnalysis';
+import { applyUniversalImageRenderer } from '../../src/lib/project-workspace/edit-shared/universalImageRenderer';
 import {
   countReachableUploadAssets,
   verifyGalleryEditOnSandbox,

@@ -5,7 +5,7 @@ import {
   SITE_CONFIG,
   TAILWIND_CONFIG,
   readWorkspaceRel,
-} from '@/lib/project-workspace/website-edit-agent/strategyContext';
+} from '@/lib/project-workspace/edit-shared/strategyContext';
 import type { DomainToolContext, DomainToolResult } from './types';
 
 /**
@@ -52,6 +52,38 @@ export async function verifySourceInvariantsTool(
       errors.push(...invariantErrors);
     }
 
+    if (check.kind === 'hero_field' && check.field) {
+      const siteConfig =
+        ctx.afterFiles[SITE_CONFIG] ??
+        (await readWorkspaceRel(ctx.agentOptions, SITE_CONFIG));
+      if (!siteConfig) {
+        errors.push('Missing siteConfig for hero verification');
+        continue;
+      }
+      const field = check.field as 'headline' | 'subheadline' | 'tagline';
+      const actual = readHeroFieldFromSource(siteConfig, field);
+      if (check.expectedValue && String(actual ?? '').trim() !== check.expectedValue.trim()) {
+        errors.push(`Hero ${field} does not match expected value`);
+      }
+    }
+
+    if (check.kind === 'business_name') {
+      const siteConfig =
+        ctx.afterFiles[SITE_CONFIG] ??
+        (await readWorkspaceRel(ctx.agentOptions, SITE_CONFIG));
+      if (!siteConfig) {
+        errors.push('Missing siteConfig for business name verification');
+        continue;
+      }
+      const parsed = parseSiteConfigSource(siteConfig);
+      if (
+        check.expectedValue &&
+        String(parsed?.businessName ?? '').trim() !== check.expectedValue.trim()
+      ) {
+        errors.push('businessName does not match expected value');
+      }
+    }
+
     if (check.kind === 'contact_field' && check.field) {
       const siteConfig =
         ctx.afterFiles[SITE_CONFIG] ??
@@ -88,6 +120,12 @@ export async function verifySourceInvariantsTool(
     changedFiles: [],
     summary: 'Source invariants passed.',
   };
+}
+
+function readHeroFieldFromSource(content: string, field: string): string | undefined {
+  const key = field === 'subheadline' ? 'subheadline' : field === 'tagline' ? 'tagline' : 'headline';
+  const match = content.match(new RegExp(`"${key}"\\s*:\\s*"([^"]*)"`));
+  return match?.[1];
 }
 
 function parseBackgroundFromContent(content: string, sectionIndex: number): string {

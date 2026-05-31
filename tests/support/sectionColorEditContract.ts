@@ -4,7 +4,7 @@
 
 import { colorNameToBackgroundClass } from '@/lib/builder/sectionPresentation';
 import { extractSiteConfigObjectLiteral } from '@/lib/site-manager/siteConfigParser';
-import { rendererComponentForSectionType } from '@/lib/project-workspace/website-edit-agent/legacySectionPresentation';
+import { rendererComponentForSectionType } from '@/lib/project-workspace/edit-shared/legacySectionPresentation';
 import {
   applySectionBackgroundEdit,
   type ApplySectionBackgroundEditResult,

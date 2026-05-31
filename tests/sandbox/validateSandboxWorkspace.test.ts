@@ -17,6 +17,10 @@ vi.mock('@/lib/preview/repairSiteConfigTypes', () => ({
   repairSiteConfigTypesViaGateway: vi.fn().mockResolvedValue(false),
 }));
 
+vi.mock('@/lib/sandbox/repairPreviewSandbox', () => ({
+  repairPreviewSandbox: vi.fn().mockResolvedValue(undefined),
+}));
+
 describe('validateSandboxWorkspace', () => {
   beforeEach(() => {
     vi.clearAllMocks();

@@ -10,7 +10,7 @@ const CLARIFY_REPLACE_IMAGE =
 
 function clarificationPlan(question: string, suggestedReplies: string[]): EditPlan {
   return {
-    planVersion: 'website-agent-v3',
+    planVersion: 'website-agent',
     needsClarification: true,
     clarificationQuestion: question,
     suggestedReplies,
@@ -43,7 +43,8 @@ export function validatePlanSkills(
   }
 
   const hasReplaceImage = plan.steps.some((s) => s.skill === 'replace_image');
-  if (hasReplaceImage && !options?.hasAttachments) {
+  if (hasReplaceImage) {
+    void options;
     return {
       ok: true,
       plan: clarificationPlan(CLARIFY_REPLACE_IMAGE, [
@@ -52,6 +53,22 @@ export function validatePlanSkills(
         'Describe which section should use the new image',
       ]),
     };
+  }
+
+  if (plan.steps.some((s) => s.skill === 'custom_code_edit')) {
+    const allowCustom =
+      process.env.WEBSITE_EDIT_ALLOW_CUSTOM_CODE === '1' ||
+      process.env.WEBSITE_EDIT_ALLOW_CUSTOM_CODE === 'true';
+    if (!allowCustom) {
+      return {
+        ok: true,
+        plan: clarificationPlan(CLARIFY_UNSUPPORTED, [
+          'Change section text or headline',
+          'Change a section background color',
+          'Update contact phone or email',
+        ]),
+      };
+    }
   }
 
   return null;

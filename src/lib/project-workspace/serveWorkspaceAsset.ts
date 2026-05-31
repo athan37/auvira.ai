@@ -50,15 +50,13 @@ export async function readWorkspaceAsset(
   pathSegments: string[]
 ): Promise<{ buffer: Buffer; contentType: string } | null> {
   const project = await getOwnerProject(projectId);
-  if (!project) return null;
+  if (!project?.gitlab?.repoUrl) return null;
 
   const useSandbox =
     isSandboxPreviewEnabled() &&
-    Boolean(project.gitlab?.repoUrl) &&
     (project.preview?.previewMode === 'sandbox' || project.codeWorkspace?.sandboxWorkspace);
 
-  const mode: 'gitlab' | 'static' = project.gitlab?.repoUrl ? 'gitlab' : 'static';
-  const relPath = resolveUploadAssetRelPath(pathSegments, mode);
+  const relPath = resolveUploadAssetRelPath(pathSegments, 'gitlab');
   if (!relPath) return null;
 
   if (useSandbox) {
@@ -72,9 +70,7 @@ export async function readWorkspaceAsset(
     }
   }
 
-  const workspacePath = project.gitlab?.repoUrl
-    ? getGitWorkspacePath(projectId)
-    : project.codeWorkspace?.workspacePath;
+  const workspacePath = getGitWorkspacePath(projectId);
   if (!workspacePath) return null;
 
   try {

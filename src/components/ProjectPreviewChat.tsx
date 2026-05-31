@@ -17,7 +17,8 @@ import {
 import {
   isImagePlacementRequest,
   MISSING_IMAGE_ATTACHMENT_MESSAGE,
-} from '@/lib/project-workspace/website-edit-agent/imagePlacementIntent';
+} from '@/lib/project-workspace/edit-shared/imagePlacementIntent';
+import { LEGACY_PROJECT_UNSUPPORTED_MESSAGE } from '@/lib/project-workspace/requireGitLabProject';
 
 export interface EditCompleteResult {
   ok: boolean;
@@ -79,6 +80,8 @@ interface ProjectPreviewChatProps {
   projectId: string;
   disabled?: boolean;
   previewReady?: boolean;
+  /** Legacy static workspace — chat edits are blocked. */
+  legacyProject?: boolean;
   onEditStart?: () => void;
   onEditSuccess?: () => void;
   onEditComplete?: (result: EditCompleteResult) => void;
@@ -374,6 +377,7 @@ export function ProjectPreviewChat({
   projectId,
   disabled,
   previewReady = true,
+  legacyProject = false,
   onEditStart,
   onEditSuccess,
   onEditComplete,
@@ -840,7 +844,11 @@ export function ProjectPreviewChat({
               increaseViewportBy={{ top: 200, bottom: 200 }}
               components={{
                 Header: () =>
-                  !previewReady ? (
+                  legacyProject ? (
+                    <div className="px-4 pt-4">
+                      <Alert variant="warning">{LEGACY_PROJECT_UNSUPPORTED_MESSAGE}</Alert>
+                    </div>
+                  ) : !previewReady ? (
                     <div className="px-4 pt-4">
                       <Alert variant="info">
                         Starting your preview… You can edit once it is ready.

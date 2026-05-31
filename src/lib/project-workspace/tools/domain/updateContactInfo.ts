@@ -2,7 +2,7 @@ import {
   SITE_CONFIG,
   readWorkspaceRel,
   writeWorkspaceRel,
-} from '@/lib/project-workspace/website-edit-agent/strategyContext';
+} from '@/lib/project-workspace/edit-shared/strategyContext';
 import { updateContactFieldInSource } from '@/lib/project-workspace/siteConfigMutations';
 import type { DomainToolContext, DomainToolResult } from './types';
 

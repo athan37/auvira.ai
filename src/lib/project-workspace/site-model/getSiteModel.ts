@@ -1,9 +1,9 @@
 import { parseSiteConfigSource } from '@/lib/site-manager/siteConfigParser';
-import { buildEnrichedSiteStructure } from '@/lib/project-workspace/website-edit-agent/resolveSectionTarget';
+import { buildEnrichedSiteStructure } from '@/lib/project-workspace/edit-shared/resolveSectionTarget';
 import {
   detectPageArchetype,
   resolveSiteWorkspace,
-} from '@/lib/project-workspace/website-edit-agent/resolveSiteWorkspace';
+} from '@/lib/project-workspace/edit-shared/resolveSiteWorkspace';
 import type { GetSiteModelInput, SiteModel } from './types';
 
 function emptySiteModel(workspacePath: string, errors: string[]): SiteModel {
@@ -66,7 +66,7 @@ export async function getSiteModel(input: GetSiteModelInput): Promise<SiteModel>
 
     const archetype =
       snapshot.archetype ??
-      detectPageArchetype(mode, snapshot.pageContent, snapshot.siteConfigContent);
+      detectPageArchetype(snapshot.pageContent, snapshot.siteConfigContent);
 
     return {
       workspacePath: input.workspacePath,

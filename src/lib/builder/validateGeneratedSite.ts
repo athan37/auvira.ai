@@ -7,7 +7,7 @@ import { getNodeBinDir } from '@/lib/runtime/nodeRuntime';
 import { isVercelServerless } from '@/lib/runtime/isVercelServerless';
 import { scratchPath } from '@/lib/runtime/scratchDir';
 import { parseSiteConfigSource } from '@/lib/site-manager/siteConfigParser';
-import { rendererComponentForSectionType } from '@/lib/project-workspace/website-edit-agent/legacySectionPresentation';
+import { rendererComponentForSectionType } from '@/lib/project-workspace/edit-shared/legacySectionPresentation';
 import { sectionRendererUsesPresentationResolver } from '@/lib/project-workspace/previewReflectsSiteConfig';
 
 const execFileAsync = promisify(execFile);

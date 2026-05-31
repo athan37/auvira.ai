@@ -1,15 +1,18 @@
 import { resolveEffectiveEditMessage } from '@/lib/chat/conversationContextForEdit';
-import { classifyEditWhat } from '@/lib/project-workspace/website-edit-agent/buildGroundedEditContext';
-import { resolveSectionWithCatalogLLM } from '@/lib/project-workspace/website-edit-agent/resolveSectionWithCatalogLLM';
-import type { ConversationTurn } from '@/lib/project-workspace/website-edit-agent/editAmbiguity';
+import { classifyEditWhat } from '@/lib/project-workspace/edit-context/classifyEditWhat';
+import { resolveSectionWithCatalogLLM } from '@/lib/project-workspace/edit-shared/resolveSectionWithCatalogLLM';
+import type { ConversationTurn } from '@/lib/project-workspace/edit-shared/editAmbiguity';
 import {
+  extractExplicitSectionTitleIntent,
   extractSectionTitleCandidates,
+  findBestSectionTitleMatch,
   resolveSectionTarget,
-} from '@/lib/project-workspace/website-edit-agent/resolveSectionTarget';
+  scoreTitleMatch,
+} from '@/lib/project-workspace/edit-shared/resolveSectionTarget';
 import {
   matchSectionFromMessage,
   type SiteSectionCatalog,
-} from '@/lib/project-workspace/website-edit-agent/siteSectionCatalog';
+} from '@/lib/project-workspace/edit-shared/siteSectionCatalog';
 import type { SiteModel } from '@/lib/project-workspace/site-model/types';
 import type { EditTarget, EditTargetCandidate, EditTargetKind } from './types';
 
@@ -120,6 +123,26 @@ export function resolveEditTargetSync(
     };
   }
 
+  const titledIntent = extractExplicitSectionTitleIntent(effectiveMessage);
+  if (titledIntent && styleEditNeedsSectionTarget(effectiveMessage)) {
+    const best = findBestSectionTitleMatch([titledIntent], catalog.sections);
+    if (!best) {
+      return {
+        kind: 'section',
+        confidence: 'low',
+        candidates: [],
+        needsClarification: true,
+        clarificationMessage:
+          `I couldn't find a section titled "${titledIntent}". Reply with the number:\n\n` +
+          catalog.sections
+            .map((s, i) => `${i + 1}. [${s.index}] ${s.type} — "${s.title}"`)
+            .join('\n'),
+        suggestedReplies: catalog.numberedReplies,
+        reason: 'Explicit section title not found',
+      };
+    }
+  }
+
   const enriched = siteModel.structure;
   if (enriched) {
     const legacy = resolveSectionTarget(effectiveMessage, history, enriched, catalog);
@@ -209,6 +232,10 @@ export async function resolveEditTargetAsync(
   const target = resolveEditTarget(message, siteModel, catalog, history);
   const effectiveMessage = resolveEffectiveEditMessage(message, history);
 
+  if (target.needsClarification) {
+    return target;
+  }
+
   const needsLlm =
     styleEditNeedsSectionTarget(effectiveMessage) &&
     (target.needsClarification ||
@@ -227,6 +254,21 @@ export async function resolveEditTargetAsync(
 
   const section = catalog.sections.find((s) => s.index === llmPick.sectionIndex);
   if (!section) {
+    return target;
+  }
+
+  const titledIntent = extractExplicitSectionTitleIntent(effectiveMessage);
+  if (titledIntent && scoreTitleMatch(section.title, titledIntent) < 50) {
+    return target;
+  }
+
+  const catalogMatch = matchSectionFromMessage(effectiveMessage, catalog, { history });
+  if (
+    catalogMatch?.confidence === 'low' ||
+    (catalogMatch?.sectionIndex != null &&
+      catalogMatch.confidence === 'high' &&
+      catalogMatch.sectionIndex !== llmPick.sectionIndex)
+  ) {
     return target;
   }
 

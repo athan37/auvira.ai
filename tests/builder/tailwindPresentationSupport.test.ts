@@ -26,6 +26,9 @@ describe('tailwindPresentationSupport', () => {
     expect(generated).toContain('safelist');
     expect(generated).toContain("'bg-black'");
     expect(generated).toContain("'bg-white'");
+    expect(generated).toMatch(/\],\s*\n\s*safelist:/);
+    const literal = generated.replace(/^[\s\S]*?module\.exports\s*=\s*/, '').replace(/;\s*$/, '');
+    expect(() => new Function(`return (${literal})`)()).not.toThrow();
   });
 
   it('tailwindContentPathsForGeneratedSite uses src catch-all', () => {
@@ -65,5 +68,19 @@ describe('tailwindPresentationSupport', () => {
     const canonical = generateTailwindConfig();
     const { changed } = normalizeCustomerSiteTailwindConfig(canonical);
     expect(changed).toBe(false);
+  });
+
+  it('repairs missing comma between content array and safelist', () => {
+    const broken = `module.exports = {
+  content: ['./src/**/*.{js,ts,jsx,tsx,mdx}']
+  safelist: ['bg-black'],
+  theme: { extend: {} },
+  plugins: [],
+}`;
+    const { content: patched, changed } = normalizeCustomerSiteTailwindConfig(broken);
+    expect(changed).toBe(true);
+    expect(patched).toMatch(/\],\s*\n\s*safelist:/);
+    const literal = patched.replace(/^[\s\S]*?module\.exports\s*=\s*/, '').replace(/;\s*$/, '');
+    expect(() => new Function(`return (${literal})`)()).not.toThrow();
   });
 });

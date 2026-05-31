@@ -4,11 +4,11 @@ import { fetchHtmlFromSandboxLoopback } from '@/lib/sandbox/fetchSandboxPreviewH
 import {
   genericSectionRendersItemImages,
   pageHasGalleryRenderer,
-} from './website-edit-agent/universalImageRenderer';
+} from './edit-shared/universalImageRenderer';
 import {
   sectionItemsHaveImageUrls,
   validateGalleryInSiteConfigSource,
-} from './website-edit-agent/validateGallerySiteConfig';
+} from './edit-shared/validateGallerySiteConfig';
 import type { WorkspaceAssetAttachment } from './workspaceAssetTypes';
 import { countUploadedImagesInHtml } from './previewImageHtml';
 

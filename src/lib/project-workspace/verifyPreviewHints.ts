@@ -1,6 +1,6 @@
 /** Shared hint extraction for preview-first edit verification. */
 
-import { isGradientBackgroundRequest } from '@/lib/project-workspace/website-edit-agent/preset/presetUtils';
+import { isGradientBackgroundRequest } from '@/lib/project-workspace/edit-shared/preset/presetUtils';
 
 const COLOR_NAMES = [
   'green',

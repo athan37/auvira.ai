@@ -65,6 +65,13 @@ export function validateGeneratedFiles(siteSpec: SiteSpec, projectName: string):
   const tailwindContent = generateTailwindConfig();
   if (!tailwindContent.includes('module.exports')) {
     errors.push({ file: 'tailwind.config.js', error: 'Must use CommonJS (module.exports)' });
+  } else {
+    try {
+      const literal = tailwindContent.replace(/^[\s\S]*?module\.exports\s*=\s*/, '').replace(/;\s*$/, '');
+      new Function(`return (${literal})`)();
+    } catch {
+      errors.push({ file: 'tailwind.config.js', error: 'Invalid JavaScript object literal' });
+    }
   }
 
   // Validate page.tsx - check for template literal escaping issues

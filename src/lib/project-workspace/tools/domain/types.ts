@@ -1,5 +1,5 @@
 import type { EditContext } from '@/lib/project-workspace/edit-context/types';
-import type { WebsiteEditAgentOptions } from '@/lib/project-workspace/website-edit-agent/types';
+import type { WebsiteEditAgentOptions } from '@/lib/project-workspace/edit-shared/types';
 
 /** Domain tool names exposed to V3 planner/executor. */
 export const DOMAIN_TOOL_NAMES = [

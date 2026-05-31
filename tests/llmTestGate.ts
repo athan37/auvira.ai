@@ -3,6 +3,12 @@ import { beforeAll, describe, vi } from 'vitest';
 /** Per-test timeout for live LLM calls (planner + E2E). */
 export const LLM_TEST_TIMEOUT_MS = 120_000;
 
+/** Default Vitest retries when VITEST_LLM_SUITE=1 (see vitest.config.ts). */
+export const LLM_TEST_RETRY = Math.max(
+  0,
+  parseInt(process.env.VITEST_LLM_RETRY ?? '2', 10) || 0
+);
+
 vi.setConfig({ testTimeout: LLM_TEST_TIMEOUT_MS });
 
 /**
@@ -23,6 +29,7 @@ export function requireLlmApiKey(): void {
 
 /**
  * Register a live LLM suite. Does not use describe.skip — missing keys fail in beforeAll.
+ * Retries on failure are configured in vitest.config.ts when VITEST_LLM_SUITE=1.
  */
 export function llmDescribe(name: string, fn: () => void): void {
   describe(name, () => {

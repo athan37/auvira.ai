@@ -20,7 +20,7 @@ import {
   readSyntheticFile,
   SYNTHETIC_SECTION_TYPES,
 } from '../support/syntheticSiteWorkspace';
-import { rendererComponentForSectionType } from '@/lib/project-workspace/website-edit-agent/legacySectionPresentation';
+import { rendererComponentForSectionType } from '@/lib/project-workspace/edit-shared/legacySectionPresentation';
 import { colorNameToBackgroundClass } from '@/lib/builder/sectionPresentation';
 import { updateSectionPresentationInSource } from '@/lib/project-workspace/siteConfigMutations';
 import { buildBlackWhiteGradientBackgroundClass } from '@/lib/builder/gradientBuilder';

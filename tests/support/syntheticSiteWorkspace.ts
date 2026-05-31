@@ -8,7 +8,7 @@ import { promises as fs } from 'fs';
 import { randomUUID } from 'crypto';
 import { SECTION_PRESENTATION_RUNTIME } from '@/lib/builder/sectionPresentationRuntime';
 import { defaultSectionBackgroundKey } from '@/lib/builder/sectionPresentation';
-import { rendererComponentForSectionType } from '@/lib/project-workspace/website-edit-agent/legacySectionPresentation';
+import { rendererComponentForSectionType } from '@/lib/project-workspace/edit-shared/legacySectionPresentation';
 import { scratchPath } from '@/lib/runtime/scratchDir';
 
 /** Supported section types for synthetic sites (extensible). */
@@ -34,6 +34,7 @@ export type SyntheticSectionSpec = {
 export type SyntheticSiteSpec = {
   /** Defaults to random synthetic business id. */
   businessName?: string;
+  hero?: { headline?: string; subheadline?: string };
   sections: SyntheticSectionSpec[];
 };
 
@@ -79,9 +80,12 @@ export function buildSyntheticSiteConfigSource(spec: SyntheticSiteSpec): string 
     return `    { type: '${type}', title: '${escapeJsString(title)}', body: 'Synthetic body', items: [] }`;
   });
 
+  const heroHeadline = spec.hero?.headline ?? 'Synthetic hero';
+  const heroSub = spec.hero?.subheadline ?? 'Synthetic tagline';
+
   return `export const siteConfig = {
   businessName: '${escapeJsString(businessName)}',
-  hero: { headline: 'Synthetic hero', subheadline: 'Synthetic tagline' },
+  hero: { headline: '${escapeJsString(heroHeadline)}', subheadline: '${escapeJsString(heroSub)}' },
   contact: {},
   sections: [
 ${sectionLines.join(',\n')}

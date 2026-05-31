@@ -14,6 +14,20 @@ export function confusingTitlesSiteSpec(): SyntheticSiteSpec {
   };
 }
 
+/** Second layout: same failure mode, different indices and wording. */
+export function alternateTrapTitlesSiteSpec(): SyntheticSiteSpec {
+  return {
+    businessName: 'Alternate Trap Site',
+    sections: [
+      { type: 'about', title: 'Partner With a Trusted Local Business' },
+      { type: 'services', title: 'Accelerate Your Growth Strategy Today' },
+      { type: 'gallery', title: 'Portfolio Work We Love to Showcase' },
+      { type: 'testimonials', title: 'Real Stories from Happy Customers' },
+      { type: 'contact', title: 'Ready When You Are — Get Started' },
+    ],
+  };
+}
+
 /** Similar verb prefixes — "Get Started" vs "Getting Started". */
 export function similarVerbSiteSpec(): SyntheticSiteSpec {
   return {

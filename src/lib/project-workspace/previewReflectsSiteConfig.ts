@@ -1,8 +1,8 @@
 import { colorNameToBackgroundClass } from '@/lib/builder/sectionPresentation';
 import { parseSiteConfigSource } from '@/lib/site-manager/siteConfigParser';
 import { extractPreviewVerifyHints, htmlShowsTailwindColor } from './verifyPreviewHints';
-import { rendererComponentForSectionType } from './website-edit-agent/legacySectionPresentation';
-import { extractSectionComponentSource } from './website-edit-agent/resolveSectionTarget';
+import { rendererComponentForSectionType } from './edit-shared/legacySectionPresentation';
+import { extractSectionComponentSource } from './edit-shared/resolveSectionTarget';
 
 export const PREVIEW_PRESENTATION_POLL_MS = 800;
 export const PREVIEW_PRESENTATION_TIMEOUT_MS = 20_000;

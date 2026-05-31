@@ -128,7 +128,7 @@ const CANONICAL_CONTENT_BLOCK = buildCanonicalContentBlock();
 
 /** Body inside module.exports for newly generated customer sites. */
 export function tailwindContentPathsForGeneratedSite(): string {
-  return `${CANONICAL_CONTENT_BLOCK}
+  return `${CANONICAL_CONTENT_BLOCK},
 ${CUSTOMER_SITE_TAILWIND_SAFELIST}`;
 }
 
@@ -168,6 +168,11 @@ export function normalizeCustomerSiteTailwindConfig(content: string): {
 
   if (next.includes('],,')) {
     next = next.replace(/\],,/g, '],');
+    changed = true;
+  }
+
+  if (/\]\s*\n\s*safelist:/.test(next) && !/\],\s*\n\s*safelist:/.test(next)) {
+    next = next.replace(/\]\s*\n(\s*safelist:)/, '],\n$1');
     changed = true;
   }
 

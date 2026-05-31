@@ -1,4 +1,4 @@
-import { matchSectionFromMessage } from '@/lib/project-workspace/website-edit-agent/siteSectionCatalog';
+import { matchSectionFromMessage } from '@/lib/project-workspace/edit-shared/siteSectionCatalog';
 import type { DomainToolContext, DomainToolResult } from './types';
 
 /**
