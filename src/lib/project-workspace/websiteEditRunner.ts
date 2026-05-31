@@ -41,6 +41,7 @@ export interface WebsiteEditOptions {
   conversationHistory?: import('./edit-shared/types').ConversationTurn[];
   lastGalleryEdit?: import('./edit-shared/types').LastGalleryEdit;
   editFocusStack?: EditFocusStack;
+  selectedTarget?: import('./edit-shared/selectedTargetTypes').SelectedTargetInput;
   editJobId?: string;
   infraStatus?: 'pending' | 'ready' | 'failed' | string;
   infraVersion?: number;
@@ -88,6 +89,7 @@ export async function runWebsiteEdit(
     conversationHistory: options.conversationHistory,
     lastGalleryEdit: resolvedGalleryEdit ?? undefined,
     editFocusStack: options.editFocusStack,
+    selectedTarget: options.selectedTarget,
     infraBaselineReady,
   };
   const result = await runWebsiteEditAgent(agentOptions, onStep);

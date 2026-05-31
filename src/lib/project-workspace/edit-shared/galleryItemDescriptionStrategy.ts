@@ -176,7 +176,8 @@ export async function runGalleryItemDescriptionStrategy(
     options.conversationHistory,
     options.lastGalleryEdit,
     options.ownerMessage,
-    options.editFocusStack
+    options.editFocusStack,
+    options.selectedTarget
   );
 
   if (!targetGallery) {

@@ -2,6 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  buildSiteSectionClearMessage,
+  buildSiteSectionFocusMessage,
+  buildSiteSectionHighlightMessage,
+  parseSiteSectionDragStartMessage,
+  type ParentToIframeSectionMessage,
+  type SelectedSection,
+  type SiteSectionContextPayload,
+} from '@/lib/preview/sectionSelectionProtocol';
+import {
   cancelWorkspaceReleaseOnEnter,
   scheduleWorkspaceReleaseOnLeave,
 } from '@/lib/runtime/releaseWorkspaceOnLeave';
@@ -30,9 +39,25 @@ interface Props {
   /** When true, defer iframe remount until edit completes and dev server settles. */
   editInProgress?: boolean;
   onReadyChange?: (ready: boolean) => void;
+  selectedSection?: SelectedSection | null;
+  hoverSectionId?: string | null;
+  focusSectionId?: string | null;
+  focusSectionNonce?: number;
+  onSelectedSectionChange?: (section: SelectedSection | null) => void;
+  onSectionDragStart?: (payload: SiteSectionContextPayload, screenX: number, screenY: number) => void;
 }
 
+const SECTION_HINT_STORAGE_KEY = 'editor-section-hint-dismissed';
+
 const STAGE_ORDER = ['idle', 'cloning', 'installing', 'starting_server', 'ready'] as const;
+
+function readHintDismissed(): boolean {
+  try {
+    return localStorage.getItem(SECTION_HINT_STORAGE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
 
 function stageProgress(stage: string): number {
   const idx = STAGE_ORDER.indexOf(stage as (typeof STAGE_ORDER)[number]);
@@ -48,6 +73,12 @@ export function ProjectPreviewFrame({
   previewRefreshKey = 0,
   editInProgress = false,
   onReadyChange,
+  selectedSection = null,
+  hoverSectionId = null,
+  focusSectionId = null,
+  focusSectionNonce = 0,
+  onSelectedSectionChange,
+  onSectionDragStart,
 }: Props) {
   const onReadyChangeRef = useRef(onReadyChange);
   onReadyChangeRef.current = onReadyChange;
@@ -62,6 +93,63 @@ export function ProjectPreviewFrame({
   const [mountedVersion, setMountedVersion] = useState(codeWorkspaceVersion);
   const chunkRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const chunkRetryCountRef = useRef(0);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const lastHighlightIdRef = useRef<string | null>(null);
+  const [showSectionHint, setShowSectionHint] = useState(false);
+
+  const selectionAvailable = previewMode !== 'live';
+
+  useEffect(() => {
+    if (previewReady && selectionAvailable) {
+      setShowSectionHint(!readHintDismissed());
+    }
+  }, [previewReady, selectionAvailable]);
+
+  const postToIframe = useCallback((message: ParentToIframeSectionMessage) => {
+    const win = iframeRef.current?.contentWindow;
+    if (!win) return;
+    try {
+      win.postMessage(message, window.location.origin);
+    } catch {
+      /* cross-origin or detached */
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!selectionAvailable) return;
+    const highlightId = hoverSectionId ?? focusSectionId ?? selectedSection?.sectionId ?? null;
+    if (lastHighlightIdRef.current === highlightId) return;
+    lastHighlightIdRef.current = highlightId;
+    if (highlightId) {
+      postToIframe(buildSiteSectionHighlightMessage(highlightId));
+    } else {
+      postToIframe(buildSiteSectionClearMessage());
+    }
+  }, [hoverSectionId, focusSectionId, selectedSection?.sectionId, selectionAvailable, postToIframe]);
+
+  useEffect(() => {
+    if (!selectionAvailable || !focusSectionId) return;
+    postToIframe(buildSiteSectionFocusMessage(focusSectionId));
+  }, [focusSectionId, focusSectionNonce, selectionAvailable, postToIframe]);
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape' || !selectedSection) return;
+      onSelectedSectionChange?.(null);
+      postToIframe(buildSiteSectionClearMessage());
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [selectedSection, onSelectedSectionChange, postToIframe]);
+
+  const dismissSectionHint = useCallback(() => {
+    setShowSectionHint(false);
+    try {
+      localStorage.setItem(SECTION_HINT_STORAGE_KEY, '1');
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   useEffect(() => {
     if (editInProgress) return;
@@ -218,15 +306,28 @@ export function ProjectPreviewFrame({
     function onMessage(event: MessageEvent) {
       if (event.origin !== window.location.origin) return;
       const data = event.data as { type?: string } | null;
-      if (data?.type !== 'preview-chunk-error') return;
-      if (editInProgress || chunkRetryCountRef.current >= 2) return;
+      if (data?.type === 'preview-chunk-error') {
+        if (editInProgress || chunkRetryCountRef.current >= 2) return;
 
-      chunkRetryCountRef.current += 1;
-      if (chunkRetryTimerRef.current) clearTimeout(chunkRetryTimerRef.current);
-      chunkRetryTimerRef.current = setTimeout(() => {
-        setIframeLoading(true);
-        setRefreshKey((prev) => prev + 1);
-      }, PREVIEW_IFRAME_SETTLE_MS);
+        chunkRetryCountRef.current += 1;
+        if (chunkRetryTimerRef.current) clearTimeout(chunkRetryTimerRef.current);
+        chunkRetryTimerRef.current = setTimeout(() => {
+          setIframeLoading(true);
+          setRefreshKey((prev) => prev + 1);
+        }, PREVIEW_IFRAME_SETTLE_MS);
+        return;
+      }
+
+      const dragStart = parseSiteSectionDragStartMessage(event.data);
+      if (dragStart && selectionAvailable) {
+        const rect = iframeRef.current?.getBoundingClientRect();
+        if (!rect) return;
+        onSectionDragStart?.(
+          dragStart.payload,
+          rect.left + dragStart.payload.clientX,
+          rect.top + dragStart.payload.clientY
+        );
+      }
     }
 
     window.addEventListener('message', onMessage);
@@ -234,7 +335,7 @@ export function ProjectPreviewFrame({
       window.removeEventListener('message', onMessage);
       if (chunkRetryTimerRef.current) clearTimeout(chunkRetryTimerRef.current);
     };
-  }, [editInProgress]);
+  }, [editInProgress, onSectionDragStart, selectionAvailable]);
 
   const handleRefresh = () => {
     setIframeLoading(true);
@@ -268,7 +369,28 @@ export function ProjectPreviewFrame({
             Edits apply in workspace — publish to update live site
           </span>
         )}
+        {showSectionHint && previewReady && selectionAvailable && (
+          <span className="text-[10px] text-blue-800 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md ml-2 hidden md:inline-flex items-center gap-1">
+            Drag a section to chat
+            <button
+              type="button"
+              onClick={dismissSectionHint}
+              className="text-blue-600 hover:text-blue-900"
+              aria-label="Dismiss hint"
+            >
+              ×
+            </button>
+          </span>
+        )}
         <div className="flex items-center gap-2">
+          {previewReady && !selectionAvailable && (
+            <span
+              className="text-[10px] text-zinc-500 hidden sm:inline"
+              title="Drag sections to chat in editor preview"
+            >
+              Drag sections in editor preview
+            </span>
+          )}
           {previewReady && (
             <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-800 capitalize">
               {setupStage === 'ready'
@@ -344,12 +466,20 @@ export function ProjectPreviewFrame({
 
         {previewUrl && (
           <iframe
+            ref={iframeRef}
             key={`${projectId}-${mountedVersion}-${refreshKey}-${previewRefreshKey}`}
             src={previewUrl}
             className="w-full h-full border-0"
             onLoad={() => {
               setIframeLoading(false);
               chunkRetryCountRef.current = 0;
+              lastHighlightIdRef.current = null;
+              if (selectionAvailable) {
+                const highlightId = hoverSectionId ?? focusSectionId ?? selectedSection?.sectionId;
+                if (highlightId) {
+                  postToIframe(buildSiteSectionHighlightMessage(highlightId));
+                }
+              }
             }}
             title="Website Preview"
             sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups"

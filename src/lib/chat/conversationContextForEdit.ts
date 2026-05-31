@@ -325,19 +325,21 @@ function mergeCompoundImageEditMessage(message: string): string | null {
 export function resolveEffectiveEditMessage(
   message: string,
   history: ConversationTurn[] = [],
-  editFocusStack?: EditFocusStack | null
+  editFocusStack?: EditFocusStack | null,
+  selectedTarget?: import('@/lib/project-workspace/edit-shared/selectedTargetTypes').SelectedTargetInput | null
 ): string {
   const recent = history.slice(-DEFAULT_EDIT_CONTEXT_TURNS);
+  const skipFocusEnrichment = Boolean(selectedTarget);
 
   return (
     mergeTestimonialOptionReply(message, recent) ??
     mergeSectionNumberReply(message, recent) ??
     mergeCompoundImageEditMessage(message) ??
-    enrichMessageWithEditFocus(message, editFocusStack) ??
-    (editFocusStack?.items.length ? null : mergeGalleryDescriptionFollowUp(message, recent)) ??
+    (!skipFocusEnrichment ? enrichMessageWithEditFocus(message, editFocusStack) : null) ??
+    (!skipFocusEnrichment && editFocusStack?.items.length ? null : mergeGalleryDescriptionFollowUp(message, recent)) ??
     mergeHeroStyleFollowUp(message, recent) ??
     mergeStyleFollowUp(message, recent) ??
-    (editFocusStack?.items.length ? null : mergeDeicticFollowUp(message, recent)) ??
+    (!skipFocusEnrichment && editFocusStack?.items.length ? null : mergeDeicticFollowUp(message, recent)) ??
     message
   );
 }

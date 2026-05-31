@@ -10,6 +10,7 @@ import type {
   EditFocusStack,
   LastGalleryEdit,
 } from '@/lib/project-workspace/edit-shared/types';
+import type { SelectedTargetInput } from '@/lib/project-workspace/edit-shared/selectedTargetTypes';
 import type { WorkspaceAssetAttachment } from '@/lib/project-workspace/workspaceAssetTypes';
 import { ProjectMessage } from '@/models/ProjectMessage';
 import {
@@ -38,6 +39,7 @@ export async function appendUserMessage(input: {
   content: string;
   attachments?: WorkspaceAssetAttachment[];
   clientMessageId?: string;
+  selectedTarget?: SelectedTargetInput;
 }): Promise<void> {
   await connectMongoDB();
   const metadata: ProjectMessageMetadata = {
@@ -45,6 +47,7 @@ export async function appendUserMessage(input: {
     arize: { syncStatus: 'pending' },
   };
   if (input.clientMessageId) metadata.clientMessageId = input.clientMessageId;
+  if (input.selectedTarget) metadata.selectedTarget = input.selectedTarget;
 
   await ProjectMessage.create({
     projectId: asObjectId(input.projectId),

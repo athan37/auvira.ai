@@ -189,6 +189,8 @@ export interface WebsiteEditAgentOptions {
   lastGalleryEdit?: LastGalleryEdit;
   /** Recent edit focus stack for N-turn deictic resolution. */
   editFocusStack?: EditFocusStack;
+  /** UI-pinned section from preview selection (beats deictic focus). */
+  selectedTarget?: import('./selectedTargetTypes').SelectedTargetInput;
   /** Section catalog when grounded context is unavailable but snap exists. */
   sectionCatalog?: import('./siteSectionCatalog').SiteSectionCatalog;
   /** When true, skip inline tailwind/page infra repairs (migration baseline ready). */

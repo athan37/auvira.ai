@@ -80,3 +80,48 @@ export function ensureAnalyticsIdsInSiteConfig(content: string): EnsureAnalytics
     sectionIds: sections.map((section, index) => sectionAnalyticsId(section, index)),
   };
 }
+
+export interface FindSectionByAnalyticsIdResult {
+  found: boolean;
+  sectionIndex?: number;
+  section?: AnalyticsSection;
+}
+
+/**
+ * Resolve a section (or hero) by analyticsId / sectionId from siteConfig source.
+ */
+export function findSectionByAnalyticsId(
+  content: string,
+  id: string
+): FindSectionByAnalyticsIdResult {
+  const normalizedId = id.trim();
+  if (!normalizedId) return { found: false };
+
+  if (normalizedId === 'hero') {
+    return {
+      found: true,
+      sectionIndex: -1,
+      section: { type: 'hero', title: 'Hero' } as AnalyticsSection,
+    };
+  }
+
+  const parsed = parseSiteConfigSource(content);
+  if (!parsed?.sections?.length) return { found: false };
+
+  const index = parsed.sections.findIndex((section, idx) => {
+    const current = section as AnalyticsSection;
+    const resolvedId = sectionAnalyticsId(current, idx);
+    return (
+      (typeof current.analyticsId === 'string' && current.analyticsId === normalizedId) ||
+      (typeof current.id === 'string' && current.id === normalizedId) ||
+      resolvedId === normalizedId
+    );
+  });
+
+  if (index < 0) return { found: false };
+  return {
+    found: true,
+    sectionIndex: index,
+    section: parsed.sections[index] as AnalyticsSection,
+  };
+}

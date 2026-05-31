@@ -62,4 +62,12 @@ describe('rewriteHtmlAssetPaths', () => {
     expect(out).toContain('preview-chunk-error');
     expect(out).toContain('</head>');
   });
+
+  it('always marks HTML injection as rewritten even when asset paths are unchanged', () => {
+    const html = '<html><head></head><body><section id="services">Services</section></body></html>';
+    const out = rewritePreviewResponseBody(Buffer.from(html), 'text/html', projectId);
+    expect(out.rewritten).toBe(true);
+    expect(String(out.body)).toContain('preview/section-bridge');
+    expect(String(out.body)).toContain('cursor:grab');
+  });
 });

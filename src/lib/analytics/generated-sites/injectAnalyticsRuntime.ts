@@ -1,5 +1,9 @@
 import type { GeneratedFile } from '@/lib/builder/types';
 import {
+  HERO_SITE_SECTION_DOM_ATTRS,
+  SITE_SECTION_DOM_ATTRS_INLINE,
+} from '@/lib/builder/siteSectionDomAttrs';
+import {
   ANALYTICS_ATTRS_PATH,
   ANALYTICS_CONFIG_PATH,
   ANALYTICS_RUNTIME_PATH,
@@ -35,26 +39,50 @@ function injectRuntimeComponent(content: string): string {
 }
 
 function injectHeroAttrs(content: string): string {
-  if (content.includes('data-analytics-id="hero"')) return content;
-  return replaceOnce(
+  if (content.includes('data-analytics-id="hero"')) {
+    return injectHeroSiteSectionAttrs(content);
+  }
+  if (content.includes('data-site-section-id="hero"')) {
+    const withAnalytics = replaceOnce(
+      content,
+      'data-site-section-id="hero"',
+      'data-analytics-id="hero" data-analytics-type="hero" data-analytics-label="Hero" data-site-section-id="hero"'
+    );
+    return injectHeroSiteSectionAttrs(withAnalytics);
+  }
+  const withAnalytics = replaceOnce(
     content,
     '<section className={"relative overflow-hidden " + preset.heroBg + " px-4 py-24 text-white sm:px-6 lg:px-8 lg:py-32"}>',
-    '<section data-analytics-id="hero" data-analytics-type="hero" data-analytics-label="Hero" className={"relative overflow-hidden " + preset.heroBg + " px-4 py-24 text-white sm:px-6 lg:px-8 lg:py-32"}>'
+    `<section data-analytics-id="hero" data-analytics-type="hero" data-analytics-label="Hero" ${HERO_SITE_SECTION_DOM_ATTRS} className={"relative overflow-hidden " + preset.heroBg + " px-4 py-24 text-white sm:px-6 lg:px-8 lg:py-32"}>`
+  );
+  return injectHeroSiteSectionAttrs(withAnalytics);
+}
+
+function injectHeroSiteSectionAttrs(content: string): string {
+  if (content.includes('data-site-section-id="hero"')) return content;
+  return replaceOnce(
+    content,
+    'data-analytics-id="hero" data-analytics-type="hero" data-analytics-label="Hero"',
+    `data-analytics-id="hero" data-analytics-type="hero" data-analytics-label="Hero" ${HERO_SITE_SECTION_DOM_ATTRS}`
   );
 }
 
 function injectSectionAttrs(content: string): string {
   const sectionAttrs =
     'data-analytics-id={section.analyticsId || section.id || slugify(section.title)} data-analytics-type="section" data-analytics-label={section.title}';
+  const siteSectionAttrs = SITE_SECTION_DOM_ATTRS_INLINE.replace(
+    '{sectionIndex}',
+    '{String(siteConfig.sections.findIndex((s) => s.type === section.type && s.title === section.title))}'
+  );
   const replacements: Array<[string, string]> = [
-    ['<section id="services" className=', `<section id="services" ${sectionAttrs} className=`],
-    ['<section id="about" className=', `<section id="about" ${sectionAttrs} className=`],
-    ['<section id="features" className=', `<section id="features" ${sectionAttrs} className=`],
-    ['<section id="faq" className=', `<section id="faq" ${sectionAttrs} className=`],
-    ['<section id="testimonials" className=', `<section id="testimonials" ${sectionAttrs} className=`],
-    ['<section id="contact" className=', `<section id="contact" ${sectionAttrs} className=`],
-    ['<section id="gallery" className=', `<section id="gallery" ${sectionAttrs} className=`],
-    ['<section id={slugify(section.title)} className=', `<section id={slugify(section.title)} ${sectionAttrs} className=`],
+    ['<section id="services" className=', `<section id="services" ${sectionAttrs} ${siteSectionAttrs} className=`],
+    ['<section id="about" className=', `<section id="about" ${sectionAttrs} ${siteSectionAttrs} className=`],
+    ['<section id="features" className=', `<section id="features" ${sectionAttrs} ${siteSectionAttrs} className=`],
+    ['<section id="faq" className=', `<section id="faq" ${sectionAttrs} ${siteSectionAttrs} className=`],
+    ['<section id="testimonials" className=', `<section id="testimonials" ${sectionAttrs} ${siteSectionAttrs} className=`],
+    ['<section id="contact" className=', `<section id="contact" ${sectionAttrs} ${siteSectionAttrs} className=`],
+    ['<section id="gallery" className=', `<section id="gallery" ${sectionAttrs} ${siteSectionAttrs} className=`],
+    ['<section id={slugify(section.title)} className=', `<section id={slugify(section.title)} ${sectionAttrs} ${siteSectionAttrs} className=`],
   ];
 
   let out = content;
@@ -63,7 +91,22 @@ function injectSectionAttrs(content: string): string {
       out = replaceOnce(out, search, replacement);
     }
   }
-  return out;
+  return injectSectionSiteSectionAttrsOnAnalytics(out);
+}
+
+/** Add site-section attrs to pages that already have analytics attrs but not site-section attrs. */
+function injectSectionSiteSectionAttrsOnAnalytics(content: string): string {
+  if (content.includes('data-site-section-id={section.analyticsId')) return content;
+  const siteSectionAttrs = SITE_SECTION_DOM_ATTRS_INLINE.replace(
+    '{sectionIndex}',
+    '{String(siteConfig.sections.findIndex((s) => s.type === section.type && s.title === section.title))}'
+  );
+  const marker = 'data-analytics-label={section.title}';
+  if (!content.includes(marker)) return content;
+  return content.replace(
+    new RegExp(`${marker}(?! data-site-section-id)`, 'g'),
+    `${marker} ${siteSectionAttrs}`
+  );
 }
 
 function injectCtaAttrs(content: string): string {

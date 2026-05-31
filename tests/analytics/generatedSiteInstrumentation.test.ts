@@ -3,8 +3,10 @@ import { generateWebsiteFiles } from '@/lib/builder/generateWebsiteFiles';
 import type { SiteSpec } from '@/lib/agent/schemas';
 import {
   ensureAnalyticsIdsInSiteConfig,
+  findSectionByAnalyticsId,
   stableAnalyticsIdForSection,
 } from '@/lib/analytics/generated-sites/ensureAnalyticsIds';
+import { injectAnalyticsIntoPageSource } from '@/lib/analytics/generated-sites/injectAnalyticsRuntime';
 import {
   ANALYTICS_CONFIG_PATH,
   ANALYTICS_RUNTIME_PATH,
@@ -69,6 +71,41 @@ describe('generated-site analytics instrumentation', () => {
     expect(second.content).toBe(first.content);
   });
 
+  it('findSectionByAnalyticsId resolves by analyticsId and survives reorder', () => {
+    const config = `export const siteConfig = {
+  "sections": [
+    { "analyticsId": "section_about_about_2", "type": "about", "title": "About", "items": [] },
+    { "analyticsId": "section_services_services_1", "type": "services", "title": "Services", "items": [] }
+  ]
+};`;
+    const about = findSectionByAnalyticsId(config, 'section_about_about_2');
+    expect(about.found).toBe(true);
+    expect(about.sectionIndex).toBe(0);
+
+    const hero = findSectionByAnalyticsId(config, 'hero');
+    expect(hero.found).toBe(true);
+    expect(hero.sectionIndex).toBe(-1);
+  });
+
+  it('generated page includes data-site-section-* attrs', () => {
+    const generated = generateWebsiteFiles(siteSpec, 'acme-services');
+    const page = generated.files.find((file) => file.filePath === PAGE_PATH)?.content ?? '';
+    expect(page).toContain('data-site-section-id="hero"');
+    expect(page).toContain('data-site-section-index');
+    expect(page).toContain('data-site-section-type');
+    expect(page).toContain('data-site-section-title');
+  });
+
+  it('injectAnalyticsIntoPageSource adds site-section attrs idempotently', () => {
+    const legacyPage = `<section id="services" className="px-4">Services</section>`;
+    const once = injectAnalyticsIntoPageSource(legacyPage);
+    expect(once).toContain('data-site-section-id');
+    const twice = injectAnalyticsIntoPageSource(once);
+    expect((twice.match(/data-site-section-id/g) ?? []).length).toBe(
+      (once.match(/data-site-section-id/g) ?? []).length
+    );
+  });
+
   it('generated SiteSection type accepts optional IDs', () => {
     const source = generateSiteConfig(siteSpec);
     expect(source).toContain('id?: string');
@@ -84,7 +121,7 @@ describe('generated-site analytics instrumentation', () => {
     expect(generated.files.some((file) => file.filePath === ANALYTICS_RUNTIME_PATH)).toBe(true);
     expect(siteConfig).toContain('"analyticsId"');
     expect(page).toContain('data-analytics-id="hero"');
-    expect(page).toContain('data-analytics-type="section"');
+    expect(page).toContain('"data-analytics-type": "section"');
     expect(page).toContain('data-analytics-type="cta"');
 
     const reinstrumented = instrumentGeneratedFiles(generated.files, {

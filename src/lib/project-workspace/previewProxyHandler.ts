@@ -58,7 +58,11 @@ function makeProxyRequest(
   targetUrl: string
 ): Promise<{ status: number; headers: Record<string, string | string[] | undefined>; body: Buffer }> {
   return new Promise((resolve, reject) => {
-    const req = require('http').get(targetUrl, (res: { statusCode?: number; headers: Record<string, string | string[] | undefined>; on: Function }) => {
+    // Request identity encoding so HTML can be rewritten (gzip breaks string injection).
+    const req = require('http').get(
+      targetUrl,
+      { headers: { 'Accept-Encoding': 'identity' } },
+      (res: { statusCode?: number; headers: Record<string, string | string[] | undefined>; on: Function }) => {
       const chunks: Buffer[] = [];
       res.on('data', (chunk: Buffer) => chunks.push(chunk));
       res.on('end', () => {
@@ -68,7 +72,8 @@ function makeProxyRequest(
           body: Buffer.concat(chunks),
         });
       });
-    });
+    }
+    );
     req.on('error', reject);
     req.on('timeout', () => {
       req.destroy();
@@ -159,6 +164,7 @@ export async function handlePreviewProxyGet(
         cache: 'no-store',
         redirect: 'follow',
         signal: AbortSignal.timeout(30_000),
+        headers: { 'Accept-Encoding': 'identity' },
       });
       const buffer = Buffer.from(await res.arrayBuffer());
       const ct = res.headers.get('content-type') || '';

@@ -6,6 +6,7 @@ import { getSiteModel } from '@/lib/project-workspace/site-model/getSiteModel';
 import { buildVerificationContract } from './buildVerificationContract';
 import { resolveDuplicateCopyTarget } from './resolveDuplicateCopyTarget';
 import { resolveEditTargetAsync } from './resolveEditTarget';
+import { formatSelectedTargetForMessage } from './resolveSelectedTarget';
 import { selectRelevantContext } from './selectRelevantContext';
 import type {
   BuildEditContextInput,
@@ -131,18 +132,23 @@ export async function buildEditContext(
   const pageContent = siteModel.pageContent ?? '';
   const sectionCatalog = buildSiteSectionCatalog(siteConfigContent, pageContent);
 
-  const effectiveMessage = resolveEffectiveEditMessage(
+  const effectiveMessageBase = resolveEffectiveEditMessage(
     input.ownerMessage,
     input.conversationHistory ?? [],
-    input.editFocusStack
+    input.editFocusStack,
+    input.selectedTarget
   );
+  const effectiveMessage = input.selectedTarget
+    ? `${effectiveMessageBase.trim()} ${formatSelectedTargetForMessage(input.selectedTarget)}`.trim()
+    : effectiveMessageBase;
 
   const target = await resolveEditTargetAsync(
     input.ownerMessage,
     siteModel,
     sectionCatalog,
     input.conversationHistory ?? [],
-    input.editFocusStack
+    input.editFocusStack,
+    input.selectedTarget
   );
 
   const sections = buildSections({ siteConfigContent, pageContent });
@@ -170,6 +176,7 @@ export async function buildEditContext(
     gateway: input.gateway,
     conversationHistory: input.conversationHistory,
     editFocusStack: input.editFocusStack,
+    selectedTarget: input.selectedTarget,
   };
 
   draftContext.selectedSnippets = selectRelevantContext(draftContext);

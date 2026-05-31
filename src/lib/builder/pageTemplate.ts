@@ -14,6 +14,18 @@ function slugify(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 }
 
+function SITE_SECTION_DATA_ATTRS(section: SiteSection, sectionIndex: number) {
+  return {
+    "data-analytics-id": section.analyticsId || section.id || slugify(String(section.title || "section")),
+    "data-analytics-type": "section",
+    "data-analytics-label": section.title,
+    "data-site-section-id": section.analyticsId || section.id || slugify(String(section.title || "section")),
+    "data-site-section-index": String(sectionIndex),
+    "data-site-section-type": section.type,
+    "data-site-section-title": section.title,
+  };
+}
+
 ${SECTION_PRESENTATION_RUNTIME}
 
 // Navigation component
@@ -36,7 +48,7 @@ function Nav() {
 function Hero() {
   const { hero } = siteConfig;
   return (
-    <section className={"relative overflow-hidden " + preset.heroBg + " px-4 py-24 text-white sm:px-6 lg:px-8 lg:py-32"}>
+    <section data-analytics-id="hero" data-analytics-type="hero" data-analytics-label="Hero" data-site-section-id="hero" data-site-section-index="-1" data-site-section-type="hero" data-site-section-title="Hero" className={"relative overflow-hidden " + preset.heroBg + " px-4 py-24 text-white sm:px-6 lg:px-8 lg:py-32"}>
       <div className={"absolute inset-0 " + preset.heroOverlay} />
       <div className="relative mx-auto grid max-w-7xl gap-12 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
         <div>
@@ -69,9 +81,9 @@ function Hero() {
 }
 
 // Services section renderer
-function ServicesSection({ section }: { section: SiteSection }) {
+function ServicesSection({ section, sectionIndex }: { section: SiteSection; sectionIndex: number }) {
   return (
-    <section id="services" className={"px-4 py-20 sm:px-6 lg:px-8 " + resolveSectionBackground(section, preset)}>
+    <section id="services" {...SITE_SECTION_DATA_ATTRS(section, sectionIndex)} className={"px-4 py-20 sm:px-6 lg:px-8 " + resolveSectionBackground(section, preset)}>
       <div className="mx-auto max-w-7xl">
         <div className="mx-auto max-w-3xl text-center mb-14">
           <p className={"mb-3 text-xs font-bold uppercase tracking-[0.28em] " + resolveSectionEyebrowClass(section, preset)}>Services</p>
@@ -93,9 +105,9 @@ function ServicesSection({ section }: { section: SiteSection }) {
 }
 
 // About section renderer
-function AboutSection({ section }: { section: SiteSection }) {
+function AboutSection({ section, sectionIndex }: { section: SiteSection; sectionIndex: number }) {
   return (
-    <section id="about" className={"px-4 py-20 sm:px-6 lg:px-8 " + resolveSectionBackground(section, preset)}>
+    <section id="about" {...SITE_SECTION_DATA_ATTRS(section, sectionIndex)} className={"px-4 py-20 sm:px-6 lg:px-8 " + resolveSectionBackground(section, preset)}>
       <div className="mx-auto max-w-7xl">
         <div className="mx-auto max-w-3xl text-center mb-14">
           <p className={"mb-3 text-xs font-bold uppercase tracking-[0.28em] " + resolveSectionEyebrowClass(section, preset)}>About</p>
@@ -116,9 +128,9 @@ function AboutSection({ section }: { section: SiteSection }) {
 }
 
 // Features section renderer
-function FeaturesSection({ section }: { section: SiteSection }) {
+function FeaturesSection({ section, sectionIndex }: { section: SiteSection; sectionIndex: number }) {
   return (
-    <section id="features" className={"px-4 py-20 sm:px-6 lg:px-8 " + resolveSectionBackground(section, preset)}>
+    <section id="features" {...SITE_SECTION_DATA_ATTRS(section, sectionIndex)} className={"px-4 py-20 sm:px-6 lg:px-8 " + resolveSectionBackground(section, preset)}>
       <div className="mx-auto max-w-7xl">
         <div className="mx-auto max-w-3xl text-center mb-14">
           <p className={"mb-3 text-xs font-bold uppercase tracking-[0.28em] " + resolveSectionEyebrowClass(section, preset)}>Features</p>
@@ -139,9 +151,9 @@ function FeaturesSection({ section }: { section: SiteSection }) {
 }
 
 // FAQ section renderer
-function FaqSection({ section }: { section: SiteSection }) {
+function FaqSection({ section, sectionIndex }: { section: SiteSection; sectionIndex: number }) {
   return (
-    <section id="faq" className={"px-4 py-20 sm:px-6 lg:px-8 " + resolveSectionBackground(section, preset)}>
+    <section id="faq" {...SITE_SECTION_DATA_ATTRS(section, sectionIndex)} className={"px-4 py-20 sm:px-6 lg:px-8 " + resolveSectionBackground(section, preset)}>
       <div className="mx-auto max-w-7xl">
         <div className="mx-auto max-w-3xl text-center mb-14">
           <p className={"mb-3 text-xs font-bold uppercase tracking-[0.28em] " + resolveSectionEyebrowClass(section, preset)}>FAQ</p>
@@ -162,9 +174,9 @@ function FaqSection({ section }: { section: SiteSection }) {
 }
 
 // Testimonials section renderer
-function TestimonialsSection({ section }: { section: SiteSection }) {
+function TestimonialsSection({ section, sectionIndex }: { section: SiteSection; sectionIndex: number }) {
   return (
-    <section id="testimonials" className={"px-4 py-20 sm:px-6 lg:px-8 " + resolveSectionBackground(section, preset)}>
+    <section id="testimonials" {...SITE_SECTION_DATA_ATTRS(section, sectionIndex)} className={"px-4 py-20 sm:px-6 lg:px-8 " + resolveSectionBackground(section, preset)}>
       <div className="mx-auto max-w-7xl">
         <div className="mx-auto max-w-3xl text-center mb-14">
           <p className={"mb-3 text-xs font-bold uppercase tracking-[0.28em] " + resolveSectionEyebrowClass(section, preset)}>Testimonials</p>
@@ -185,10 +197,10 @@ function TestimonialsSection({ section }: { section: SiteSection }) {
 }
 
 // Contact section renderer
-function ContactSection({ section }: { section: SiteSection }) {
+function ContactSection({ section, sectionIndex }: { section: SiteSection; sectionIndex: number }) {
   const { contact } = siteConfig;
   return (
-    <section id="contact" className={"px-4 py-20 sm:px-6 lg:px-8 " + resolveSectionBackground(section, preset) + " text-white"}>
+    <section id="contact" {...SITE_SECTION_DATA_ATTRS(section, sectionIndex)} className={"px-4 py-20 sm:px-6 lg:px-8 " + resolveSectionBackground(section, preset) + " text-white"}>
       <div className="mx-auto max-w-7xl">
         <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
           <div>
@@ -219,7 +231,7 @@ function ContactSection({ section }: { section: SiteSection }) {
 }
 
 // Product / project photo gallery
-function GallerySection({ section }: { section: SiteSection }) {
+function GallerySection({ section, sectionIndex }: { section: SiteSection; sectionIndex: number }) {
   const images = (section.items || []).filter((item) => (item as { imageUrl?: string }).imageUrl);
   const count = images.length;
   const gridClass =
@@ -232,7 +244,7 @@ function GallerySection({ section }: { section: SiteSection }) {
           : "grid gap-6 sm:grid-cols-2 lg:grid-cols-3";
 
   return (
-    <section id="gallery" className={"px-4 py-20 sm:px-6 lg:px-8 " + resolveSectionBackground(section, preset)}>
+    <section id="gallery" {...SITE_SECTION_DATA_ATTRS(section, sectionIndex)} className={"px-4 py-20 sm:px-6 lg:px-8 " + resolveSectionBackground(section, preset)}>
       <div className="mx-auto max-w-7xl">
         <div className="mx-auto max-w-3xl text-center mb-12">
           <p className={"mb-3 text-xs font-bold uppercase tracking-[0.28em] " + resolveSectionEyebrowClass(section, preset)}>Gallery</p>
@@ -274,9 +286,9 @@ function GallerySection({ section }: { section: SiteSection }) {
 }
 
 // Generic section renderer (fallback)
-function GenericSection({ section }: { section: SiteSection }) {
+function GenericSection({ section, sectionIndex }: { section: SiteSection; sectionIndex: number }) {
   return (
-    <section id={slugify(section.title)} className={"px-4 py-20 sm:px-6 lg:px-8 " + resolveSectionBackground(section, preset)}>
+    <section id={slugify(section.title)} {...SITE_SECTION_DATA_ATTRS(section, sectionIndex)} className={"px-4 py-20 sm:px-6 lg:px-8 " + resolveSectionBackground(section, preset)}>
       <div className="mx-auto max-w-7xl">
         <div className="mx-auto max-w-3xl text-center mb-14">
           <h2 className={"text-3xl font-semibold tracking-tight md:text-5xl " + resolveSectionTitleClass(section, preset)}>{section.title}</h2>
@@ -316,16 +328,16 @@ function GenericSection({ section }: { section: SiteSection }) {
 }
 
 // Section router
-function SectionRenderer({ section }: { section: SiteSection }) {
+function SectionRenderer({ section, sectionIndex }: { section: SiteSection; sectionIndex: number }) {
   switch (section.type) {
-    case "services": return <ServicesSection section={section} />;
-    case "about": return <AboutSection section={section} />;
-    case "features": return <FeaturesSection section={section} />;
-    case "faq": return <FaqSection section={section} />;
-    case "testimonials": return <TestimonialsSection section={section} />;
-    case "contact": return <ContactSection section={section} />;
-    case "gallery": return <GallerySection section={section} />;
-    default: return <GenericSection section={section} />;
+    case "services": return <ServicesSection section={section} sectionIndex={sectionIndex} />;
+    case "about": return <AboutSection section={section} sectionIndex={sectionIndex} />;
+    case "features": return <FeaturesSection section={section} sectionIndex={sectionIndex} />;
+    case "faq": return <FaqSection section={section} sectionIndex={sectionIndex} />;
+    case "testimonials": return <TestimonialsSection section={section} sectionIndex={sectionIndex} />;
+    case "contact": return <ContactSection section={section} sectionIndex={sectionIndex} />;
+    case "gallery": return <GallerySection section={section} sectionIndex={sectionIndex} />;
+    default: return <GenericSection section={section} sectionIndex={sectionIndex} />;
   }
 }
 
@@ -347,7 +359,7 @@ export default function Home() {
       <Nav />
       <Hero />
       {siteConfig.sections.map((section, index) => (
-        <SectionRenderer key={section.type + "-" + index} section={section} />
+        <SectionRenderer key={section.type + "-" + index} section={section} sectionIndex={index} />
       ))}
       <Footer />
     </main>

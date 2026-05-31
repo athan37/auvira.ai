@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { cn } from '@/lib/cn';
 import { ProjectPreviewChat, type EditCompleteResult } from '@/components/ProjectPreviewChat';
 import { OWNER_COPY } from '@/lib/owner/ownerCopy';
@@ -27,6 +27,14 @@ interface Deployment {
 interface Props {
   projectId: string;
   previewReady: boolean;
+  selectedSection?: import('@/lib/preview/sectionSelectionProtocol').SelectedSection | null;
+  onClearSelectedSection?: () => void;
+  onHistorySectionHover?: (sectionId: string | null) => void;
+  onHistorySectionClick?: (sectionId: string) => void;
+  focusedHistorySectionId?: string | null;
+  focusChatInputKey?: number;
+  isChatDropActive?: boolean;
+  isSectionDragging?: boolean;
   needsSave?: boolean;
   hasGitlab?: boolean;
   gitlabWebUrl?: string | null;
@@ -46,6 +54,14 @@ interface Props {
 export function ProjectEditorSidebar({
   projectId,
   previewReady,
+  selectedSection,
+  onClearSelectedSection,
+  onHistorySectionHover,
+  onHistorySectionClick,
+  focusedHistorySectionId = null,
+  focusChatInputKey = 0,
+  isChatDropActive = false,
+  isSectionDragging = false,
   needsSave,
   hasGitlab,
   gitlabWebUrl,
@@ -62,6 +78,12 @@ export function ProjectEditorSidebar({
 }: Props) {
   const [tab, setTab] = useState<Tab>('chat');
 
+  useEffect(() => {
+    if (focusChatInputKey > 0) {
+      setTab('chat');
+    }
+  }, [focusChatInputKey]);
+
   const tabs: { id: Tab; label: string }[] = [
     { id: 'chat', label: 'Chat' },
     { id: 'changes', label: 'Changes' },
@@ -70,7 +92,13 @@ export function ProjectEditorSidebar({
   ];
 
   return (
-    <div className="flex flex-col h-full min-h-0 relative">
+    <div
+      className={cn(
+        'flex flex-col h-full min-h-0 relative rounded-xl transition-shadow',
+        isSectionDragging && 'ring-2 ring-blue-300 ring-offset-2',
+        isChatDropActive && 'ring-2 ring-blue-500 ring-offset-2 bg-blue-50/40'
+      )}
+    >
       <div
         className="flex border-b border-zinc-200/80 bg-white rounded-t-xl overflow-hidden shrink-0"
         role="tablist"
@@ -119,6 +147,12 @@ export function ProjectEditorSidebar({
             disabled={!previewReady || !hasGitlab}
             previewReady={previewReady}
             legacyProject={!hasGitlab}
+            selectedSection={selectedSection}
+            onClearSelectedSection={onClearSelectedSection}
+            onHistorySectionHover={onHistorySectionHover}
+            onHistorySectionClick={onHistorySectionClick}
+            focusedHistorySectionId={focusedHistorySectionId}
+            focusChatInputKey={focusChatInputKey}
             onEditStart={onEditStart}
             onEditSuccess={onEditSuccess}
             onEditComplete={onEditComplete}

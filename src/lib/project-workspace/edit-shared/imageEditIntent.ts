@@ -143,10 +143,19 @@ export function resolveTargetGalleryForCaptions(
   history?: ConversationTurn[],
   lastGalleryEdit?: LastGalleryEdit | null,
   ownerMessage?: string,
-  editFocusStack?: EditFocusStack | null
+  editFocusStack?: EditFocusStack | null,
+  selectedTarget?: import('./selectedTargetTypes').SelectedTargetInput | null
 ): GalleryCaptionTarget | null {
   const candidates = gallerySectionsFromConfig(siteConfigContent);
   if (candidates.length === 0) return null;
+
+  if (selectedTarget?.kind === 'section' && selectedTarget.sectionType === 'gallery') {
+    const fromSelected =
+      selectedTarget.sectionIndex != null
+        ? candidates.find((c) => c.sectionIndex === selectedTarget.sectionIndex)
+        : undefined;
+    if (fromSelected) return fromSelected;
+  }
 
   if (ownerMessage) {
     const titled = galleryTitleMentionedInMessage(ownerMessage, candidates);

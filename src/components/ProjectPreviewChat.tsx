@@ -8,6 +8,13 @@ import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { cn } from '@/lib/cn';
 import EditErrorTrace from '@/components/project/EditErrorTrace';
+import { SelectedSectionChip } from '@/components/project/SelectedSectionChip';
+import { MessageSelectedSectionBadge } from '@/components/project/MessageSelectedSectionBadge';
+import type { SelectedSection } from '@/lib/preview/sectionSelectionProtocol';
+import {
+  selectedTargetSectionId,
+  type SelectedTargetInput,
+} from '@/lib/project-workspace/edit-shared/selectedTargetTypes';
 import { markEditorVital } from '@/lib/metrics/clientVitals';
 
 import {
@@ -38,6 +45,7 @@ type ChatMessage = {
   role: 'user' | 'assistant';
   content: string;
   imagePreviews?: string[];
+  selectedTarget?: SelectedTargetInput;
   /** Assistant message for a failed edit. */
   isError?: boolean;
   /** Ask-back only — not a hard failure. */
@@ -82,6 +90,12 @@ interface ProjectPreviewChatProps {
   previewReady?: boolean;
   /** Legacy static workspace — chat edits are blocked. */
   legacyProject?: boolean;
+  selectedSection?: SelectedSection | null;
+  onClearSelectedSection?: () => void;
+  onHistorySectionHover?: (sectionId: string | null) => void;
+  onHistorySectionClick?: (sectionId: string) => void;
+  focusedHistorySectionId?: string | null;
+  focusChatInputKey?: number;
   onEditStart?: () => void;
   onEditSuccess?: () => void;
   onEditComplete?: (result: EditCompleteResult) => void;
@@ -247,31 +261,74 @@ function ChevronButton({
   );
 }
 
+function selectedTargetFromSection(section: SelectedSection): SelectedTargetInput {
+  return {
+    kind: section.kind,
+    sectionId: section.sectionId,
+    analyticsId: section.analyticsId,
+    sectionIndex: section.sectionIndex,
+    sectionType: section.sectionType,
+    sectionTitle: section.sectionTitle,
+  };
+}
+
 function ChatMessageBubble({
   msg,
   sending,
   previewReady,
   onApplyPrompt,
+  onHistorySectionHover,
+  onHistorySectionClick,
+  focusedHistorySectionId,
 }: {
   msg: ChatMessage;
   sending: boolean;
   previewReady: boolean;
   onApplyPrompt: (text: string) => void;
+  onHistorySectionHover?: (sectionId: string | null) => void;
+  onHistorySectionClick?: (sectionId: string) => void;
+  focusedHistorySectionId?: string | null;
 }) {
+  const historySectionId = msg.selectedTarget
+    ? selectedTargetSectionId(msg.selectedTarget)
+    : undefined;
+
   return (
     <div className={cn('flex', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
       <div
         className={cn(
-          'max-w-[85%] rounded-lg px-3 py-2 text-sm',
-          msg.role === 'user'
-            ? 'bg-zinc-950 text-white'
-            : msg.isClarification
-              ? 'bg-sky-50 border border-sky-200 text-sky-950 shadow-sm'
-              : msg.isError
-                ? 'bg-red-50 border border-red-200 text-red-900 shadow-sm'
-                : 'bg-white border border-zinc-200 text-zinc-800 shadow-sm'
+          'flex max-w-[85%] flex-col gap-1',
+          msg.role === 'user' ? 'items-end' : 'items-start'
         )}
       >
+        {msg.role === 'user' && msg.selectedTarget ? (
+          <MessageSelectedSectionBadge
+            target={msg.selectedTarget}
+            interactive={Boolean(
+              previewReady && historySectionId && (onHistorySectionHover || onHistorySectionClick)
+            )}
+            active={Boolean(historySectionId && historySectionId === focusedHistorySectionId)}
+            onHoverStart={() => onHistorySectionHover?.(historySectionId ?? null)}
+            onHoverEnd={() => onHistorySectionHover?.(null)}
+            onClick={
+              historySectionId && onHistorySectionClick
+                ? () => onHistorySectionClick(historySectionId)
+                : undefined
+            }
+          />
+        ) : null}
+        <div
+          className={cn(
+            'rounded-lg px-3 py-2 text-sm w-full',
+            msg.role === 'user'
+              ? 'bg-zinc-950 text-white'
+              : msg.isClarification
+                ? 'bg-sky-50 border border-sky-200 text-sky-950 shadow-sm'
+                : msg.isError
+                  ? 'bg-red-50 border border-red-200 text-red-900 shadow-sm'
+                  : 'bg-white border border-zinc-200 text-zinc-800 shadow-sm'
+          )}
+        >
         {msg.isClarification && (
           <p className="text-xs font-semibold uppercase tracking-wide text-sky-800 mb-1">
             Quick question
@@ -313,6 +370,7 @@ function ChatMessageBubble({
             ))}
           </div>
         )}
+        </div>
       </div>
     </div>
   );
@@ -378,6 +436,12 @@ export function ProjectPreviewChat({
   disabled,
   previewReady = true,
   legacyProject = false,
+  selectedSection = null,
+  onClearSelectedSection,
+  onHistorySectionHover,
+  onHistorySectionClick,
+  focusedHistorySectionId = null,
+  focusChatInputKey = 0,
   onEditStart,
   onEditSuccess,
   onEditComplete,
@@ -395,8 +459,16 @@ export function ProjectPreviewChat({
   const manualStepNavRef = useRef(false);
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const chipAnchorRef = useRef<HTMLDivElement>(null);
+  const chatInputId = `project-chat-input-${projectId}`;
 
   const inputDisabled = disabled || !previewReady || sending;
+
+  useEffect(() => {
+    if (focusChatInputKey <= 0) return;
+    chipAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    document.getElementById(chatInputId)?.focus();
+  }, [focusChatInputKey, chatInputId]);
 
   useEffect(() => {
     return () => {
@@ -527,6 +599,7 @@ export function ProjectPreviewChat({
     setSending(true);
     setUploadError(null);
     onEditStart?.();
+    const pinnedTarget = selectedSection ? selectedTargetFromSection(selectedSection) : undefined;
     setMessages((prev) => [
       ...prev,
       {
@@ -534,6 +607,7 @@ export function ProjectPreviewChat({
         role: 'user',
         content: userMsg,
         imagePreviews: pendingImages.map((img) => img.previewUrl),
+        ...(pinnedTarget ? { selectedTarget: pinnedTarget } : {}),
       },
     ]);
     setShowSteps(true);
@@ -582,6 +656,7 @@ export function ProjectPreviewChat({
             message: userMsg,
             attachments,
             clientMessageId: requestClientMessageId,
+            ...(pinnedTarget ? { selectedTarget: pinnedTarget } : {}),
           }),
           signal: AbortSignal.timeout(300000),
         });
@@ -751,10 +826,20 @@ export function ProjectPreviewChat({
           sending={sending}
           previewReady={previewReady}
           onApplyPrompt={applyPrompt}
+          onHistorySectionHover={onHistorySectionHover}
+          onHistorySectionClick={onHistorySectionClick}
+          focusedHistorySectionId={focusedHistorySectionId}
         />
       </div>
     ),
-    [applyPrompt, previewReady, sending]
+    [
+      applyPrompt,
+      focusedHistorySectionId,
+      onHistorySectionClick,
+      onHistorySectionHover,
+      previewReady,
+      sending,
+    ]
   );
 
   const stepsFailed = agentSteps.some((s) => s.status === 'failed');
@@ -863,6 +948,20 @@ export function ProjectPreviewChat({
         </div>
 
         <form onSubmit={handleSubmit} className="p-3 border-t border-zinc-200/80 shrink-0 space-y-2">
+          <div ref={chipAnchorRef}>
+            {selectedSection && onClearSelectedSection ? (
+              <>
+                <SelectedSectionChip
+                  selection={selectedSection}
+                  onClear={onClearSelectedSection}
+                  pulseKey={focusChatInputKey}
+                />
+                <p className="text-[10px] text-zinc-500 mb-2">
+                  Type your edit below — e.g. make it red
+                </p>
+              </>
+            ) : null}
+          </div>
           {pendingImages.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {pendingImages.map((img) => (
@@ -908,6 +1007,7 @@ export function ProjectPreviewChat({
               <ImageAttachIcon className="h-5 w-5" />
             </Button>
             <Input
+              id={chatInputId}
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}

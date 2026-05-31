@@ -4,6 +4,7 @@ import { resolveSectionWithCatalogLLM } from '@/lib/project-workspace/edit-share
 import type { ConversationTurn } from '@/lib/project-workspace/edit-shared/editAmbiguity';
 import { resolveDeicticTargetFromFocus } from '@/lib/project-workspace/edit-shared/resolveEditFocus';
 import type { EditFocusStack } from '@/lib/project-workspace/edit-shared/types';
+import type { SelectedTargetInput } from '@/lib/project-workspace/edit-shared/selectedTargetTypes';
 import {
   extractExplicitSectionTitleIntent,
   extractSectionTitleCandidates,
@@ -18,6 +19,7 @@ import {
 } from '@/lib/project-workspace/edit-shared/siteSectionCatalog';
 import type { SiteModel } from '@/lib/project-workspace/site-model/types';
 import type { EditTarget, EditTargetCandidate, EditTargetKind } from './types';
+import { resolveSelectedTarget } from './resolveSelectedTarget';
 
 function toCandidate(
   kind: EditTargetKind,
@@ -92,9 +94,10 @@ export function resolveEditTarget(
   siteModel: SiteModel,
   catalog: SiteSectionCatalog,
   history: ConversationTurn[] = [],
-  editFocusStack?: EditFocusStack | null
+  editFocusStack?: EditFocusStack | null,
+  selectedTarget?: SelectedTargetInput
 ): EditTarget {
-  return resolveEditTargetSync(message, siteModel, catalog, history, editFocusStack);
+  return resolveEditTargetSync(message, siteModel, catalog, history, editFocusStack, selectedTarget);
 }
 
 /** Sync resolver (no LLM). Prefer {@link resolveEditTargetAsync} for V3 planning. */
@@ -103,9 +106,16 @@ export function resolveEditTargetSync(
   siteModel: SiteModel,
   catalog: SiteSectionCatalog,
   history: ConversationTurn[] = [],
-  editFocusStack?: EditFocusStack | null
+  editFocusStack?: EditFocusStack | null,
+  selectedTarget?: SelectedTargetInput
 ): EditTarget {
-  const effectiveMessage = resolveEffectiveEditMessage(message, history, editFocusStack);
+  const siteConfigContent = siteModel.siteConfigContent ?? '';
+  const fromSelection = resolveSelectedTarget(selectedTarget, catalog, siteConfigContent);
+  if (fromSelection) {
+    return fromSelection;
+  }
+
+  const effectiveMessage = resolveEffectiveEditMessage(message, history, editFocusStack, selectedTarget);
   const lower = effectiveMessage.toLowerCase();
 
   if (/\b(hero|headline|tagline|subheadline)\b/i.test(lower) && !/\bsection\b/i.test(lower)) {
@@ -284,12 +294,16 @@ export async function resolveEditTargetAsync(
   siteModel: SiteModel,
   catalog: SiteSectionCatalog,
   history: ConversationTurn[] = [],
-  editFocusStack?: EditFocusStack | null
+  editFocusStack?: EditFocusStack | null,
+  selectedTarget?: SelectedTargetInput
 ): Promise<EditTarget> {
-  const target = resolveEditTarget(message, siteModel, catalog, history, editFocusStack);
-  const effectiveMessage = resolveEffectiveEditMessage(message, history, editFocusStack);
+  const target = resolveEditTarget(message, siteModel, catalog, history, editFocusStack, selectedTarget);
+  const effectiveMessage = resolveEffectiveEditMessage(message, history, editFocusStack, selectedTarget);
 
   if (target.needsClarification) {
+    if (selectedTarget) {
+      return target;
+    }
     const fromFocus = resolveDeicticTargetFromFocus(message, editFocusStack, catalog);
     if (fromFocus && !fromFocus.needsClarification) {
       return fromFocus;

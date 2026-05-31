@@ -1,5 +1,6 @@
 import type { WorkspaceAssetAttachment } from '@/lib/project-workspace/workspaceAssetTypes';
 import type { EditFocusStack } from '@/lib/project-workspace/edit-shared/types';
+import type { SelectedTargetInput } from '@/lib/project-workspace/edit-shared/selectedTargetTypes';
 
 export type ProjectChatOutcome = 'success' | 'clarification' | 'failure';
 export type ArizeSyncStatus = 'pending' | 'synced' | 'failed';
@@ -47,6 +48,8 @@ export interface ProjectMessageMetadata {
     imageCount: number;
   };
   editFocusStack?: EditFocusStack;
+  /** Preview section pinned when the user sent this message (drag-to-chat). */
+  selectedTarget?: SelectedTargetInput;
 }
 
 export interface ChatApiMessage {
@@ -61,6 +64,7 @@ export interface ChatApiMessage {
   errorTrace?: string;
   errorStage?: string;
   errorJobId?: string;
+  selectedTarget?: SelectedTargetInput;
 }
 
 export function normalizeAttachmentRefs(
@@ -98,5 +102,6 @@ export function mapMessageForApi(args: {
     errorTrace: metadata?.errorTraceExcerpt,
     errorStage: metadata?.errorStage,
     errorJobId: metadata?.editJobId,
+    selectedTarget: metadata?.selectedTarget,
   };
 }

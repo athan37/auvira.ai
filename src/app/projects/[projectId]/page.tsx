@@ -17,6 +17,12 @@ import { Badge, statusToBadgeTone } from '@/components/ui/Badge';
 import { Alert } from '@/components/ui/Alert';
 import { Spinner } from '@/components/ui/Spinner';
 import { projectSupportsV3Edits } from '@/lib/project-workspace/requireGitLabProject';
+import { SectionDragGhost } from '@/components/project/SectionDragGhost';
+import {
+  selectedSectionFromPayload,
+  type SelectedSection,
+  type SiteSectionContextPayload,
+} from '@/lib/preview/sectionSelectionProtocol';
 
 interface Deployment {
   provider: string;
@@ -70,8 +76,22 @@ export default function ProjectPage() {
   const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
   const [previewReady, setPreviewReady] = useState(false);
   const [editInProgress, setEditInProgress] = useState(false);
+  const [selectedSection, setSelectedSection] = useState<SelectedSection | null>(null);
+  const [historyHoverSectionId, setHistoryHoverSectionId] = useState<string | null>(null);
+  const [focusedHistorySectionId, setFocusedHistorySectionId] = useState<string | null>(null);
+  const [historyFocusNonce, setHistoryFocusNonce] = useState(0);
+  const [sectionToast, setSectionToast] = useState<string | null>(null);
+  const [focusChatInputKey, setFocusChatInputKey] = useState(0);
   const [scratchWarning, setScratchWarning] = useState<string | null>(null);
   const previewReloadCancelRef = useRef<(() => void) | null>(null);
+  const chatDropZoneRef = useRef<HTMLDivElement>(null);
+  const sectionDragPayloadRef = useRef<SiteSectionContextPayload | null>(null);
+  const [sectionDrag, setSectionDrag] = useState<{
+    payload: SiteSectionContextPayload;
+    x: number;
+    y: number;
+  } | null>(null);
+  const [isChatDropActive, setIsChatDropActive] = useState(false);
 
   useEffect(() => {
     try {
@@ -110,6 +130,75 @@ export default function ProjectPage() {
       return null;
     }
   }, [projectId]);
+
+  const handleClearSelection = useCallback(() => {
+    setSelectedSection(null);
+  }, []);
+
+  const handleHistorySectionClick = useCallback((sectionId: string) => {
+    setFocusedHistorySectionId(sectionId);
+    setHistoryFocusNonce((n) => n + 1);
+  }, []);
+
+  const handleSelectedSectionChange = useCallback((section: SelectedSection | null) => {
+    setSelectedSection(section);
+    if (section) {
+      const label =
+        section.kind === 'hero'
+          ? 'Hero'
+          : section.sectionTitle?.trim() || section.sectionType;
+      setSectionToast(`Added "${label}" to chat`);
+      setFocusChatInputKey((k) => k + 1);
+    }
+  }, []);
+
+  const isPointInChatDropZone = useCallback((clientX: number, clientY: number) => {
+    const dropEl = chatDropZoneRef.current;
+    if (!dropEl) return false;
+    const rect = dropEl.getBoundingClientRect();
+    return (
+      clientX >= rect.left &&
+      clientX <= rect.right &&
+      clientY >= rect.top &&
+      clientY <= rect.bottom
+    );
+  }, []);
+
+  const finishSectionDrag = useCallback(
+    (clientX: number, clientY: number) => {
+      const payloadToDrop = sectionDragPayloadRef.current;
+      if (payloadToDrop && isPointInChatDropZone(clientX, clientY)) {
+        handleSelectedSectionChange(selectedSectionFromPayload(payloadToDrop));
+      }
+      sectionDragPayloadRef.current = null;
+      setSectionDrag(null);
+      setIsChatDropActive(false);
+    },
+    [handleSelectedSectionChange, isPointInChatDropZone]
+  );
+
+  const handleSectionDragStart = useCallback(
+    (payload: SiteSectionContextPayload, screenX: number, screenY: number) => {
+      sectionDragPayloadRef.current = payload;
+      setSectionDrag({ payload, x: screenX, y: screenY });
+      setIsChatDropActive(isPointInChatDropZone(screenX, screenY));
+    },
+    [isPointInChatDropZone]
+  );
+
+  const handleSectionDragMove = useCallback(
+    (clientX: number, clientY: number) => {
+      setSectionDrag((prev) => (prev ? { ...prev, x: clientX, y: clientY } : null));
+      setIsChatDropActive(isPointInChatDropZone(clientX, clientY));
+    },
+    [isPointInChatDropZone]
+  );
+
+  useEffect(() => {
+    if (!sectionToast) return;
+    const timer = setTimeout(() => setSectionToast(null), 3500);
+    return () => clearTimeout(timer);
+  }, [sectionToast]);
 
   const handlePreviewReadyChange = useCallback((ready: boolean) => {
     setPreviewReady(ready);
@@ -195,6 +284,23 @@ export default function ProjectPage() {
           <Alert variant="warning">{scratchWarning}</Alert>
         </div>
       )}
+      {sectionToast && (
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 px-4 py-2 rounded-lg bg-zinc-900 text-white text-sm shadow-lg">
+          {sectionToast}
+        </div>
+      )}
+      {sectionDrag && (
+        <>
+          <SectionDragGhost payload={sectionDrag.payload} x={sectionDrag.x} y={sectionDrag.y} />
+          {/* Capture pointer after iframe drag starts — parent window misses iframe mouse events */}
+          <div
+            className="fixed inset-0 z-[99] cursor-grabbing select-none"
+            aria-hidden
+            onMouseMove={(event) => handleSectionDragMove(event.clientX, event.clientY)}
+            onMouseUp={(event) => finishSectionDrag(event.clientX, event.clientY)}
+          />
+        </>
+      )}
       <div className="flex flex-col lg:flex-row flex-1 min-h-0 h-[calc(100vh-3.5rem)] p-3 lg:p-4 gap-3 lg:gap-4">
         <div className="flex-1 min-h-[320px] lg:min-h-0 min-w-0 flex flex-col">
           <ProjectPreviewFrame
@@ -203,13 +309,44 @@ export default function ProjectPage() {
             previewRefreshKey={previewRefreshKey}
             editInProgress={editInProgress}
             onReadyChange={handlePreviewReadyChange}
+            selectedSection={selectedSection}
+            hoverSectionId={historyHoverSectionId}
+            focusSectionId={focusedHistorySectionId}
+            focusSectionNonce={historyFocusNonce}
+            onSelectedSectionChange={handleSelectedSectionChange}
+            onSectionDragStart={handleSectionDragStart}
           />
         </div>
 
-        <div className="w-full lg:w-[380px] xl:w-[420px] shrink-0 min-h-[400px] lg:min-h-0 flex flex-col">
+        <div
+          ref={chatDropZoneRef}
+          className="w-full lg:w-[380px] xl:w-[420px] shrink-0 min-h-[400px] lg:min-h-0 flex flex-col relative"
+        >
+          {sectionDrag && (
+            <div
+              className={`pointer-events-none absolute inset-0 z-10 rounded-xl border-2 border-dashed transition-colors ${
+                isChatDropActive ? 'border-blue-500 bg-blue-50/60' : 'border-blue-300/80 bg-blue-50/20'
+              }`}
+              aria-hidden
+            >
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="rounded-lg bg-white/90 px-3 py-1.5 text-sm font-medium text-blue-700 shadow-sm">
+                  {isChatDropActive ? 'Release to add to chat' : 'Drop here'}
+                </span>
+              </div>
+            </div>
+          )}
           <ProjectEditorSidebar
             projectId={projectId}
             previewReady={previewReady}
+            selectedSection={selectedSection}
+            onClearSelectedSection={handleClearSelection}
+            onHistorySectionHover={setHistoryHoverSectionId}
+            onHistorySectionClick={handleHistorySectionClick}
+            focusedHistorySectionId={focusedHistorySectionId}
+            focusChatInputKey={focusChatInputKey}
+            isChatDropActive={isChatDropActive}
+            isSectionDragging={sectionDrag !== null}
             needsSave={project.needsSave ?? project.hasUnpublishedChanges}
             hasGitlab={projectSupportsV3Edits(project)}
             gitlabWebUrl={project.gitlab?.webUrl || project.gitlab?.repoUrl}

@@ -49,6 +49,25 @@ describe('projectChatService', () => {
     expect(payload.metadata.attachments).toHaveLength(1);
   });
 
+  it('appendUserMessage stores selectedTarget in metadata', async () => {
+    const svc = await import('../../src/lib/chat/projectChatService');
+    await svc.appendUserMessage({
+      projectId: '665f4ec12f1fe71c6527f2df',
+      content: 'Make this section red.',
+      selectedTarget: {
+        kind: 'section',
+        sectionId: 'section_services_services_1',
+        sectionIndex: 1,
+        sectionType: 'services',
+        sectionTitle: 'Services',
+      },
+    });
+
+    const payload = createMock.mock.calls[0]?.[0];
+    expect(payload.metadata.selectedTarget?.sectionId).toBe('section_services_services_1');
+    expect(payload.metadata.selectedTarget?.sectionTitle).toBe('Services');
+  });
+
   it('appendAssistantMessage defaults arize sync status', async () => {
     const svc = await import('../../src/lib/chat/projectChatService');
     await svc.appendAssistantMessage({

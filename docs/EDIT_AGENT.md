@@ -41,6 +41,18 @@ Each successful edit pushes an `EditFocus` item onto `editFocusStack` in assista
 
 Load path: `resolveEditFocusFromProject()` in stream route → `WebsiteEditAgentOptions.editFocusStack`.
 
+## Preview section selection (UI pin)
+
+Click-to-select in the **editable preview** (proxy mode only) sends `selectedTarget` on each edit POST. Target resolution priority:
+
+1. `selectedTarget` from preview (UI pin)
+2. Explicit section title/number in the current message
+3. `editFocusStack` / deictic ("that section")
+4. Section catalog + LLM fallback
+5. Clarification
+
+Contract: `src/lib/project-workspace/edit-shared/selectedTargetTypes.ts` → `resolveSelectedTarget()` in `edit-context/`. Persisted on user chat messages as `metadata.selectedTarget` for traceability. Live/cross-origin preview disables selection mode.
+
 ## LangGraph — defer unless
 
 | Signal | Action |

@@ -1,3 +1,5 @@
+import { injectPreviewSectionSelection } from '@/lib/preview/injectPreviewSectionSelection';
+
 const PREVIEW_REWRITE_CONTENT_TYPES = [
   'text/html',
   'text/css',
@@ -20,6 +22,7 @@ function shouldSkipPath(path: string, proxyBase: string): boolean {
     path.startsWith('tel:') ||
     path.startsWith('data:') ||
     path.startsWith('blob:') ||
+    path.startsWith('/api/projects/') ||
     path.startsWith(proxyBase)
   );
 }
@@ -92,10 +95,16 @@ export function rewritePreviewResponseBody(
 
   const text = body.toString('utf8');
   let rewritten = rewritePreviewAssetPaths(text, projectId);
+  let didRewrite = rewritten !== text;
+
   if (contentType.includes('text/html')) {
+    const beforeInject = rewritten;
     rewritten = injectPreviewChunkErrorRecovery(rewritten);
+    rewritten = injectPreviewSectionSelection(rewritten, projectId);
+    didRewrite = didRewrite || rewritten !== beforeInject;
   }
-  if (rewritten === text) {
+
+  if (!didRewrite) {
     return { body, rewritten: false, contentType };
   }
 

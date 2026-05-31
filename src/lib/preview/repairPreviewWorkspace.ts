@@ -1,5 +1,6 @@
 import { promises as fs } from 'fs';
 import path from 'path';
+import { instrumentGeneratedSite } from '@/lib/analytics/generated-sites/instrumentGeneratedSite';
 import { repairPageTsxStructure } from '@/lib/project-workspace/repairPageTsxStructure';
 import { repairSiteConfigTypesInWorkspace } from '@/lib/preview/repairSiteConfigTypes';
 import { repairSectionPresentationWiringInWorkspace } from '@/lib/project-workspace/edit-shared/legacySectionPresentation';
@@ -23,6 +24,12 @@ export async function repairPreviewWorkspace(workspacePath: string): Promise<voi
     }
   } catch {
     /* optional */
+  }
+
+  try {
+    await instrumentGeneratedSite({ workspacePath });
+  } catch {
+    /* analytics / section attrs optional for preview */
   }
 }
 

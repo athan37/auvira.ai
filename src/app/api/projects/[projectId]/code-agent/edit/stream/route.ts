@@ -14,6 +14,7 @@ import {
 } from '@/lib/project-workspace/requireGitLabProject';
 import { WebsiteProject } from '@/models/WebsiteProject';
 import { runWebsiteEdit } from '@/lib/project-workspace/websiteEditRunner';
+import { normalizeSelectedTarget } from '@/lib/project-workspace/edit-shared/selectedTargetTypes';
 import { resolveWorkspaceForEdit } from '@/lib/project-workspace/resolveWorkspaceGateway';
 import { type WorkspaceGateway } from '@/lib/project-workspace/workspaceGateway';
 import { validateSandboxWorkspace } from '@/lib/sandbox/validateSandboxWorkspace';
@@ -133,10 +134,12 @@ export async function POST(
   }
 
   const body = await request.json();
-  const { message, attachments: rawAttachments, clientMessageId } = body;
+  const { message, attachments: rawAttachments, clientMessageId, selectedTarget: rawSelectedTarget } = body;
   if (!message || typeof message !== 'string') {
     return NextResponse.json({ detail: 'message is required' }, { status: 400 });
   }
+
+  const selectedTarget = normalizeSelectedTarget(rawSelectedTarget);
 
   const attachments: WorkspaceAssetAttachment[] = Array.isArray(rawAttachments)
     ? rawAttachments
@@ -325,6 +328,7 @@ export async function POST(
           content: message,
           attachments,
           clientMessageId: typeof clientMessageId === 'string' ? clientMessageId : undefined,
+          selectedTarget,
         });
         conversationHistory = await buildConversationHistory({
           projectId: project._id,
@@ -392,6 +396,7 @@ export async function POST(
             conversationHistory,
             lastGalleryEdit: lastGalleryEdit ?? undefined,
             editFocusStack,
+            selectedTarget,
             editJobId: jobId,
             infraStatus: project.infraStatus,
             infraVersion: project.infraVersion,

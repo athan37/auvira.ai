@@ -85,3 +85,30 @@ npm run test:all                # final gate before merge/push
 | Synthetic test harness | `tests/support/syntheticSiteWorkspace.ts`, `tests/support/sectionColorEditContract.ts`, `tests/support/llmEditScenario.ts` |
 | LLM edit-error suites | `tests/edit-agent/copyEdit.llm.test.ts`, `structuralEdit.llm.test.ts`, `plannerGuards.llm.test.ts`, `reportAccuracy.llm.test.ts` |
 | LLM test gate | `tests/llmTestGate.ts` |
+
+## Preview section drag-to-chat
+
+Users pin a section target by **dragging a section from the editable preview iframe onto the chat sidebar**. The pinned section is sent as `selectedTarget` on each edit POST (see `docs/EDIT_AGENT.md`).
+
+| Area | Path |
+|------|------|
+| Bridge script (served externally) | `src/lib/preview/sectionBridgeScript.ts` |
+| Proxy HTML injection | `src/lib/preview/injectPreviewSectionSelection.ts`, `src/lib/project-workspace/previewProxyRewrite.ts` |
+| Parent drag overlay + drop zone | `src/app/projects/[projectId]/page.tsx` |
+| postMessage protocol | `src/lib/preview/sectionSelectionProtocol.ts` |
+| Section DOM attrs on generated sites | `src/lib/builder/siteSectionDomAttrs.ts`, `src/lib/analytics/generated-sites/injectAnalyticsRuntime.ts` |
+
+**Editable preview only** — `previewMode === 'live'` loads the published site directly with no proxy injection; drag is disabled by design.
+
+### Problems fixed (why drag initially failed)
+
+1. **Gzip HTML skipped injection** — The workspace preview proxy received compressed HTML, so `injectPreviewSectionSelection` could not find `</head>`. Fix: request `Accept-Encoding: identity` in `previewProxyHandler.ts` and track injection as a rewrite even when asset paths are unchanged.
+2. **Inline script blocked by CSP** — Inline bridge scripts were blocked in some preview contexts. Fix: serve the bridge from `/api/projects/[projectId]/preview/section-bridge` and inject a `<script src="…">` tag (versioned query param busts cache).
+3. **Cross-iframe mouse events** — After mousedown inside the iframe, the parent window did not reliably receive `mousemove`/`mouseup`. Fix: on `SITE_SECTION_DRAG_START`, show a full-screen capture overlay in `page.tsx` that tracks pointer until drop.
+4. **Missing section attrs on legacy workspaces** — Older clones lacked `data-site-section-id`. Fix: bridge falls back to any `<section>` / known `id`, and workspace repair runs `instrumentGeneratedSite` to add attrs.
+
+After bridge changes, **hard-refresh the preview** (toolbar refresh) so proxied HTML picks up the new `section-bridge?v=` version.
+
+### Chat history persistence
+
+When a user sends a message with a dragged section pinned, `metadata.selectedTarget` is stored on the user `ProjectMessage` document (same shape as the edit POST body). The chat UI renders a read-only section badge **above** that user message so edits can be traced later.

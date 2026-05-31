@@ -6,6 +6,7 @@ import { isGalleryDescriptionRequest } from '@/lib/project-workspace/edit-shared
 import type { EditContext } from '@/lib/project-workspace/edit-context/types';
 import { formatStructureMap } from '@/lib/project-workspace/edit-shared/resolveSectionTarget';
 import { resolveDuplicateCopyTarget } from '@/lib/project-workspace/edit-context/resolveDuplicateCopyTarget';
+import { formatSelectedTargetForMessage } from '@/lib/project-workspace/edit-context/resolveSelectedTarget';
 import { EDIT_SKILL_NAMES } from './editPlan.schema';
 
 const PLANNER_SYSTEM = `You are Website Edit Agent planner for small business sites (siteConfig.ts + section-loop page.tsx).
@@ -84,12 +85,15 @@ export function buildPlanEditUserPrompt(editContext: EditContext, userPrompt: st
       ? `Gallery context: owner likely means section [${galleryImageSections[0].index}] "${galleryImageSections[0].title}" (${galleryImageSections[0].itemCount} item(s)). Do not ask which images — add item descriptions in siteConfig.\n\n`
       : '';
 
+  const pinnedTarget = editContext.selectedTarget
+    ? `UI-SELECTED TARGET (pinned): ${formatSelectedTargetForMessage(editContext.selectedTarget)}\n\n`
+    : '';
+
   return `Business: ${siteModel.parsedConfig?.businessName ?? '(unknown)'}
 Archetype: ${siteModel.archetype}
 Risk: ${riskFlags.level} (${riskFlags.reasons.join('; ') || 'none'})
 
-${duplicateBlock}${galleryHint}${historyBlock}
-${resolvedTarget}
+${duplicateBlock}${galleryHint}${historyBlock}${pinnedTarget}${resolvedTarget}
 
 Sections:
 ${sectionSummaries || '(none)'}

@@ -46,6 +46,7 @@ export async function runWebsiteEditAgent(
     gateway: options.gateway,
     infraBaselineReady: options.infraBaselineReady,
     editFocusStack: options.editFocusStack,
+    selectedTarget: options.selectedTarget,
   });
 
   emitStep(onStep, 'v3_context', 'Understanding your site', 'completed');
