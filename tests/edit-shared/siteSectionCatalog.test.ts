@@ -121,6 +121,15 @@ describe('siteSectionCatalog', () => {
     expect(result?.sectionIndex).not.toBe(2);
   });
 
+  it('resolves quoted section title phrasing with "section" suffix', () => {
+    const result = matchSectionFromMessage(
+      'change color of the "Everything You Need to Grow Your Business" section to blue to gray gradient',
+      catalog
+    );
+    expect(result?.confidence).toBe('high');
+    expect(result?.sectionIndex).toBe(0);
+  });
+
   it('stripColorWordsFromMessage removes gradient filler tokens', () => {
     const stripped = stripColorWordsFromMessage(
       'change this section background to color gradient Everything You Need to Grow Your Business'

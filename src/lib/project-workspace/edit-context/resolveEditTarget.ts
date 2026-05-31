@@ -11,6 +11,7 @@ import {
 } from '@/lib/project-workspace/edit-shared/resolveSectionTarget';
 import {
   matchSectionFromMessage,
+  findSectionsContainingPhrase,
   type SiteSectionCatalog,
 } from '@/lib/project-workspace/edit-shared/siteSectionCatalog';
 import type { SiteModel } from '@/lib/project-workspace/site-model/types';
@@ -53,7 +54,8 @@ function readHeroHeadline(siteConfigContent: string): string | undefined {
 /** Style edits quoting the hero headline (often labeled "section" by owners) → hero target. */
 function heroStyleTargetFromQuotedHeadline(
   effectiveMessage: string,
-  siteModel: SiteModel
+  siteModel: SiteModel,
+  catalog: SiteSectionCatalog
 ): EditTarget | null {
   const what = classifyEditWhat(effectiveMessage);
   if (what !== 'style_background' && what !== 'style_text' && what !== 'style_card') {
@@ -68,6 +70,14 @@ function heroStyleTargetFromQuotedHeadline(
     (title) => title.trim() === headline || scoreTitleMatch(headline, title) >= 85
   );
   if (!matchesHeadline) return null;
+
+  // Section title beats hero when the quoted phrase lives in a content section.
+  for (const title of quotedTitles) {
+    const sectionHits = findSectionsContainingPhrase(title, catalog);
+    if (sectionHits.some((s) => scoreTitleMatch(s.title, title) >= 85)) {
+      return null;
+    }
+  }
 
   return heroTarget('high', `Quoted title matches hero headline "${headline}"`);
 }
@@ -98,21 +108,6 @@ export function resolveEditTargetSync(
     return heroTarget('high', 'Hero keyword match');
   }
 
-  const heroFromQuotedHeadline = heroStyleTargetFromQuotedHeadline(effectiveMessage, siteModel);
-  if (heroFromQuotedHeadline) {
-    return heroFromQuotedHeadline;
-  }
-
-  if (/\b(phone|email|address)\b/i.test(lower) && /\b(contact|call|reach)\b/i.test(lower)) {
-    return {
-      kind: 'site',
-      confidence: 'high',
-      candidates: [toCandidate('site', undefined, undefined, undefined, 'high', 'Contact field edit')],
-      needsClarification: false,
-      reason: 'Contact field edit',
-    };
-  }
-
   const titleCandidates = extractSectionTitleCandidates(effectiveMessage);
   const hasQuotedTitle = titleCandidates.length > 0;
 
@@ -137,6 +132,25 @@ export function resolveEditTargetSync(
       ],
       needsClarification: false,
       reason: catalogMatch.reason,
+    };
+  }
+
+  const heroFromQuotedHeadline = heroStyleTargetFromQuotedHeadline(
+    effectiveMessage,
+    siteModel,
+    catalog
+  );
+  if (heroFromQuotedHeadline) {
+    return heroFromQuotedHeadline;
+  }
+
+  if (/\b(phone|email|address)\b/i.test(lower) && /\b(contact|call|reach)\b/i.test(lower)) {
+    return {
+      kind: 'site',
+      confidence: 'high',
+      candidates: [toCandidate('site', undefined, undefined, undefined, 'high', 'Contact field edit')],
+      needsClarification: false,
+      reason: 'Contact field edit',
     };
   }
 
@@ -254,7 +268,7 @@ function styleEditNeedsSectionTarget(message: string): boolean {
 }
 
 /**
- * Resolve edit target with optional catalog LLM when deterministic matching fails (SECTION_TARGET_LLM=1).
+ * Resolve edit target with catalog LLM fallback for style edits (disable with SECTION_TARGET_LLM=0).
  */
 export async function resolveEditTargetAsync(
   message: string,
@@ -269,13 +283,22 @@ export async function resolveEditTargetAsync(
     return target;
   }
 
-  if (target.kind === 'hero' || target.kind === 'nav' || target.kind === 'footer') {
+  if (target.kind === 'nav' || target.kind === 'footer') {
     return target;
   }
 
+  const phraseHints = extractSectionTitleCandidates(effectiveMessage).filter(
+    (p) => p.trim().length >= 8
+  );
+  const phraseLocated =
+    phraseHints.length > 0 &&
+    phraseHints.some((phrase) => findSectionsContainingPhrase(phrase, catalog).length === 1);
+
   const needsLlm =
     styleEditNeedsSectionTarget(effectiveMessage) &&
-    (target.kind !== 'section' ||
+    !phraseLocated &&
+    (target.kind === 'hero' ||
+      target.kind !== 'section' ||
       target.sectionIndex == null ||
       target.confidence !== 'high');
 
@@ -291,6 +314,13 @@ export async function resolveEditTargetAsync(
   const section = catalog.sections.find((s) => s.index === llmPick.sectionIndex);
   if (!section) {
     return target;
+  }
+
+  for (const phrase of phraseHints) {
+    const hits = findSectionsContainingPhrase(phrase, catalog);
+    if (hits.length === 1 && hits[0]!.index !== llmPick.sectionIndex) {
+      return target;
+    }
   }
 
   const titledIntent = extractExplicitSectionTitleIntent(effectiveMessage);

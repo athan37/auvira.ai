@@ -12,6 +12,7 @@ import {
   type EnrichedSectionSummary,
   type EnrichedSiteStructureSnapshot,
 } from './resolveSectionTarget';
+import { parseSiteConfigSource } from '@/lib/site-manager/siteConfigParser';
 import type { SectionMatchCandidate, SectionTargetResult } from './types';
 
 /** Canonical section list built once per edit and attached to all prompt paths. */
@@ -22,6 +23,8 @@ export interface SiteSectionCatalog {
   /** Numbered titles for clarification UI, e.g. "1 — Get Started Today". */
   numberedReplies: string[];
   snapshot: EnrichedSiteStructureSnapshot;
+  /** Raw siteConfig source used to enrich section body previews for LLM prompts. */
+  siteConfigContent?: string;
 }
 
 const ORDINAL_PATTERNS: Array<{ pattern: RegExp; index: (n: number) => number }> = [
@@ -139,14 +142,85 @@ function buildClarificationFromCatalog(catalog: SiteSectionCatalog): Pick<
   };
 }
 
+const MIN_PHRASE_SEARCH_LEN = 8;
+
+function normalizePhraseForSearch(phrase: string): string {
+  return phrase.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+/** Find sections whose title/body/items or page renderer contain the phrase. */
+export function findSectionsContainingPhrase(
+  phrase: string,
+  catalog: SiteSectionCatalog
+): EnrichedSectionSummary[] {
+  const needle = normalizePhraseForSearch(phrase);
+  const wordCount = needle.split(' ').filter(Boolean).length;
+  const minLen = wordCount >= 2 ? MIN_PHRASE_SEARCH_LEN : 12;
+  if (needle.length < minLen) return [];
+
+  return catalog.sections.filter((section) => {
+    if (scoreTitleMatch(section.title, phrase) >= 85) return true;
+    if (wordCount < 2) return false;
+    const searchText = section.searchText ?? normalizePhraseForSearch(section.title);
+    return searchText.includes(needle);
+  });
+}
+
+function sectionBodyPreview(sectionIndex: number, siteConfigContent?: string): string | null {
+  if (!siteConfigContent) return null;
+  const body = parseSiteConfigSource(siteConfigContent)?.sections?.[sectionIndex]?.body;
+  if (!body || typeof body !== 'string') return null;
+  const trimmed = body.trim();
+  if (!trimmed) return null;
+  return trimmed.length > 120 ? `${trimmed.slice(0, 117)}…` : trimmed;
+}
+
+function matchSectionByPhraseInSite(
+  message: string,
+  catalog: SiteSectionCatalog
+): SectionTargetResult | null {
+  const titleCandidates = extractSectionTitleCandidates(message);
+  const phrases = [...new Set(titleCandidates.filter((p) => p.trim().length >= MIN_PHRASE_SEARCH_LEN))];
+  if (phrases.length === 0) return null;
+
+  for (const phrase of phrases) {
+    const matches = findSectionsContainingPhrase(phrase, catalog);
+    if (matches.length === 1) {
+      return sectionTarget(
+        matches[0]!,
+        'high',
+        `Phrase located in section: "${phrase}"`
+      );
+    }
+    if (matches.length > 1) {
+      const candidates = matches.map(toMatchCandidate);
+      return {
+        confidence: 'low',
+        kind: 'section',
+        matches: candidates,
+        clarificationMessage:
+          'I found multiple sections containing that phrase. Reply with the number:\n\n' +
+          candidates
+            .map((m, i) => `${i + 1}. [${m.index}] ${m.type} — "${m.title}"`)
+            .join('\n'),
+        suggestedReplies: candidates.map((m, i) => `${i + 1} — ${m.title}`),
+      };
+    }
+  }
+
+  return null;
+}
+
 export function buildSiteSectionCatalogFromSnapshot(
-  snapshot: EnrichedSiteStructureSnapshot
+  snapshot: EnrichedSiteStructureSnapshot,
+  siteConfigContent?: string
 ): SiteSectionCatalog {
   return {
     sections: snapshot.sections,
-    textBlock: formatStructureMap(snapshot),
+    textBlock: formatStructureMap(snapshot, siteConfigContent),
     numberedReplies: buildSectionSuggestedReplies(snapshot.sections),
     snapshot,
+    siteConfigContent,
   };
 }
 
@@ -158,7 +232,7 @@ export function buildSiteSectionCatalog(
   pageContent: string
 ): SiteSectionCatalog {
   const snapshot = buildEnrichedSiteStructure(siteConfigContent, pageContent);
-  return buildSiteSectionCatalogFromSnapshot(snapshot);
+  return buildSiteSectionCatalogFromSnapshot(snapshot, siteConfigContent);
 }
 
 /** Stable prompt block for LLM / clarifier injection. */
@@ -172,7 +246,10 @@ export function formatSectionCatalogForClarifier(catalog: SiteSectionCatalog): s
     'AVAILABLE HOMEPAGE SECTIONS (use these indices/titles — do not guess):',
   ];
   for (const s of catalog.sections) {
-    lines.push(`  [${s.index}] ${s.type} — "${s.title}"`);
+    const bodyPreview = sectionBodyPreview(s.index, catalog.siteConfigContent);
+    lines.push(
+      `  [${s.index}] ${s.type} — "${s.title}"${bodyPreview ? ` — body: "${bodyPreview}"` : ''}`
+    );
   }
   return lines.join('\n');
 }
@@ -208,6 +285,11 @@ export function matchSectionFromMessage(
         return sectionTarget(section, 'high', `Ordinal match: ${pattern.source}`);
       }
     }
+  }
+
+  const phraseMatch = matchSectionByPhraseInSite(effectiveMessage, catalog);
+  if (phraseMatch) {
+    return phraseMatch;
   }
 
   const titleCandidates = extractSectionTitleCandidates(effectiveMessage);

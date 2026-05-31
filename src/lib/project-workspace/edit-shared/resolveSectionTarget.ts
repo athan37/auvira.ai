@@ -4,6 +4,7 @@ import {
   type SiteStructureSnapshot,
   type SiteSectionSummary,
 } from './siteStructureAnalysis';
+import { parseSiteConfigSource } from '@/lib/site-manager/siteConfigParser';
 import type { ConversationTurn } from './editAmbiguity';
 import { wantsNewImageSection } from './imagePlacementIntent';
 import { resolveEffectiveEditMessage } from '@/lib/chat/conversationContextForEdit';
@@ -23,6 +24,8 @@ export interface EnrichedSectionSummary extends SiteSectionSummary {
   rendererComponent: string;
   configLineRange: LineRange | null;
   pageComponentRange: LineRange | null;
+  /** Title, body, and item copy — used for phrase-in-section lookup. */
+  searchText?: string;
 }
 
 export interface EnrichedSiteStructureSnapshot extends SiteStructureSnapshot {
@@ -115,6 +118,26 @@ export function extractSectionTitleCandidates(message: string): string[] {
     for (const match of message.matchAll(/'([^'\\]|\\.)*'/g)) {
       const inner = match[0].slice(1, -1).trim();
       if (inner.length >= 3) candidates.push(inner);
+    }
+  }
+
+  const quotedSectionTitle = message.match(
+    /(?:change|update|edit|make|set)\s+(?:the\s+)?(?:color|colour|background|style|gradient|card|text|copy|wording|of)\s+(?:of\s+)?(?:the\s+)?["']([^"'\n]{3,160})["']\s+section\b/i
+  );
+  if (quotedSectionTitle?.[1]) {
+    candidates.push(quotedSectionTitle[1].trim());
+  }
+
+  const unquotedSectionTitle = message.match(
+    /(?:change|update|edit|make|set)\s+(?:the\s+)?(?:color|colour|background|style|gradient|card|text|copy|wording|of)\s+(?:of\s+)?(?:the\s+)?([^"'\n,]{8,160}?)\s+section\b/i
+  );
+  if (unquotedSectionTitle?.[1]) {
+    const title = unquotedSectionTitle[1].trim();
+    if (
+      title.split(/\s+/).filter(Boolean).length >= 2 &&
+      !/\bsection\b/i.test(title)
+    ) {
+      candidates.push(title);
     }
   }
 
@@ -372,23 +395,57 @@ export function extractSectionComponentSource(
   const endIdx = endMatch?.index != null ? startIdx + endMatch.index : pageContent.length;
   return { content: pageContent.slice(startIdx, endIdx) };
 }
-function formatStructureMapLines(sections: EnrichedSectionSummary[]): string {
+function formatStructureMapLines(
+  sections: EnrichedSectionSummary[],
+  siteConfigContent?: string
+): string {
   const lines: string[] = ['SITE STRUCTURE MAP:'];
   if (sections.length === 0) {
     lines.push('  (no siteConfig.sections — hero/nav/footer may be hardcoded)');
   } else {
     for (const s of sections) {
+      const bodyPreview = sectionBodyPreviewFromConfig(s.index, siteConfigContent);
       lines.push(
-        `  [${s.index}] type="${s.type}" title="${s.title}" → ${s.rendererComponent}`
+        `  [${s.index}] type="${s.type}" title="${s.title}"${bodyPreview ? ` body="${bodyPreview}"` : ''} → ${s.rendererComponent}`
       );
     }
   }
   return lines.join('\n');
 }
 
+function sectionBodyPreviewFromConfig(sectionIndex: number, siteConfigContent?: string): string | null {
+  if (!siteConfigContent) return null;
+  const body = parseSiteConfigSource(siteConfigContent)?.sections?.[sectionIndex]?.body;
+  if (!body || typeof body !== 'string') return null;
+  const trimmed = body.trim();
+  if (!trimmed) return null;
+  return trimmed.length > 120 ? `${trimmed.slice(0, 117)}…` : trimmed;
+}
+
 /**
  * Build enriched site structure (section map + renderer + line ranges) for all edits.
  */
+function buildSectionSearchText(
+  sectionIndex: number,
+  siteConfigContent: string,
+  pageContent: string,
+  rendererComponent: string
+): string {
+  const parts: string[] = [];
+  const configSection = parseSiteConfigSource(siteConfigContent)?.sections?.[sectionIndex];
+  if (configSection?.title) parts.push(String(configSection.title));
+  if (configSection?.body) parts.push(String(configSection.body));
+  for (const item of configSection?.items ?? []) {
+    if (item.title) parts.push(String(item.title));
+    if (item.description) parts.push(String(item.description));
+  }
+  const componentSource = extractSectionComponentSource(pageContent, rendererComponent);
+  if (componentSource?.content) {
+    parts.push(componentSource.content.replace(/\{section\.title\}/g, String(configSection?.title ?? '')));
+  }
+  return parts.join(' ').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
 export function buildEnrichedSiteStructure(
   siteConfigContent: string,
   pageContent: string
@@ -401,10 +458,11 @@ export function buildEnrichedSiteStructure(
       rendererComponent,
       configLineRange: findSiteConfigSectionLineRange(siteConfigContent, s.index),
       pageComponentRange: extractSectionComponentRange(pageContent, rendererComponent),
+      searchText: buildSectionSearchText(s.index, siteConfigContent, pageContent, rendererComponent),
     };
   });
 
-  const structureMap = formatStructureMapLines(sections);
+  const structureMap = formatStructureMapLines(sections, siteConfigContent);
 
   return {
     ...base,
@@ -415,9 +473,10 @@ export function buildEnrichedSiteStructure(
 
 /** Human-readable section map for prompts and clarification. */
 export function formatStructureMap(
-  snapshot: Pick<EnrichedSiteStructureSnapshot, 'sections'>
+  snapshot: Pick<EnrichedSiteStructureSnapshot, 'sections'>,
+  siteConfigContent?: string
 ): string {
-  return formatStructureMapLines(snapshot.sections);
+  return formatStructureMapLines(snapshot.sections, siteConfigContent);
 }
 
 export function buildStructureBrief(snapshot: EnrichedSiteStructureSnapshot): string {

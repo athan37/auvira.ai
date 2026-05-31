@@ -1,5 +1,8 @@
 import { getLLMClient } from '@/lib/llm/llmClient';
-import { formatSectionCatalogForPrompt, type SiteSectionCatalog } from './siteSectionCatalog';
+import {
+  formatSectionCatalogForClarifier,
+  type SiteSectionCatalog,
+} from './siteSectionCatalog';
 
 export interface CatalogLLMMatch {
   sectionIndex: number;
@@ -9,13 +12,14 @@ export interface CatalogLLMMatch {
 
 const MAX_SECTIONS_FOR_LLM = 15;
 
+/** Enabled by default; set SECTION_TARGET_LLM=0 to disable catalog LLM picker. */
 function isSectionTargetLlmEnabled(): boolean {
-  return process.env.SECTION_TARGET_LLM === '1';
+  return process.env.SECTION_TARGET_LLM !== '0';
 }
 
 /**
- * Optional LLM fallback to pick a section index from the catalog when deterministic matching fails.
- * Gated by SECTION_TARGET_LLM=1 and only runs for small sites (≤15 sections).
+ * LLM fallback to pick a section index from the catalog when deterministic matching fails.
+ * Runs for style edits on sites with ≤15 sections unless SECTION_TARGET_LLM=0.
  */
 export async function resolveSectionWithCatalogLLM(
   message: string,
@@ -29,7 +33,7 @@ export async function resolveSectionWithCatalogLLM(
   }
 
   const llm = getLLMClient();
-  const catalogBlock = formatSectionCatalogForPrompt(catalog);
+  const catalogBlock = formatSectionCatalogForClarifier(catalog);
 
   const prompt = `You pick which homepage section the owner wants to edit.
 
@@ -43,8 +47,10 @@ Reply with JSON only:
 
 Rules:
 - sectionIndex MUST be one of the [index] values listed above.
+- If the owner quotes or names a phrase, find which section **title or body** contains that exact phrase — that is the target section.
 - Match section **type** and **title** to owner intent (e.g. portfolio/photos/work samples → type="gallery"; customer quotes/growth stories → type="testimonials").
 - When the owner says "section titled X", match only when a catalog title equals X or clearly contains X as a multi-word phrase — never pick a section because a single common word (e.g. "business") appears inside a longer title.
+- The hero/top banner is NOT in this catalog — only numbered content sections below the hero.
 - If the message does not clearly target one section, use confidence "low".
 - Do not invent sections.`;
 
