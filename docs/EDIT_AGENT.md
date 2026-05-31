@@ -34,3 +34,20 @@ buildEditContext → resolveEditTarget → planEdit → executePlan → domain t
 
 - `remove_section`, `reorder_sections`, `replace_image` — clarify or stub
 - Section-aware gradient from current background color
+
+## Edit focus stack (N-turn memory)
+
+Each successful edit pushes an `EditFocus` item onto `editFocusStack` in assistant message metadata (newest first, cap 5). Deictic follow-ups ("that section", "that image") resolve against this stack via `resolveEditFocus.ts` — not ad-hoc per-intent merge functions.
+
+Load path: `resolveEditFocusFromProject()` in stream route → `WebsiteEditAgentOptions.editFocusStack`.
+
+## LangGraph — defer unless
+
+| Signal | Action |
+|--------|--------|
+| Focus stack + tests cover 4–6 turn chains reliably | Stay in-repo (current default) |
+| Need pause/resume edit workflow across server restarts | LangGraph checkpointer + Mongo |
+| Product wants editable graph / parallel branches | LangGraph StateGraph |
+| One orchestration model for edit + build + deploy | Platform-level decision |
+
+LangGraph would sit **above** existing domain tools as a thin orchestrator; do not rewrite presentation or gallery pipelines into graph nodes wholesale.

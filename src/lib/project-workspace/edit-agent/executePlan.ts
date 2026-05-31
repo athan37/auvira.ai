@@ -136,6 +136,27 @@ export async function executePlan(
   const summaryResult = await executeDomainTool('summarize_actual_changes', toolCtx, {});
   const ownerMessage = summaryResult.summary || summaries.join(' ') || 'Updated your website.';
 
+  const styleStep = plan.steps.find((s) => s.skill === 'update_section_style');
+  const editFocus =
+    styleStep && editContext.target.sectionIndex != null
+      ? {
+          kind: 'section_style' as const,
+          sectionIndex: editContext.target.sectionIndex,
+          sectionTitle:
+            editContext.target.title ??
+            editContext.sections.find((s) => s.index === editContext.target.sectionIndex)?.title ??
+            `section ${editContext.target.sectionIndex}`,
+          sectionType:
+            editContext.target.sectionType ??
+            editContext.sections.find((s) => s.index === editContext.target.sectionIndex)?.type,
+          backgroundClass:
+            typeof styleStep.params?.backgroundClass === 'string'
+              ? styleStep.params.backgroundClass
+              : undefined,
+          at: new Date().toISOString(),
+        }
+      : undefined;
+
   return {
     ok: true,
     summary: ownerMessage,
@@ -155,6 +176,7 @@ export async function executePlan(
         : plan.intent === 'contact'
           ? 'contact'
           : 'generic',
+    editFocus,
     editMeta: {
       planVersion: plan.planVersion ?? 'website-agent',
       intent: plan.intent,

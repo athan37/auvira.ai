@@ -2,6 +2,8 @@ import { resolveEffectiveEditMessage } from '@/lib/chat/conversationContextForEd
 import { classifyEditWhat } from '@/lib/project-workspace/edit-context/classifyEditWhat';
 import { resolveSectionWithCatalogLLM } from '@/lib/project-workspace/edit-shared/resolveSectionWithCatalogLLM';
 import type { ConversationTurn } from '@/lib/project-workspace/edit-shared/editAmbiguity';
+import { resolveDeicticTargetFromFocus } from '@/lib/project-workspace/edit-shared/resolveEditFocus';
+import type { EditFocusStack } from '@/lib/project-workspace/edit-shared/types';
 import {
   extractExplicitSectionTitleIntent,
   extractSectionTitleCandidates,
@@ -89,9 +91,10 @@ export function resolveEditTarget(
   message: string,
   siteModel: SiteModel,
   catalog: SiteSectionCatalog,
-  history: ConversationTurn[] = []
+  history: ConversationTurn[] = [],
+  editFocusStack?: EditFocusStack | null
 ): EditTarget {
-  return resolveEditTargetSync(message, siteModel, catalog, history);
+  return resolveEditTargetSync(message, siteModel, catalog, history, editFocusStack);
 }
 
 /** Sync resolver (no LLM). Prefer {@link resolveEditTargetAsync} for V3 planning. */
@@ -99,9 +102,10 @@ export function resolveEditTargetSync(
   message: string,
   siteModel: SiteModel,
   catalog: SiteSectionCatalog,
-  history: ConversationTurn[] = []
+  history: ConversationTurn[] = [],
+  editFocusStack?: EditFocusStack | null
 ): EditTarget {
-  const effectiveMessage = resolveEffectiveEditMessage(message, history);
+  const effectiveMessage = resolveEffectiveEditMessage(message, history, editFocusStack);
   const lower = effectiveMessage.toLowerCase();
 
   if (/\b(hero|headline|tagline|subheadline)\b/i.test(lower) && !/\bsection\b/i.test(lower)) {
@@ -236,6 +240,11 @@ export function resolveEditTargetSync(
     /\b(this|that)\s+section\b/i.test(effectiveMessage) &&
     !hasQuotedTitle
   ) {
+    const fromFocus = resolveDeicticTargetFromFocus(message, editFocusStack, catalog);
+    if (fromFocus && !fromFocus.needsClarification) {
+      return fromFocus;
+    }
+
     return {
       kind: 'section',
       confidence: 'low',
@@ -274,12 +283,17 @@ export async function resolveEditTargetAsync(
   message: string,
   siteModel: SiteModel,
   catalog: SiteSectionCatalog,
-  history: ConversationTurn[] = []
+  history: ConversationTurn[] = [],
+  editFocusStack?: EditFocusStack | null
 ): Promise<EditTarget> {
-  const target = resolveEditTarget(message, siteModel, catalog, history);
-  const effectiveMessage = resolveEffectiveEditMessage(message, history);
+  const target = resolveEditTarget(message, siteModel, catalog, history, editFocusStack);
+  const effectiveMessage = resolveEffectiveEditMessage(message, history, editFocusStack);
 
   if (target.needsClarification) {
+    const fromFocus = resolveDeicticTargetFromFocus(message, editFocusStack, catalog);
+    if (fromFocus && !fromFocus.needsClarification) {
+      return fromFocus;
+    }
     return target;
   }
 

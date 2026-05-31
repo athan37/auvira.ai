@@ -2,6 +2,7 @@ import {
   DEFAULT_EDIT_CONTEXT_TURNS,
   formatWeightedConversationForPrompt,
 } from '@/lib/chat/conversationContextForEdit';
+import { isGalleryDescriptionRequest } from '@/lib/project-workspace/edit-shared/galleryItemDescriptionStrategy';
 import type { EditContext } from '@/lib/project-workspace/edit-context/types';
 import { formatStructureMap } from '@/lib/project-workspace/edit-shared/resolveSectionTarget';
 import { resolveDuplicateCopyTarget } from '@/lib/project-workspace/edit-context/resolveDuplicateCopyTarget';
@@ -75,11 +76,19 @@ export function buildPlanEditUserPrompt(editContext: EditContext, userPrompt: st
     DEFAULT_EDIT_CONTEXT_TURNS
   );
 
+  const galleryImageSections = editContext.sections.filter(
+    (s) => s.type === 'gallery' && (s.itemCount ?? 0) > 0
+  );
+  const galleryHint =
+    isGalleryDescriptionRequest(editContext.effectiveMessage) && galleryImageSections.length > 0
+      ? `Gallery context: owner likely means section [${galleryImageSections[0].index}] "${galleryImageSections[0].title}" (${galleryImageSections[0].itemCount} item(s)). Do not ask which images — add item descriptions in siteConfig.\n\n`
+      : '';
+
   return `Business: ${siteModel.parsedConfig?.businessName ?? '(unknown)'}
 Archetype: ${siteModel.archetype}
 Risk: ${riskFlags.level} (${riskFlags.reasons.join('; ') || 'none'})
 
-${duplicateBlock}${historyBlock}
+${duplicateBlock}${galleryHint}${historyBlock}
 ${resolvedTarget}
 
 Sections:

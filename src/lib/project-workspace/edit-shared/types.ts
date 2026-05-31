@@ -142,6 +142,36 @@ export interface WorkspaceProfile {
 
 export type ConversationTurn = { role: 'user' | 'assistant'; content: string };
 
+export interface LastGalleryEdit {
+  sectionIndex: number;
+  title: string;
+  imageUrls: string[];
+  imageCount: number;
+}
+
+export type EditFocusKind =
+  | 'section_created'
+  | 'section_style'
+  | 'gallery_captions'
+  | 'section_copy'
+  | 'hero';
+
+export interface EditFocus {
+  kind: EditFocusKind;
+  sectionIndex: number;
+  sectionTitle: string;
+  sectionType?: string;
+  imageUrls?: string[];
+  imageCount?: number;
+  backgroundClass?: string;
+  editJobId?: string;
+  at: string;
+}
+
+export interface EditFocusStack {
+  items: EditFocus[];
+}
+
 export interface WebsiteEditAgentOptions {
   workspacePath: string;
   ownerMessage: string;
@@ -155,6 +185,10 @@ export interface WebsiteEditAgentOptions {
   conversationHistory?: ConversationTurn[];
   /** Pre-resolved WHERE/WHAT from buildGroundedEditContext. */
   editTargetPlan?: EditTargetPlan;
+  /** Last successful gallery image placement (from chat metadata or prior turn). */
+  lastGalleryEdit?: LastGalleryEdit;
+  /** Recent edit focus stack for N-turn deictic resolution. */
+  editFocusStack?: EditFocusStack;
   /** Section catalog when grounded context is unavailable but snap exists. */
   sectionCatalog?: import('./siteSectionCatalog').SiteSectionCatalog;
   /** When true, skip inline tailwind/page infra repairs (migration baseline ready). */
@@ -178,5 +212,12 @@ export interface WebsiteEditAgentResult {
     planVersion?: string;
     intent?: string;
     skills?: string[];
+    lastGalleryEdit?: LastGalleryEdit;
   };
+  /** Set when an image gallery section was created/updated this turn. */
+  lastGalleryEdit?: LastGalleryEdit;
+  /** Focus artifact for this turn (merged into editFocusStack by runner). */
+  editFocus?: EditFocus;
+  /** Updated focus stack after this edit completes. */
+  editFocusStack?: EditFocusStack;
 }

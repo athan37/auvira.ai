@@ -1,5 +1,6 @@
 import type { SiteSectionPresentation } from '@/lib/builder/sectionPresentation';
 import type { ConversationTurn } from '@/lib/project-workspace/edit-shared/editAmbiguity';
+import type { EditFocusStack } from '@/lib/project-workspace/edit-shared/types';
 import type { SiteSectionCatalog } from '@/lib/project-workspace/edit-shared/siteSectionCatalog';
 import type { WorkspaceMode } from '@/lib/project-workspace/edit-shared/types';
 import type { SiteModel } from '@/lib/project-workspace/site-model/types';
@@ -109,6 +110,7 @@ export interface EditContext {
   infraBaselineReady: boolean;
   gateway?: import('@/lib/project-workspace/workspaceGateway').WorkspaceGateway;
   conversationHistory?: ConversationTurn[];
+  editFocusStack?: EditFocusStack;
 }
 
 export interface BuildEditContextInput {
@@ -118,6 +120,7 @@ export interface BuildEditContextInput {
   conversationHistory?: ConversationTurn[];
   gateway?: import('@/lib/project-workspace/workspaceGateway').WorkspaceGateway;
   infraBaselineReady?: boolean;
+  editFocusStack?: EditFocusStack;
 }
 
 export interface BuildEditContextResult {

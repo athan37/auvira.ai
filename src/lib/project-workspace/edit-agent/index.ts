@@ -45,6 +45,7 @@ export async function runWebsiteEditAgent(
     conversationHistory: options.conversationHistory,
     gateway: options.gateway,
     infraBaselineReady: options.infraBaselineReady,
+    editFocusStack: options.editFocusStack,
   });
 
   emitStep(onStep, 'v3_context', 'Understanding your site', 'completed');

@@ -1,4 +1,8 @@
 import type { ConversationTurn } from '@/lib/project-workspace/edit-shared/editAmbiguity';
+import { enrichMessageWithEditFocus } from '@/lib/project-workspace/edit-shared/resolveEditFocus';
+import type { EditFocusStack } from '@/lib/project-workspace/edit-shared/types';
+import { isGalleryDescriptionRequest } from '@/lib/project-workspace/edit-shared/galleryItemDescriptionStrategy';
+import { isCompoundImagePlacementAndCaption } from '@/lib/project-workspace/edit-shared/imageEditIntent';
 import {
   extractColorsFromMessage,
 } from '@/lib/project-workspace/edit-shared/preset/presetUtils';
@@ -220,6 +224,7 @@ function mergeDeicticFollowUp(message: string, history: ConversationTurn[]): str
   const isDeictic =
     /^(this|that|it)\b/i.test(trimmed) ||
     /\b(this|that)\s+section\b/i.test(trimmed) ||
+    /\b(these|those|that)\s+(image|images|photo|photos|picture|pictures)\b/i.test(trimmed) ||
     /\b(below|above)\b/i.test(trimmed);
   if (!isDeictic) return null;
 
@@ -229,22 +234,110 @@ function mergeDeicticFollowUp(message: string, history: ConversationTurn[]): str
   return `${prior.content} — follow-up: ${trimmed}`;
 }
 
+/** Assistant recently confirmed a product/gallery section with uploaded images. */
+export function wasRecentGalleryImageSectionCreated(history: ConversationTurn[]): boolean {
+  return history.some(
+    (turn) =>
+      turn.role === 'assistant' &&
+      (/product section with \d+ image/i.test(turn.content) ||
+        /Added your product section/i.test(turn.content) ||
+        /gallery section with \d+ image/i.test(turn.content) ||
+        /image\(s\) in the preview/i.test(turn.content) ||
+        /images are live/i.test(turn.content) ||
+        /uploaded successfully/i.test(turn.content) ||
+        /your images.*preview/i.test(turn.content))
+  );
+}
+
+/** Parse image count from assistant confirmation after gallery placement. */
+export function extractGalleryImageCountFromAssistant(content: string): number | null {
+  const match = content.match(/(\d+)\s+image/i);
+  if (!match?.[1]) return null;
+  const count = parseInt(match[1], 10);
+  return Number.isFinite(count) && count > 0 ? count : null;
+}
+
+function findPriorImagePlacementUserMessage(
+  history: ConversationTurn[],
+  excludeContent?: string
+): ConversationTurn | null {
+  const exclude = excludeContent?.trim();
+  for (let i = history.length - 1; i >= 0; i--) {
+    const turn = history[i];
+    if (turn.role !== 'user') continue;
+    const content = turn.content.trim();
+    if (exclude && content === exclude) continue;
+    if (
+      /\b(image|images|photo|photos|picture|pictures)\b/i.test(content) &&
+      /\b(add|put|place|upload|new section|gallery)\b/i.test(content)
+    ) {
+      return turn;
+    }
+  }
+  return null;
+}
+
+function imageCountFromGalleryAssistantHistory(history: ConversationTurn[]): number | null {
+  for (let i = history.length - 1; i >= 0; i--) {
+    const turn = history[i];
+    if (turn.role !== 'assistant') continue;
+    const count = extractGalleryImageCountFromAssistant(turn.content);
+    if (count != null) return count;
+  }
+  return null;
+}
+
+function mergeGalleryDescriptionFollowUp(
+  message: string,
+  history: ConversationTurn[]
+): string | null {
+  if (!isGalleryDescriptionRequest(message)) return null;
+  if (!wasRecentGalleryImageSectionCreated(history)) return null;
+
+  const imageCount = imageCountFromGalleryAssistantHistory(history);
+  const singular = /\b(that|the|it)\s+image\b/i.test(message);
+  const targetHint = imageCount
+    ? singular
+      ? `gallery/product section with ${imageCount} uploaded image(s); caption the most recently added image section`
+      : `gallery/product section with ${imageCount} uploaded image(s)`
+    : singular
+      ? 'most recently added gallery image section'
+      : 'gallery/product section with uploaded images';
+
+  const prior = findPriorImagePlacementUserMessage(history, message) ?? findPriorUserMessage(history, message);
+  const trimmed = message.trim();
+  if (prior) {
+    return `${prior.content} — follow-up: ${trimmed} (target: ${targetHint})`;
+  }
+  return `${trimmed} (target: ${targetHint})`;
+}
+
+function mergeCompoundImageEditMessage(message: string): string | null {
+  if (!isCompoundImagePlacementAndCaption(message)) return null;
+  const trimmed = message.trim();
+  return `${trimmed} (compound: place uploaded image(s) in a new section, then add placeholder descriptions)`;
+}
+
 /**
  * Merge clarification follow-ups and short replies with prior user intent.
  * Closest messages in history carry the most weight when resolving.
  */
 export function resolveEffectiveEditMessage(
   message: string,
-  history: ConversationTurn[] = []
+  history: ConversationTurn[] = [],
+  editFocusStack?: EditFocusStack | null
 ): string {
   const recent = history.slice(-DEFAULT_EDIT_CONTEXT_TURNS);
 
   return (
     mergeTestimonialOptionReply(message, recent) ??
     mergeSectionNumberReply(message, recent) ??
+    mergeCompoundImageEditMessage(message) ??
+    enrichMessageWithEditFocus(message, editFocusStack) ??
+    (editFocusStack?.items.length ? null : mergeGalleryDescriptionFollowUp(message, recent)) ??
     mergeHeroStyleFollowUp(message, recent) ??
     mergeStyleFollowUp(message, recent) ??
-    mergeDeicticFollowUp(message, recent) ??
+    (editFocusStack?.items.length ? null : mergeDeicticFollowUp(message, recent)) ??
     message
   );
 }

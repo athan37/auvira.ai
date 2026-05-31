@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_EDIT_CONTEXT_TURNS,
+  extractGalleryImageCountFromAssistant,
   extractSectionPickFromListReply,
   extractSectionTitleFromListReply,
   formatConversationForIntentClarifier,
   formatWeightedConversationForPrompt,
   resolveEffectiveEditMessage,
+  wasRecentGalleryImageSectionCreated,
 } from '../../src/lib/chat/conversationContextForEdit';
 
 describe('conversationContextForEdit', () => {
@@ -96,6 +98,99 @@ describe('conversationContextForEdit', () => {
 
   it('uses eight turns by default for edit context', () => {
     expect(DEFAULT_EDIT_CONTEXT_TURNS).toBe(8);
+  });
+
+  it('merges gallery description follow-up after product section with images', () => {
+    const history = [
+      { role: 'user' as const, content: 'add these images to a new sections' },
+      {
+        role: 'assistant' as const,
+        content:
+          'Added your product section with 4 image(s) in the preview. Scroll just below the hero to see it.',
+      },
+    ];
+
+    expect(wasRecentGalleryImageSectionCreated(history)).toBe(true);
+    expect(
+      extractGalleryImageCountFromAssistant(
+        'Added your product section with 4 image(s) in the preview.'
+      )
+    ).toBe(4);
+
+    const effective = resolveEffectiveEditMessage('add more description to these images', history);
+    expect(effective).toContain('add these images to a new sections');
+    expect(effective).toContain('add more description to these images');
+    expect(effective).toMatch(/gallery\/product section with 4 uploaded image/i);
+  });
+
+  it('merges singular that-image follow-up after 1-image gallery placement', () => {
+    const history = [
+      { role: 'user' as const, content: 'add this image to a new section' },
+      {
+        role: 'assistant' as const,
+        content:
+          'Added your product section with 1 image(s) in the preview. Scroll just below the hero to see it.',
+      },
+    ];
+
+    const effective = resolveEffectiveEditMessage('add some description to that image', history);
+    expect(effective).toContain('add this image to a new section');
+    expect(effective).toContain('add some description to that image');
+    expect(effective).toMatch(/1 uploaded image/i);
+  });
+
+  it('merges compound numbered image+description message', () => {
+    const effective = resolveEffectiveEditMessage(
+      '1) add this image to a new section and 2) add some description to that image',
+      []
+    );
+    expect(effective).toContain('compound');
+    expect(effective).toContain('placeholder descriptions');
+  });
+
+  it('merges vague them after double gallery placement', () => {
+    const history = [
+      { role: 'user' as const, content: 'add these images to a new section called Showcase' },
+      {
+        role: 'assistant' as const,
+        content: 'Added your product section with 2 image(s) in the preview.',
+      },
+      { role: 'user' as const, content: 'add this image to a new section' },
+      {
+        role: 'assistant' as const,
+        content: 'Added your product section with 1 image(s) in the preview.',
+      },
+    ];
+    const effective = resolveEffectiveEditMessage('can you add captions to them', history);
+    expect(effective).toMatch(/1 uploaded image/i);
+  });
+
+  it('merges caption follow-up after generic assistant image confirmation', () => {
+    const history = [
+      { role: 'user' as const, content: 'add this image to a new section' },
+      { role: 'assistant' as const, content: 'Your images are live in the preview now.' },
+    ];
+
+    expect(wasRecentGalleryImageSectionCreated(history)).toBe(true);
+
+    const effective = resolveEffectiveEditMessage('add some description to that image', history);
+    expect(effective).toContain('add this image to a new section');
+    expect(effective).toMatch(/gallery\/product section|uploaded image|most recently added gallery/i);
+  });
+
+  it('merges caption follow-up after intervening style edit in history', () => {
+    const history = [
+      { role: 'user' as const, content: 'add this image to a new section' },
+      {
+        role: 'assistant' as const,
+        content: 'Added your product section with 1 image(s) in the preview.',
+      },
+      { role: 'user' as const, content: 'change the background color of the "Our Work" section to black' },
+      { role: 'assistant' as const, content: 'Changed background of "Our Work" to bg-black.' },
+    ];
+    const effective = resolveEffectiveEditMessage('add some description to that image', history);
+    expect(effective).toContain('add this image to a new section');
+    expect(effective).toMatch(/1 uploaded image/i);
   });
 
   it('merges hero gradient follow-up with prior background request', () => {

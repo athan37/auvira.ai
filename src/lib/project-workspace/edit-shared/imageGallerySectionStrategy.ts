@@ -19,6 +19,7 @@ import { resolveSiteWorkspace } from './resolveSiteWorkspace';
 import { verifyEditApplied } from './verifyEditApplied';
 import { stampSiteConfigForGalleryPreviewReload } from './gallerySiteConfig';
 import { validateGalleryInSiteConfigSource } from './validateGallerySiteConfig';
+import { extractLastGalleryEditFromSiteConfig } from './imageEditIntent';
 import {
   describeSiteConfigParseFailure,
   parseSiteConfigSource,
@@ -211,11 +212,19 @@ export async function runImageGallerySectionStrategy(
     ? `${ownerMessage} (placement chosen from your site layout.)`
     : `${ownerMessage} (placement chosen by site structure rules.)`;
 
+  const lastGalleryEdit =
+    extractLastGalleryEditFromSiteConfig(
+      afterSiteConfig,
+      attachments.map((a) => a.publicUrl)
+    ) ?? undefined;
+
   return {
     ok: true,
     strategy: 'image_gallery',
     summary,
     ownerMessage: summary,
     changedFiles,
+    lastGalleryEdit,
+    editMeta: lastGalleryEdit ? { lastGalleryEdit } : undefined,
   };
 }

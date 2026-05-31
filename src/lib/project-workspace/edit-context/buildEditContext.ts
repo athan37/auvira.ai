@@ -133,14 +133,16 @@ export async function buildEditContext(
 
   const effectiveMessage = resolveEffectiveEditMessage(
     input.ownerMessage,
-    input.conversationHistory ?? []
+    input.conversationHistory ?? [],
+    input.editFocusStack
   );
 
   const target = await resolveEditTargetAsync(
     input.ownerMessage,
     siteModel,
     sectionCatalog,
-    input.conversationHistory ?? []
+    input.conversationHistory ?? [],
+    input.editFocusStack
   );
 
   const sections = buildSections({ siteConfigContent, pageContent });
@@ -167,6 +169,7 @@ export async function buildEditContext(
     infraBaselineReady,
     gateway: input.gateway,
     conversationHistory: input.conversationHistory,
+    editFocusStack: input.editFocusStack,
   };
 
   draftContext.selectedSnippets = selectRelevantContext(draftContext);

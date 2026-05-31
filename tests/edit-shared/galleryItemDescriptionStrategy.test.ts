@@ -9,6 +9,15 @@ describe('isGalleryDescriptionRequest', () => {
     expect(isGalleryDescriptionRequest('add captions for the photos')).toBe(true);
   });
 
+  it('matches singular that-image follow-up', () => {
+    expect(isGalleryDescriptionRequest('add some description to that image')).toBe(true);
+  });
+
+  it('matches split-compound caption phrase and partial finish-the-rest', () => {
+    expect(isGalleryDescriptionRequest('label each pic.')).toBe(true);
+    expect(isGalleryDescriptionRequest('finish the rest')).toBe(true);
+  });
+
   it('does not match unrelated edits', () => {
     expect(isGalleryDescriptionRequest('change background to blue')).toBe(false);
     expect(isGalleryDescriptionRequest('update phone number')).toBe(false);

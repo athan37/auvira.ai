@@ -1,4 +1,5 @@
 import type { WorkspaceAssetAttachment } from '@/lib/project-workspace/workspaceAssetTypes';
+import type { EditFocusStack } from '@/lib/project-workspace/edit-shared/types';
 
 export type ProjectChatOutcome = 'success' | 'clarification' | 'failure';
 export type ArizeSyncStatus = 'pending' | 'synced' | 'failed';
@@ -39,6 +40,13 @@ export interface ProjectMessageMetadata {
   previewVersion?: number;
   strategy?: string;
   arize?: ProjectMessageArizeMetadata;
+  lastGalleryEdit?: {
+    sectionIndex: number;
+    title: string;
+    imageUrls: string[];
+    imageCount: number;
+  };
+  editFocusStack?: EditFocusStack;
 }
 
 export interface ChatApiMessage {

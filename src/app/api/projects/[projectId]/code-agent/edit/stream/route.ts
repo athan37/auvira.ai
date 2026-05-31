@@ -50,6 +50,8 @@ import {
   appendAssistantMessage,
   appendUserMessage,
   buildConversationHistory,
+  resolveEditFocusFromProject,
+  resolveLastGalleryEditForProject,
 } from '@/lib/chat/projectChatService';
 import {
   EditStepTimer,
@@ -328,6 +330,12 @@ export async function POST(
           projectId: project._id,
           maxTurns: 8,
         });
+        const editFocusStack = await resolveEditFocusFromProject({
+          projectId: project._id,
+        });
+        const lastGalleryEdit = await resolveLastGalleryEditForProject({
+          projectId: project._id,
+        });
         emit('step', { id: 'loading', label: 'Loading your website draft', status: 'active', jobId });
 
         await appendEditJobLog(jobId, 'workspace_prepare_started', 'Preparing workspace');
@@ -382,6 +390,9 @@ export async function POST(
             attachments,
             gateway,
             conversationHistory,
+            lastGalleryEdit: lastGalleryEdit ?? undefined,
+            editFocusStack,
+            editJobId: jobId,
             infraStatus: project.infraStatus,
             infraVersion: project.infraVersion,
           },
@@ -1017,6 +1028,8 @@ export async function POST(
               slowestMs: slowest?.durationMs,
             },
             strategy: agentResult.strategy,
+            lastGalleryEdit: agentResult.lastGalleryEdit,
+            editFocusStack: agentResult.editFocusStack,
           },
         });
 

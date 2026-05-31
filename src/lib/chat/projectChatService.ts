@@ -1,6 +1,15 @@
 import mongoose from 'mongoose';
 import { connectMongoDB } from '@/lib/mongodb';
-import type { ConversationTurn } from '@/lib/project-workspace/edit-shared/types';
+import {
+  editFocusFromLastGalleryEdit,
+  lastGalleryEditFromFocusStack,
+  normalizeEditFocusStack,
+} from '@/lib/project-workspace/edit-shared/editFocus';
+import type {
+  ConversationTurn,
+  EditFocusStack,
+  LastGalleryEdit,
+} from '@/lib/project-workspace/edit-shared/types';
 import type { WorkspaceAssetAttachment } from '@/lib/project-workspace/workspaceAssetTypes';
 import { ProjectMessage } from '@/models/ProjectMessage';
 import {
@@ -110,4 +119,79 @@ export async function buildConversationHistory(input: {
       role: doc.role === 'assistant' ? ('assistant' as const) : ('user' as const),
       content: String(doc.content || '').slice(0, 2000),
     }));
+}
+
+/** Most recent gallery placement artifact from assistant message metadata. */
+export async function resolveLastGalleryEditFromProject(input: {
+  projectId: string | mongoose.Types.ObjectId;
+  maxMessages?: number;
+}): Promise<LastGalleryEdit | null> {
+  await connectMongoDB();
+  const projectObjectId = asObjectId(input.projectId);
+  const limit = Math.max(1, Math.floor(input.maxMessages ?? 24));
+  const docs = await ProjectMessage.find({
+    projectId: projectObjectId,
+    role: 'assistant',
+  })
+    .select('metadata')
+    .sort({ createdAt: -1 })
+    .limit(limit)
+    .lean();
+
+  for (const doc of docs) {
+    const meta = doc.metadata as ProjectMessageMetadata | undefined;
+    const edit = meta?.lastGalleryEdit;
+    if (
+      edit &&
+      typeof edit.sectionIndex === 'number' &&
+      typeof edit.title === 'string' &&
+      Array.isArray(edit.imageUrls) &&
+      typeof edit.imageCount === 'number'
+    ) {
+      return edit;
+    }
+  }
+  return null;
+}
+
+/** Most recent edit focus stack from assistant message metadata. */
+export async function resolveEditFocusFromProject(input: {
+  projectId: string | mongoose.Types.ObjectId;
+  maxMessages?: number;
+}): Promise<EditFocusStack> {
+  await connectMongoDB();
+  const projectObjectId = asObjectId(input.projectId);
+  const limit = Math.max(1, Math.floor(input.maxMessages ?? 24));
+  const docs = await ProjectMessage.find({
+    projectId: projectObjectId,
+    role: 'assistant',
+  })
+    .select('metadata')
+    .sort({ createdAt: -1 })
+    .limit(limit)
+    .lean();
+
+  for (const doc of docs) {
+    const meta = doc.metadata as ProjectMessageMetadata | undefined;
+    const stack = normalizeEditFocusStack(meta?.editFocusStack);
+    if (stack) return stack;
+  }
+
+  const legacyGallery = await resolveLastGalleryEditFromProject(input);
+  if (legacyGallery) {
+    return { items: [editFocusFromLastGalleryEdit(legacyGallery)] };
+  }
+
+  return { items: [] };
+}
+
+/** Resolve gallery artifact — prefers focus stack, falls back to legacy metadata. */
+export async function resolveLastGalleryEditForProject(input: {
+  projectId: string | mongoose.Types.ObjectId;
+  maxMessages?: number;
+}): Promise<LastGalleryEdit | null> {
+  const stack = await resolveEditFocusFromProject(input);
+  const fromStack = lastGalleryEditFromFocusStack(stack);
+  if (fromStack) return fromStack;
+  return resolveLastGalleryEditFromProject(input);
 }

@@ -72,4 +72,57 @@ describe('projectChatService conversation history', () => {
     expect(rows[0]?.errorJobId).toBe('job-1');
     expect(rows[0]?.imagePreviews).toEqual(['https://cdn.example.com/x.jpg']);
   });
+
+  it('resolveEditFocusFromProject reads editFocusStack metadata', async () => {
+    mockFindResult([
+      {
+        metadata: {
+          editFocusStack: {
+            items: [
+              {
+                kind: 'section_created',
+                sectionIndex: 2,
+                sectionTitle: 'Winter Portfolio',
+                imageUrls: ['/uploads/a.png'],
+                imageCount: 1,
+                at: '2026-01-01T00:00:00.000Z',
+              },
+            ],
+          },
+        },
+      },
+    ]);
+
+    const svc = await import('../../src/lib/chat/projectChatService');
+    const stack = await svc.resolveEditFocusFromProject({
+      projectId: '665f4ec12f1fe71c6527f2df',
+    });
+
+    expect(stack.items).toHaveLength(1);
+    expect(stack.items[0]?.sectionIndex).toBe(2);
+    expect(stack.items[0]?.sectionTitle).toBe('Winter Portfolio');
+  });
+
+  it('resolveEditFocusFromProject bootstraps from lastGalleryEdit when stack missing', async () => {
+    mockFindResult([
+      {
+        metadata: {
+          lastGalleryEdit: {
+            sectionIndex: 3,
+            title: 'Showcase',
+            imageUrls: ['/uploads/x.png'],
+            imageCount: 1,
+          },
+        },
+      },
+    ]);
+
+    const svc = await import('../../src/lib/chat/projectChatService');
+    const stack = await svc.resolveEditFocusFromProject({
+      projectId: '665f4ec12f1fe71c6527f2df',
+    });
+
+    expect(stack.items[0]?.kind).toBe('section_created');
+    expect(stack.items[0]?.sectionIndex).toBe(3);
+  });
 });

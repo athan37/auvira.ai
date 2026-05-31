@@ -7,8 +7,13 @@ import {
   styleStepBackgroundHint,
   styleStepSectionIndex,
 } from '../../support/planWithLiveLlm';
+import {
+  conversationAfterGalleryPlacement,
+  GALLERY_TURN_TWO_USER,
+  seedGallerySiteConfigWithImages,
+} from '../../support/galleryDescriptionScenario';
 import type { ConversationTurn } from '@/lib/project-workspace/edit-shared/types';
-import { defaultMultiSectionSiteSpec } from '../../support/syntheticSiteWorkspace';
+import { defaultMultiSectionSiteSpec, createSyntheticWorkspace } from '../../support/syntheticSiteWorkspace';
 
 const SYNTHETIC_SECTIONS = defaultMultiSectionSiteSpec().sections;
 const GALLERY_INDEX = 2;
@@ -75,6 +80,35 @@ describeRunLlmIntegration('chat history edit (hard LLM integration)', () => {
     expect(styleStep, JSON.stringify(plan.steps)).toBeTruthy();
     expect(styleStepSectionIndex(styleStep)).toBe(GALLERY_INDEX);
     expect(styleStepBackgroundHint(styleStep)).toMatch(/blue/i);
+  });
+
+  it('V3 planner: gallery image description follow-up resolves Our Work gallery (not which section)', async () => {
+    const siteSpec = {
+      sections: [
+        { type: 'services' as const, title: 'Complete HVAC Website Solutions' },
+        { type: 'gallery' as const, title: 'Our Work' },
+        { type: 'about' as const, title: 'hi, this is david' },
+      ],
+    };
+    const workspacePath = await createSyntheticWorkspace({
+      site: siteSpec,
+      pageMode: 'wired',
+      tailwind: 'canonical',
+    });
+    await seedGallerySiteConfigWithImages(workspacePath);
+
+    const plan = await planWithLiveLlm(
+      GALLERY_TURN_TWO_USER,
+      siteSpec,
+      conversationAfterGalleryPlacement()
+    );
+
+    const clarification = plan.clarificationQuestion ?? '';
+    expect(clarification, JSON.stringify(plan)).not.toMatch(/which section/i);
+    expect(clarification, JSON.stringify(plan)).not.toMatch(/which images/i);
+
+    const galleryTarget = plan.targets?.find((t) => t.sectionType === 'gallery');
+    expect(galleryTarget?.sectionTitle, JSON.stringify(plan)).toMatch(/Our Work/i);
   });
 
   it('V3 planner: testimonial style follow-up chooses section background scope', async () => {

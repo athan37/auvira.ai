@@ -4,9 +4,11 @@
 
 import { promises as fs } from 'fs';
 import { runWebsiteEditAgent } from './edit-agent';
-import type { AgentStepEvent } from './edit-shared/types';
+import { buildEditFocusStackAfterEdit, lastGalleryEditFromFocusStack } from './edit-shared/editFocus';
+import type { AgentStepEvent, EditFocusStack } from './edit-shared/types';
 import { isAllowedWorkspacePath } from './workspaceEditShared';
 import { isInfraBaselineReady } from './infra/isInfraBaselineReady';
+import type { WorkspaceGateway } from './workspaceGateway';
 
 export type WebsiteEditAgentMode = 'ts';
 
@@ -25,9 +27,9 @@ export interface WebsiteEditResult {
   needsClarification?: boolean;
   suggestedReplies?: string[];
   editMeta?: import('./edit-shared/types').WebsiteEditAgentResult['editMeta'];
+  lastGalleryEdit?: import('./edit-shared/types').LastGalleryEdit;
+  editFocusStack?: EditFocusStack;
 }
-
-import type { WorkspaceGateway } from './workspaceGateway';
 
 export interface WebsiteEditOptions {
   workspacePath: string;
@@ -37,6 +39,9 @@ export interface WebsiteEditOptions {
   attachments?: import('./workspaceAssetTypes').WorkspaceAssetAttachment[];
   gateway?: WorkspaceGateway;
   conversationHistory?: import('./edit-shared/types').ConversationTurn[];
+  lastGalleryEdit?: import('./edit-shared/types').LastGalleryEdit;
+  editFocusStack?: EditFocusStack;
+  editJobId?: string;
   infraStatus?: 'pending' | 'ready' | 'failed' | string;
   infraVersion?: number;
 }
@@ -71,6 +76,8 @@ export async function runWebsiteEdit(
     infraStatus: options.infraStatus,
     infraVersion: options.infraVersion,
   });
+  const resolvedGalleryEdit =
+    options.lastGalleryEdit ?? lastGalleryEditFromFocusStack(options.editFocusStack);
   const agentOptions = {
     workspacePath: options.workspacePath,
     ownerMessage: options.ownerMessage,
@@ -79,9 +86,23 @@ export async function runWebsiteEdit(
     attachments: options.attachments,
     gateway: options.gateway,
     conversationHistory: options.conversationHistory,
+    lastGalleryEdit: resolvedGalleryEdit ?? undefined,
+    editFocusStack: options.editFocusStack,
     infraBaselineReady,
   };
   const result = await runWebsiteEditAgent(agentOptions, onStep);
+
+  const editFocusStack =
+    result.ok && !result.needsClarification
+      ? buildEditFocusStackAfterEdit({
+          priorStack: options.editFocusStack,
+          result,
+          editJobId: options.editJobId,
+        })
+      : options.editFocusStack ?? { items: [] };
+
+  const lastGalleryEdit =
+    result.lastGalleryEdit ?? lastGalleryEditFromFocusStack(editFocusStack) ?? undefined;
 
   return {
     ok: result.ok,
@@ -97,5 +118,7 @@ export async function runWebsiteEdit(
     needsClarification: result.needsClarification,
     suggestedReplies: result.suggestedReplies,
     editMeta: result.editMeta,
+    lastGalleryEdit,
+    editFocusStack,
   };
 }
