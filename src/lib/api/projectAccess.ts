@@ -1,21 +1,56 @@
 import { auth } from '@/lib/auth';
 import { connectMongoDB } from '@/lib/mongodb';
+import { User } from '@/models/User';
 import { WebsiteProject } from '@/models/WebsiteProject';
 import mongoose from 'mongoose';
 
-/**
- * Returns the current session user id, or null if not authenticated.
- */
-export async function getServerUserId(): Promise<string | null> {
-  const session = await auth();
-  return session?.user?.id ?? null;
-}
-
-function isDevAuthBypassEnabled(): boolean {
+/** Dev-only: SITE_AGENT_DEV_BYPASS_AUTH=1 skips owner checks and API session requirements. */
+export function isDevAuthBypassEnabled(): boolean {
   return (
     process.env.NODE_ENV === 'development' &&
     process.env.SITE_AGENT_DEV_BYPASS_AUTH === '1'
   );
+}
+
+/**
+ * Resolve the dev bypass actor from SITE_AGENT_DEV_BYPASS_USER_ID or the oldest user in MongoDB.
+ */
+export async function resolveDevBypassUserId(): Promise<string | null> {
+  if (!isDevAuthBypassEnabled()) {
+    return null;
+  }
+
+  await connectMongoDB();
+
+  const configured = process.env.SITE_AGENT_DEV_BYPASS_USER_ID?.trim();
+  if (configured) {
+    try {
+      const user = await User.findById(configured).select('_id').lean<{ _id: mongoose.Types.ObjectId }>();
+      if (user?._id) {
+        return user._id.toString();
+      }
+      console.warn('[auth] SITE_AGENT_DEV_BYPASS_USER_ID not found — falling back to first user');
+    } catch {
+      console.warn('[auth] Invalid SITE_AGENT_DEV_BYPASS_USER_ID — falling back to first user');
+    }
+  }
+
+  const fallback = await User.findOne()
+    .sort({ createdAt: 1 })
+    .select('_id')
+    .lean<{ _id: mongoose.Types.ObjectId }>();
+  return fallback?._id?.toString() ?? null;
+}
+
+/**
+ * Returns the current session user id, or the dev bypass user when enabled locally.
+ */
+export async function getServerUserId(): Promise<string | null> {
+  const session = await auth();
+  if (session?.user?.id) {
+    return session.user.id;
+  }
+  return resolveDevBypassUserId();
 }
 
 /**
@@ -55,17 +90,23 @@ export async function getOwnerProject(projectId: string) {
 export async function getProjectActorUserId(
   project: NonNullable<Awaited<ReturnType<typeof getOwnerProject>>>
 ): Promise<string | null> {
-  const sessionUserId = await getServerUserId();
-  return sessionUserId ?? project.ownerId?.toString() ?? null;
+  const actorUserId = await getServerUserId();
+  return actorUserId ?? project.ownerId?.toString() ?? null;
 }
 
 /**
  * Returns 401 JSON if not authenticated.
+ * In local dev with SITE_AGENT_DEV_BYPASS_AUTH=1, uses the configured bypass user.
  */
 export async function requireAuth() {
   const userId = await getServerUserId();
   if (!userId) {
-    return { error: 'Unauthorized', status: 401 };
+    return {
+      error: isDevAuthBypassEnabled()
+        ? 'Unauthorized — set SITE_AGENT_DEV_BYPASS_USER_ID or sign in'
+        : 'Unauthorized',
+      status: 401,
+    };
   }
   return { userId };
 }
