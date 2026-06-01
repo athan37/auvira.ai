@@ -26,6 +26,8 @@ export function buildVerificationContractFromPlan(plan: EditPlan): VerificationC
         checks.push({
           kind: 'section_background',
           sectionIndex,
+          field:
+            merged.presentationField === 'cardClass' ? 'cardClass' : 'backgroundClass',
           expectedValue:
             (merged.backgroundClass as string | undefined) ??
             (merged.backgroundColor as string | undefined),
@@ -61,6 +63,31 @@ export function buildVerificationContractFromPlan(plan: EditPlan): VerificationC
       if (value) {
         checks.push({
           kind: 'business_name',
+          expectedValue: String(value),
+        });
+      }
+    }
+
+    const copySkills = new Set([
+      'update_section_copy',
+      'update_config_field',
+      'update_section_item_copy',
+      'update_cta_label',
+    ]);
+    if (copySkills.has(step.skill)) {
+      const fieldPath =
+        (merged.fieldPath as string | undefined) ??
+        (merged.field === 'title' || merged.field === 'body'
+          ? merged.sectionIndex != null
+            ? `sections[${merged.sectionIndex}].${merged.field}`
+            : undefined
+          : undefined);
+      const value = merged.value ?? merged[merged.field as string];
+      if (fieldPath && value) {
+        checks.push({
+          kind: 'copy_field',
+          field: fieldPath,
+          sectionIndex: coerceIndex(merged.sectionIndex),
           expectedValue: String(value),
         });
       }

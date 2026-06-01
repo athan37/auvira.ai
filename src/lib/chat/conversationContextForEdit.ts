@@ -318,6 +318,24 @@ function mergeCompoundImageEditMessage(message: string): string | null {
   return `${trimmed} (compound: place uploaded image(s) in a new section, then add placeholder descriptions)`;
 }
 
+function mergeSameSectionPinReply(
+  message: string,
+  history: ConversationTurn[]
+): string | null {
+  if (!/\b(same section|that section again|same target)\b/i.test(message)) return null;
+  for (let i = history.length - 1; i >= 0; i--) {
+    const turn = history[i];
+    if (turn.role !== 'user') continue;
+    const meta = turn.metadata as { selectedTarget?: unknown } | undefined;
+    if (meta?.selectedTarget && typeof meta.selectedTarget === 'object') {
+      const pin = meta.selectedTarget as { sectionTitle?: string; sectionType?: string };
+      const label = pin.sectionTitle ?? pin.sectionType ?? 'pinned section';
+      return `${message} (continue with previously pinned section: ${label})`;
+    }
+  }
+  return null;
+}
+
 /**
  * Merge clarification follow-ups and short replies with prior user intent.
  * Closest messages in history carry the most weight when resolving.
@@ -334,6 +352,7 @@ export function resolveEffectiveEditMessage(
   return (
     mergeTestimonialOptionReply(message, recent) ??
     mergeSectionNumberReply(message, recent) ??
+    mergeSameSectionPinReply(message, recent) ??
     mergeCompoundImageEditMessage(message) ??
     (!skipFocusEnrichment ? enrichMessageWithEditFocus(message, editFocusStack) : null) ??
     (!skipFocusEnrichment && editFocusStack?.items.length ? null : mergeGalleryDescriptionFollowUp(message, recent)) ??

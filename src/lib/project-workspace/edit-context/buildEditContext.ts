@@ -7,6 +7,7 @@ import { buildVerificationContract } from './buildVerificationContract';
 import { resolveDuplicateCopyTarget } from './resolveDuplicateCopyTarget';
 import { resolveEditTargetAsync } from './resolveEditTarget';
 import { formatSelectedTargetForMessage } from './resolveSelectedTarget';
+import { buildSelectedTargetContext } from './selectedTargetContext';
 import { selectRelevantContext } from './selectRelevantContext';
 import type {
   BuildEditContextInput,
@@ -138,9 +139,6 @@ export async function buildEditContext(
     input.editFocusStack,
     input.selectedTarget
   );
-  const effectiveMessage = input.selectedTarget
-    ? `${effectiveMessageBase.trim()} ${formatSelectedTargetForMessage(input.selectedTarget)}`.trim()
-    : effectiveMessageBase;
 
   const target = await resolveEditTargetAsync(
     input.ownerMessage,
@@ -153,6 +151,24 @@ export async function buildEditContext(
 
   const sections = buildSections({ siteConfigContent, pageContent });
   const infraBaselineReady = input.infraBaselineReady === true;
+
+  const selectedTargetContext =
+    input.selectedTarget && siteConfigContent
+      ? buildSelectedTargetContext({
+          selectedTarget: input.selectedTarget,
+          siteConfigContent,
+          pageContent,
+          catalog: sectionCatalog,
+          target,
+        })
+      : undefined;
+
+  const effectiveMessage = input.selectedTarget
+    ? `${effectiveMessageBase.trim()} ${formatSelectedTargetForMessage(
+        input.selectedTarget,
+        selectedTargetContext?.recommendedDefaultField?.fieldPath
+      )}`.trim()
+    : effectiveMessageBase;
 
   const draftContext: EditContext = {
     workspacePath: input.workspacePath,
@@ -177,6 +193,7 @@ export async function buildEditContext(
     conversationHistory: input.conversationHistory,
     editFocusStack: input.editFocusStack,
     selectedTarget: input.selectedTarget,
+    selectedTargetContext: selectedTargetContext ?? undefined,
   };
 
   draftContext.selectedSnippets = selectRelevantContext(draftContext);

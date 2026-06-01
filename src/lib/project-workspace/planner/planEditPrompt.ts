@@ -2,11 +2,17 @@ import {
   DEFAULT_EDIT_CONTEXT_TURNS,
   formatWeightedConversationForPrompt,
 } from '@/lib/chat/conversationContextForEdit';
-import { isGalleryDescriptionRequest } from '@/lib/project-workspace/edit-shared/galleryItemDescriptionStrategy';
+import {
+  isGalleryDescriptionRequest,
+  isSectionCardDescriptionRequest,
+} from '@/lib/project-workspace/edit-shared/galleryItemDescriptionStrategy';
 import type { EditContext } from '@/lib/project-workspace/edit-context/types';
 import { formatStructureMap } from '@/lib/project-workspace/edit-shared/resolveSectionTarget';
 import { resolveDuplicateCopyTarget } from '@/lib/project-workspace/edit-context/resolveDuplicateCopyTarget';
 import { formatSelectedTargetForMessage } from '@/lib/project-workspace/edit-context/resolveSelectedTarget';
+import {
+  formatSelectedTargetContextBlock,
+} from '@/lib/project-workspace/edit-context/selectedTargetContext';
 import { EDIT_SKILL_NAMES } from './editPlan.schema';
 
 const PLANNER_SYSTEM = `You are Website Edit Agent planner for small business sites (siteConfig.ts + section-loop page.tsx).
@@ -20,7 +26,7 @@ Rules:
 - Prefer config skills over custom_code_edit (never use custom_code_edit unless the owner explicitly asks for custom code or layout not covered by skills).
 - Never set needsClarification false if any step lacks required params (value, sectionIndex, field, or color).
 - Use clarificationQuestion (not clarificationMessage) when clarifying.
-- update_section_style → section background/card via params.backgroundColor or params.presentation.backgroundClass.
+- update_section_style → section background/card via params.backgroundColor or params.presentation.backgroundClass; use params.presentationField "cardClass" when the owner names an inner element (e.g. "contact information background", "card background") — not the whole section wrapper.
 - update_contact → params phone, email, or address with exact user value.
 - update_hero → params headline, subheadline, or tagline with params.value.
 - update_business_name → params value (siteConfig businessName only).
@@ -80,20 +86,39 @@ export function buildPlanEditUserPrompt(editContext: EditContext, userPrompt: st
   const galleryImageSections = editContext.sections.filter(
     (s) => s.type === 'gallery' && (s.itemCount ?? 0) > 0
   );
+  const sectionCardDescriptionRequest = isSectionCardDescriptionRequest(
+    editContext.effectiveMessage
+  );
   const galleryHint =
-    isGalleryDescriptionRequest(editContext.effectiveMessage) && galleryImageSections.length > 0
+    isGalleryDescriptionRequest(editContext.effectiveMessage) &&
+    !sectionCardDescriptionRequest &&
+    galleryImageSections.length > 0
       ? `Gallery context: owner likely means section [${galleryImageSections[0].index}] "${galleryImageSections[0].title}" (${galleryImageSections[0].itemCount} item(s)). Do not ask which images — add item descriptions in siteConfig.\n\n`
       : '';
 
-  const pinnedTarget = editContext.selectedTarget
-    ? `UI-SELECTED TARGET (pinned): ${formatSelectedTargetForMessage(editContext.selectedTarget)}\n\n`
-    : '';
+  const pinnedSectionIndex = editContext.selectedTargetContext?.resolved.sectionIndex;
+  const pinnedTitleOnlyItems =
+    editContext.selectedTargetContext?.section?.items?.filter(
+      (item) => !(typeof item.imageUrl === 'string' && item.imageUrl.includes('/uploads/'))
+    ) ?? [];
+  const sectionCardHint =
+    sectionCardDescriptionRequest &&
+    pinnedSectionIndex != null &&
+    pinnedTitleOnlyItems.length > 0
+      ? `Section card context: owner wants descriptions on title-only cards in pinned section [${pinnedSectionIndex}] "${editContext.selectedTargetContext?.resolved.sectionTitle ?? ''}". Use update_config_field on sections[${pinnedSectionIndex}].items[j].description for each card (keep titles unchanged).\n\n`
+      : '';
+
+  const pinnedTarget = editContext.selectedTargetContext
+    ? `${formatSelectedTargetContextBlock(editContext.selectedTargetContext)}\n\n`
+    : editContext.selectedTarget
+      ? `UI-SELECTED TARGET (pinned): ${formatSelectedTargetForMessage(editContext.selectedTarget)}\n\n`
+      : '';
 
   return `Business: ${siteModel.parsedConfig?.businessName ?? '(unknown)'}
 Archetype: ${siteModel.archetype}
 Risk: ${riskFlags.level} (${riskFlags.reasons.join('; ') || 'none'})
 
-${duplicateBlock}${galleryHint}${historyBlock}${pinnedTarget}${resolvedTarget}
+${duplicateBlock}${galleryHint}${sectionCardHint}${historyBlock}${pinnedTarget}${resolvedTarget}
 
 Sections:
 ${sectionSummaries || '(none)'}

@@ -2,7 +2,7 @@
  * Preview iframe bridge script (served externally to avoid inline-script CSP blocks).
  */
 
-export const PREVIEW_SECTION_BRIDGE_VERSION = 14;
+export const PREVIEW_SECTION_BRIDGE_VERSION = 15;
 
 const HIGHLIGHT_CLASS = 'site-editor-section-highlight';
 const HOVER_CLASS = 'site-editor-section-hover';
@@ -47,7 +47,27 @@ function findSectionNode(sectionId){
   return document.querySelector('[data-site-section-id="'+sectionId+'"]')||document.querySelector('[data-analytics-id="'+sectionId+'"]')||document.getElementById(sectionId);
 }
 
-function readPayload(el){
+function readElementPayload(sectionEl,target){
+  var node=target;
+  while(node&&node!==sectionEl){
+    if(!node.getAttribute)break;
+    var kind=node.getAttribute("data-site-element-kind");
+    if(kind){
+      var itemIdx=node.getAttribute("data-site-item-index");
+      var parsedIdx=itemIdx!=null?parseInt(itemIdx,10):undefined;
+      return{
+        elementKind:kind,
+        elementLabel:node.getAttribute("data-site-element-label")||"",
+        fieldPath:node.getAttribute("data-site-config-field-path")||"",
+        itemIndex:Number.isFinite(parsedIdx)?parsedIdx:undefined
+      };
+    }
+    node=node.parentElement;
+  }
+  return null;
+}
+
+function readPayload(el,target){
   var id=el.getAttribute("data-site-section-id")||el.getAttribute("data-analytics-id")||el.id||"";
   var idxAttr=el.getAttribute("data-site-section-index");
   var idx=idxAttr!=null?parseInt(idxAttr,10):allSections().indexOf(el);
@@ -56,7 +76,10 @@ function readPayload(el){
   var title=el.getAttribute("data-site-section-title")||el.getAttribute("data-analytics-label")||el.id||type;
   if(id==="hero"||type==="hero"){idx=-1;type="hero";title=title||"Hero";}
   if(!id){id="section_"+idx+"_"+type;}
-  return{sectionId:id,analyticsId:id,sectionIndex:idx,sectionType:type,sectionTitle:title};
+  var base={sectionId:id,analyticsId:id,sectionIndex:idx,sectionType:type,sectionTitle:title,kind:type==="hero"?"hero":"section"};
+  var element=target?readElementPayload(el,target):null;
+  if(!element)return base;
+  return Object.assign({},base,element);
 }
 
 function clearHighlight(){
@@ -108,7 +131,7 @@ document.addEventListener("mousedown",function(e){
   if(e.button!==0||dragState)return;
   var el=findSectionEl(e.target);
   if(!el)return;
-  var payload=readPayload(el);
+  var payload=readPayload(el,e.target);
   if(!payload.sectionId)return;
   e.preventDefault();
   dragState={payload:payload,startX:e.clientX,startY:e.clientY,started:false,el:el};

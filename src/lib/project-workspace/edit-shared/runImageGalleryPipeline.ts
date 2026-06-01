@@ -92,7 +92,9 @@ export async function routeAttachmentEdits(
 
   if (isCaptionOnlyFollowUp(options.ownerMessage, hasAttachments)) {
     const galleryCaptions = await runGalleryItemDescriptionStrategy(options, beforeHashes);
-    if (galleryCaptions) return galleryCaptions;
+    if (galleryCaptions?.ok || galleryCaptions?.needsClarification) {
+      return galleryCaptions;
+    }
   }
 
   if (hasAttachments) {

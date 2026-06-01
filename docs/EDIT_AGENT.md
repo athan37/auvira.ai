@@ -43,7 +43,7 @@ Load path: `resolveEditFocusFromProject()` in stream route → `WebsiteEditAgent
 
 ## Preview section selection (UI pin)
 
-Click-to-select in the **editable preview** (proxy mode only) sends `selectedTarget` on each edit POST. Target resolution priority:
+**Drag** a section from the editable preview (proxy mode) onto chat to pin it. Each edit POST may include `selectedTarget`. Target resolution priority:
 
 1. `selectedTarget` from preview (UI pin)
 2. Explicit section title/number in the current message
@@ -51,7 +51,13 @@ Click-to-select in the **editable preview** (proxy mode only) sends `selectedTar
 4. Section catalog + LLM fallback
 5. Clarification
 
-Contract: `src/lib/project-workspace/edit-shared/selectedTargetTypes.ts` → `resolveSelectedTarget()` in `edit-context/`. Persisted on user chat messages as `metadata.selectedTarget` for traceability. Live/cross-origin preview disables selection mode.
+When a target is pinned, `buildEditContext` attaches `selectedTargetContext` with parsed section values and an **EDITABLE FIELDS** list (config field paths + current values). The planner prompt includes `UI-SELECTED TARGET`, `SELECTED TARGET CONTEXT`, and pin rules. Deterministic routing handles high-confidence pinned copy edits (e.g. "change the title to …") via `update_config_field`.
+
+Element-level pins (optional): preview bridge v15+ reads `data-site-element-kind`, `data-site-config-field-path`, and `data-site-item-index` on clicked elements within a section.
+
+**Inner vs outer background:** When the owner names an inner element (`contact information`, `card`, `info panel`), style edits target `presentation.cardClass` on the pinned section — not `presentation.backgroundClass`. The planner context block lists `STYLABLE PRESENTATION TARGETS` to disambiguate.
+
+Contract: `src/lib/project-workspace/edit-shared/selectedTargetTypes.ts` → `resolveSelectedTarget()` + `buildSelectedTargetContext()` in `edit-context/`. Persisted on user chat messages as `metadata.selectedTarget`. Live/cross-origin preview disables selection mode.
 
 ## LangGraph — defer unless
 

@@ -1,4 +1,6 @@
 import { classifyEditWhat } from '@/lib/project-workspace/edit-context/classifyEditWhat';
+import { inferPresentationStyleTarget } from '@/lib/project-workspace/edit-context/inferPresentationStyleTarget';
+import { inferSelectedTargetField } from '@/lib/project-workspace/edit-context/inferSelectedTargetField';
 import { extractSectionBackgroundClassFromMessage } from '@/lib/builder/sectionPresentation';
 import {
   extractBackgroundColorFromMessage,
@@ -219,6 +221,55 @@ export function buildDeterministicPlan(editContext: EditContext): EditPlan | nul
   const heroStyle = planHeroBackgroundStyle(editContext);
   if (heroStyle) return heroStyle;
 
+  if (editContext.selectedTarget && editContext.selectedTargetContext) {
+    const inferred = inferSelectedTargetField(
+      message,
+      editContext.selectedTargetContext,
+      what
+    );
+    if (inferred?.skipCopyInference) {
+      // fall through to style handlers below
+    } else if (
+      inferred?.fieldPath &&
+      inferred.value &&
+      what === 'copy' &&
+      editContext.target.confidence !== 'low'
+    ) {
+      const sectionIndex = editContext.target.sectionIndex;
+      return {
+        planVersion: 'website-agent',
+        needsClarification: false,
+        intent: 'copy',
+        targets: sectionIndex != null
+          ? [
+              {
+                kind: 'section',
+                sectionIndex,
+                sectionTitle: editContext.target.title,
+                sectionType: editContext.target.sectionType,
+                field: inferred.fieldPath,
+              },
+            ]
+          : [{ kind: 'hero', field: inferred.fieldPath }],
+        verification: [
+          {
+            kind: 'copy_field',
+            field: inferred.fieldPath,
+            sectionIndex,
+            expectedValue: inferred.value,
+          },
+        ],
+        risk: { level: editContext.riskFlags.level, reasons: editContext.riskFlags.reasons },
+        steps: [
+          {
+            skill: 'update_config_field',
+            params: { fieldPath: inferred.fieldPath, value: inferred.value },
+          },
+        ],
+      };
+    }
+  }
+
   const sectionCopy = parseSectionTitleCopyEdit(message);
   if (
     sectionCopy &&
@@ -324,46 +375,67 @@ export function buildDeterministicPlan(editContext: EditContext): EditPlan | nul
     }
   }
 
-  if (what === 'style_background' && editContext.target.sectionIndex != null) {
+  if (editContext.target.sectionIndex != null) {
     const bgClass = extractSectionBackgroundClassFromMessage(message);
     const color = extractBackgroundColorFromMessage(message);
-    if (!bgClass && !color) return null;
+    if (bgClass || color) {
+      const styleTarget = inferPresentationStyleTarget(
+        message,
+        editContext.selectedTargetContext,
+        editContext.target.title
+      );
+      const isInnerElementStyle =
+        styleTarget.presentationField === 'cardClass' && styleTarget.confidence === 'high';
+      const hasPinnedSectionTarget =
+        editContext.target.sectionIndex != null && !!editContext.selectedTarget;
+      const hasColorStyleSignal = Boolean(bgClass || color);
+      const isSectionStyle =
+        hasColorStyleSignal &&
+        (what === 'style_background' ||
+          what === 'style_card' ||
+          isInnerElementStyle ||
+          hasPinnedSectionTarget);
 
-    return {
-      planVersion: 'website-agent',
-      needsClarification: false,
-      intent: 'style',
-      targets: [
-        {
-          kind: 'section',
-          sectionIndex: editContext.target.sectionIndex,
-          sectionTitle: editContext.target.title,
-          sectionType: editContext.target.sectionType,
-        },
-      ],
-      verification: [
-        {
-          kind: 'section_background',
-          sectionIndex: editContext.target.sectionIndex,
-          expectedValue: bgClass ?? undefined,
-        },
-      ],
-      risk: { level: editContext.riskFlags.level, reasons: editContext.riskFlags.reasons },
-      steps: [
-        {
-          skill: 'update_section_style',
-          target: {
-            sectionIndex: editContext.target.sectionIndex,
-            sectionType: editContext.target.sectionType,
-            title: editContext.target.title,
-          },
-          params: {
-            backgroundClass: bgClass ?? undefined,
-            backgroundColor: color ?? undefined,
-          },
-        },
-      ],
-    };
+      if (isSectionStyle) {
+        return {
+          planVersion: 'website-agent',
+          needsClarification: false,
+          intent: 'style',
+          targets: [
+            {
+              kind: 'section',
+              sectionIndex: editContext.target.sectionIndex,
+              sectionTitle: editContext.target.title,
+              sectionType: editContext.target.sectionType,
+            },
+          ],
+          verification: [
+            {
+              kind: 'section_background',
+              sectionIndex: editContext.target.sectionIndex,
+              field: styleTarget.presentationField,
+              expectedValue: bgClass ?? undefined,
+            },
+          ],
+          risk: { level: editContext.riskFlags.level, reasons: editContext.riskFlags.reasons },
+          steps: [
+            {
+              skill: 'update_section_style',
+              target: {
+                sectionIndex: editContext.target.sectionIndex,
+                sectionType: editContext.target.sectionType,
+                title: editContext.target.title,
+              },
+              params: {
+                backgroundClass: bgClass ?? undefined,
+                backgroundColor: color ?? undefined,
+                presentationField: styleTarget.presentationField,
+              },
+            },
+          ],
+        };
+      }
+    }
   }
 
   const contact = parseContactField(message);

@@ -19,6 +19,7 @@ export {
 export interface ConversationTurn {
   role: 'user' | 'assistant';
   content: string;
+  metadata?: Record<string, unknown>;
 }
 
 /** @deprecated Use ConversationTurn */

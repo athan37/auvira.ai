@@ -21,21 +21,27 @@ export async function summarizeActualChangesTool(
     for (let i = 0; i < sections.length; i++) {
       const afterSection = sections[i] as {
         title?: string;
-        presentation?: { backgroundClass?: string };
+        presentation?: { backgroundClass?: string; cardClass?: string };
       };
       const beforeSection = beforeParsed?.sections?.[i] as
-        | { presentation?: { backgroundClass?: string } }
+        | { presentation?: { backgroundClass?: string; cardClass?: string } }
         | undefined;
       const afterBg = afterSection.presentation?.backgroundClass?.trim();
       const beforeBg = beforeSection?.presentation?.backgroundClass?.trim();
-      if (afterBg && afterBg !== beforeBg) {
+      const afterCard = afterSection.presentation?.cardClass?.trim();
+      const beforeCard = beforeSection?.presentation?.cardClass?.trim();
+      const changedPresentation = afterBg && afterBg !== beforeBg ? afterBg : undefined;
+      const changedCardPresentation =
+        !changedPresentation && afterCard && afterCard !== beforeCard ? afterCard : undefined;
+      const changedClass = changedPresentation ?? changedCardPresentation;
+      if (changedClass) {
         const title = afterSection.title ?? `section ${i + 1}`;
         return {
           ok: true,
           changedFiles: [],
           summary: formatSectionBackgroundChangeSummary(
             title,
-            afterBg,
+            changedClass,
             ctx.editContext.effectiveMessage ?? ctx.editContext.ownerMessage
           ),
         };

@@ -33,6 +33,11 @@ export function sectionBackgroundClass(section: Record<string, unknown>): string
     : undefined;
 }
 
+export function sectionCardClass(section: Record<string, unknown>): string | undefined {
+  const presentation = section.presentation as Record<string, unknown> | undefined;
+  return typeof presentation?.cardClass === 'string' ? presentation.cardClass : undefined;
+}
+
 /** siteConfig source must be byte-identical (no mutation on clarify). */
 export function assertSiteConfigUnchanged(before: string, after: string): void {
   expect(after, 'siteConfig must not change').toBe(before);

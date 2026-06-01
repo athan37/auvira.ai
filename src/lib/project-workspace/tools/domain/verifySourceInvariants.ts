@@ -1,4 +1,8 @@
 import { parseSiteConfigSource } from '@/lib/site-manager/siteConfigParser';
+import {
+  parseConfigFieldPath,
+  readConfigFieldValue,
+} from '@/lib/project-workspace/edit-context/configFieldPaths';
 import { assertSectionColorEditInvariants } from '@/lib/project-workspace/sectionPresentationEdit';
 import {
   PAGE_TSX,
@@ -31,8 +35,10 @@ export async function verifySourceInvariantsTool(
       }
 
       const section = ctx.editContext.sections.find((s) => s.index === check.sectionIndex);
+      const presentationField =
+        check.field === 'cardClass' ? 'cardClass' : 'backgroundClass';
       const expectedClass =
-        check.expectedValue ?? parseBackgroundFromContent(siteConfig, check.sectionIndex);
+        check.expectedValue ?? parseBackgroundFromContent(siteConfig, check.sectionIndex, presentationField);
 
       if (!expectedClass) {
         continue;
@@ -45,6 +51,7 @@ export async function verifySourceInvariantsTool(
         sectionIndex: check.sectionIndex,
         rendererComponent: section?.rendererComponent ?? 'GenericSection',
         expectedBackgroundClass: expectedClass,
+        presentationField,
         infraBaselineReady: ctx.editContext.infraBaselineReady,
         changedFiles: ctx.changedFiles,
       });
@@ -99,6 +106,37 @@ export async function verifySourceInvariantsTool(
       }
     }
 
+    if (check.kind === 'copy_field' && check.field && check.expectedValue) {
+      const siteConfig =
+        ctx.afterFiles[SITE_CONFIG] ??
+        (await readWorkspaceRel(ctx.agentOptions, SITE_CONFIG));
+      if (!siteConfig) {
+        errors.push('Missing siteConfig for copy_field verification');
+        continue;
+      }
+      const parsedConfig = parseSiteConfigSource(siteConfig) as Record<string, unknown> | null;
+      const fieldPath = check.field;
+      const parsedPath = parseConfigFieldPath(fieldPath);
+      if (parsedPath && parsedConfig) {
+        const actual = readConfigFieldValue(parsedConfig, parsedPath);
+        if (String(actual ?? '').trim() !== check.expectedValue.trim()) {
+          errors.push(`Copy field ${fieldPath} does not match expected value`);
+        }
+        continue;
+      }
+      if (check.sectionIndex != null && (fieldPath === 'title' || fieldPath === 'body')) {
+        const sections = parsedConfig?.sections;
+        const section =
+          Array.isArray(sections) && sections[check.sectionIndex]
+            ? (sections[check.sectionIndex] as Record<string, unknown>)
+            : undefined;
+        const actual = section?.[fieldPath];
+        if (String(actual ?? '').trim() !== check.expectedValue.trim()) {
+          errors.push(`Section ${fieldPath} does not match expected value`);
+        }
+      }
+    }
+
     if (check.kind === 'generic') {
       if (ctx.changedFiles.length === 0) {
         errors.push('No files changed');
@@ -128,10 +166,15 @@ function readHeroFieldFromSource(content: string, field: string): string | undef
   return match?.[1];
 }
 
-function parseBackgroundFromContent(content: string, sectionIndex: number): string {
+function parseBackgroundFromContent(
+  content: string,
+  sectionIndex: number,
+  field: 'backgroundClass' | 'cardClass' = 'backgroundClass'
+): string {
   const parsed = parseSiteConfigSource(content);
   const section = parsed?.sections?.[sectionIndex] as
-    | { presentation?: { backgroundClass?: string } }
+    | { presentation?: { backgroundClass?: string; cardClass?: string } }
     | undefined;
-  return section?.presentation?.backgroundClass?.trim() ?? '';
+  const value = section?.presentation?.[field];
+  return value?.trim() ?? '';
 }

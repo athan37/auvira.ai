@@ -40,6 +40,7 @@ import {
 import {
   presentationWiringIssues,
   sectionPresentationBackgroundClass,
+  sectionPresentationCardClass,
   sectionRendererUsesPresentationResolver,
 } from './previewReflectsSiteConfig';
 import type { WebsiteEditAgentOptions } from './edit-shared/types';
@@ -66,6 +67,8 @@ export interface SectionPresentationWorkspace {
 export interface ApplySectionBackgroundEditInput {
   workspace: SectionPresentationWorkspace;
   sectionTarget: SectionBackgroundTarget;
+  /** Which presentation token to update (default section wrapper background). */
+  presentationField?: 'backgroundClass' | 'cardClass';
   /** Explicit Tailwind class (e.g. bg-red-600). Takes precedence over colorName. */
   backgroundClass?: string;
   /** Color word from owner message when backgroundClass is omitted. */
@@ -92,6 +95,7 @@ export interface AssertSectionColorEditInvariantsInput {
   sectionIndex: number;
   rendererComponent: string;
   expectedBackgroundClass: string;
+  presentationField?: 'backgroundClass' | 'cardClass';
   infraBaselineReady: boolean;
   changedFiles: string[];
   /** tailwind.config.js content before any pipeline tailwind mutation (infra-ready guard). */
@@ -136,18 +140,22 @@ export function assertSectionColorEditInvariants(
     sectionIndex,
     rendererComponent,
     expectedBackgroundClass,
+    presentationField = 'backgroundClass',
     infraBaselineReady,
     changedFiles,
   } = input;
 
-  const actualClass = sectionPresentationBackgroundClass(siteConfigContent, sectionIndex);
+  const actualClass =
+    presentationField === 'cardClass'
+      ? sectionPresentationCardClass(siteConfigContent, sectionIndex)
+      : sectionPresentationBackgroundClass(siteConfigContent, sectionIndex);
   if (actualClass !== expectedBackgroundClass) {
     errors.push(
-      `siteConfig section ${sectionIndex} backgroundClass is "${actualClass ?? 'missing'}", expected "${expectedBackgroundClass}"`
+      `siteConfig section ${sectionIndex} ${presentationField} is "${actualClass ?? 'missing'}", expected "${expectedBackgroundClass}"`
     );
   }
 
-  if (!sectionRendererUsesPresentationResolver(pageContent, rendererComponent)) {
+  if (presentationField === 'backgroundClass' && !sectionRendererUsesPresentationResolver(pageContent, rendererComponent)) {
     errors.push(`${rendererComponent} does not use resolveSectionBackground`);
   }
 
@@ -229,6 +237,7 @@ export async function applySectionBackgroundEdit(
   input: ApplySectionBackgroundEditInput
 ): Promise<ApplySectionBackgroundEditResult> {
   const { workspace, sectionTarget, projectInfraStatus } = input;
+  const presentationField = input.presentationField ?? 'backgroundClass';
   const options = workspaceOptions(workspace);
   const infraReady = projectInfraStatus.infraBaselineReady === true;
 
@@ -288,10 +297,12 @@ export async function applySectionBackgroundEdit(
   const sectionType = sectionTarget.sectionType || String(section?.type ?? 'generic');
 
   const colorName = input.colorName ?? backgroundClass.replace(/^bg-/, '');
+  const presentationPatch =
+    presentationField === 'cardClass'
+      ? { cardClass: backgroundClass }
+      : { backgroundClass };
   const updated = input.backgroundClass
-    ? updateSectionPresentationInSource(siteConfigBefore, sectionIndex, {
-        backgroundClass,
-      })
+    ? updateSectionPresentationInSource(siteConfigBefore, sectionIndex, presentationPatch)
     : updateSectionBackgroundColorInSource(
         siteConfigBefore,
         sectionIndex,
@@ -300,7 +311,9 @@ export async function applySectionBackgroundEdit(
       );
 
   const presentationAlreadyCorrect =
-    sectionPresentationBackgroundClass(siteConfigBefore, sectionIndex) === backgroundClass;
+    presentationField === 'cardClass'
+      ? sectionPresentationCardClass(siteConfigBefore, sectionIndex) === backgroundClass
+      : sectionPresentationBackgroundClass(siteConfigBefore, sectionIndex) === backgroundClass;
 
   if ((!updated || updated === siteConfigBefore) && !presentationAlreadyCorrect) {
     return {
@@ -384,6 +397,7 @@ export async function applySectionBackgroundEdit(
     sectionIndex,
     rendererComponent,
     expectedBackgroundClass: backgroundClass,
+    presentationField,
     infraBaselineReady: infraReady,
     changedFiles,
     tailwindContentBefore: tailwindBefore,

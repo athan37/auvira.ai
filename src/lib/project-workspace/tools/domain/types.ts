@@ -6,6 +6,7 @@ export const DOMAIN_TOOL_NAMES = [
   'get_site_model',
   'find_section',
   'update_copy_field',
+  'update_config_field',
   'update_contact_info',
   'update_section_list',
   'apply_section_background',

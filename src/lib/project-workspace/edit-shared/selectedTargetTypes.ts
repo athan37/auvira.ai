@@ -9,6 +9,11 @@ export interface SelectedTargetInput {
   sectionIndex?: number;
   sectionType?: string;
   sectionTitle?: string;
+  /** Optional element pin (Phase 3+). */
+  fieldPath?: string;
+  itemIndex?: number;
+  elementKind?: string;
+  elementLabel?: string;
 }
 
 /** Normalize client/API selectedTarget to a consistent shape. */
@@ -44,6 +49,23 @@ export function normalizeSelectedTarget(
       ? input.sectionTitle.trim()
       : undefined;
 
+  const fieldPath =
+    typeof input.fieldPath === 'string' && input.fieldPath.trim()
+      ? input.fieldPath.trim()
+      : undefined;
+  const itemIndex =
+    typeof input.itemIndex === 'number' && Number.isFinite(input.itemIndex)
+      ? input.itemIndex
+      : undefined;
+  const elementKind =
+    typeof input.elementKind === 'string' && input.elementKind.trim()
+      ? input.elementKind.trim()
+      : undefined;
+  const elementLabel =
+    typeof input.elementLabel === 'string' && input.elementLabel.trim()
+      ? input.elementLabel.trim()
+      : undefined;
+
   if (kind === 'hero') {
     return {
       kind: 'hero',
@@ -51,6 +73,10 @@ export function normalizeSelectedTarget(
       analyticsId: sectionId ?? 'hero',
       sectionType: 'hero',
       sectionTitle: sectionTitle ?? 'Hero',
+      fieldPath,
+      itemIndex,
+      elementKind,
+      elementLabel,
     };
   }
 
@@ -66,6 +92,10 @@ export function normalizeSelectedTarget(
     sectionIndex,
     sectionType,
     sectionTitle,
+    fieldPath,
+    itemIndex,
+    elementKind,
+    elementLabel,
   };
 }
 

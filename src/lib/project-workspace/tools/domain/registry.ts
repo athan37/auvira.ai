@@ -9,6 +9,7 @@ import {
 import { summarizeActualChangesTool } from './summarizeActualChanges';
 import { updateContactInfoTool } from './updateContactInfo';
 import { updateCopyFieldTool } from './updateCopyField';
+import { updateConfigFieldTool } from './updateConfigField';
 import { getSiteModelTool, replaceImageTool, updateThemeTool } from './updateTheme';
 import { verifySourceInvariantsTool } from './verifySourceInvariants';
 import type { DomainToolContext, DomainToolHandler, DomainToolName, DomainToolResult } from './types';
@@ -17,6 +18,7 @@ const HANDLERS: Record<DomainToolName, DomainToolHandler> = {
   get_site_model: (ctx) => getSiteModelTool(ctx),
   find_section: findSectionTool,
   update_copy_field: updateCopyFieldTool,
+  update_config_field: updateConfigFieldTool,
   update_contact_info: updateContactInfoTool,
   update_section_list: updateSectionListTool,
   apply_section_background: applySectionBackgroundTool,
@@ -35,6 +37,9 @@ export const SKILL_TO_DOMAIN_TOOL: Partial<Record<string, DomainToolName>> = {
   update_contact: 'update_contact_info',
   update_business_name: 'update_copy_field',
   update_section_copy: 'update_copy_field',
+  update_config_field: 'update_config_field',
+  update_section_item_copy: 'update_config_field',
+  update_cta_label: 'update_config_field',
   update_theme: 'update_theme',
   update_section_style: 'apply_section_background',
   add_section: 'add_section',
@@ -84,15 +89,32 @@ export function paramsForSkill(
   }
 
   if (skill === 'update_section_copy') {
+    const fieldPath = merged.fieldPath as string | undefined;
     const field = (merged.field as string) ?? 'title';
+    const sectionIndex =
+      typeof merged.sectionIndex === 'number'
+        ? merged.sectionIndex
+        : editContext.target.sectionIndex;
+    const value = merged.value ?? merged[field];
+    if (fieldPath) {
+      return { fieldPath, value };
+    }
     return {
       scope: 'section',
       field,
-      sectionIndex:
-        typeof merged.sectionIndex === 'number'
-          ? merged.sectionIndex
-          : editContext.target.sectionIndex,
-      value: merged.value ?? merged[field],
+      sectionIndex,
+      value,
+    };
+  }
+
+  if (
+    skill === 'update_config_field' ||
+    skill === 'update_section_item_copy' ||
+    skill === 'update_cta_label'
+  ) {
+    return {
+      fieldPath: merged.fieldPath ?? merged.field,
+      value: merged.value,
     };
   }
 
@@ -104,6 +126,7 @@ export function paramsForSkill(
           : editContext.target.sectionIndex,
       backgroundClass: merged.backgroundClass,
       backgroundColor: merged.backgroundColor ?? merged.color,
+      presentationField: merged.presentationField,
       sectionType: merged.sectionType ?? editContext.target.sectionType,
       title: merged.title ?? editContext.target.title,
       rendererComponent: merged.rendererComponent ?? editContext.target.rendererComponent,

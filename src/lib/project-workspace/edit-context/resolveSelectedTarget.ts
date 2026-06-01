@@ -118,14 +118,23 @@ export function resolveSelectedTarget(
 }
 
 /** Append pinned target hint for planner visibility. */
-export function formatSelectedTargetForMessage(selectedTarget: SelectedTargetInput): string {
+export function formatSelectedTargetForMessage(
+  selectedTarget: SelectedTargetInput,
+  recommendedFieldPath?: string
+): string {
   if (selectedTarget.kind === 'hero') {
-    return '(UI-selected section: hero "Hero")';
+    const fieldHint = selectedTarget.fieldPath ?? recommendedFieldPath;
+    return fieldHint
+      ? `(UI-selected section: hero "Hero", field ${fieldHint})`
+      : '(UI-selected section: hero "Hero")';
   }
   const parts = [
     selectedTarget.sectionIndex != null ? `index ${selectedTarget.sectionIndex}` : null,
     selectedTarget.sectionId ? `id "${selectedTarget.sectionId}"` : null,
     selectedTarget.sectionTitle ? `title "${selectedTarget.sectionTitle}"` : null,
+    selectedTarget.fieldPath ?? recommendedFieldPath
+      ? `field ${selectedTarget.fieldPath ?? recommendedFieldPath}`
+      : null,
   ].filter(Boolean);
   return `(UI-selected section: ${parts.join(', ')})`;
 }

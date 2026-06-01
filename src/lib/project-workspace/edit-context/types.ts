@@ -5,6 +5,7 @@ import type { SelectedTargetInput } from '@/lib/project-workspace/edit-shared/se
 import type { SiteSectionCatalog } from '@/lib/project-workspace/edit-shared/siteSectionCatalog';
 import type { WorkspaceMode } from '@/lib/project-workspace/edit-shared/types';
 import type { SiteModel } from '@/lib/project-workspace/site-model/types';
+import type { SelectedTargetContext } from './selectedTargetContext';
 
 export type EditIntentKind =
   | 'copy'
@@ -113,6 +114,7 @@ export interface EditContext {
   conversationHistory?: ConversationTurn[];
   editFocusStack?: EditFocusStack;
   selectedTarget?: SelectedTargetInput;
+  selectedTargetContext?: SelectedTargetContext;
 }
 
 export interface BuildEditContextInput {

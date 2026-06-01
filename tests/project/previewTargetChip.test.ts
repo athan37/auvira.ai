@@ -34,6 +34,15 @@ describe('previewTargetChipLabels', () => {
     expect(formatPreviewTargetLabel(ctaTarget)).toBe('CTA: Book Now');
   });
 
+  it('formats field-level labels when fieldPath is pinned', () => {
+    expect(
+      formatPreviewTargetLabel({
+        ...ctaTarget,
+        fieldPath: 'sections[2].title',
+      })
+    ).toBe('CTA: Book Now › title');
+  });
+
   it('renders pinned and used chip labels with unified copy', () => {
     expect(formatPreviewTargetChipText(heroTarget, 'pinned')).toBe('Pinned: Hero');
     expect(formatPreviewTargetChipText(ctaTarget, 'used')).toBe('Used: CTA: Book Now');

@@ -26,8 +26,14 @@ export async function applySectionBackgroundTool(
     };
   }
 
+  const presentationField =
+    params.presentationField === 'cardClass' || params.presentationField === 'backgroundClass'
+      ? params.presentationField
+      : 'backgroundClass';
+  const ownerMessage = ctx.editContext.effectiveMessage ?? ctx.editContext.ownerMessage ?? '';
+
   const section = ctx.editContext.sections.find((s) => s.index === sectionIndex);
-  const backgroundClass = resolveSectionBackgroundClassForEdit(ctx.editContext.effectiveMessage, {
+  const backgroundClass = resolveSectionBackgroundClassForEdit(ownerMessage, {
     backgroundClass:
       typeof params.backgroundClass === 'string' ? params.backgroundClass : undefined,
     backgroundColor:
@@ -59,7 +65,8 @@ export async function applySectionBackgroundTool(
     ''
   );
   pipelineInput.backgroundClass = backgroundClass;
-  pipelineInput.workspace.ownerMessage = ctx.editContext.effectiveMessage;
+  pipelineInput.presentationField = presentationField;
+  pipelineInput.workspace.ownerMessage = ownerMessage;
 
   const result = await applySectionBackgroundEdit(pipelineInput);
 
@@ -78,6 +85,7 @@ export async function applySectionBackgroundTool(
     invariantErrors: result.ok ? undefined : result.invariantErrors,
     evidence: {
       backgroundClass: result.backgroundClass,
+      presentationField,
       sectionIndex: String(result.sectionIndex),
       sectionTitle: result.sectionTitle,
     },

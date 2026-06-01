@@ -43,6 +43,19 @@ export function sectionPresentationBackgroundClass(
   return typeof bg === 'string' && bg.trim() ? bg.trim() : null;
 }
 
+/** Read presentation.cardClass for a section index. */
+export function sectionPresentationCardClass(
+  siteConfigContent: string,
+  sectionIndex: number
+): string | null {
+  const parsed = parseSiteConfigSource(siteConfigContent);
+  const section = parsed?.sections?.[sectionIndex] as
+    | { presentation?: { cardClass?: string } }
+    | undefined;
+  const card = section?.presentation?.cardClass;
+  return typeof card === 'string' && card.trim() ? card.trim() : null;
+}
+
 /** Expected bg-* classes from owner message color words (e.g. red -> bg-red-200). */
 export function expectedBackgroundClassesFromMessage(ownerMessage: string): string[] {
   const hints = extractPreviewVerifyHints(ownerMessage);

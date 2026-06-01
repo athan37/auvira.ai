@@ -1,122 +1,130 @@
-# AI Website Migration Agent
+# AI Website Migration Agent (Site Agent)
 
-Turn an outdated business website into a clean Git-backed site, then maintain it through chat.
+Turn an outdated business website into a clean Git-backed Next.js site, then maintain it through plain-language chat. Owners can **clone an existing URL** or **start from scratch**, review an AI-generated plan, publish through a build gate, and iterate in a project workspace with live preview.
 
-## How It Works
+**Package name:** `ai-website-migration-agent`  
+**Node:** `>=20 <21` (see `engines` in [`package.json`](package.json))
 
-### Two Product Modes
+---
 
-**1. Clone existing website**
-Paste a URL → system crawls it → generates a fresh Next.js site → commits to GitLab → deploys to Vercel.
+## Overview
 
-**2. Create from scratch**
-Fill in a short form → system writes a website plan → builds and deploys the site.
+Site Agent is a Next.js application that:
 
-### Architecture
+1. **Extracts** business facts from an existing site (clone mode) or a short intake form (scratch mode)
+2. **Generates** a one-page Next.js + Tailwind site from deterministic templates — the LLM produces JSON (`siteConfig`, copy, colors), not React source
+3. **Validates** every build locally before GitLab commit or Vercel deploy
+4. **Maintains** the site via a GitLab-backed edit agent: chat edits run against a workspace preview, with rollback and diff review
 
-The LLM only generates JSON data (business info, section copy, colors). It never generates code. A static React template reads from `siteConfig.ts` to render the page. Every generated site passes a local build validation before it is committed or deployed — broken code never reaches Vercel.
+Authenticated owners get a dashboard, per-project editor (preview + chat + publish), optional product catalog, and site health monitoring.
 
-### Reliability
+---
 
-- **Build gate**: All generated sites are built with `npm run build` in a temp directory. Only successful builds are committed to GitLab and deployed to Vercel.
-- **Vercel readiness polling**: The UI polls for deployment status every 5 seconds. "Open Live Site" is only enabled once Vercel reports READY, preventing owners from opening 404 URLs.
-- **Content fidelity**: Clone mode validates the generated site against extracted facts, blocking hallucinated phone numbers (e.g., 555 prefixes), fake testimonials, and fake awards.
+## Product modes
 
-### Owner Loop
+| Mode | Entry | Flow |
+|------|--------|------|
+| **Clone** | Dashboard → **New from URL** or `/projects/new/clone` | Crawl → plan → template pick → build preview → save backup → publish live |
+| **Scratch** | Dashboard → **Start without a URL** or `/projects/new/scratch` | Intake form → plan → build → publish |
 
-After deployment, the owner can chat to update the site — "Add pricing section", "Update phone number", "Make it more premium". Each edit runs the build gate before commit; if validation fails, the previous live site stays unchanged. **Publish live site** saves a backup copy to GitLab, then updates the public URL on Vercel (SHA-pinned deploy; live badge shows **Live** only when the deployment matches your backup).
+### Owner-facing UI
 
-#### Owner-facing UI (dashboard → editor)
+| Area | What owners see |
+|------|-----------------|
+| **Dashboard** | Getting-started checklist; in-progress clone jobs; project list |
+| **Clone wizard** | Phase progress; template gallery; **Save backup copy** / **Publish live site** |
+| **Editor** (`/projects/[projectId]`) | Draft preview; Chat / Changes / Publish tabs; sticky publish when there are unpublished edits |
 
-| Step             | What owners see                                                                                                                                                                |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Dashboard**    | Getting-started checklist; **In progress** clone jobs with **Continue setup**; **New from URL** or **Start without a URL**                                                     |
-| **Clone wizard** | Phase progress (bar stays below 100% until publish completes); **Pick a look** template gallery before **Build Preview**; unified **Save backup copy** / **Publish live site** |
-| **Editor**       | Draft preview (left); Chat / Changes / **Publish** tabs; sticky **Publish live** when there are unpublished edits; plain status (**Live**, **Updating live site…**)            |
+Primary actions avoid GitLab/Vercel jargon — **backup copy**, **draft preview**, **live website**.
 
-**Language:** Primary actions avoid GitLab/Vercel jargon — use **backup copy**, **draft preview**, and **live website**. Advanced links to the GitLab repo are optional.
+---
 
-**Failed edits:** Chat suggests opening the **Changes** tab; the UI auto-switches there on failure so owners can review files or undo.
+## Architecture
 
-#### Product catalog (Phase 2)
-
-Owners can add products under **Publish → Product catalog** in the project editor. Products are stored in MongoDB (`Product` model, scoped by `projectId`). **Add products to draft preview** merges a product grid into `src/lib/siteConfig.ts` in the local workspace; **Publish live site** deploys that draft.
-
-- `GET/POST /api/projects/[projectId]/catalog` — list / create products
-- `POST /api/projects/[projectId]/catalog/sync` — inject catalog into draft `siteConfig`
-
-Sites remain static export (`output: 'export'`); listings use inquiry CTAs or external product links, not native checkout.
-
-#### Commerce (Phase 3 — not enabled by default)
-
-Online checkout is planned via Stripe Payment Links or an embed (Shopify/Woo). Configuration stub: set `STRIPE_CHECKOUT_ENABLED=true` and `STRIPE_SECRET_KEY` when implementing checkout (`src/lib/commerce/stripeConfig.ts`). Until then, use catalog + contact CTAs.
-
-#### Regression: deploy consistency
-
-```bash
-npx tsx scripts/e2e-deploy-verify.ts --project-id <id>
+```
+Owner UI (Next.js)
+ │
+ ├─ Clone / scratch agents ──► LLM (JSON siteSpec / websitePlan)
+ │         │
+ │         ▼
+ │   Builder templates ──► generated Next.js site
+ │         │
+ │         ▼
+ │   Build gate (npm install + next build)
+ │         │
+ │         ▼
+ └─ Edit agent ──► GitLab workspace ◄──► GitLab repo ──► Vercel deploy
+                           │
+                           └─ Preview: local proxy (dev) or Vercel Sandbox (production)
 ```
 
-Verifies GitLab commit visibility, SHA-pinned Vercel deploy, and production HTML match. Recommended in CI after infra changes.
+### Core design rules
 
-### Stack
+- **LLM generates data only** — section copy, CTAs, colors, business facts — never React components or Tailwind class strings in generated output
+- **Templates render the page** — `src/lib/builder/pageTemplate.ts` and related builder code read `siteConfig.ts`
+- **Build gate** — generated and edited sites must pass `npm run build` in a temp workspace before commit/deploy; failed edits do not replace the live site
+- **GitLab is required for owner edits** — projects without a complete GitLab link return **409** on edit APIs
+- **Deploy consistency** — publish syncs the full workspace to GitLab, waits for commit visibility, then triggers a SHA-pinned Vercel build
 
-- Next.js 14 + Tailwind CSS + TypeScript
-- GitLab (code storage for generated customer sites)
-- Vercel (hosting for this app and customer sites)
-- Local LLM proxy (any OpenAI-compatible API)
+### Website Edit Agent
 
-## CI/CD (GitHub + Vercel)
+Owner chat edits on `/projects/[projectId]` use the TypeScript edit agent:
 
-**GitHub** runs CI on every push/PR to `main` (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)): `typecheck` → `test` (unit only, no live LLM) → `build`.
+```
+buildEditContext → resolveEditTarget → planEdit → executePlan → domain tools → verify → summarize
+```
 
-### Testing
+- **HTTP:** `POST /api/projects/[projectId]/code-agent/edit/stream` (SSE)
+- **Runner:** `src/lib/project-workspace/websiteEditRunner.ts`
+- **Agent:** `src/lib/project-workspace/edit-agent/index.ts`
 
-See **[`AGENTS.md`](AGENTS.md)** for agent workflow: local keys live in **`.env` / `.env.local`** (from `.env.example`); **run LLM integration tests locally** (`npm run test:llm` or `npm run test:all`) before merging edit-agent changes for best coverage.
+Owners can **drag a section from the preview iframe onto chat** to pin a `selectedTarget` for scoped edits. See [`docs/EDIT_AGENT.md`](docs/EDIT_AGENT.md) and [`AGENTS.md`](AGENTS.md) (preview bridge, focus stack, inner-element styling).
 
-| Command | What runs | Typical time |
-| -------- | ---------- | ------------- |
-| `npm test` | Unit + integration tests (**excludes** `*.llm.test.ts` and live LLM integration files) | ~5–15s |
-| `npm run test:llm` | Live MiniMax planner/E2E tests (requires `MINIMAX_API_KEY` in `.env`) | ~100s |
-| `npm run test:llm:presentation` | Section presentation token LLM suite only | ~80s |
-| `npm run test:all` | `npm test` then `npm run test:llm` | ~2 min |
-| `npm run test:contracts` | Section color contracts + classifier/strategy (deterministic) | ~1–2s |
-| `npm run test:llm:contracts` | LLM smoke: 3 synthetic section-color cases (needs `MINIMAX_API_KEY` in `.env`) | ~5–30s |
+### Preview modes
 
-LLM suites use a **120s** per-test timeout (`tests/llmTestGate.ts`). Default unit tests use **5s** so hung tests fail fast.
+| Environment | Preview |
+|-------------|---------|
+| **Local dev** | Git clone → scratch disk → `next dev` → `/api/projects/.../preview/proxy` |
+| **Vercel (`VERCEL=1`)** | [Vercel Sandbox](https://vercel.com/docs/vercel-sandbox): isolated VM, `git clone` + `npm run dev` (~30 min TTL). See [`docs/VERCEL_SANDBOX_IMPLEMENTATION.md`](docs/VERCEL_SANDBOX_IMPLEMENTATION.md) |
+| **Live iframe** | Published Vercel URL (`previewMode: 'live'`) — no section drag-to-chat |
 
-**Vercel** deploys the app when you connect the GitHub repo (do not also run `vercel deploy` from Actions or you will double-deploy).
+### Other features
 
-### One-time Vercel setup
+- **Product catalog (Phase 2)** — MongoDB `Product` model; sync into draft `siteConfig`; static export with inquiry CTAs (no native checkout)
+- **Site Manager** — scheduled checks (uptime, phone, hours, services, banner expiry); incidents and fix proposals via `/api/projects/[projectId]/site-manager/*`
+- **Analytics** — optional runtime on generated sites; collect endpoint at `/api/analytics/collect`
+- **Commerce (Phase 3, not enabled)** — Stripe checkout stub in `src/lib/commerce/stripeConfig.ts`; not wired in `.env.example`
 
-1. [Vercel](https://vercel.com) → **Add Project** → import `athan37/la-mue-site-builder`.
-2. **Production Branch:** `main` (pushes to `main` deploy production; other branches get Preview URLs if enabled).
-3. **Environment variables** (Production + Preview): `MONGODB_URI`, `NEXTAUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, GitLab, MiniMax, etc. **You do not need** `NEXTAUTH_URL` or `NEXT_PUBLIC_APP_URL` on Vercel — Auth.js detects the host when `VERCEL=1` (set automatically), and `next.config.js` sets `NEXT_PUBLIC_APP_URL` from `VERCEL_URL` at build time. Override only if you use a custom domain. Optional customer-site deploys: `SITE_AGENT_VERCEL_TOKEN`.
-4. After first deploy, add your Vercel URL to **Google OAuth** redirect URIs: `https://<your-domain>/api/auth/callback/google` (this step cannot be fully automated).
-5. Push to `main` and confirm a deployment appears under Vercel → **Deployments**.
+---
 
-### Vercel Sandbox dev preview (production editor)
+## Tech stack
 
-When this app runs on Vercel (`VERCEL=1`), owner projects use [Vercel Sandbox](https://vercel.com/docs/vercel-sandbox) for a local-like preview: `git clone` → `npm install` → `npm run dev` in an isolated VM (~30 minutes per session). Chat edits run on the **same filesystem** as the dev server.
+| Layer | Technology |
+|-------|------------|
+| App | Next.js 14, React 18, TypeScript, Tailwind CSS |
+| Auth | Auth.js (NextAuth v5), Google OAuth |
+| Data | MongoDB (Mongoose) — users, projects, chat, catalog, site health |
+| Code storage | GitLab (generated customer sites) |
+| Hosting | Vercel (this app + customer sites) |
+| LLM | MiniMax (default), optional Gemini for tool loop, optional local proxy |
+| Preview (prod) | `@vercel/sandbox` |
+| Tests | Vitest |
 
-- **Enable:** default on Vercel; set `SITE_AGENT_SANDBOX_ENABLED=0` to fall back to the published live URL iframe.
-- **Auth:** Vercel OIDC on deployments (recommended) or `vercel env pull` token for local SDK testing.
-- **TTL:** `SITE_AGENT_SANDBOX_TIMEOUT` (default `30m`), aligned with scratch release on editor leave.
-- **Local dev:** unchanged — still uses scratch disk + `/api/.../preview/proxy` (no Sandbox).
+---
 
-See `docs/VERCEL_SANDBOX_IMPLEMENTATION.md` for architecture and rollout notes.
+## Prerequisites
 
-### Optional: require CI before merge
+- **Node.js 20** (`engines` in `package.json`)
+- **MongoDB** — local or Atlas (`MONGODB_URI`)
+- **Google OAuth** app — for sign-in
+- **GitLab** personal access token + group ID — repo creation for generated sites
+- **MiniMax API key** — generation, planning, and edit agent (required for LLM tests)
+- **Optional:** `SITE_AGENT_VERCEL_TOKEN` — deploy **customer** sites via Vercel API (not required to host this app on Vercel)
+- **Optional:** `rg` (ripgrep) on PATH — complex edit-agent tool loop
 
-GitHub → **Settings** → **Branches** → protect `main` → require status check **CI**.
+---
 
-1. Enter an existing small-business website URL
-2. The system crawls the website and extracts business info using your local LLM proxy
-3. Generates a modern one-page Next.js/Tailwind website
-4. Creates a GitLab repo and commits the generated files
-5. Supports follow-up edits like "add FAQ" or "add booking button"
-
-## Setup Instructions
+## Setup
 
 ### 1. Install dependencies
 
@@ -126,636 +134,254 @@ npm install
 
 ### 2. Configure environment
 
-Copy `.env.example` to `.env.local` and fill in the values:
+Copy [`.env.example`](.env.example) to **`.env.local`** (Next.js dev) and/or **`.env`** (Vitest via `node --env-file=.env`):
 
 ```bash
 cp .env.example .env.local
+cp .env.example .env   # optional; recommended for npm test scripts
 ```
 
-Edit `.env.local`:
+Fill in values — **never commit** `.env` or `.env.local`.
 
-- `GITLAB_TOKEN`: Your GitLab personal access token
-- `GITLAB_GROUP_ID`: The ID of your GitLab group where projects will be created
-- `SITE_AGENT_VERCEL_TOKEN`: Optional — Vercel API token so the app can create/deploy **customer** sites (not required to host this app on Vercel)
-- `SITE_AGENT_VERCEL_TEAM_ID`: Optional team ID if your token is team-scoped
+### 3. GitLab token
 
-### 3. Configure MiniMax API
+Create a GitLab personal access token with scopes: `api`, `read_user`, `read_repository`, `write_repository`. Set `GITLAB_TOKEN` and `GITLAB_GROUP_ID`.
 
-Set in `.env.local` (see `.env.example`):
+### 4. Google OAuth
 
-| Variable          | Example                                        |
-| ----------------- | ---------------------------------------------- |
-| `LLM_PROVIDER`    | `minimax` (default — direct API)               |
-| `MINIMAX_API_KEY` | `sk-cp-...`                                    |
-| `MINIMAX_API_URL` | `https://api.minimax.io/anthropic/v1/messages` |
-| `MINIMAX_MODEL`   | `MiniMax-M2.7-highspeed`                       |
+1. [Google Cloud Console](https://console.cloud.google.com/) → OAuth 2.0 Client ID (Web)
+2. Redirect URI: `http://localhost:3000/api/auth/callback/google`
+3. JavaScript origin: `http://localhost:3000`
+4. Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `AUTH_SECRET` (or `NEXTAUTH_SECRET`)
 
-**Optional:** use a local proxy instead (`LLM_PROVIDER=minimax-proxy`, `MINIMAX_PROXY_URL=http://localhost:3457/minimax-json`).
-
-### 4. Create GitLab Token
-
-1. Go to GitLab → Settings → Access Tokens
-2. Create a token with these scopes:
-   - `api`
-   - `read_user`
-   - `read_repository`
-   - `write_repository`
-3. Copy the token to `GITLAB_TOKEN` in `.env.local`
-
-### 5. Find GitLab Group ID
-
-1. Go to your GitLab group
-2. The group ID is in the URL: `https://gitlab.com/groups/<group-name>/-/groups/<group-id>`
-3. Or use the GitLab API: `GET /groups/:group_path`
-
-### 6. Optional: Configure Vercel for Live Preview
-
-Vercel integration enables automatic deployment to a live URL. Without it, you can still use the GitLab repo.
-
-1. **Create Vercel Token:**
-   - Go to https://vercel.com/account/tokens
-   - Create a new token with scope `full` or `deployments`
-   - Add `SITE_AGENT_VERCEL_TOKEN` to `.env.local` (optional; legacy `VERCEL_API_TOKEN` / `VERCEL_TOKEN` still work locally)
-
-2. **Find Vercel Team ID (if using a team):**
-   - Go to https://vercel.com/account/teams
-   - Your team ID is in the team settings URL
-   - Add `SITE_AGENT_VERCEL_TEAM_ID` to `.env.local` only if using a team-scoped token (optional)
-
-3. **Note:** Vercel will automatically import the GitLab repo and deploy. First deploy may take 1-3 minutes.
-
-### 7. Run the app
+### 5. Run the app
 
 ```bash
 npm run dev
 ```
 
-Visit http://localhost:3000
+Open [http://localhost:3000](http://localhost:3000). Sign in → dashboard → create or open a project.
 
-### 8. Enable owner website edits (TypeScript agent)
-
-After a project is saved to GitLab, edits on `/projects/[projectId]` use the **TypeScript WebsiteEditAgent** in [`src/lib/project-workspace/edit-shared/`](src/lib/project-workspace/edit-shared/):
-
-- **Router** picks single-shot (fast) vs tool loop (complex edits)
-- **Single-shot** for simple style/color requests (direct MiniMax API)
-- **Tool loop** for sections, copy, and repo-wide changes (requires `rg` on PATH)
-
-Clone-job preview-chat on `/clone/jobs/[id]` is a separate flow.
-
-**1. Set `MINIMAX_API_KEY`** (and optional `MINIMAX_MODEL`).
-
-**2. Start Next.js:**
-
-```bash
-npm run dev
-```
-
-| Variable                    | Purpose                                            |
-| --------------------------- | -------------------------------------------------- |
-| `LLM_PROVIDER`              | `minimax` (default), `minimax-proxy`, or `gemini`  |
-| `WEBSITE_EDIT_LLM_PROVIDER` | Optional: set to `gemini` for agent tool-loop only |
-
-**Troubleshooting**
-
-| Symptom                       | Fix                                                                    |
-| ----------------------------- | ---------------------------------------------------------------------- |
-| `No files were changed`       | Retry; for complex edits be more specific                              |
-| `I had trouble understanding` | MiniMax JSON failed twice — try `WEBSITE_EDIT_LLM_PROVIDER=gemini`     |
-| Preview 503                   | Restart page; preview dev server may be hung (see workspace bootstrap) |
-
-## Test API Endpoints
-
-### 1. LLM Generate JSON
-
-```bash
-curl -X POST http://localhost:3000/api/llm/generate-json \
-  -H "Content-Type: application/json" \
-  -d '{
-    "prompt": "Return a simple JSON object with a greeting message",
-    "schema": {
-      "type": "object",
-      "properties": {
-        "message": { "type": "string" }
-      },
-      "required": ["message"]
-    }
-  }'
-```
-
-### 2. GitLab Create Project
-
-```bash
-curl -X POST http://localhost:3000/api/gitlab/test-create-project \
-  -H "Content-Type: application/json" \
-  -d '{"name": "demo-generated-site"}'
-```
-
-### 3. Agent Rebuild (Full Flow)
-
-```bash
-curl -X POST http://localhost:3000/api/agent/rebuild \
-  -H "Content-Type: application/json" \
-  -d '{
-    "url": "https://example.com",
-    "instruction": "Make it modern and clean",
-    "projectName": "my-test-site"
-  }'
-```
-
-Response includes:
-
-- `stageLogs`: array of stage entries with timestamps and durations
-- `duration_ms`: total elapsed time
-- `businessProfile`: extracted business info
-- `siteSpec`: generated site specification
-- `gitlab.projectId`, `gitlab.repoUrl`: created GitLab project info
-- `deployment.status`: "project_created", "failed", or "pending"
-- `deployment.liveUrl`: live Vercel URL if successful
-- `deployment.note`: status message or fallback instructions
-
-### 4. Vercel Create Project (Test)
-
-```bash
-curl -X POST http://localhost:3000/api/vercel/test-create-project \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "test-vercel-site",
-    "gitlabProjectId": 12345678,
-    "gitlabRepoUrl": "https://gitlab.com/group/project.git",
-    "gitlabPathWithNamespace": "group/project"
-  }'
-```
-
-### 5. Agent Edit
-
-```bash
-curl -X POST http://localhost:3000/api/agent/edit \
-  -H "Content-Type: application/json" \
-  -d '{
-    "projectId": 12345678,
-    "siteSpec": {
-      "siteTitle": "My Business",
-      "tagline": "Serving since 2020",
-      "primaryCTA": "Get Started",
-      "secondaryCTA": "Learn More",
-      "sections": [
-        { "type": "hero", "title": "", "body": "", "items": [] },
-        { "type": "services", "title": "Services", "body": "", "items": [] }
-      ],
-      "designDirection": { "tone": "", "layout": "", "colors": [] }
-    },
-    "editRequest": "Add a booking section to the homepage"
-  }'
-```
-
-Response includes:
-
-- `stageLogs`: array of stage entries with timestamps and durations
-- `duration_ms`: total elapsed time
-- `updatedSiteSpec`: the modified site specification
-- `summaryOfChanges`: list of changes made
-
-## Known MVP Limitations
+For dev auth bypass in local scripts only, see commented flags in `.env.example` (`SITE_AGENT_DEV_BYPASS_AUTH`).
 
 ---
 
-## Authentication & Multi-Project Support
+## Environment variables
 
-### Overview
+Names from [`.env.example`](.env.example) — set values locally; do not commit secrets.
 
-NextAuth (Auth.js) with Google OAuth provides authentication. MongoDB stores user accounts, website projects, chat history, and action logs. Each logged-in user owns their own projects — the API enforces owner-gated access on every endpoint.
-
-### Environment Variables
-
-```bash
-# MongoDB (required for auth)
-MONGODB_URI=mongodb://localhost:27017/ai-website-migration
-
-# NextAuth (required for auth)
-GOOGLE_CLIENT_ID=your-google-client-id
-GOOGLE_CLIENT_SECRET=your-google-client-secret
-NEXTAUTH_SECRET=your-nextauth-secret-min-32-chars
-NEXTAUTH_URL=http://localhost:3000
-```
-
-### Google OAuth Setup
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com/) → APIs & Services → Credentials
-2. Create OAuth 2.0 Client ID (Web application)
-3. Add **`http://localhost:3000/api/auth/callback/google`** as an authorized redirect URI (exact path; not `/providers/google`)
-4. Add **`http://localhost:3000`** as an authorized JavaScript origin
-5. Copy Client ID and Client Secret to `.env.local`
-
-### API Endpoints
-
-| Method | Endpoint                                           | Description                                  |
-| ------ | -------------------------------------------------- | -------------------------------------------- |
-| GET    | `/api/projects`                                    | List all projects for the authenticated user |
-| GET    | `/api/projects/[projectId]`                        | Get a single project (owner-gated)           |
-| POST   | `/api/projects/clone`                              | Clone a URL and save as a project            |
-| POST   | `/api/projects/scratch/propose`                    | Generate a website plan (no DB save)         |
-| POST   | `/api/projects/scratch/build`                      | Build from plan and save as project          |
-| POST   | `/api/projects/[projectId]/code-agent/edit/stream` | Owner website edit (SSE)                     |
-| GET    | `/api/projects/[projectId]/messages`               | Get chat history                             |
-| GET    | `/api/projects/[projectId]/deployment-status`      | Poll Vercel deployment status                |
-
-### Key Design Decisions
-
-- **Backend-owned metadata**: Frontend only sends `projectId` + `message` for chat edits. siteSpec, GitLab projectId, and Vercel metadata are all loaded from MongoDB by the backend.
-- **Owner-gated access**: Every project API filters by `ownerId` from the auth session. Attempting to access another user's project returns 404.
-- **Fail-safe edits**: If the build gate fails on a chat edit, the previous site stays live and unchanged — no broken code is ever committed.
-- **Existing routes preserved**: `/api/agent/rebuild`, `/api/agent/edit`, `/api/agent/build-from-plan` remain functional as smoke tests and fallbacks.
-
-### Frontend Pages
-
-- `/auth/signin` — Google sign-in page
-- `/dashboard` — Project list with auth-gated access (redirects to sign-in if not authenticated)
-- `/projects/[projectId]` — Per-project workspace with website preview, deployment status, and chat
+| Variable | Purpose |
+|----------|---------|
+| `LLM_PROVIDER` | `minimax` (default), `minimax-proxy`, or `gemini` |
+| `MINIMAX_API_KEY` | MiniMax API key (required for LLM tests and default generation) |
+| `MINIMAX_API_URL` | MiniMax messages endpoint |
+| `MINIMAX_MODEL` | Model id (e.g. `MiniMax-M2.7-highspeed`) |
+| `MINIMAX_IMAGE_KEY` | Optional image API (not used by edit agent) |
+| `MINIMAX_IMAGE_API_URL` | Optional image API URL |
+| `MINIMAX_PROXY_URL` | Local proxy when `LLM_PROVIDER=minimax-proxy` |
+| `WEBSITE_EDIT_LLM_PROVIDER` | Optional: `gemini` for agent tool loop only |
+| `WEBSITE_EDIT_MAX_TOKENS` | Optional token cap for edits |
+| `MONGODB_URI` | MongoDB connection string |
+| `GOOGLE_CLIENT_ID` | Google OAuth client id |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
+| `AUTH_SECRET` | Auth.js secret (preferred) |
+| `NEXTAUTH_SECRET` | Legacy alias for auth secret |
+| `NEXTAUTH_URL` | App URL (local dev; optional on Vercel) |
+| `AUTH_TRUST_HOST` | Optional Auth.js trust host |
+| `SITE_AGENT_DEV_BYPASS_AUTH` | Dev-only auth bypass (server) |
+| `NEXT_PUBLIC_SITE_AGENT_DEV_BYPASS_AUTH` | Dev-only auth bypass (client) |
+| `SITE_AGENT_DEV_BYPASS_USER_ID` | Dev bypass user id for scripts |
+| `GITLAB_TOKEN` | GitLab personal access token |
+| `GITLAB_GROUP_ID` | GitLab group for new repos |
+| `GITLAB_BASE_URL` | GitLab API base (default `https://gitlab.com/api/v4`) |
+| `SITE_AGENT_VERCEL_TOKEN` | Vercel API token for customer site deploys |
+| `SITE_AGENT_VERCEL_TEAM_ID` | Optional Vercel team id |
+| `VERCEL_PROJECT_PREFIX` | Prefix for generated Vercel project names |
+| `NEXT_PUBLIC_APP_URL` | Public app URL override |
+| `SITE_AGENT_SCRATCH_DIR` | Custom scratch workspace path |
+| `SITE_AGENT_SCRATCH_TTL_MS` | Scratch TTL (default 30 min) |
+| `SITE_AGENT_RUN_BUILD_GATE` | Force build gate on |
+| `SITE_AGENT_SKIP_BUILD_GATE` | Skip build gate |
+| `VERCEL_SANDBOX_TOKEN` | Sandbox SDK token (local testing) |
+| `SITE_AGENT_SANDBOX_TIMEOUT` | Sandbox session timeout (default `30m`) |
+| `SITE_AGENT_SANDBOX_ENABLED` | Set `0` to disable sandbox preview on Vercel |
+| `VITEST_LLM_RETRY` | Retries for live LLM tests (default `2`) |
 
 ---
 
-## Smoke Tests
+## npm scripts
 
-### Main App Build
+| Script | Description |
+|--------|-------------|
+| `dev` | Start Next.js dev server (`scripts/dev.sh`, frees port 3000) |
+| `dev:wait` | Wait for dev server ready |
+| `build` | Production build (`scripts/build.sh`) |
+| `build:clean` | Remove `.next` then build |
+| `start` | Start production server |
+| `clean` | Remove `.next` |
+| `lint` | ESLint (Next.js) |
+| `typecheck` | `tsc --noEmit` |
+| `test` | Vitest unit suite (excludes `*.llm.test.ts` and gated integration files) |
+| `test:watch` | Vitest watch mode |
+| `test:all` | **Final gate:** `test` → `test:llm` → `test:llm:contracts` |
+| `test:contracts` | Fast deterministic section-color / builder contracts (~1s) |
+| `test:edit-agent` | Edit-agent unit tests |
+| `test:section-color` | Section color + sandbox validation tests |
+| `test:integration` | Section style preview sync integration test |
+| `test:llm` | Full live LLM planner + edit-agent integration (`VITEST_LLM_SUITE=1`) |
+| `test:llm:contracts` | LLM section-color smoke (3 synthetic cases) |
+| `test:llm:edit-errors` | Copy, structural, planner guardrails LLM suite |
+| `test:llm:edit-agent` | Edit-agent smoke + hard + gradient LLM subset |
+| `test:llm:edit-agent:hard` | Hard edit-agent LLM cases only |
+| `test:llm:gradients` | Section gradient background LLM tests |
+| `test:llm:presentation` | Section presentation LLM suite (gradients, contact card, inner element) |
+| `test:llm:inner-element` | Inner element style LLM tests |
+| `test:llm:section-catalog` | Section catalog hard LLM tests |
+| `test:scratch-live` | Live scratch workflow script |
+| `test:diff-local` | Local diff API script |
+| `test:build-gate-local` | Local build gate script |
+
+LLM scripts load `.env` via `node --env-file=.env` and require `MINIMAX_API_KEY`.
+
+---
+
+## Testing
+
+| Tier | Command | When |
+|------|---------|------|
+| Fast deterministic | `npm run test:contracts` | Section color pipeline, wiring (~1s) |
+| Full unit (no LLM) | `npm test` | CI default (~5–15s) |
+| LLM smoke | `npm run test:llm:contracts` | 3 synthetic section-color cases |
+| Live LLM integration | `npm run test:llm` | **Before merge** on edit-agent / planner changes |
+| LLM edit-errors | `npm run test:llm:edit-errors` | Copy, structural, planner guardrails |
+| **Final gate** | `npm run test:all` | Unit + full LLM + LLM contracts |
+
+**CI** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)): `typecheck` → `test` → `test:contracts` → `build` — no live LLM (no secrets in GitHub).
+
+Before merge on agent/edit work, run locally:
 
 ```bash
-npm run build
+npm run test:all
+npm run typecheck && npm run build   # when types or build paths change
 ```
 
-Expected: Build completes without errors.
+For agent workflow details, test harness paths, and preview drag-to-chat troubleshooting, see **[`AGENTS.md`](AGENTS.md)**.
 
-### Clone Route Smoke Test
+- Default unit timeout: **5s**; live LLM: **120s** per test (`tests/llmTestGate.ts`)
+- LLM retries: **2** by default (`VITEST_LLM_RETRY`)
+
+---
+
+## Key paths
+
+| Area | Path |
+|------|------|
+| Builder / templates | `src/lib/builder/` |
+| Clone workflow | `src/lib/clone/`, `src/app/api/projects/clone/` |
+| Scratch workflow | `src/lib/agent/`, `src/app/api/projects/scratch/` |
+| Edit agent | `src/lib/project-workspace/edit-agent/` |
+| Edit runner | `src/lib/project-workspace/websiteEditRunner.ts` |
+| Section color / presentation | `src/lib/project-workspace/sectionPresentationEdit.ts` |
+| siteConfig mutations | `src/lib/project-workspace/siteConfigMutations.ts` |
+| Edit context / selected target | `src/lib/project-workspace/edit-context/` |
+| Domain tools | `src/lib/project-workspace/tools/domain/` |
+| Preview proxy + bridge | `src/lib/preview/`, `src/lib/project-workspace/previewProxyHandler.ts` |
+| Vercel deploy | `src/lib/vercel/` |
+| GitLab client | `src/lib/gitlab/` |
+| Vercel Sandbox | `src/lib/sandbox/` |
+| Site Manager | `src/lib/site-manager/` |
+| Models | `src/models/` |
+| Project editor UI | `src/app/projects/[projectId]/page.tsx` |
+| Synthetic test fixtures | `tests/support/syntheticSiteWorkspace.ts` |
+
+---
+
+## Documentation
+
+| Doc | Contents |
+|-----|----------|
+| [`AGENTS.md`](AGENTS.md) | AI agent / contributor guide: credentials, testing gates, key paths, preview drag-to-chat |
+| [`docs/EDIT_AGENT.md`](docs/EDIT_AGENT.md) | Edit agent pipeline, selected target, focus stack |
+| [`docs/VERCEL_SANDBOX_IMPLEMENTATION.md`](docs/VERCEL_SANDBOX_IMPLEMENTATION.md) | Sandbox architecture and env on Vercel |
+
+---
+
+## Deployment
+
+### This app (Site Agent)
+
+1. Connect the GitHub repo to [Vercel](https://vercel.com)
+2. **Production branch:** `main`
+3. Set environment variables (Production + Preview): at minimum `MONGODB_URI`, `AUTH_SECRET`, Google OAuth, GitLab, MiniMax; optional `SITE_AGENT_VERCEL_TOKEN` for customer deploys
+4. On Vercel, `NEXTAUTH_URL` / `NEXT_PUBLIC_APP_URL` are usually auto-derived (`VERCEL=1`, `next.config.js`)
+5. Add production URL to Google OAuth redirect URIs: `https://<your-domain>/api/auth/callback/google`
+
+Do **not** run `vercel deploy` from CI if GitHub integration already deploys — that double-deploys.
+
+### Customer sites
+
+After GitLab commit, the app can create/link a Vercel project, disable SSO on the preview project, and trigger deploy hooks. Publish flow verifies GitLab commit SHA before marking the site **Live**.
+
+Deploy consistency check (manual / CI):
 
 ```bash
+npx tsx scripts/e2e-deploy-verify.ts --project-id <id>
+```
+
+### Vercel Sandbox (production editor)
+
+When `VERCEL=1`, owner previews use Vercel Sandbox by default. Disable with `SITE_AGENT_SANDBOX_ENABLED=0` to fall back to the published live URL iframe.
+
+---
+
+## API reference (selected)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/projects` | List owner projects |
+| GET | `/api/projects/[projectId]` | Project detail |
+| POST | `/api/projects/clone` | Start clone flow |
+| POST | `/api/projects/scratch/propose` | Generate website plan |
+| POST | `/api/projects/scratch/build` | Build from plan |
+| POST | `/api/projects/[projectId]/code-agent/edit/stream` | Owner edit (SSE) |
+| GET | `/api/projects/[projectId]/messages` | Chat history |
+| GET | `/api/projects/[projectId]/deployment-status` | Vercel deployment status |
+| GET/POST | `/api/projects/[projectId]/catalog` | Product catalog |
+
+Legacy/smoke routes (no auth in some setups): `/api/agent/rebuild`, `/api/agent/edit`, `/api/agent/build-from-plan`, `/api/agent/propose-website-plan`, `/api/llm/generate-json`, `/api/gitlab/test-create-project`.
+
+---
+
+## Contributing
+
+- Prefer synthetic contract tests (`tests/support/syntheticSiteWorkspace.ts`) over site-specific fixtures except frozen regressions
+- Do not merge edit-agent / planner / routing changes without `npm run test:all` passing locally with `MINIMAX_API_KEY`
+- Production deploys from `main`; PR branches get Vercel preview URLs when enabled
+
+For AI agents and detailed edit-agent conventions, see **[`AGENTS.md`](AGENTS.md)**.
+
+---
+
+## Smoke tests
+
+```bash
+npm run typecheck && npm run build
+npm test
+npm run test:contracts
+```
+
+With the dev server running (`npm run dev`), optional API checks:
+
+```bash
+# Full clone rebuild (requires GitLab + LLM)
 curl -X POST http://localhost:3000/api/agent/rebuild \
   -H "Content-Type: application/json" \
-  -d '{
-    "url": "https://www.lindseylewislaw.com/",
-    "projectName": "clone-smoke-test",
-    "validateBuild": true
-  }'
-```
+  -d '{"url":"https://example.com","projectName":"smoke-test","validateBuild":true}'
 
-Expected:
-
-- `ok: true`
-- `generatedSiteValidation.ok: true`
-- `contentFidelity.passed: true`
-- `deployment.status: "triggered"`
-
-### Scratch Plan Route Smoke Test
-
-```bash
+# Scratch plan
 curl -X POST http://localhost:3000/api/agent/propose-website-plan \
   -H "Content-Type: application/json" \
-  -d '{
-    "businessName": "Bayou Bright Cleaning",
-    "industry": "home cleaning",
-    "location": "Houston, TX",
-    "services": "standard cleaning, deep cleaning, move-in move-out cleaning",
-    "targetCustomers": "busy families and apartment renters",
-    "mainGoal": "get leads",
-    "phone": "512-555-9999",
-    "email": "hello@bayoubrightcleaning.com",
-    "address": "",
-    "desiredStyle": "friendly local but professional",
-    "notes": "I want people to request a quote online."
-  }'
+  -d '{"businessName":"Example Co","industry":"cleaning","location":"Austin, TX","services":"standard cleaning","targetCustomers":"families","mainGoal":"get leads","phone":"512-555-0100","email":"hello@example.com","address":"","desiredStyle":"professional","notes":""}'
 ```
 
-Expected:
-
-- `ok: true`
-- `websitePlan` exists
-- `phone: "512-555-9999"` is not blocked (512-555 is a real Austin exchange)
-- No fake testimonials or awards in plan
-
-### Scratch Build Route Smoke Test
-
-```bash
-curl -X POST http://localhost:3000/api/agent/build-from-plan \
-  -H "Content-Type: application/json" \
-  -d '{
-    "projectName": "scratch-smoke-test",
-    "validateBuild": true,
-    "websitePlan": {
-      "businessName": "Bayou Bright Cleaning",
-      "industry": "home cleaning",
-      "positioning": "Bayou Bright Cleaning provides professional home cleaning services in Houston TX.",
-      "targetCustomers": ["busy families"],
-      "primaryGoal": "get leads",
-      "contentPlan": {
-        "hero": {
-          "headline": "Houston Trusted Home Cleaning Experts",
-          "subheadline": "Professional cleaning for busy families",
-          "primaryCTA": "Get a Free Quote",
-          "secondaryCTA": "View Services"
-        },
-        "sections": [
-          {"type": "services", "title": "Our Services", "purpose": "Detail cleaning services", "contentNotes": ["Standard Cleaning", "Deep Cleaning", "Move-in/Move-out"]}
-        ]
-      }
-    }
-  }'
-```
-
-Expected:
-
-- `ok: true`
-- `mode: "scratch"`
-- `generatedSiteValidation.ok: true`
-- `scratchValidation.ok: true`
-- GitLab repo created
-- Vercel deployment triggered
-
-### Deployment Status Smoke Test
-
-```bash
-curl "http://localhost:3000/api/projects/YOUR_PROJECT_ID/deployment-status"
-```
-
-Expected:
-
-- `ok: true`
-- `status: "ready" | "building" | "pending" | "failed"`
-- `commitVerified: true` only when the live Vercel build matches the commit you just deployed
-- `liveUrl` is the **production** URL (`https://your-project.vercel.app`), not a one-off preview URL
-
-### Deploy consistency (preview → GitLab → Vercel)
-
-When you click **Deploy to Vercel** on a project:
-
-1. **Full preview sync** — every publishable file in the local workspace is pushed to GitLab (force sync).
-2. **GitLab propagation** — deploy waits until that commit SHA is visible on GitLab (fails if not within 30s).
-3. **SHA-pinned Vercel build** — Vercel is asked to build that exact commit (not an unpinned deploy hook).
-4. **Verified live link** — the UI shows **Live** only when Vercel reports READY **and** the deployment matches your commit SHA.
-5. **Production URL** — use `https://{vercelProjectName}.vercel.app`. Links like `…-kb5bda2hh-…-athan37s-projects.vercel.app` are frozen deployment snapshots and do not update when you redeploy.
-
-**Save to GitLab** backs up changes without publishing. **Deploy** always syncs the full preview first, then publishes.
-
----
-
-## Generated Site Reliability
-
-Every generated website must pass a local build validation before it is committed to GitLab or deployed to Vercel.
-
-### Architecture Rules
-
-The LLM only generates JSON data:
-
-- `factualSiteData` — strictly extracted facts from the crawled site
-- `siteSpec` — section titles, body copy, items, CTAs
-- `designBrief` — color palette, typography, layout enum values
-
-The LLM never generates:
-
-- React code or components
-- Tailwind class strings
-- CSS or imports
-- `package.json`, Next.js config, or Tailwind config
-- arbitrary code
-
-All actual code comes from `templates.ts` — deterministic, pre-audited templates chosen by enum values.
-
-### Build Gate Flow
-
-1. **Generate files** — `generateWebsiteFiles()` renders the template with siteSpec data
-2. **Write to temp** — Files written to `.tmp/generated-sites/<project>-<timestamp>/`
-3. **Check required files** — package.json, next.config.js, tailwind.config.js, postcss.config.js, tsconfig.json, src/app/layout.tsx, src/app/page.tsx, src/app/globals.css, src/lib/siteConfig.ts, README.md
-4. **Static validation** — Scan for unsafe patterns in page.tsx and siteConfig.ts:
-   - Blocked: `\${`, `${escapedSiteSpec}`, `process.env`, `require(`, `dangerouslySetInnerHTML`, `@/lib/agent`, `contact@example`, `(555)`, `Sterling Immigration Law`
-   - Required: `export default function Home` in page.tsx, `export const siteConfig` in siteConfig.ts
-5. **Run npm build** — `npm install --silent && npm run build` with NODE_ENV=production, 90s timeout
-6. **Commit gate** — Only if build exits 0: create GitLab repo → commit files → trigger Vercel deploy
-
-### Fail-Fast Behavior
-
-If the build gate fails:
-
-- No GitLab project is created
-- No code is committed
-- No Vercel deployment is triggered
-- Error is returned with validation logs
-
-This keeps broken code from ever reaching Vercel, which cannot be undeployed.
-
-### Chat Edit Safety
-
-The same build gate protects chat edits:
-
-- After an edit request, `validateGeneratedSite()` runs on the updated files
-- Only if validation passes does the commit happen
-- If validation fails, the previous live website stays safe and unchanged
-
-### `.tmp` Directory
-
-Validated build artifacts are written to `.tmp/generated-sites/`. This directory is gitignored and never committed.
-
-### Build Validation Request Parameter
-
-```bash
-curl -X POST http://localhost:3000/api/agent/rebuild \
-  -H "Content-Type: application/json" \
-  -d '{
-    "url": "https://example.com",
-    "projectName": "my-site",
-    "validateBuild": true   # default: true, set false for quick local experiments
-  }'
-```
-
----
-
-## Live Preview via Vercel
-
-After rebuild, if `SITE_AGENT_VERCEL_TOKEN` is configured, the system:
-
-1. Creates a Vercel project connected to your GitLab repo
-2. Creates a deploy hook for the main branch
-3. Triggers the deployment automatically
-
-### How It Works
-
-1. After GitLab commit, `createVercelProject()` is called with GitLab repo info
-2. Vercel API creates a new project with GitLab as the git source
-3. **SSO protection is disabled** via `PATCH /v2/projects/:id` so the deployment is publicly accessible
-4. A deploy hook is created via `POST /v2/projects/:id/deploy-hooks`
-5. The deploy hook URL is called to trigger the first deployment
-6. Vercel clones the GitLab repo, runs `npm install && npm run build`, and deploys
-
-### Deployment Status
-
-Response includes `deployment.status`:
-
-- `"triggered"` — Deploy hook created and triggered successfully
-- `"trigger_failed"` — Deploy hook was created but triggering failed
-- `"failed"` — Vercel project creation itself failed
-
-### If Deployment Does Not Start
-
-**Check Vercel dashboard:**
-
-1. Go to `deployment.projectUrl` (shown in response)
-2. Check if deployment appears under "Deployments" tab
-3. If not, click "Create Deployments" or push a new commit
-
-**Common issues:**
-
-- **Deploy hook 404**: The hook ID returned by Vercel API was malformed. Solution: delete the project and retry.
-- **Deploy hook returns error**: The git credential may be invalid. Reconnect GitLab in Vercel dashboard.
-- **Project created but no deployment**: Vercel requires a git push or manual trigger for first deployment.
-
-**Manual trigger via API:**
-
-```bash
-# Get deploy hook URL from project
-curl -s "https://api.vercel.com/v2/projects/<projectId>" \
-  -H "Authorization: Bearer $SITE_AGENT_VERCEL_TOKEN" | jq '.link.deployHooks[-1].url'
-
-# Trigger deployment
-curl -X POST "<deploy-hook-url>" \
-  -H "Authorization: Bearer $SITE_AGENT_VERCEL_TOKEN"
-```
-
-**Manual Vercel Import:**
-
-1. Go to https://vercel.com/import/git
-2. Paste your GitLab repo URL: `https://gitlab.com/<namespace>/<project>.git`
-3. Vercel will auto-detect Next.js and deploy
-
-### Vercel API Fallback
-
-If you don't have `SITE_AGENT_VERCEL_TOKEN`, the GitLab repo is still created. You can always manually import the repo URL into Vercel.
-
-## Deployment Readiness Tracking
-
-Vercel deployments are triggered asynchronously. After rebuild, the API returns immediately while Vercel is still building. The live URL may show 404 until Vercel finishes.
-
-### How It Works
-
-1. Rebuild triggers GitLab commit → then calls `createVercelProject()`
-2. Vercel project is created, deploy hook is triggered
-3. API response includes `deployment.status = "triggered"` and `deployment.triggeredAt`
-4. Frontend starts polling `GET /api/vercel/deployment-status?projectName=...&since=...`
-5. Polling runs every 5 seconds for up to 3 minutes
-6. UI shows: Pending → Building → Ready (or Failed)
-
-### Deployment Status States
-
-- **pending** — Triggered but Vercel has not created a deployment record yet
-- **building** — Vercel is building (QUEUED, INITIALIZING, BUILDING)
-- **ready** — Deployment is live (READY state)
-- **failed** — Deployment failed or was canceled (ERROR, CANCELED)
-
-### UI Behavior
-
-The `DeploymentStatusCard` component shows in the bottom-right corner of the workspace:
-
-- **Not ready**: "Open Live Site" button is disabled/grayed, shows warning about 404
-- **Ready**: "Open Live Site" button is enabled and green
-
-### Manual Status Check
-
-```bash
-curl "http://localhost:3000/api/vercel/deployment-status?projectName=clone-lindsey-lewis-test-afyc2d-ol3e&since=2026-05-18T00:02:08Z"
-```
-
-Response:
-
-```json
-{
-  "ok": true,
-  "status": "ready",
-  "vercelState": "READY",
-  "deploymentId": "dpl_xxxxx",
-  "deploymentUrl": "https://clone-lindsey-lewis-test-afyc2d-ol3e.vercel.app",
-  "inspectorUrl": "https://vercel.com/dashboard/deployments/dpl_xxxxx",
-  "createdAt": 1779062652387,
-  "readyAt": 1779062680000,
-  "projectName": "clone-lindsey-lewis-test-afyc2d-ol3e",
-  "message": "Your website is live."
-}
-```
-
-### Troubleshooting
-
-**Vercel deployment returns 404 after rebuild:**
-
-- Wait 1-3 minutes — Vercel may still be building
-- Check deployment status at `deployment.projectUrl`
-- If status is `trigger_failed`, the deploy hook was created but trigger failed — manually trigger via Vercel dashboard
-
-**Deploy hook creation failed (trigger_failed status):**
-
-- This is non-fatal — the Vercel project is still created
-- Go to Vercel dashboard and click "Create Deployments" or push a new commit
-- Or use the manual trigger via API shown above
-
-**GitLab Pages URL returns 404:**
-
-- Check that the pipeline passed (CI/CD → Pipelines)
-- Ensure the project is public or Pages is enabled
-- Wait 1-2 minutes after pipeline completion
-
-**Pipeline failed:**
-
-- Check the pipeline log for build errors
-- Common issue: `next build` may have TypeScript errors in generated code
-- Verify `package.json` has `"build": "next build"` script
-
----
-
-## Website Maintenance Chat
-
-After rebuilding a website, the owner can maintain and update their site through a chat interface.
-
-### How It Works
-
-1. **After rebuild**, the generated site state is saved in browser localStorage (`ai-website-agent-current-site`):
-   - projectId, repoUrl, liveUrl
-   - siteSpec (current website structure)
-   - businessProfile (business info)
-   - lastUpdated timestamp
-
-2. **Maintenance chat** appears below the rebuild section:
-   - Owner can type natural language requests: "Add FAQ section", "Update phone number", "Make it more premium"
-   - Quick action buttons for common edits
-   - Chat history is persisted in localStorage (`ai-website-agent-chat-history`)
-
-3. **On each edit**:
-   - Frontend calls `POST /api/agent/edit` with projectId, siteSpec, and editRequest
-   - Backend updates siteSpec via LLM
-   - Backend regenerates files and commits to GitLab
-   - Backend triggers Vercel redeploy via deploy hook
-   - Frontend updates localStorage with new siteSpec
-
-4. **Vercel redeploys** automatically from GitLab connection:
-   - After GitLab commit, Vercel detects the push and starts a new deployment
-   - Or the deploy hook is triggered directly
-   - Takes 1-3 minutes for the new version to go live
-
-### Supported Edits
-
-**Simple content updates:**
-
-- Add/update FAQ, pricing, booking CTA, testimonials
-- Update contact info, phone, hours, address
-- Change tone or improve CTAs
-- Add services or rewrite copy
-- Make site look more premium
-
-**Complex features (placeholder only):**
-
-- Booking backend, login, payments, CRM, inventory
-- These add a placeholder CTA section with note that full integration is not implemented in MVP
-
-### Persistence
-
-- **localStorage only** — no database, cleared if user clears browser cache
-- Chat history persists across sessions
-- Each new rebuild creates a new site state (old site still accessible via GitLab)
-
-### Constraints
-
-- No auth, database, or backend integration in MVP
-- Real booking/payment/login are placeholders only
-- Owner must have access to the GitLab account that owns the project
+Expected: `ok: true`, build validation passes when `validateBuild: true`, GitLab/Vercel steps succeed when tokens are configured.

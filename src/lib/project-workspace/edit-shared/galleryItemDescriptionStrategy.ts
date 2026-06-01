@@ -1,6 +1,7 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import { getLLMClient } from '@/lib/llm/llmClient';
+import { parseSiteConfigSource } from '@/lib/site-manager/siteConfigParser';
 import {
   computeWorkspaceHashes,
   getChangedFilesFromHashes,
@@ -10,6 +11,7 @@ import {
   applyPlaceholderGalleryDescriptions,
   resolveTargetGalleryForCaptions,
 } from './imageEditIntent';
+import type { SelectedTargetInput } from './selectedTargetTypes';
 import { verifyEditApplied } from './verifyEditApplied';
 import {
   analyzeSiteStructureForImages,
@@ -22,19 +24,74 @@ const SITE_CONFIG = 'src/lib/siteConfig.ts';
 type FileEdit = { path: string; content: string };
 type LlmEditResponse = { files: FileEdit[]; summary?: string };
 
-/** Follow-up like "add description for these/that image(s)" (often no new attachments). */
-export function isGalleryDescriptionRequest(message: string): boolean {
+const CAPTION_INTENT_RE =
+  /\b(description|descriptions|caption|captions|blurb|blurbs|label|labels|text under|underneath|under it)\b/i;
+const EXPLICIT_IMAGE_REFERENCE_RE =
+  /\b(image|images|photo|photos|picture|pictures|pics|pic|gallery)\b/i;
+const SECTION_GALLERY_REFERENCE_RE =
+  /\bsection\b/i;
+const SECTION_GALLERY_CONTEXT_RE =
+  /\b(portfolio|gallery|photo|photos|image|images|picture|pictures|upload|uploads)\b/i;
+const SECTION_CARD_REFERENCE_RE =
+  /\b(card|cards|tile|tiles|box|boxes|feature|features|service|services|item|items)\b/i;
+const SECTION_CONTEXT_RE = /\b(section|inside|within|in this|in the)\b/i;
+
+/** Owner wants descriptions on section cards/tiles (not gallery image captions). */
+export function isSectionCardDescriptionRequest(message: string): boolean {
   const lower = message.toLowerCase();
   const hasCaptionIntent =
-    /\b(description|descriptions|caption|captions|blurb|label|labels|text under|underneath|under it)\b/.test(
-      lower
-    ) ||
+    CAPTION_INTENT_RE.test(lower) ||
     /\bdesc\b/.test(lower) ||
     /\b(finish|complete)\s+(the\s+)?rest\b/.test(lower);
+  if (!hasCaptionIntent) return false;
+  if (EXPLICIT_IMAGE_REFERENCE_RE.test(lower)) return false;
+  if (SECTION_CARD_REFERENCE_RE.test(lower)) return true;
+  if (/\b(these|those|them)\b/.test(lower) && SECTION_CONTEXT_RE.test(lower)) return true;
+  return false;
+}
+
+function itemHasUploadImageUrl(item: { imageUrl?: string }): boolean {
+  return typeof item.imageUrl === 'string' && item.imageUrl.includes('/uploads/');
+}
+
+function siteConfigHasImageGallery(siteConfigContent: string): boolean {
+  return /imageUrl/.test(siteConfigContent) && /\/uploads\//.test(siteConfigContent);
+}
+
+/** Pinned section has title-only cards (no upload imageUrl on items). */
+export function selectedTargetHasTitleOnlyItems(
+  siteConfigContent: string,
+  selectedTarget?: SelectedTargetInput | null
+): boolean {
+  if (!selectedTarget || selectedTarget.kind !== 'section') return false;
+  const config = parseSiteConfigSource(siteConfigContent);
+  if (!config?.sections?.length) return false;
+
+  const sectionIndex = selectedTarget.sectionIndex;
+  if (sectionIndex == null || !Number.isFinite(sectionIndex)) return false;
+
+  const section = config.sections[sectionIndex];
+  const items = section?.items ?? [];
+  if (items.length === 0) return false;
+
+  const withImages = items.filter((item) => itemHasUploadImageUrl(item));
+  return withImages.length === 0;
+}
+
+/** Follow-up like "add description for these/that image(s)" (often no new attachments). */
+export function isGalleryDescriptionRequest(message: string): boolean {
+  if (isSectionCardDescriptionRequest(message)) return false;
+
+  const lower = message.toLowerCase();
+  if (/\b(finish|complete)\s+(the\s+)?rest\b/.test(lower)) return true;
+
+  const hasCaptionIntent =
+    CAPTION_INTENT_RE.test(lower) ||
+    /\bdesc\b/.test(lower);
   const hasImageReference =
-    /\b(image|images|photo|photos|picture|pictures|pics|pic|gallery|these|those|them|that|the|it)\b/.test(
-      lower
-    ) ||
+    EXPLICIT_IMAGE_REFERENCE_RE.test(lower) ||
+    (SECTION_GALLERY_REFERENCE_RE.test(lower) && SECTION_GALLERY_CONTEXT_RE.test(lower)) ||
+    /\b(these|those|them|that|it)\b/.test(lower) ||
     /\bjust (added|uploaded|created)\b/.test(lower) ||
     /\b(you just|just now)\b/.test(lower) ||
     /\bsection you (just )?created\b/.test(lower) ||
@@ -143,6 +200,10 @@ export async function runGalleryItemDescriptionStrategy(
     return null;
   }
 
+  if (isSectionCardDescriptionRequest(options.ownerMessage)) {
+    return null;
+  }
+
   async function readRel(rel: string): Promise<string | null> {
     try {
       return options.gateway
@@ -158,7 +219,16 @@ export async function runGalleryItemDescriptionStrategy(
     return null;
   }
 
-  if (!/imageUrl/.test(siteConfigContent) || !/\/uploads\//.test(siteConfigContent)) {
+  const pinnedTitleOnlySection = selectedTargetHasTitleOnlyItems(
+    siteConfigContent,
+    options.selectedTarget
+  );
+  const sectionCardRequest = isSectionCardDescriptionRequest(options.ownerMessage);
+
+  if (!siteConfigHasImageGallery(siteConfigContent)) {
+    if (sectionCardRequest || pinnedTitleOnlySection) {
+      return null;
+    }
     return {
       ok: false,
       strategy: 'gallery_captions',
@@ -181,6 +251,9 @@ export async function runGalleryItemDescriptionStrategy(
   );
 
   if (!targetGallery) {
+    if (sectionCardRequest || pinnedTitleOnlySection) {
+      return null;
+    }
     return {
       ok: false,
       strategy: 'gallery_captions',

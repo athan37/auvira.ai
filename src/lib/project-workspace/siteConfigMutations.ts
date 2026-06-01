@@ -224,6 +224,7 @@ export function addSectionToSource(
 }
 
 import { normalizeTailwindBackgroundClass } from '@/lib/builder/tailwindBackgroundResolver';
+import { parseConfigFieldPath } from '@/lib/project-workspace/edit-context/configFieldPaths';
 
 /**
  * Update presentation tokens on a section by index in siteConfig.ts source.
@@ -294,6 +295,61 @@ function subtitleStyleMarkerToColor(subtitle: string): string | null {
 }
 
 /**
+ * Update a allowlisted config field path in siteConfig.ts source.
+ */
+export function updateConfigFieldInSource(
+  content: string,
+  fieldPath: string,
+  value: string
+): string | null {
+  const parsed = parseConfigFieldPath(fieldPath);
+  if (!parsed || !value.trim()) return null;
+
+  return mutateSiteConfigSource(content, (config) => {
+    if (parsed.scope === 'businessName') {
+      if (config.businessName === value) return false;
+      config.businessName = value;
+      return true;
+    }
+    if (parsed.scope === 'hero') {
+      const hero = asMutableRecord(config.hero);
+      if (hero[parsed.field] === value) return false;
+      hero[parsed.field] = value;
+      config.hero = hero;
+      return true;
+    }
+    if (parsed.scope === 'contact') {
+      const contact = asMutableRecord(config.contact);
+      if (contact[parsed.field] === value) return false;
+      contact[parsed.field] = value;
+      config.contact = contact;
+      return true;
+    }
+
+    const sections = Array.isArray(config.sections)
+      ? (config.sections as Array<Record<string, unknown>>)
+      : [];
+    const section = sections[parsed.sectionIndex ?? -1];
+    if (!section) return false;
+
+    if (parsed.scope === 'section') {
+      if (section[parsed.field] === value) return false;
+      section[parsed.field] = value;
+      return true;
+    }
+
+    const items = Array.isArray(section.items)
+      ? (section.items as Array<Record<string, unknown>>)
+      : [];
+    const item = items[parsed.itemIndex ?? -1];
+    if (!item) return false;
+    if (item[parsed.field] === value) return false;
+    item[parsed.field] = value;
+    return true;
+  });
+}
+
+/**
  * Update section title or body copy in siteConfig.ts source.
  */
 export function updateSectionCopyInSource(
@@ -302,7 +358,7 @@ export function updateSectionCopyInSource(
   field: string,
   value: string
 ): string | null {
-  const allowed = new Set(['title', 'body']);
+  const allowed = new Set(['title', 'body', 'subtitle']);
   if (!allowed.has(field) || !value.trim() || sectionIndex < 0) return null;
 
   return mutateSiteConfigSource(content, (config) => {
