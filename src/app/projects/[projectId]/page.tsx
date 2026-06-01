@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { AppShell } from '@/components/layout/AppShell';
-import { ProjectPreviewFrame } from '@/components/ProjectPreviewFrame';
+import { ProjectPreviewFrame, type PreviewReadyState } from '@/components/ProjectPreviewFrame';
 import {
   schedulePreviewIframeReloads,
   workspaceEditNeedsPreviewReload,
@@ -75,6 +75,7 @@ export default function ProjectPage() {
   const [diffRefreshKey, setDiffRefreshKey] = useState(0);
   const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
   const [previewReady, setPreviewReady] = useState(false);
+  const [previewTargetingAvailable, setPreviewTargetingAvailable] = useState(false);
   const [editInProgress, setEditInProgress] = useState(false);
   const [selectedSection, setSelectedSection] = useState<SelectedSection | null>(null);
   const [historyHoverSectionId, setHistoryHoverSectionId] = useState<string | null>(null);
@@ -216,8 +217,9 @@ export default function ProjectPage() {
     return () => document.removeEventListener('mousedown', handlePointerDown);
   }, [handleSectionHighlightDismiss]);
 
-  const handlePreviewReadyChange = useCallback((ready: boolean) => {
-    setPreviewReady(ready);
+  const handlePreviewReadyChange = useCallback((state: PreviewReadyState) => {
+    setPreviewReady(state.ready);
+    setPreviewTargetingAvailable(state.targetingAvailable);
   }, []);
 
   const handleDeploySuccess = useCallback(() => {
@@ -356,6 +358,7 @@ export default function ProjectPage() {
           <ProjectEditorSidebar
             projectId={projectId}
             previewReady={previewReady}
+            previewTargetingAvailable={previewTargetingAvailable}
             selectedSection={selectedSection}
             onClearSelectedSection={handleClearSelection}
             onHistorySectionHover={setHistoryHoverSectionId}

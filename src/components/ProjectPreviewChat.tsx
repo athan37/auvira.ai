@@ -8,9 +8,14 @@ import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { cn } from '@/lib/cn';
 import EditErrorTrace from '@/components/project/EditErrorTrace';
-import { SelectedSectionChip } from '@/components/project/SelectedSectionChip';
-import { MessageSelectedSectionBadge } from '@/components/project/MessageSelectedSectionBadge';
+import { PreviewTargetChip } from '@/components/project/PreviewTargetChip';
+import { PreviewTargetHint } from '@/components/project/PreviewTargetHint';
 import type { SelectedSection } from '@/lib/preview/sectionSelectionProtocol';
+import {
+  dismissPreviewTargetHint,
+  isPreviewTargetHintDismissed,
+  shouldShowPreviewTargetHint,
+} from '@/lib/preview/previewTargetHintStorage';
 import {
   selectedTargetSectionId,
   type SelectedTargetInput,
@@ -88,6 +93,8 @@ interface ProjectPreviewChatProps {
   projectId: string;
   disabled?: boolean;
   previewReady?: boolean;
+  /** Editable proxy preview — enables drag targeting and first-run hint. */
+  previewTargetingAvailable?: boolean;
   /** Legacy static workspace — chat edits are blocked. */
   legacyProject?: boolean;
   selectedSection?: SelectedSection | null;
@@ -302,15 +309,16 @@ function ChatMessageBubble({
         )}
       >
         {msg.role === 'user' && msg.selectedTarget ? (
-          <MessageSelectedSectionBadge
+          <PreviewTargetChip
             target={msg.selectedTarget}
+            variant="used"
             interactive={Boolean(
               previewReady && historySectionId && (onHistorySectionHover || onHistorySectionClick)
             )}
             active={Boolean(historySectionId && historySectionId === focusedHistorySectionId)}
             onHoverStart={() => onHistorySectionHover?.(historySectionId ?? null)}
             onHoverEnd={() => onHistorySectionHover?.(null)}
-            onClick={
+            onActivate={
               historySectionId && onHistorySectionClick
                 ? () => onHistorySectionClick(historySectionId)
                 : undefined
@@ -435,6 +443,7 @@ export function ProjectPreviewChat({
   projectId,
   disabled,
   previewReady = true,
+  previewTargetingAvailable = false,
   legacyProject = false,
   selectedSection = null,
   onClearSelectedSection,
@@ -462,7 +471,39 @@ export function ProjectPreviewChat({
   const chipAnchorRef = useRef<HTMLDivElement>(null);
   const chatInputId = `project-chat-input-${projectId}`;
 
+  const refocusChatInput = useCallback(() => {
+    document.getElementById(chatInputId)?.focus();
+  }, [chatInputId]);
+
+  const [targetHintDismissed, setTargetHintDismissed] = useState(() => isPreviewTargetHintDismissed());
+  const [targetHintPulse, setTargetHintPulse] = useState(false);
+
+  const showTargetHint = shouldShowPreviewTargetHint({
+    previewReady,
+    previewTargetingAvailable,
+    hasSelectedTarget: Boolean(selectedSection),
+    dismissed: targetHintDismissed,
+  });
+
   const inputDisabled = disabled || !previewReady || sending;
+
+  useEffect(() => {
+    if (!showTargetHint) return;
+    setTargetHintPulse(true);
+    const timer = setTimeout(() => setTargetHintPulse(false), 2400);
+    return () => clearTimeout(timer);
+  }, [showTargetHint]);
+
+  useEffect(() => {
+    if (!selectedSection || targetHintDismissed) return;
+    dismissPreviewTargetHint();
+    setTargetHintDismissed(true);
+  }, [selectedSection, targetHintDismissed]);
+
+  const dismissTargetHint = useCallback(() => {
+    dismissPreviewTargetHint();
+    setTargetHintDismissed(true);
+  }, []);
 
   useEffect(() => {
     if (focusChatInputKey <= 0) return;
@@ -949,15 +990,28 @@ export function ProjectPreviewChat({
 
         <form onSubmit={handleSubmit} className="p-3 border-t border-zinc-200/80 shrink-0 space-y-2">
           <div ref={chipAnchorRef}>
+            <PreviewTargetHint
+              visible={showTargetHint}
+              pulse={targetHintPulse}
+              onDismiss={dismissTargetHint}
+            />
             {selectedSection && onClearSelectedSection ? (
               <>
-                <SelectedSectionChip
-                  selection={selectedSection}
-                  onClear={onClearSelectedSection}
-                  pulseKey={focusChatInputKey}
+                <PreviewTargetChip
+                  target={selectedTargetFromSection(selectedSection)}
+                  variant="pinned"
                   interactive={previewReady}
+                  active={focusedHistorySectionId === selectedSection.sectionId}
+                  pulseKey={focusChatInputKey}
+                  onClear={onClearSelectedSection}
                   onHoverStart={() => onHistorySectionHover?.(selectedSection.sectionId)}
                   onHoverEnd={() => onHistorySectionHover?.(null)}
+                  onActivate={
+                    onHistorySectionClick
+                      ? () => onHistorySectionClick(selectedSection.sectionId)
+                      : undefined
+                  }
+                  refocusInput={refocusChatInput}
                 />
                 <p className="text-[10px] text-zinc-500 mb-2">
                   Type your edit below — e.g. make it red

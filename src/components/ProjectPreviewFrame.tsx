@@ -32,6 +32,12 @@ interface WorkspaceStatus {
   liveUrl?: string | null;
 }
 
+export interface PreviewReadyState {
+  ready: boolean;
+  /** Editable proxy preview with section bridge (not live/cross-origin). */
+  targetingAvailable: boolean;
+}
+
 interface Props {
   projectId: string;
   codeWorkspaceVersion?: number;
@@ -39,7 +45,7 @@ interface Props {
   previewRefreshKey?: number;
   /** When true, defer iframe remount until edit completes and dev server settles. */
   editInProgress?: boolean;
-  onReadyChange?: (ready: boolean) => void;
+  onReadyChange?: (state: PreviewReadyState) => void;
   selectedSection?: SelectedSection | null;
   hoverSectionId?: string | null;
   focusSectionId?: string | null;
@@ -49,17 +55,7 @@ interface Props {
   onSectionHighlightDismiss?: () => void;
 }
 
-const SECTION_HINT_STORAGE_KEY = 'editor-section-hint-dismissed';
-
 const STAGE_ORDER = ['idle', 'cloning', 'installing', 'starting_server', 'ready'] as const;
-
-function readHintDismissed(): boolean {
-  try {
-    return localStorage.getItem(SECTION_HINT_STORAGE_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
 
 function stageProgress(stage: string): number {
   const idx = STAGE_ORDER.indexOf(stage as (typeof STAGE_ORDER)[number]);
@@ -98,15 +94,8 @@ export function ProjectPreviewFrame({
   const chunkRetryCountRef = useRef(0);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const lastHighlightRef = useRef<{ id: string | null; hover: boolean }>({ id: null, hover: false });
-  const [showSectionHint, setShowSectionHint] = useState(false);
 
   const selectionAvailable = previewMode !== 'live';
-
-  useEffect(() => {
-    if (previewReady && selectionAvailable) {
-      setShowSectionHint(!readHintDismissed());
-    }
-  }, [previewReady, selectionAvailable]);
 
   const postToIframe = useCallback((message: ParentToIframeSectionMessage) => {
     const win = iframeRef.current?.contentWindow;
@@ -147,15 +136,6 @@ export function ProjectPreviewFrame({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [selectedSection, onSelectedSectionChange, postToIframe]);
 
-  const dismissSectionHint = useCallback(() => {
-    setShowSectionHint(false);
-    try {
-      localStorage.setItem(SECTION_HINT_STORAGE_KEY, '1');
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
   useEffect(() => {
     if (editInProgress) return;
     const timer = setTimeout(() => {
@@ -178,8 +158,9 @@ export function ProjectPreviewFrame({
       setLivePreviewUrl(null);
     }
     const isReady = Boolean(status.ready);
+    const targetingAvailable = isReady && status.previewMode !== 'live';
     setPreviewReady(isReady);
-    onReadyChangeRef.current?.(isReady);
+    onReadyChangeRef.current?.({ ready: isReady, targetingAvailable });
     if (isReady) {
       markEditorVital('editor.preview_ready', { projectId, stage: status.stage });
     }
@@ -378,19 +359,6 @@ export function ProjectPreviewFrame({
         {previewMode === 'live' && previewReady && (
           <span className="text-[10px] text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md ml-2 hidden sm:inline">
             Edits apply in workspace — publish to update live site
-          </span>
-        )}
-        {showSectionHint && previewReady && selectionAvailable && (
-          <span className="text-[10px] text-blue-800 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md ml-2 hidden md:inline-flex items-center gap-1">
-            Drag a section to chat
-            <button
-              type="button"
-              onClick={dismissSectionHint}
-              className="text-blue-600 hover:text-blue-900"
-              aria-label="Dismiss hint"
-            >
-              ×
-            </button>
           </span>
         )}
         <div className="flex items-center gap-2">

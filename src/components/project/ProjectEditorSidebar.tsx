@@ -27,6 +27,7 @@ interface Deployment {
 interface Props {
   projectId: string;
   previewReady: boolean;
+  previewTargetingAvailable?: boolean;
   selectedSection?: import('@/lib/preview/sectionSelectionProtocol').SelectedSection | null;
   onClearSelectedSection?: () => void;
   onHistorySectionHover?: (sectionId: string | null) => void;
@@ -54,6 +55,7 @@ interface Props {
 export function ProjectEditorSidebar({
   projectId,
   previewReady,
+  previewTargetingAvailable = false,
   selectedSection,
   onClearSelectedSection,
   onHistorySectionHover,
@@ -146,6 +148,7 @@ export function ProjectEditorSidebar({
             projectId={projectId}
             disabled={!previewReady || !hasGitlab}
             previewReady={previewReady}
+            previewTargetingAvailable={previewTargetingAvailable}
             legacyProject={!hasGitlab}
             selectedSection={selectedSection}
             onClearSelectedSection={onClearSelectedSection}
