@@ -1,6 +1,7 @@
 'use client';
 
 import { getTemplateDisplayName } from '@/lib/builder/templateGallery';
+import { getLayoutStarterDisplayName } from '@/lib/builder/layoutStarters';
 import { isOwnerChosenTemplate } from '@/lib/builder/ownerTemplateSelection';
 
 interface Section {
@@ -23,6 +24,7 @@ interface SuggestedTemplate {
   category: string;
   variant: string;
   reason?: string;
+  layoutStarterId?: string;
 }
 
 interface Props {
@@ -111,10 +113,19 @@ export default function ProposedPlanCard({ plan, suggestedTemplate, showRawPlan 
         {/* Template */}
         {suggestedTemplate && (
           <div>
-            <div className="text-xs font-semibold text-gray-500 uppercase mb-1">Color theme</div>
+            <div className="text-xs font-semibold text-gray-500 uppercase mb-1">Layout starter</div>
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm bg-indigo-100 text-indigo-700 px-2 py-1 rounded">
-                {getTemplateDisplayName(suggestedTemplate.variant)}
+              {suggestedTemplate.layoutStarterId ? (
+                <span className="text-sm bg-indigo-100 text-indigo-700 px-2 py-1 rounded">
+                  {getLayoutStarterDisplayName(suggestedTemplate.layoutStarterId)}
+                </span>
+              ) : (
+                <span className="text-sm bg-indigo-100 text-indigo-700 px-2 py-1 rounded">
+                  {getTemplateDisplayName(suggestedTemplate.variant)}
+                </span>
+              )}
+              <span className="text-xs text-gray-500">
+                Theme: {getTemplateDisplayName(suggestedTemplate.variant)}
               </span>
               {isOwnerChosenTemplate(suggestedTemplate.reason) && (
                 <span className="text-xs text-indigo-600">Your choice</span>

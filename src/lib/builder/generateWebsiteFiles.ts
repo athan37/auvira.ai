@@ -20,6 +20,7 @@ import { pickBackgroundColor } from './cssColor';
 import type { TemplateSelection } from '../agent/selectTemplateAgent';
 import { instrumentGeneratedFiles } from '@/lib/analytics/generated-sites/instrumentGeneratedSite';
 import type { LayoutStarter } from './layoutStarters';
+import { applyLayoutStrategyToPreset } from './layoutStarters';
 
 export function generateWebsiteFiles(
   siteSpec: SiteSpec,
@@ -33,10 +34,11 @@ export function generateWebsiteFiles(
 
   // Get preset from template variant
   const variant = layoutStarter?.variant ?? template?.variant ?? 'modern-clean';
-  const preset = {
-    ...getPreset(variant),
-    heroStyle: layoutStarter?.heroStyle ?? 'split',
-  };
+  const basePreset = getPreset(variant);
+  const preset = applyLayoutStrategyToPreset(
+    { ...basePreset, heroStyle: layoutStarter?.heroStyle ?? 'split' },
+    layoutStarter
+  );
 
   const customBg = pickBackgroundColor(cleanedSiteSpec.designDirection?.colors);
   if (cleanedSiteSpec.designDirection?.colors?.length) {

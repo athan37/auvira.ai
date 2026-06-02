@@ -2,22 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api/projectAccess';
 import { proposeWebsitePlanAgent } from '@/lib/agent/proposeWebsitePlanAgent';
 import type { ScratchIntake, WebsitePlan } from '@/lib/agent/schemas';
-import { getDefaultLayoutStarter, getLayoutStarter } from '@/lib/builder/layoutStarters';
+import { applyLayoutStarterToPlan } from '@/lib/scratch/applyLayoutStarterToPlan';
 
 export const runtime = 'nodejs';
-
-function applyLayoutStarterToPlan(plan: WebsitePlan, layoutStarterId?: string): WebsitePlan {
-  const starter = getLayoutStarter(layoutStarterId) ?? getDefaultLayoutStarter();
-  return {
-    ...plan,
-    suggestedTemplate: {
-      category: starter.category,
-      variant: starter.variant,
-      reason: layoutStarterId ? 'Selected by owner' : 'Default layout starter applied.',
-      layoutStarterId: starter.id,
-    },
-  };
-}
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();

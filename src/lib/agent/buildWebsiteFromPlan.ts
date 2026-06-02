@@ -143,6 +143,11 @@ export async function buildWebsiteFromPlan(
   }
   logStage(stageLogs, 'plan_to_sitespec_done', logPrefix, Date.now() - startTime);
 
+  const layoutStarter =
+    getLayoutStarter(input.layoutStarterId) ??
+    getLayoutStarter(websitePlan.suggestedTemplate?.layoutStarterId) ??
+    getDefaultLayoutStarter();
+
   logStage(stageLogs, 'design_brief_start', logPrefix);
   let designBrief: DesignBrief;
   try {
@@ -176,12 +181,11 @@ export async function buildWebsiteFromPlan(
       `[${logPrefix}] Design brief failed, using default: ${error instanceof Error ? error.message : 'Unknown error'}`
     );
   }
+  designBrief = {
+    ...designBrief,
+    layoutStrategy: layoutStarter.layoutStrategy,
+  };
   logStage(stageLogs, 'design_brief_done', logPrefix, Date.now() - startTime);
-
-  const layoutStarter =
-    getLayoutStarter(input.layoutStarterId) ??
-    getLayoutStarter(websitePlan.suggestedTemplate?.layoutStarterId) ??
-    getDefaultLayoutStarter();
 
   const template: TemplateSelection = {
     category: layoutStarter.category,
