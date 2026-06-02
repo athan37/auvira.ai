@@ -50,8 +50,10 @@ function heroTarget(confidence: 'high' | 'medium' | 'low', reason: string): Edit
 }
 
 function readHeroHeadline(siteConfigContent: string): string | undefined {
-  const quotedKey = siteConfigContent.match(/"headline"\s*:\s*"([^"]*)"/)?.[1]?.trim();
-  if (quotedKey) return quotedKey;
+  const doubleQuoted = siteConfigContent.match(/"headline"\s*:\s*"([^"]*)"/)?.[1]?.trim();
+  if (doubleQuoted) return doubleQuoted;
+  const singleQuoted = siteConfigContent.match(/headline\s*:\s*'((?:\\'|[^'])*)'/)?.[1]?.trim();
+  if (singleQuoted) return singleQuoted.replace(/\\'/g, "'");
   return siteConfigContent.match(/\bheadline\s*:\s*"([^"]*)"/)?.[1]?.trim();
 }
 
@@ -299,6 +301,10 @@ export async function resolveEditTargetAsync(
 ): Promise<EditTarget> {
   const target = resolveEditTarget(message, siteModel, catalog, history, editFocusStack, selectedTarget);
   const effectiveMessage = resolveEffectiveEditMessage(message, history, editFocusStack, selectedTarget);
+
+  if (target.kind === 'hero' && target.confidence === 'high') {
+    return target;
+  }
 
   if (target.needsClarification) {
     if (selectedTarget) {

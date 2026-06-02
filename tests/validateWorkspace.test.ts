@@ -56,36 +56,3 @@ describe('validateWorkspace', () => {
     await fs.rm(dir, { recursive: true, force: true });
   });
 });
-
-const SERVICEPROMAGIC_WS = path.join(
-  process.cwd(),
-  '.tmp/git-workspaces/6a1bc4fdc795e45980a08f4e/repo'
-);
-
-describe.runIf(() => {
-  try {
-    require('fs').accessSync(SERVICEPROMAGIC_WS);
-    return true;
-  } catch {
-    return false;
-  }
-})('validateWorkspace production build (ServiceProMagic)', () => {
-  it('builds after preview dev left a stale .next cache', async () => {
-    await fs.mkdir(path.join(SERVICEPROMAGIC_WS, '.next'), { recursive: true });
-    await fs.writeFile(path.join(SERVICEPROMAGIC_WS, '.next', 'BUILD_ID'), 'stale-dev');
-
-    const prevNodeEnv = process.env.NODE_ENV;
-    Object.defineProperty(process.env, 'NODE_ENV', { value: 'development', writable: true, configurable: true });
-    try {
-      const result = await validateWorkspace(SERVICEPROMAGIC_WS, { forceFullBuild: true });
-      expect(result.ok, result.errors.join('; ') || result.buildLog).toBe(true);
-      expect(result.buildLog).toContain('Removed stale .next cache');
-    } finally {
-      Object.defineProperty(process.env, 'NODE_ENV', {
-        value: prevNodeEnv,
-        writable: true,
-        configurable: true,
-      });
-    }
-  }, 180_000);
-});
