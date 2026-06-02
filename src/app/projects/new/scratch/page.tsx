@@ -5,15 +5,19 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useState } from 'react';
 import { AppShell } from '@/components/layout/AppShell';
-import { TemplateGalleryPicker } from '@/components/clone/TemplateGalleryPicker';
+import ProposedPlanCard from '@/components/clone/ProposedPlanCard';
+import { LayoutStarterPicker } from '@/components/scratch/LayoutStarterPicker';
 import { Alert } from '@/components/ui/Alert';
 import { Button } from '@/components/ui/Button';
 import { Card, CardBody } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { PageContainer } from '@/components/ui/PageContainer';
 import { Spinner } from '@/components/ui/Spinner';
-import type { TemplateGalleryEntry } from '@/lib/builder/templateGallery';
+import type { WebsitePlan } from '@/lib/agent/schemas';
+import type { LayoutStarter, LayoutStarterId } from '@/lib/builder/layoutStarters';
+import { websitePlanToProposedPlan } from '@/lib/scratch/websitePlanToProposedPlan';
 
+type ScratchStep = 'intake' | 'review';
 type ScratchProgressStage = 'idle' | 'planning' | 'building' | 'saving';
 
 const SCRATCH_PROGRESS_STEPS: Array<{ key: ScratchProgressStage; label: string }> = [
@@ -61,6 +65,7 @@ function ScratchProgressSteps({ stage }: { stage: ScratchProgressStage }) {
 export default function NewScratchPage() {
   const { status } = useSession();
   const router = useRouter();
+  const [step, setStep] = useState<ScratchStep>('intake');
   const [businessName, setBusinessName] = useState('');
   const [industry, setIndustry] = useState('');
   const [location, setLocation] = useState('');
@@ -68,7 +73,9 @@ export default function NewScratchPage() {
   const [mainGoal, setMainGoal] = useState('Get more leads');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
-  const [selectedTemplate, setSelectedTemplate] = useState<TemplateGalleryEntry | null>(null);
+  const [selectedStarter, setSelectedStarter] = useState<LayoutStarter | null>(null);
+  const [websitePlan, setWebsitePlan] = useState<WebsitePlan | null>(null);
+  const [layoutStarterId, setLayoutStarterId] = useState<LayoutStarterId | null>(null);
   const [loading, setLoading] = useState(false);
   const [progressStage, setProgressStage] = useState<ScratchProgressStage>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -86,7 +93,17 @@ export default function NewScratchPage() {
     );
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const intakePayload = {
+    businessName: businessName.trim(),
+    industry: industry.trim(),
+    location: location.trim(),
+    services: services.trim(),
+    mainGoal,
+    phone: phone.trim(),
+    email: email.trim(),
+  };
+
+  const handlePropose = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!businessName.trim() || !industry.trim()) return;
 
@@ -99,13 +116,8 @@ export default function NewScratchPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          businessName: businessName.trim(),
-          industry: industry.trim(),
-          location: location.trim(),
-          services: services.trim(),
-          mainGoal,
-          phone: phone.trim(),
-          email: email.trim(),
+          ...intakePayload,
+          layoutStarterId: selectedStarter?.id,
         }),
       });
       const proposeData = await proposeRes.json();
@@ -115,34 +127,43 @@ export default function NewScratchPage() {
         return;
       }
 
-      setProgressStage('building');
+      setWebsitePlan(proposeData.websitePlan as WebsitePlan);
+      setLayoutStarterId(
+        (proposeData.layoutStarterId as LayoutStarterId | undefined) ??
+          selectedStarter?.id ??
+          proposeData.websitePlan?.suggestedTemplate?.layoutStarterId ??
+          null
+      );
+      setStep('review');
+      setProgressStage('idle');
+    } catch {
+      setError('Network error');
+      setProgressStage('idle');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      const plan = proposeData.websitePlan as Record<string, unknown>;
-      if (selectedTemplate) {
-        plan.suggestedTemplate = {
-          category: selectedTemplate.category,
-          variant: selectedTemplate.variant,
-          reason: 'Selected by owner',
-        };
-      }
+  const handleBuild = async () => {
+    if (!websitePlan) return;
 
+    setLoading(true);
+    setError(null);
+    setProgressStage('building');
+
+    try {
       const buildRes = await fetch('/api/projects/scratch/build', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          websitePlan: plan,
+          websitePlan,
           projectName: businessName.trim(),
+          layoutStarterId: layoutStarterId ?? websitePlan.suggestedTemplate?.layoutStarterId,
           intake: {
-            businessName: businessName.trim(),
-            industry: industry.trim(),
-            location: location.trim(),
-            services: services.trim(),
-            mainGoal,
-            phone: phone.trim(),
-            email: email.trim(),
+            ...intakePayload,
             targetCustomers: '',
             address: '',
-            desiredStyle: selectedTemplate?.category || 'professional',
+            desiredStyle: selectedStarter?.category || websitePlan.suggestedTemplate?.category || 'professional',
             notes: '',
           },
         }),
@@ -184,7 +205,9 @@ export default function NewScratchPage() {
             <div>
               <h1 className="text-2xl font-bold text-zinc-900 mb-2">Start from a template</h1>
               <p className="text-zinc-600">
-                Tell us about your business. We will generate a website you can edit and publish.
+                {step === 'intake'
+                  ? 'Tell us about your business and pick a layout starter. We will propose a plan before building.'
+                  : 'Review your proposed website plan, then confirm to build.'}
               </p>
             </div>
 
@@ -192,52 +215,84 @@ export default function NewScratchPage() {
 
             <ScratchProgressSteps stage={progressStage} />
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <Input
-                placeholder="Business name *"
-                value={businessName}
-                onChange={(e) => setBusinessName(e.target.value)}
-                required
-              />
-              <Input
-                placeholder="Industry * (e.g. HVAC, law firm)"
-                value={industry}
-                onChange={(e) => setIndustry(e.target.value)}
-                required
-              />
-              <Input placeholder="Location" value={location} onChange={(e) => setLocation(e.target.value)} />
-              <Input
-                placeholder="Services (comma-separated)"
-                value={services}
-                onChange={(e) => setServices(e.target.value)}
-              />
-              <Input placeholder="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
-              <Input
-                placeholder="Email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
+            {step === 'intake' ? (
+              <form onSubmit={handlePropose} className="space-y-4">
+                <Input
+                  placeholder="Business name *"
+                  value={businessName}
+                  onChange={(e) => setBusinessName(e.target.value)}
+                  required
+                />
+                <Input
+                  placeholder="Industry * (e.g. HVAC, law firm)"
+                  value={industry}
+                  onChange={(e) => setIndustry(e.target.value)}
+                  required
+                />
+                <Input placeholder="Location" value={location} onChange={(e) => setLocation(e.target.value)} />
+                <Input
+                  placeholder="Services (comma-separated)"
+                  value={services}
+                  onChange={(e) => setServices(e.target.value)}
+                />
+                <Input placeholder="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
+                <Input
+                  placeholder="Email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
 
-              <TemplateGalleryPicker
-                selectedCategory={selectedTemplate?.category}
-                selectedVariant={selectedTemplate?.variant}
-                onSelect={setSelectedTemplate}
-                disabled={loading}
-                description="Same color themes as clone — pick the look for your new site."
-              />
+                <LayoutStarterPicker
+                  selectedId={selectedStarter?.id ?? layoutStarterId}
+                  onSelect={setSelectedStarter}
+                  disabled={loading}
+                />
 
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? (
-                  <>
-                    <Spinner size="sm" />
-                    Building your website…
-                  </>
-                ) : (
-                  'Create website'
-                )}
-              </Button>
-            </form>
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? (
+                    <>
+                      <Spinner size="sm" />
+                      Creating plan…
+                    </>
+                  ) : (
+                    'Continue to plan review'
+                  )}
+                </Button>
+              </form>
+            ) : (
+              <div className="space-y-4">
+                <ProposedPlanCard
+                  plan={websitePlan ? websitePlanToProposedPlan(websitePlan) : null}
+                  suggestedTemplate={websitePlan?.suggestedTemplate}
+                />
+
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="w-full sm:w-auto"
+                    disabled={loading}
+                    onClick={() => {
+                      setStep('intake');
+                      setError(null);
+                    }}
+                  >
+                    Back to intake
+                  </Button>
+                  <Button type="button" className="w-full sm:flex-1" disabled={loading} onClick={handleBuild}>
+                    {loading ? (
+                      <>
+                        <Spinner size="sm" />
+                        Building your website…
+                      </>
+                    ) : (
+                      'Confirm and build website'
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardBody>
         </Card>
       </PageContainer>

@@ -11,8 +11,12 @@ import { generateDesignBriefAgent, getDefaultDesignBrief } from './generateDesig
 import { generateWebsiteFiles } from '@/lib/builder/generateWebsiteFiles';
 import { validateGeneratedSite } from '@/lib/builder/validateGeneratedSite';
 import type { TemplateSelection } from './selectTemplateAgent';
-import type { TemplateVariant } from '@/lib/builder/themePresets';
 import type { GenerateWebsiteFilesResult } from '@/lib/builder/types';
+import {
+  getDefaultLayoutStarter,
+  getLayoutStarter,
+  type LayoutStarter,
+} from '@/lib/builder/layoutStarters';
 
 export interface StageLog {
   stage: string;
@@ -24,6 +28,7 @@ export interface BuildWebsiteFromPlanInput {
   websitePlan: WebsitePlan;
   intake: ScratchIntake;
   projectName: string;
+  layoutStarterId?: string;
   validateBuild?: boolean;
   logPrefix?: string;
 }
@@ -37,6 +42,8 @@ export interface BuildWebsiteFromPlanResult {
   siteSpec?: SiteSpec;
   designBrief?: DesignBrief;
   template?: TemplateSelection;
+  layoutStarter?: LayoutStarter;
+  layoutStarterId?: string;
   uniqueName?: string;
   generated?: GenerateWebsiteFilesResult;
   scratchValidation?: { ok: boolean; issues: string[] };
@@ -171,17 +178,18 @@ export async function buildWebsiteFromPlan(
   }
   logStage(stageLogs, 'design_brief_done', logPrefix, Date.now() - startTime);
 
-  const template: TemplateSelection = websitePlan.suggestedTemplate?.category
-    ? {
-        category: websitePlan.suggestedTemplate.category as TemplateSelection['category'],
-        variant: (websitePlan.suggestedTemplate.variant as TemplateVariant) || 'modern-clean',
-        reason: websitePlan.suggestedTemplate.reason || 'From website plan template selection.',
-      }
-    : {
-        category: 'general-service',
-        variant: 'modern-clean',
-        reason: 'Default template selected.',
-      };
+  const layoutStarter =
+    getLayoutStarter(input.layoutStarterId) ??
+    getLayoutStarter(websitePlan.suggestedTemplate?.layoutStarterId) ??
+    getDefaultLayoutStarter();
+
+  const template: TemplateSelection = {
+    category: layoutStarter.category,
+    variant: layoutStarter.variant,
+    reason:
+      websitePlan.suggestedTemplate?.reason ||
+      (input.layoutStarterId ? 'Selected by owner' : 'Default template selected.'),
+  };
 
   const name = input.projectName || websitePlan.businessName || 'generated-website';
   const uniqueName = generateUniqueProjectName(name);
@@ -189,7 +197,7 @@ export async function buildWebsiteFromPlan(
   logStage(stageLogs, 'build_files_start', logPrefix);
   let generated: GenerateWebsiteFilesResult;
   try {
-    generated = generateWebsiteFiles(siteSpec, uniqueName, designBrief, template);
+    generated = generateWebsiteFiles(siteSpec, uniqueName, designBrief, template, layoutStarter);
   } catch (error) {
     logStage(stageLogs, 'build_files_failed', logPrefix);
     return {
@@ -201,6 +209,8 @@ export async function buildWebsiteFromPlan(
       siteSpec,
       designBrief,
       template,
+      layoutStarter,
+      layoutStarterId: layoutStarter.id,
       uniqueName,
       scratchValidation,
       fidelityValidation,
@@ -236,6 +246,8 @@ export async function buildWebsiteFromPlan(
         siteSpec,
         designBrief,
         template,
+        layoutStarter,
+        layoutStarterId: layoutStarter.id,
         uniqueName,
         generated,
         scratchValidation,
@@ -254,6 +266,8 @@ export async function buildWebsiteFromPlan(
     siteSpec,
     designBrief,
     template,
+    layoutStarter,
+    layoutStarterId: layoutStarter.id,
     uniqueName,
     generated,
     scratchValidation,

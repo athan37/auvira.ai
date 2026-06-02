@@ -7,3 +7,13 @@ describe('pageTemplate testimonials', () => {
     expect(PAGE_TSX_TEMPLATE).not.toMatch(/italic">"\{item\.description/);
   });
 });
+
+describe('pageTemplate hero variants', () => {
+  it('switches hero layout via preset.heroStyle', () => {
+    expect(PAGE_TSX_TEMPLATE).toContain('const style = preset.heroStyle || "split"');
+    expect(PAGE_TSX_TEMPLATE).toContain('function HeroCentered()');
+    expect(PAGE_TSX_TEMPLATE).toContain('function HeroPhoneFirst()');
+    expect(PAGE_TSX_TEMPLATE).toContain('function HeroMenuFeature()');
+    expect(PAGE_TSX_TEMPLATE).toContain('function HeroAppointment()');
+  });
+});

@@ -44,13 +44,125 @@ function Nav() {
   );
 }
 
-// Hero section
-function Hero() {
+function HeroContactCard() {
+  return (
+    <div className={"rounded-[2rem] border border-white/10 " + preset.surfaceBg + " p-8 text-slate-950 shadow-2xl"}>
+      <p className={"text-xs font-bold uppercase tracking-[0.25em] " + preset.sectionEyebrow}>Get Started</p>
+      <h2 className="mt-4 font-serif text-3xl font-semibold">Ready to work with us?</h2>
+      <p className="mt-4 leading-7 text-slate-600">Get clear next steps and a professional experience from the first conversation.</p>
+      {siteConfig.contact.phone && (
+        <div className={"mt-6 rounded-2xl " + preset.mutedBg + " p-4 font-semibold"}>{siteConfig.contact.phone}</div>
+      )}
+      {siteConfig.contact.email && (
+        <div className={"mt-3 rounded-2xl " + preset.mutedBg + " p-4 font-semibold"}>{siteConfig.contact.email}</div>
+      )}
+    </div>
+  );
+}
+
+function HeroCtaButtons() {
   const { hero } = siteConfig;
   return (
-    <section data-analytics-id="hero" data-analytics-type="hero" data-analytics-label="Hero" data-site-section-id="hero" data-site-section-index="-1" data-site-section-type="hero" data-site-section-title="Hero" className={"relative overflow-hidden " + preset.heroBg + " px-4 py-24 text-white sm:px-6 lg:px-8 lg:py-32"}>
+    <div className="mt-9 flex flex-wrap gap-4 justify-center lg:justify-start">
+      {hero.primaryCta && (
+        <a href="#contact" className={"inline-flex items-center justify-center rounded-full px-6 py-3 text-sm font-bold shadow-lg shadow-black/20 transition hover:-translate-y-0.5 " + preset.primaryButton}>{hero.primaryCta}</a>
+      )}
+      {hero.secondaryCta && (
+        <a href="#services" className={"inline-flex items-center justify-center rounded-full border-2 border-white/30 px-6 py-3 text-sm font-semibold text-white transition hover:bg-white/10 " + preset.secondaryButton}>{hero.secondaryCta}</a>
+      )}
+    </div>
+  );
+}
+
+function HeroSectionShell({ children, className }: { children: any; className?: string }) {
+  return (
+    <section data-analytics-id="hero" data-analytics-type="hero" data-analytics-label="Hero" data-site-section-id="hero" data-site-section-index="-1" data-site-section-type="hero" data-site-section-title="Hero" className={"relative overflow-hidden " + preset.heroBg + " px-4 py-24 text-white sm:px-6 lg:px-8 lg:py-32 " + (className || "")}>
       <div className={"absolute inset-0 " + preset.heroOverlay} />
-      <div className="relative mx-auto grid max-w-7xl gap-12 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+      <div className="relative mx-auto max-w-7xl">{children}</div>
+    </section>
+  );
+}
+
+function HeroSplit() {
+  const { hero } = siteConfig;
+  return (
+    <HeroSectionShell>
+      <div className="grid gap-12 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+        <div>
+          {hero.eyebrow && <p className={"mb-5 text-xs font-bold uppercase tracking-[0.3em] " + preset.heroEyebrow}>{hero.eyebrow}</p>}
+          <h1 className={"font-serif text-5xl font-semibold tracking-tight md:text-7xl " + preset.heroText}>{hero.headline}</h1>
+          {hero.subheadline && <p className={"mt-6 max-w-2xl text-xl leading-9 " + preset.heroMutedText}>{hero.subheadline}</p>}
+          <HeroCtaButtons />
+        </div>
+        <HeroContactCard />
+      </div>
+    </HeroSectionShell>
+  );
+}
+
+function HeroCentered() {
+  const { hero } = siteConfig;
+  return (
+    <HeroSectionShell>
+      <div className="mx-auto max-w-4xl text-center">
+        {hero.eyebrow && <p className={"mb-5 text-xs font-bold uppercase tracking-[0.3em] " + preset.heroEyebrow}>{hero.eyebrow}</p>}
+        <h1 className={"font-serif text-5xl font-semibold tracking-tight md:text-7xl " + preset.heroText}>{hero.headline}</h1>
+        {hero.subheadline && <p className={"mt-6 text-xl leading-9 " + preset.heroMutedText}>{hero.subheadline}</p>}
+        <HeroCtaButtons />
+      </div>
+    </HeroSectionShell>
+  );
+}
+
+function HeroPhoneFirst() {
+  const { hero, contact } = siteConfig;
+  return (
+    <HeroSectionShell>
+      <div className="max-w-3xl">
+        {hero.eyebrow && <p className={"mb-5 text-xs font-bold uppercase tracking-[0.3em] " + preset.heroEyebrow}>{hero.eyebrow}</p>}
+        <h1 className={"font-serif text-5xl font-semibold tracking-tight md:text-6xl " + preset.heroText}>{hero.headline}</h1>
+        {hero.subheadline && <p className={"mt-6 max-w-2xl text-xl leading-9 " + preset.heroMutedText}>{hero.subheadline}</p>}
+        {contact.phone && (
+          <a href={"tel:" + contact.phone.replace(/[^0-9]/g, "")} className={"mt-8 inline-flex items-center justify-center rounded-full px-8 py-4 text-lg font-bold shadow-lg shadow-black/20 transition hover:-translate-y-0.5 " + preset.primaryButton}>
+            Call {contact.phone}
+          </a>
+        )}
+        <HeroCtaButtons />
+      </div>
+    </HeroSectionShell>
+  );
+}
+
+function HeroMenuFeature() {
+  const { hero } = siteConfig;
+  const featured = siteConfig.sections.find((section) => section.type === "services")?.items?.slice(0, 3) || [];
+  return (
+    <HeroSectionShell>
+      <div className="grid gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
+        <div>
+          {hero.eyebrow && <p className={"mb-5 text-xs font-bold uppercase tracking-[0.3em] " + preset.heroEyebrow}>{hero.eyebrow}</p>}
+          <h1 className={"font-serif text-5xl font-semibold tracking-tight md:text-6xl " + preset.heroText}>{hero.headline}</h1>
+          {hero.subheadline && <p className={"mt-6 max-w-2xl text-xl leading-9 " + preset.heroMutedText}>{hero.subheadline}</p>}
+          <HeroCtaButtons />
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
+          {(featured.length > 0 ? featured : [{ title: "Chef's Special" }, { title: "Seasonal Menu" }, { title: "Private Events" }]).map((item, i) => (
+            <div key={i} className={"rounded-2xl border border-white/10 " + preset.surfaceBg + " p-5 text-slate-950 shadow-lg"}>
+              <p className={"text-xs font-bold uppercase tracking-[0.2em] " + preset.sectionEyebrow}>Featured</p>
+              <p className="mt-2 text-lg font-semibold">{item.title}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </HeroSectionShell>
+  );
+}
+
+function HeroAppointment() {
+  const { hero } = siteConfig;
+  return (
+    <HeroSectionShell>
+      <div className="grid gap-12 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
         <div>
           {hero.eyebrow && <p className={"mb-5 text-xs font-bold uppercase tracking-[0.3em] " + preset.heroEyebrow}>{hero.eyebrow}</p>}
           <h1 className={"font-serif text-5xl font-semibold tracking-tight md:text-7xl " + preset.heroText}>{hero.headline}</h1>
@@ -59,25 +171,32 @@ function Hero() {
             {hero.primaryCta && (
               <a href="#contact" className={"inline-flex items-center justify-center rounded-full px-6 py-3 text-sm font-bold shadow-lg shadow-black/20 transition hover:-translate-y-0.5 " + preset.primaryButton}>{hero.primaryCta}</a>
             )}
-            {hero.secondaryCta && (
-              <a href="#services" className={"inline-flex items-center justify-center rounded-full border-2 border-white/30 px-6 py-3 text-sm font-semibold text-white transition hover:bg-white/10 " + preset.secondaryButton}>{hero.secondaryCta}</a>
+            {siteConfig.contact.phone && (
+              <a href={"tel:" + siteConfig.contact.phone.replace(/[^0-9]/g, "")} className={"inline-flex items-center justify-center rounded-full border-2 border-white/30 px-6 py-3 text-sm font-semibold text-white transition hover:bg-white/10 " + preset.secondaryButton}>{siteConfig.contact.phone}</a>
             )}
           </div>
         </div>
         <div className={"rounded-[2rem] border border-white/10 " + preset.surfaceBg + " p-8 text-slate-950 shadow-2xl"}>
-          <p className={"text-xs font-bold uppercase tracking-[0.25em] " + preset.sectionEyebrow}>Get Started</p>
-          <h2 className="mt-4 font-serif text-3xl font-semibold">Ready to work with us?</h2>
-          <p className="mt-4 leading-7 text-slate-600">Get clear next steps and a professional experience from the first conversation.</p>
-          {siteConfig.contact.phone && (
-            <div className={"mt-6 rounded-2xl " + preset.mutedBg + " p-4 font-semibold"}>{siteConfig.contact.phone}</div>
-          )}
+          <p className={"text-xs font-bold uppercase tracking-[0.25em] " + preset.sectionEyebrow}>Book an Appointment</p>
+          <h2 className="mt-4 font-serif text-3xl font-semibold">Schedule your visit</h2>
+          <p className="mt-4 leading-7 text-slate-600">Friendly care with clear next steps from your first contact.</p>
           {siteConfig.contact.email && (
-            <div className={"mt-3 rounded-2xl " + preset.mutedBg + " p-4 font-semibold"}>{siteConfig.contact.email}</div>
+            <div className={"mt-6 rounded-2xl " + preset.mutedBg + " p-4 font-semibold"}>{siteConfig.contact.email}</div>
           )}
         </div>
       </div>
-    </section>
+    </HeroSectionShell>
   );
+}
+
+// Hero section — layout driven by preset.heroStyle from layout starter
+function Hero() {
+  const style = preset.heroStyle || "split";
+  if (style === "centered") return <HeroCentered />;
+  if (style === "phone-first") return <HeroPhoneFirst />;
+  if (style === "menu-feature") return <HeroMenuFeature />;
+  if (style === "appointment-hero") return <HeroAppointment />;
+  return <HeroSplit />;
 }
 
 // Services section renderer

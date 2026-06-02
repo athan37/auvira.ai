@@ -1,9 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api/projectAccess';
 import { proposeWebsitePlanAgent } from '@/lib/agent/proposeWebsitePlanAgent';
-import type { ScratchIntake } from '@/lib/agent/schemas';
+import type { ScratchIntake, WebsitePlan } from '@/lib/agent/schemas';
+import { getDefaultLayoutStarter, getLayoutStarter } from '@/lib/builder/layoutStarters';
 
 export const runtime = 'nodejs';
+
+function applyLayoutStarterToPlan(plan: WebsitePlan, layoutStarterId?: string): WebsitePlan {
+  const starter = getLayoutStarter(layoutStarterId) ?? getDefaultLayoutStarter();
+  return {
+    ...plan,
+    suggestedTemplate: {
+      category: starter.category,
+      variant: starter.variant,
+      reason: layoutStarterId ? 'Selected by owner' : 'Default layout starter applied.',
+      layoutStarterId: starter.id,
+    },
+  };
+}
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
@@ -34,10 +48,12 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await proposeWebsitePlanAgent(intake);
+    const websitePlan = applyLayoutStarterToPlan(result.data as WebsitePlan, body.layoutStarterId);
 
     return NextResponse.json({
       ok: true,
-      websitePlan: result.data,
+      websitePlan,
+      layoutStarterId: websitePlan.suggestedTemplate.layoutStarterId,
       stageLogs: result.stageLogs,
       duration_ms: Date.now() - startTime,
     });

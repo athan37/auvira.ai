@@ -89,6 +89,7 @@ export interface IWebsiteProject extends Document {
     category: string;
     variant: string;
     reason: string;
+    layoutStarterId?: string;
   };
   generatedSiteValidation?: {
     ok: boolean;
@@ -147,6 +148,7 @@ const WebsiteProjectSchema = new Schema<IWebsiteProject>(
       category: String,
       variant: String,
       reason: String,
+      layoutStarterId: String,
     },
     generatedSiteValidation: { type: Schema.Types.Mixed },
     contentFidelity: { type: Schema.Types.Mixed },

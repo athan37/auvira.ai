@@ -19,19 +19,24 @@ import { normalizeSiteSpec } from './normalizeSiteSpec';
 import { pickBackgroundColor } from './cssColor';
 import type { TemplateSelection } from '../agent/selectTemplateAgent';
 import { instrumentGeneratedFiles } from '@/lib/analytics/generated-sites/instrumentGeneratedSite';
+import type { LayoutStarter } from './layoutStarters';
 
 export function generateWebsiteFiles(
   siteSpec: SiteSpec,
   projectName: string,
   designBrief?: DesignBrief,
-  template?: TemplateSelection
+  template?: TemplateSelection,
+  layoutStarter?: LayoutStarter
 ): GenerateWebsiteFilesResult {
   // Clean siteSpec to remove any markdown artifacts before generating files
   const cleanedSiteSpec = normalizeSiteSpec(cleanGeneratedCopy(siteSpec) as SiteSpec);
 
   // Get preset from template variant
-  const variant = template?.variant ?? 'modern-clean';
-  const preset = { ...getPreset(variant) };
+  const variant = layoutStarter?.variant ?? template?.variant ?? 'modern-clean';
+  const preset = {
+    ...getPreset(variant),
+    heroStyle: layoutStarter?.heroStyle ?? 'split',
+  };
 
   const customBg = pickBackgroundColor(cleanedSiteSpec.designDirection?.colors);
   if (cleanedSiteSpec.designDirection?.colors?.length) {

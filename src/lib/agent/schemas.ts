@@ -509,7 +509,8 @@ export const websitePlanSchema = {
       "properties": {
         "category": { "type": "string" },
         "variant": { "type": "string" },
-        "reason": { "type": "string" }
+        "reason": { "type": "string" },
+        "layoutStarterId": { "type": "string" }
       }
     },
     "riskWarnings": { "type": "array", "items": { "type": "string" } }
@@ -548,6 +549,7 @@ export interface WebsitePlan {
     category: string;
     variant: string;
     reason: string;
+    layoutStarterId?: string;
   };
   riskWarnings: string[];
 }

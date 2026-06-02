@@ -27,11 +27,12 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { websitePlan, projectName, validateBuild = true, intake: intakeBody } = body as {
+    const { websitePlan, projectName, validateBuild = true, intake: intakeBody, layoutStarterId } = body as {
       websitePlan: WebsitePlan;
       projectName: string;
       validateBuild?: boolean;
       intake?: Partial<ScratchIntake>;
+      layoutStarterId?: string;
     };
 
     if (!websitePlan) {
@@ -44,6 +45,7 @@ export async function POST(request: NextRequest) {
       websitePlan,
       intake,
       projectName,
+      layoutStarterId: layoutStarterId ?? websitePlan.suggestedTemplate?.layoutStarterId,
       validateBuild,
       logPrefix: 'PROJECTS/SCRATCH/BUILD',
     });
@@ -131,11 +133,12 @@ export async function POST(request: NextRequest) {
       name: websitePlan.businessName || projectName,
       siteSpec: siteSpec as any,
       websitePlan: websitePlan as any,
-      template: websitePlan.suggestedTemplate
+      template: buildResult.template
         ? {
-            category: websitePlan.suggestedTemplate.category,
-            variant: websitePlan.suggestedTemplate.variant || 'modern-clean',
-            reason: websitePlan.suggestedTemplate.reason || '',
+            category: buildResult.template.category,
+            variant: buildResult.template.variant,
+            reason: buildResult.template.reason,
+            layoutStarterId: buildResult.layoutStarterId,
           }
         : undefined,
       scratchValidation: buildResult.scratchValidation
@@ -227,7 +230,8 @@ export async function POST(request: NextRequest) {
       projectId: project._id.toString(),
       siteSpec,
       websitePlan,
-      template: websitePlan.suggestedTemplate,
+      template: buildResult.template,
+      layoutStarterId: buildResult.layoutStarterId,
       generatedSiteValidation: buildValidation,
       gitlab: {
         projectId: gitlabResult.id,
