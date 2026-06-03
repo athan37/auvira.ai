@@ -4,7 +4,7 @@ import { CloneJob, PREVIEW_STEPS, BUILD_SUMMARY_ITEMS, type IBuildSummaryItem } 
 import { getLLMClient } from '@/lib/llm/llmClient';
 import { buildGenerateSiteSpecPrompt } from '@/lib/agent/prompts';
 import { generateDesignBriefAgent, getDefaultDesignBrief } from '@/lib/agent/generateDesignBriefAgent';
-import { generateCloneWebsiteFiles } from '@/lib/clone/cloneTemplateSelection';
+import { generateCloneWebsiteFiles, resolveCloneTemplateSelection } from '@/lib/clone/cloneTemplateSelection';
 import { validateGeneratedSite } from '@/lib/builder/validateGeneratedSite';
 import { waitForPreviewReady } from '@/lib/preview/waitForPreviewReady';
 import { spawn, ChildProcess } from 'child_process';
@@ -290,6 +290,7 @@ export async function POST(
     }
 
     const uniqueName = generateUniqueProjectName(job.projectName || (job.businessProfile as any)?.businessName || 'generated-site');
+    const templateSelection = resolveCloneTemplateSelection(job.suggestedTemplate);
     const generated = generateCloneWebsiteFiles(
       siteSpec as unknown as import('@/lib/agent/schemas').SiteSpec,
       uniqueName,
@@ -341,7 +342,7 @@ export async function POST(
     }
 
     // Style summary
-    await markSummaryDone(jobId, 'style', `Applied ${template.category} / ${template.variant} style`);
+    await markSummaryDone(jobId, 'style', `Applied ${templateSelection.category} / ${templateSelection.variant} style`);
 
     // Step 7: quality_check — validate
     await markPreviewStepRunning(jobId, 'quality_check');

@@ -436,10 +436,8 @@ pages:
  * All business content lives here - page.tsx only renders it.
  */
 export function generateSiteConfig(siteSpec: SiteSpec): string {
-  // Extract contact info from sections
-  const contactItems = (siteSpec.sections.find((s) => s.type === 'contact')?.items || []).map((item) =>
-    typeof item === 'string' ? item : item.title
-  );
+  // Extract contact info from sections (items are plain strings in SiteSpec)
+  const contactItems = siteSpec.sections.find((s) => s.type === 'contact')?.items ?? [];
   const phoneItem =
     contactItems.find(
       (i) =>
