@@ -1,3 +1,4 @@
+import { classifyEditWhat } from '@/lib/project-workspace/edit-context/classifyEditWhat';
 import type { EditContext } from '@/lib/project-workspace/edit-context/types';
 import type { EditPlan } from '@/lib/project-workspace/planner/editPlan.schema';
 import {
@@ -17,6 +18,11 @@ import {
   planFromExplorerStyleApply,
 } from './planFromExplorer';
 
+function isStyleEditIntent(message: string): boolean {
+  const what = classifyEditWhat(message);
+  return what === 'style_background' || what === 'style_card' || what === 'style_text';
+}
+
 /**
  * Explorer pipeline: deterministic surfaces first, optional LLM when ambiguous.
  */
@@ -24,6 +30,10 @@ export async function tryExplorerPlan(editContext: EditContext): Promise<EditPla
   if (!shouldRunDeterministicExplorer(editContext)) return null;
 
   const explored = exploreSectionTargetDeterministic(editContext);
+
+  if (explored.kind === 'needs_llm' && isStyleEditIntent(editContext.effectiveMessage)) {
+    return null;
+  }
   if (explored.kind === 'apply') {
     if (explored.fieldPath.includes('presentation.')) {
       const field = explored.fieldPath.includes('cardClass')
@@ -113,6 +123,10 @@ export async function tryExplorerPlan(editContext: EditContext): Promise<EditPla
         });
       }
     }
+  }
+
+  if (isStyleEditIntent(editContext.effectiveMessage)) {
+    return null;
   }
 
   return planFromExplorerClarify(editContext, candidates, editContext.target.title);

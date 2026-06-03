@@ -50,7 +50,7 @@ describeRunLlmIntegration('explorer agent (LLM)', () => {
       const built = await buildEditContext({
         workspacePath,
         mode: 'gitlab',
-        ownerMessage: 'change the info on the blue card to Explorer Card Title',
+        ownerMessage: 'change contact information to Explorer Card Title',
         infraBaselineReady: true,
         selectedTarget: {
           kind: 'section',
