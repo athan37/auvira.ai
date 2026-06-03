@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api/projectAccess';
 import { proposeWebsitePlanAgent } from '@/lib/agent/proposeWebsitePlanAgent';
 import type { ScratchIntake, WebsitePlan } from '@/lib/agent/schemas';
-import { applyLayoutStarterToPlan } from '@/lib/scratch/applyLayoutStarterToPlan';
+import { applyScratchTemplateSelectionToPlan } from '@/lib/scratch/applyScratchTemplateSelectionToPlan';
 
 export const runtime = 'nodejs';
 
@@ -35,7 +35,11 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await proposeWebsitePlanAgent(intake);
-    const websitePlan = applyLayoutStarterToPlan(result.data as WebsitePlan, body.layoutStarterId);
+    const websitePlan = applyScratchTemplateSelectionToPlan(result.data as WebsitePlan, {
+      layoutStarterId: body.layoutStarterId,
+      templateCategory: body.templateCategory,
+      templateVariant: body.templateVariant,
+    });
 
     return NextResponse.json({
       ok: true,

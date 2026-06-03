@@ -32,8 +32,8 @@ export function generateWebsiteFiles(
   // Clean siteSpec to remove any markdown artifacts before generating files
   const cleanedSiteSpec = normalizeSiteSpec(cleanGeneratedCopy(siteSpec) as SiteSpec);
 
-  // Get preset from template variant
-  const variant = layoutStarter?.variant ?? template?.variant ?? 'modern-clean';
+  // Color theme comes from template selection; layout starter only affects structure/hero.
+  const variant = template?.variant ?? layoutStarter?.variant ?? 'modern-clean';
   const basePreset = getPreset(variant);
   const preset = applyLayoutStrategyToPreset(
     { ...basePreset, heroStyle: layoutStarter?.heroStyle ?? 'split' },

@@ -110,30 +110,33 @@ export default function ProposedPlanCard({ plan, suggestedTemplate, showRawPlan 
           </div>
         )}
 
-        {/* Template */}
+        {/* Layout + color templates */}
         {suggestedTemplate && (
-          <div>
-            <div className="text-xs font-semibold text-gray-500 uppercase mb-1">Layout starter</div>
-            <div className="flex items-center gap-2 flex-wrap">
-              {suggestedTemplate.layoutStarterId ? (
+          <div className="space-y-3">
+            <div>
+              <div className="text-xs font-semibold text-gray-500 uppercase mb-1">Layout template</div>
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm bg-indigo-100 text-indigo-700 px-2 py-1 rounded">
-                  {getLayoutStarterDisplayName(suggestedTemplate.layoutStarterId)}
+                  {suggestedTemplate.layoutStarterId
+                    ? getLayoutStarterDisplayName(suggestedTemplate.layoutStarterId)
+                    : 'Default layout'}
                 </span>
-              ) : (
-                <span className="text-sm bg-indigo-100 text-indigo-700 px-2 py-1 rounded">
+              </div>
+            </div>
+            <div>
+              <div className="text-xs font-semibold text-gray-500 uppercase mb-1">Color theme</div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm bg-emerald-100 text-emerald-800 px-2 py-1 rounded">
                   {getTemplateDisplayName(suggestedTemplate.variant)}
                 </span>
-              )}
-              <span className="text-xs text-gray-500">
-                Theme: {getTemplateDisplayName(suggestedTemplate.variant)}
-              </span>
-              {isOwnerChosenTemplate(suggestedTemplate.reason) && (
-                <span className="text-xs text-indigo-600">Your choice</span>
+                {isOwnerChosenTemplate(suggestedTemplate.reason) && (
+                  <span className="text-xs text-indigo-600">Your choice</span>
+                )}
+              </div>
+              {suggestedTemplate.reason && !isOwnerChosenTemplate(suggestedTemplate.reason) && (
+                <p className="text-xs text-gray-400 mt-1">{suggestedTemplate.reason}</p>
               )}
             </div>
-            {suggestedTemplate.reason && !isOwnerChosenTemplate(suggestedTemplate.reason) && (
-              <p className="text-xs text-gray-400 mt-1">{suggestedTemplate.reason}</p>
-            )}
           </div>
         )}
 

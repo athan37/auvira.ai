@@ -3,18 +3,26 @@
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { AppShell } from '@/components/layout/AppShell';
 import ProposedPlanCard from '@/components/clone/ProposedPlanCard';
+import { TemplateGalleryPicker } from '@/components/clone/TemplateGalleryPicker';
+import { ScratchDesignPreviewPanel } from '@/components/scratch/ScratchDesignPreviewPanel';
+import { ScratchFormSection } from '@/components/scratch/ScratchFormSection';
 import { StarterGalleryPicker } from '@/components/scratch/StarterGalleryPicker';
 import { Alert } from '@/components/ui/Alert';
 import { Button } from '@/components/ui/Button';
-import { Card, CardBody } from '@/components/ui/Card';
 import { Input, Textarea } from '@/components/ui/Input';
 import { PageContainer } from '@/components/ui/PageContainer';
 import { Spinner } from '@/components/ui/Spinner';
+import { cn } from '@/lib/cn';
 import type { WebsitePlan } from '@/lib/agent/schemas';
-import type { LayoutStarter, LayoutStarterId } from '@/lib/builder/layoutStarters';
+import {
+  recommendLayoutStarterForIndustry,
+  type LayoutStarter,
+  type LayoutStarterId,
+} from '@/lib/builder/layoutStarters';
+import { getTemplateGallery, type TemplateGalleryEntry } from '@/lib/builder/templateGallery';
 import { websitePlanToProposedPlan } from '@/lib/scratch/websitePlanToProposedPlan';
 
 type ScratchStep = 'intake' | 'review';
@@ -32,6 +40,13 @@ const SCRATCH_PROGRESS_STEPS: Array<{ key: Exclude<ScratchProgressStage, 'idle' 
   { key: 'building', label: 'Building' },
   { key: 'saving', label: 'Saving' },
 ];
+
+const HOW_IT_WORKS = [
+  'Tell us about your business and pick layout + colors',
+  'Review the AI-proposed plan (edit before building)',
+  'Build a draft site in your workspace',
+  'Refine with chat and publish when ready',
+] as const;
 
 const selectClassName =
   'w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-950 focus:border-zinc-950 focus:outline-none focus:ring-2 focus:ring-zinc-950/10 disabled:bg-zinc-50 disabled:text-zinc-500';
@@ -56,8 +71,8 @@ function ScratchProgressSteps({ stage }: { stage: ScratchProgressStage }) {
                   done
                     ? 'bg-emerald-100 text-emerald-700'
                     : active
-                    ? 'bg-zinc-900 text-white'
-                    : 'bg-zinc-200 text-zinc-500'
+                      ? 'bg-zinc-900 text-white'
+                      : 'bg-zinc-200 text-zinc-500'
                 }`}
               >
                 {done ? '✓' : index + 1}
@@ -72,9 +87,65 @@ function ScratchProgressSteps({ stage }: { stage: ScratchProgressStage }) {
   );
 }
 
+function ScratchStepPill({
+  step,
+  hasPlan,
+  onIntake,
+  onReview,
+}: {
+  step: ScratchStep;
+  hasPlan: boolean;
+  onIntake: () => void;
+  onReview: () => void;
+}) {
+  return (
+    <div className="inline-flex rounded-lg border border-zinc-200 bg-zinc-50 p-0.5">
+      <button
+        type="button"
+        onClick={onIntake}
+        className={cn(
+          'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+          step === 'intake' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-600 hover:text-zinc-900'
+        )}
+      >
+        Intake
+      </button>
+      <button
+        type="button"
+        onClick={onReview}
+        disabled={!hasPlan}
+        className={cn(
+          'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+          step === 'review' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-600 hover:text-zinc-900',
+          !hasPlan && 'cursor-not-allowed opacity-50'
+        )}
+      >
+        Review
+      </button>
+    </div>
+  );
+}
+
+function HowItWorks() {
+  return (
+    <div className="rounded-xl border border-zinc-200 bg-white p-5 sm:p-6">
+      <h3 className="text-sm font-medium text-zinc-700 mb-2">How it works</h3>
+      <ol className="text-sm text-zinc-500 space-y-1 list-decimal list-inside">
+        {HOW_IT_WORKS.map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
 export default function NewScratchPage() {
   const { status } = useSession();
   const router = useRouter();
+  const defaultTheme = useMemo(
+    () => getTemplateGallery().find((t) => t.variant === 'modern-clean') ?? getTemplateGallery()[0],
+    []
+  );
   const [step, setStep] = useState<ScratchStep>('intake');
   const [businessName, setBusinessName] = useState('');
   const [industry, setIndustry] = useState('');
@@ -85,7 +156,10 @@ export default function NewScratchPage() {
   const [notes, setNotes] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
+  const [optionalOpen, setOptionalOpen] = useState(false);
   const [selectedStarter, setSelectedStarter] = useState<LayoutStarter | null>(null);
+  const [layoutManuallySelected, setLayoutManuallySelected] = useState(false);
+  const [selectedTheme, setSelectedTheme] = useState<TemplateGalleryEntry>(defaultTheme);
   const [websitePlan, setWebsitePlan] = useState<WebsitePlan | null>(null);
   const [layoutStarterId, setLayoutStarterId] = useState<LayoutStarterId | null>(null);
   const [revisionNote, setRevisionNote] = useState('');
@@ -117,16 +191,64 @@ export default function NewScratchPage() {
     phone: phone.trim(),
     email: email.trim(),
     address: '',
-    desiredStyle: selectedStarter?.category || 'professional',
+    desiredStyle: selectedTheme.category || selectedStarter?.category || 'professional',
     notes: notes.trim(),
   };
 
   const resolvedLayoutStarterId =
     layoutStarterId ?? selectedStarter?.id ?? websitePlan?.suggestedTemplate?.layoutStarterId ?? undefined;
 
-  const handlePropose = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!businessName.trim() || !industry.trim()) return;
+  const templateSelectionPayload = {
+    templateCategory: selectedTheme.category,
+    templateVariant: selectedTheme.variant,
+  };
+
+  const canPropose = Boolean(businessName.trim() && industry.trim());
+  const readinessItems = [
+    { label: 'Business name', done: Boolean(businessName.trim()) },
+    { label: 'Industry', done: Boolean(industry.trim()) },
+    { label: 'Layout template (recommended)', done: Boolean(selectedStarter) },
+  ];
+
+  const syncPlanTemplate = (updates: {
+    layoutStarterId?: LayoutStarterId;
+    category?: string;
+    variant?: string;
+  }) => {
+    if (!websitePlan?.suggestedTemplate) return;
+    setWebsitePlan({
+      ...websitePlan,
+      suggestedTemplate: {
+        ...websitePlan.suggestedTemplate,
+        ...updates,
+      },
+    });
+  };
+
+  const handleIndustryChange = (value: string) => {
+    setIndustry(value);
+    if (!layoutManuallySelected && value.trim()) {
+      const recommended = recommendLayoutStarterForIndustry(value);
+      setSelectedStarter(recommended);
+      setLayoutStarterId(recommended.id);
+    }
+  };
+
+  const handleStarterSelect = (starter: LayoutStarter) => {
+    setLayoutManuallySelected(true);
+    setSelectedStarter(starter);
+    setLayoutStarterId(starter.id);
+    syncPlanTemplate({ layoutStarterId: starter.id });
+  };
+
+  const handleThemeSelect = (theme: TemplateGalleryEntry) => {
+    setSelectedTheme(theme);
+    syncPlanTemplate({ category: theme.category, variant: theme.variant });
+  };
+
+  const handlePropose = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!canPropose) return;
 
     setLoading(true);
     setError(null);
@@ -139,6 +261,8 @@ export default function NewScratchPage() {
         body: JSON.stringify({
           ...intakePayload,
           layoutStarterId: selectedStarter?.id,
+          templateCategory: selectedTheme.category,
+          templateVariant: selectedTheme.variant,
         }),
       });
       const proposeData = await proposeRes.json();
@@ -180,6 +304,7 @@ export default function NewScratchPage() {
           websitePlan,
           instruction: revisionNote.trim(),
           layoutStarterId: resolvedLayoutStarterId,
+          ...templateSelectionPayload,
           intake: intakePayload,
         }),
       });
@@ -225,10 +350,7 @@ export default function NewScratchPage() {
       if (buildData.ok && buildData.projectId) {
         setProgressStage('saving');
         if (buildData.warning) {
-          sessionStorage.setItem(
-            `project-warning-${buildData.projectId}`,
-            String(buildData.warning)
-          );
+          sessionStorage.setItem(`project-warning-${buildData.projectId}`, String(buildData.warning));
         }
         router.push(`/projects/${buildData.projectId}`);
       } else {
@@ -243,6 +365,37 @@ export default function NewScratchPage() {
     }
   };
 
+  const intakePrimaryButton = (
+    <Button
+      type="button"
+      className="w-full"
+      disabled={loading || !canPropose}
+      onClick={() => void handlePropose()}
+    >
+      {loading && progressStage === 'planning' ? (
+        <>
+          <Spinner size="sm" />
+          Creating plan…
+        </>
+      ) : (
+        'Continue to plan review'
+      )}
+    </Button>
+  );
+
+  const reviewPrimaryButton = (
+    <Button type="button" className="w-full" disabled={loading || !websitePlan} onClick={handleBuild}>
+      {loading && progressStage === 'building' ? (
+        <>
+          <Spinner size="sm" />
+          Building your website…
+        </>
+      ) : (
+        'Confirm and build website'
+      )}
+    </Button>
+  );
+
   return (
     <AppShell
       variant="minimal"
@@ -252,162 +405,301 @@ export default function NewScratchPage() {
         </Link>
       }
     >
-      <PageContainer narrow className="py-10">
-        <Card>
-          <CardBody className="p-8 space-y-6">
+      <PageContainer className="py-8 sm:py-10 pb-28 lg:pb-10 max-w-6xl">
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div>
               <h1 className="text-2xl font-bold text-zinc-900 mb-2">Start from a template</h1>
-              <p className="text-zinc-600">
+              <p className="text-zinc-600 max-w-2xl">
                 {step === 'intake'
-                  ? 'Tell us about your business and pick a layout starter. We will propose a plan before building.'
+                  ? 'Tell us about your business, then pick a layout template and color theme. We will propose a plan before building.'
                   : 'Review your proposed website plan, revise if needed, then confirm to build.'}
               </p>
             </div>
+            <ScratchStepPill
+              step={step}
+              hasPlan={Boolean(websitePlan)}
+              onIntake={() => {
+                setStep('intake');
+                setError(null);
+                setShowRevisionInput(false);
+              }}
+              onReview={() => {
+                if (websitePlan) {
+                  setStep('review');
+                  setError(null);
+                }
+              }}
+            />
+          </div>
 
-            {error && <Alert variant="error">{error}</Alert>}
+          {error && <Alert variant="error">{error}</Alert>}
 
-            <ScratchProgressSteps stage={progressStage} />
+          <ScratchProgressSteps stage={progressStage} />
 
-            {step === 'intake' ? (
-              <form onSubmit={handlePropose} className="space-y-4">
-                <Input
-                  placeholder="Business name *"
-                  value={businessName}
-                  onChange={(e) => setBusinessName(e.target.value)}
-                  required
-                />
-                <Input
-                  placeholder="Industry * (e.g. HVAC, law firm)"
-                  value={industry}
-                  onChange={(e) => setIndustry(e.target.value)}
-                  required
-                />
-                <Input placeholder="Location" value={location} onChange={(e) => setLocation(e.target.value)} />
-                <Input
-                  placeholder="Services (comma-separated)"
-                  value={services}
-                  onChange={(e) => setServices(e.target.value)}
-                />
-                <div className="space-y-1">
-                  <label htmlFor="mainGoal" className="text-xs font-medium text-zinc-600">
-                    Main goal
-                  </label>
-                  <select
-                    id="mainGoal"
-                    className={selectClassName}
-                    value={mainGoal}
-                    onChange={(e) => setMainGoal(e.target.value)}
+          {step === 'intake' && (
+            <ScratchDesignPreviewPanel
+              variant="compact"
+              businessName={businessName}
+              industry={industry}
+              selectedStarter={selectedStarter}
+              selectedTheme={selectedTheme}
+            />
+          )}
+
+          {step === 'review' && (
+            <ScratchDesignPreviewPanel
+              variant="compact"
+              businessName={businessName}
+              industry={industry}
+              selectedStarter={selectedStarter}
+              selectedTheme={selectedTheme}
+            />
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 lg:gap-6">
+            <div className="lg:col-span-3 space-y-4 min-w-0">
+              {step === 'intake' ? (
+                <form onSubmit={handlePropose} className="space-y-4">
+                  <ScratchFormSection
+                    title="About your business"
+                    description="Required details help us propose the right site structure and copy."
                   >
-                    {MAIN_GOAL_OPTIONS.map((goal) => (
-                      <option key={goal} value={goal}>
-                        {goal}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <Input
-                  placeholder="Target customers (e.g. homeowners, small businesses)"
-                  value={targetCustomers}
-                  onChange={(e) => setTargetCustomers(e.target.value)}
-                />
-                <Input placeholder="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
-                <Input
-                  placeholder="Email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-                <Textarea
-                  placeholder="Style notes or anything else we should know (optional)"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={3}
-                />
-
-                <StarterGalleryPicker
-                  selectedId={selectedStarter?.id ?? layoutStarterId}
-                  onSelect={setSelectedStarter}
-                  disabled={loading}
-                  industry={industry}
-                />
-
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? (
-                    <>
-                      <Spinner size="sm" />
-                      Creating plan…
-                    </>
-                  ) : (
-                    'Continue to plan review'
-                  )}
-                </Button>
-              </form>
-            ) : (
-              <div className="space-y-4">
-                <ProposedPlanCard
-                  plan={websitePlan ? websitePlanToProposedPlan(websitePlan) : null}
-                  suggestedTemplate={websitePlan?.suggestedTemplate}
-                />
-
-                {showRevisionInput ? (
-                  <div className="rounded-xl border border-zinc-200 bg-white p-4 space-y-3">
-                    <div>
-                      <h2 className="text-sm font-medium text-zinc-900">Revise plan</h2>
-                      <p className="text-xs text-zinc-500 mt-0.5">
-                        Describe how you want the proposed plan changed before building.
-                      </p>
+                    <div className="space-y-4">
+                      <div>
+                        <label htmlFor="businessName" className="block text-sm font-medium text-zinc-700 mb-1">
+                          Business name *
+                        </label>
+                        <Input
+                          id="businessName"
+                          value={businessName}
+                          onChange={(e) => setBusinessName(e.target.value)}
+                          placeholder="Acme Plumbing"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="industry" className="block text-sm font-medium text-zinc-700 mb-1">
+                          Industry *
+                        </label>
+                        <Input
+                          id="industry"
+                          value={industry}
+                          onChange={(e) => handleIndustryChange(e.target.value)}
+                          placeholder="e.g. HVAC, law firm, restaurant"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="location" className="block text-sm font-medium text-zinc-700 mb-1">
+                          Location
+                        </label>
+                        <Input
+                          id="location"
+                          value={location}
+                          onChange={(e) => setLocation(e.target.value)}
+                          placeholder="City, state or service area"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="services" className="block text-sm font-medium text-zinc-700 mb-1">
+                          Services
+                        </label>
+                        <Input
+                          id="services"
+                          value={services}
+                          onChange={(e) => setServices(e.target.value)}
+                          placeholder="Comma-separated list of services"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="mainGoal" className="block text-sm font-medium text-zinc-700 mb-1">
+                          Main goal
+                        </label>
+                        <select
+                          id="mainGoal"
+                          className={selectClassName}
+                          value={mainGoal}
+                          onChange={(e) => setMainGoal(e.target.value)}
+                        >
+                          {MAIN_GOAL_OPTIONS.map((goal) => (
+                            <option key={goal} value={goal}>
+                              {goal}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
-                    <Textarea
-                      value={revisionNote}
-                      onChange={(e) => setRevisionNote(e.target.value)}
-                      placeholder="e.g. Add a FAQ section and make the primary CTA about booking a consultation"
-                      rows={4}
+                  </ScratchFormSection>
+
+                  <ScratchFormSection title="Optional details">
+                    <button
+                      type="button"
+                      onClick={() => setOptionalOpen((open) => !open)}
+                      className="flex w-full items-center justify-between text-sm font-medium text-zinc-700"
+                    >
+                      <span>{optionalOpen ? 'Hide optional fields' : 'Add contact info and notes'}</span>
+                      <span className="text-zinc-400">{optionalOpen ? '−' : '+'}</span>
+                    </button>
+                    {optionalOpen && (
+                      <div className="space-y-4 pt-2">
+                        <div>
+                          <label htmlFor="targetCustomers" className="block text-sm font-medium text-zinc-700 mb-1">
+                            Target customers
+                          </label>
+                          <Input
+                            id="targetCustomers"
+                            value={targetCustomers}
+                            onChange={(e) => setTargetCustomers(e.target.value)}
+                            placeholder="e.g. homeowners, small businesses"
+                          />
+                        </div>
+                        <div>
+                          <label htmlFor="phone" className="block text-sm font-medium text-zinc-700 mb-1">
+                            Phone
+                          </label>
+                          <Input
+                            id="phone"
+                            value={phone}
+                            onChange={(e) => setPhone(e.target.value)}
+                            placeholder="(555) 123-4567"
+                          />
+                        </div>
+                        <div>
+                          <label htmlFor="email" className="block text-sm font-medium text-zinc-700 mb-1">
+                            Email
+                          </label>
+                          <Input
+                            id="email"
+                            type="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            placeholder="hello@example.com"
+                          />
+                        </div>
+                        <div>
+                          <label htmlFor="notes" className="block text-sm font-medium text-zinc-700 mb-1">
+                            Style notes
+                          </label>
+                          <Textarea
+                            id="notes"
+                            value={notes}
+                            onChange={(e) => setNotes(e.target.value)}
+                            placeholder="Anything else we should know (optional)"
+                            rows={3}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </ScratchFormSection>
+
+                  <ScratchFormSection
+                    title="Choose your look"
+                    description="Pick page structure and colors independently — change either anytime before building."
+                  >
+                    <StarterGalleryPicker
+                      hideHeader
+                      selectedId={selectedStarter?.id ?? layoutStarterId}
+                      onSelect={handleStarterSelect}
+                      disabled={loading}
+                      industry={industry}
+                    />
+                    <TemplateGalleryPicker
+                      hideHeader
+                      selectedCategory={selectedTheme.category}
+                      selectedVariant={selectedTheme.variant}
+                      onSelect={handleThemeSelect}
+                      disabled={loading}
+                      description="Pick colors and typography mood independently from the layout above."
+                    />
+                  </ScratchFormSection>
+
+                  <HowItWorks />
+                </form>
+              ) : (
+                <div className="space-y-4">
+                  <ProposedPlanCard
+                    plan={websitePlan ? websitePlanToProposedPlan(websitePlan) : null}
+                    suggestedTemplate={websitePlan?.suggestedTemplate}
+                  />
+
+                  {showRevisionInput ? (
+                    <div className="rounded-xl border border-zinc-200 bg-white p-4 space-y-3">
+                      <div>
+                        <h2 className="text-sm font-medium text-zinc-900">Revise plan</h2>
+                        <p className="text-xs text-zinc-500 mt-0.5">
+                          Describe how you want the proposed plan changed before building.
+                        </p>
+                      </div>
+                      <Textarea
+                        value={revisionNote}
+                        onChange={(e) => setRevisionNote(e.target.value)}
+                        placeholder="e.g. Add a FAQ section and make the primary CTA about booking a consultation"
+                        rows={4}
+                        disabled={loading}
+                      />
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          disabled={loading || !revisionNote.trim()}
+                          onClick={handleRevise}
+                        >
+                          {loading && progressStage === 'revising' ? (
+                            <>
+                              <Spinner size="sm" />
+                              Revising…
+                            </>
+                          ) : (
+                            'Apply revision'
+                          )}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          disabled={loading}
+                          onClick={() => {
+                            setShowRevisionInput(false);
+                            setRevisionNote('');
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={loading}
+                      onClick={() => setShowRevisionInput(true)}
+                    >
+                      Revise plan
+                    </Button>
+                  )}
+
+                  <ScratchFormSection
+                    title="Adjust design"
+                    description="Change layout or colors without going back to intake."
+                  >
+                    <StarterGalleryPicker
+                      hideHeader
+                      selectedId={selectedStarter?.id ?? layoutStarterId}
+                      onSelect={handleStarterSelect}
+                      disabled={loading}
+                      industry={industry}
+                    />
+                    <TemplateGalleryPicker
+                      hideHeader
+                      selectedCategory={selectedTheme.category}
+                      selectedVariant={selectedTheme.variant}
+                      onSelect={handleThemeSelect}
                       disabled={loading}
                     />
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        disabled={loading || !revisionNote.trim()}
-                        onClick={handleRevise}
-                      >
-                        {loading && progressStage === 'revising' ? (
-                          <>
-                            <Spinner size="sm" />
-                            Revising…
-                          </>
-                        ) : (
-                          'Apply revision'
-                        )}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        disabled={loading}
-                        onClick={() => {
-                          setShowRevisionInput(false);
-                          setRevisionNote('');
-                        }}
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    disabled={loading}
-                    onClick={() => setShowRevisionInput(true)}
-                  >
-                    Revise plan
-                  </Button>
-                )}
+                  </ScratchFormSection>
 
-                <div className="flex flex-col sm:flex-row gap-3">
                   <Button
                     type="button"
                     variant="secondary"
-                    className="w-full sm:w-auto"
                     disabled={loading}
                     onClick={() => {
                       setStep('intake');
@@ -417,22 +709,34 @@ export default function NewScratchPage() {
                   >
                     Back to intake
                   </Button>
-                  <Button type="button" className="w-full sm:flex-1" disabled={loading} onClick={handleBuild}>
-                    {loading && progressStage === 'building' ? (
-                      <>
-                        <Spinner size="sm" />
-                        Building your website…
-                      </>
-                    ) : (
-                      'Confirm and build website'
-                    )}
-                  </Button>
                 </div>
+              )}
+            </div>
+
+            <div className="hidden lg:block lg:col-span-2 min-w-0 self-stretch">
+              <div className="sticky top-[4.5rem] z-10">
+                <ScratchDesignPreviewPanel
+                  businessName={businessName}
+                  industry={industry}
+                  selectedStarter={selectedStarter}
+                  selectedTheme={selectedTheme}
+                  sticky={false}
+                  showReadiness={step === 'intake'}
+                  readinessItems={readinessItems}
+                >
+                  {step === 'intake' ? intakePrimaryButton : reviewPrimaryButton}
+                </ScratchDesignPreviewPanel>
               </div>
-            )}
-          </CardBody>
-        </Card>
+            </div>
+          </div>
+        </div>
       </PageContainer>
+
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-zinc-200 bg-white/95 p-4 backdrop-blur supports-[backdrop-filter]:bg-white/80 lg:hidden">
+        <div className="mx-auto max-w-6xl">
+          {step === 'intake' ? intakePrimaryButton : reviewPrimaryButton}
+        </div>
+      </div>
     </AppShell>
   );
 }

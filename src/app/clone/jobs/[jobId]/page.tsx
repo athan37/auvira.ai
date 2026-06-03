@@ -14,9 +14,11 @@ import CloneJobSuccessCard from '@/components/clone/CloneJobSuccessCard';
 import PreviewChatCard from '@/components/clone/PreviewChatCard';
 import LiveBuildSummaryCard from '@/components/clone/LiveBuildSummaryCard';
 import { TemplateGalleryPicker } from '@/components/clone/TemplateGalleryPicker';
+import { StarterGalleryPicker } from '@/components/scratch/StarterGalleryPicker';
 import { CloneDeployInterstitial } from '@/components/clone/CloneDeployInterstitial';
 import { PublishActions } from '@/components/owner/PublishActions';
 import type { TemplateGalleryEntry } from '@/lib/builder/templateGallery';
+import type { LayoutStarter, LayoutStarterId } from '@/lib/builder/layoutStarters';
 import { getClonePreviewProjectPath } from '@/lib/clone/cloneBuildPreviewResponse';
 
 interface CrawlPage {
@@ -117,6 +119,7 @@ interface SuggestedTemplate {
   category: string;
   variant: string;
   reason?: string;
+  layoutStarterId?: string;
 }
 
 interface ReviewChecklist {
@@ -249,6 +252,7 @@ export default function CloneJobPage() {
   const [showRevisionInput, setShowRevisionInput] = useState(false);
   const [showDeployInterstitial, setShowDeployInterstitial] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<{ category: string; variant: string } | null>(null);
+  const [selectedLayoutId, setSelectedLayoutId] = useState<LayoutStarterId | null>(null);
 
   const fetchJob = useCallback(async () => {
     try {
@@ -324,12 +328,25 @@ export default function CloneJobPage() {
         body: JSON.stringify({
           category: entry.category,
           variant: entry.variant,
-          reason: 'Selected by owner',
         }),
       });
       await fetchJob();
     } catch {
       setError('Failed to save template selection');
+    }
+  };
+
+  const handleLayoutSelect = async (starter: LayoutStarter) => {
+    setSelectedLayoutId(starter.id);
+    try {
+      await fetch(`/api/projects/clone/jobs/${jobId}/set-layout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ layoutStarterId: starter.id }),
+      });
+      await fetchJob();
+    } catch {
+      setError('Failed to save layout selection');
     }
   };
 
@@ -524,7 +541,13 @@ export default function CloneJobPage() {
           {/* RIGHT COLUMN — Actions (2/5) */}
           <div className="lg:col-span-2 space-y-4">
             {isReviewReady && job.suggestedTemplate && (
-              <div className="bg-white rounded-xl border border-gray-200 p-4">
+              <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-4">
+                <StarterGalleryPicker
+                  selectedId={selectedLayoutId ?? job.suggestedTemplate.layoutStarterId ?? null}
+                  onSelect={handleLayoutSelect}
+                  disabled={approving}
+                  industry={job.extractedFactsSummary?.industry || ''}
+                />
                 <TemplateGalleryPicker
                   selectedCategory={selectedTemplate?.category || job.suggestedTemplate.category}
                   selectedVariant={selectedTemplate?.variant || job.suggestedTemplate.variant}

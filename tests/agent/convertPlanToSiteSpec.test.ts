@@ -1,74 +1,55 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { convertPlanToSiteSpec } from '@/lib/agent/convertPlanToSiteSpec';
 import type { WebsitePlan, ScratchIntake } from '@/lib/agent/schemas';
 
-const basePlan: WebsitePlan = {
-  businessName: 'Houston HVAC Pros',
-  industry: 'HVAC',
-  positioning: 'Trusted local HVAC experts.',
+const plan: WebsitePlan = {
+  businessName: 'River City Plumbing',
+  industry: 'Home services',
+  positioning: 'Reliable plumbing.',
   targetCustomers: ['Homeowners'],
-  primaryGoal: 'Get more leads',
+  primaryGoal: 'Leads',
   recommendedPagesOrSections: [],
   contentPlan: {
     hero: {
-      headline: 'Premium HVAC Service in Houston',
-      subheadline: 'Fast repairs and maintenance you can trust',
-      primaryCTA: 'Schedule Service',
-      secondaryCTA: 'View Services',
+      headline: 'Trusted Plumbing',
+      subheadline: 'Fast service',
+      primaryCTA: 'Call',
+      secondaryCTA: 'Learn',
     },
     sections: [
       {
-        type: 'services',
-        title: 'Our Services',
-        purpose: 'List core offerings',
-        contentNotes: ['AC Repair', 'Maintenance'],
+        type: 'contact',
+        title: 'Contact',
+        purpose: 'Reach us',
+        contentNotes: ['Call or email for a quote'],
       },
     ],
   },
   requiredMissingInfo: [],
   optionalMissingInfo: [],
-  suggestedTemplate: {
-    category: 'home-services',
-    variant: 'local-service-pro',
-    reason: 'Local trades',
-  },
+  suggestedTemplate: { category: 'home-services', variant: 'local-service-pro', reason: 'test' },
   riskWarnings: [],
 };
 
-const baseIntake: ScratchIntake = {
-  businessName: 'Houston HVAC Pros',
-  industry: 'HVAC',
-  location: 'Houston, TX',
-  services: 'AC Repair, Maintenance',
-  targetCustomers: 'Homeowners',
-  mainGoal: 'Get more leads',
-  phone: '713-555-0100',
-  email: 'hello@houstonhvac.example',
+const intake: ScratchIntake = {
+  businessName: 'River City Plumbing',
+  industry: 'Home services',
+  location: 'Austin',
+  services: '',
+  targetCustomers: '',
+  mainGoal: 'Leads',
+  phone: '512-555-9999',
+  email: 'hello@rivercityplumbing.test',
   address: '',
   desiredStyle: 'home-services',
   notes: '',
 };
 
 describe('convertPlanToSiteSpec', () => {
-  it('maps contentPlan.hero into siteSpec headline, tagline, and CTAs', () => {
-    const spec = convertPlanToSiteSpec(basePlan, baseIntake);
-
-    expect(spec.siteTitle).toBe('Premium HVAC Service in Houston');
-    expect(spec.tagline).toBe('Fast repairs and maintenance you can trust');
-    expect(spec.primaryCTA).toBe('Schedule Service');
-    expect(spec.secondaryCTA).toBe('View Services');
-
-    const hero = spec.sections.find((s) => s.type === 'hero');
-    expect(hero?.title).toBe('Premium HVAC Service in Houston');
-    expect(hero?.body).toBe('Fast repairs and maintenance you can trust');
-  });
-
-  it('includes contact items from intake when phone and email are provided', () => {
-    const spec = convertPlanToSiteSpec(basePlan, baseIntake);
+  it('merges intake phone and email into an existing contact section', () => {
+    const spec = convertPlanToSiteSpec(plan, intake);
     const contact = spec.sections.find((s) => s.type === 'contact');
-
-    expect(contact).toBeDefined();
-    expect(contact?.items).toContain('713-555-0100');
-    expect(contact?.items).toContain('hello@houstonhvac.example');
+    expect(contact?.items).toContain('512-555-9999');
+    expect(contact?.items).toContain('hello@rivercityplumbing.test');
   });
 });

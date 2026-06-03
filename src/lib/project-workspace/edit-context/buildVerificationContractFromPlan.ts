@@ -1,6 +1,11 @@
 import type { EditPlan } from '@/lib/project-workspace/planner/editPlan.schema';
 import type { VerificationCheck, VerificationContract } from './types';
 import { mergedStepParams } from '@/lib/project-workspace/planner/editStepParams.schema';
+import {
+  resolveContactUpdateField,
+  resolveContactUpdateValue,
+} from './resolveContactUpdateField';
+import { stripPinnedTargetSuffix } from './pinnedContactSectionCopy';
 
 function coerceIndex(value: unknown): number | undefined {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -11,7 +16,10 @@ function coerceIndex(value: unknown): number | undefined {
 /**
  * Build hard verification checks from executed plan steps (not only user message).
  */
-export function buildVerificationContractFromPlan(plan: EditPlan): VerificationContract {
+export function buildVerificationContractFromPlan(
+  plan: EditPlan,
+  message?: string
+): VerificationContract {
   const checks: VerificationCheck[] = [];
 
   for (const step of plan.steps) {
@@ -36,13 +44,11 @@ export function buildVerificationContractFromPlan(plan: EditPlan): VerificationC
     }
 
     if (step.skill === 'update_contact') {
-      const field =
-        (merged.field as string) ??
-        (merged.phone ? 'phone' : merged.email ? 'email' : merged.address ? 'address' : 'phone');
+      const field = resolveContactUpdateField(merged, message ? stripPinnedTargetSuffix(message) : message);
       checks.push({
         kind: 'contact_field',
         field,
-        expectedValue: String(merged.value ?? merged[field] ?? ''),
+        expectedValue: resolveContactUpdateValue(merged, field),
       });
     }
 

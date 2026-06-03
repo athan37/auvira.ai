@@ -437,9 +437,16 @@ pages:
  */
 export function generateSiteConfig(siteSpec: SiteSpec): string {
   // Extract contact info from sections
-  const contactItems = siteSpec.sections.find(s => s.type === 'contact')?.items || [];
-  const phoneItem = contactItems.find(i => i.toLowerCase().includes('phone') || i.includes('(')) || '';
-  const emailItem = contactItems.find(i => i.includes('@')) || '';
+  const contactItems = (siteSpec.sections.find((s) => s.type === 'contact')?.items || []).map((item) =>
+    typeof item === 'string' ? item : item.title
+  );
+  const phoneItem =
+    contactItems.find(
+      (i) =>
+        /phone/i.test(i) ||
+        /(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/.test(i)
+    ) || '';
+  const emailItem = contactItems.find((i) => i.includes('@')) || '';
 
   // Build hero from siteSpec (hero section title wins over siteTitle for headline)
   const heroSection = siteSpec.sections.find(s => s.type === 'hero');

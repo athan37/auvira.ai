@@ -5,7 +5,7 @@ import { getLLMClient } from '@/lib/llm/llmClient';
 import { buildApplyEditPrompt } from '@/lib/agent/prompts';
 import { generateDesignBriefAgent, getDefaultDesignBrief } from '@/lib/agent/generateDesignBriefAgent';
 import { ensureClonePreviewWorkspace } from '@/lib/clone/ensureClonePreviewWorkspace';
-import { generateWebsiteFiles } from '@/lib/builder/generateWebsiteFiles';
+import { generateCloneWebsiteFiles } from '@/lib/clone/cloneTemplateSelection';
 import { validateGeneratedFiles } from '@/lib/builder/validateGeneratedFiles';
 import { spawn } from 'child_process';
 import { writeFileSync, existsSync, mkdirSync, rmSync } from 'fs';
@@ -109,8 +109,12 @@ export async function POST(
     }
 
     const uniqueName = generateUniqueProjectName(job.projectName || (job.businessProfile as any)?.businessName || 'generated-site');
-    const template = job.suggestedTemplate || { category: 'general-service', variant: 'modern-clean' };
-    const generated = generateWebsiteFiles(updatedSiteSpec as unknown as import('@/lib/agent/schemas').SiteSpec, uniqueName, designBrief, template);
+    const generated = generateCloneWebsiteFiles(
+      updatedSiteSpec as unknown as import('@/lib/agent/schemas').SiteSpec,
+      uniqueName,
+      designBrief,
+      job.suggestedTemplate
+    );
 
     // Step 3: Validate files (sync only, skip full build for speed)
     const validationErrors = validateGeneratedFiles(generated.files);

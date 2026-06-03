@@ -175,16 +175,25 @@ export async function POST(
     };
     log(job, 'planning', `Content fidelity: ${fidelityResult.passed ? 'passed' : 'critical issues: ' + fidelityResult.criticalIssues.join(', ')}`);
 
-    // Template: keep owner choice from clone start / review; otherwise AI suggestion
+    // Template: keep owner color/layout from clone start or review; otherwise AI suggestion
     const { isOwnerChosenTemplate } = await import('@/lib/builder/ownerTemplateSelection');
+    const ownerLayoutStarterId = job.suggestedTemplate?.layoutStarterId;
     if (isOwnerChosenTemplate(job.suggestedTemplate?.reason) && job.suggestedTemplate?.variant) {
       log(job, 'planning', `Using owner theme: ${job.suggestedTemplate.category} / ${job.suggestedTemplate.variant}`);
+      if (ownerLayoutStarterId) {
+        job.suggestedTemplate = {
+          ...job.suggestedTemplate,
+          layoutStarterId: ownerLayoutStarterId,
+        };
+        log(job, 'planning', `Using owner layout: ${ownerLayoutStarterId}`);
+      }
     } else {
       const template = selectTemplateAgent(job.businessProfile as BusinessProfile);
       job.suggestedTemplate = {
         category: template.category,
         variant: template.variant,
         reason: template.reason,
+        layoutStarterId: ownerLayoutStarterId,
       };
       log(job, 'planning', `Suggested template: ${template.category} / ${template.variant}`);
     }

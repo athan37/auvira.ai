@@ -27,7 +27,7 @@ Rules:
 - Never set needsClarification false if any step lacks required params (value, sectionIndex, field, or color).
 - Use clarificationQuestion (not clarificationMessage) when clarifying.
 - update_section_style → section background/card via params.backgroundColor or params.presentation.backgroundClass; use params.presentationField "cardClass" when the owner names an inner element (e.g. "contact information background", "card background") — not the whole section wrapper.
-- update_contact → params phone, email, or address with exact user value.
+- update_contact → params phone, email, or address with exact user value. Do NOT use update_contact when a contact section is UI-pinned and the owner changes "contact information" / "contact info" prose — use update_config_field on the pinned section body (or title) instead.
 - update_hero → params headline, subheadline, or tagline with params.value.
 - update_business_name → params value (siteConfig businessName only).
 - Target kind must be one of: section, hero, nav, footer, site, businessName.

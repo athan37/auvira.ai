@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { WebsitePlan } from '@/lib/agent/schemas';
-import { applyLayoutStarterToPlan } from '@/lib/scratch/applyLayoutStarterToPlan';
+import { applyScratchTemplateSelectionToPlan } from '@/lib/scratch/applyScratchTemplateSelectionToPlan';
 
 const basePlan: WebsitePlan = {
   businessName: 'Test Co',
@@ -28,16 +28,16 @@ const basePlan: WebsitePlan = {
   riskWarnings: [],
 };
 
-describe('applyLayoutStarterToPlan', () => {
-  it('sets layoutStarterId without overwriting color theme', () => {
-    const plan = applyLayoutStarterToPlan(basePlan, 'phone-first-service');
-    expect(plan.suggestedTemplate.layoutStarterId).toBe('phone-first-service');
-    expect(plan.suggestedTemplate.variant).toBe('modern-clean');
-    expect(plan.suggestedTemplate.reason).toBe('LLM suggestion');
-  });
+describe('applyScratchTemplateSelectionToPlan', () => {
+  it('applies layout and color independently', () => {
+    const plan = applyScratchTemplateSelectionToPlan(basePlan, {
+      layoutStarterId: 'centered-minimal',
+      templateCategory: 'restaurant',
+      templateVariant: 'restaurant-warm',
+    });
 
-  it('uses default starter when id is missing', () => {
-    const plan = applyLayoutStarterToPlan(basePlan);
     expect(plan.suggestedTemplate.layoutStarterId).toBe('centered-minimal');
+    expect(plan.suggestedTemplate.variant).toBe('restaurant-warm');
+    expect(plan.suggestedTemplate.category).toBe('restaurant');
   });
 });

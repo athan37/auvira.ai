@@ -120,6 +120,7 @@ export interface ICloneJob extends Document {
     category: string;
     variant: string;
     reason?: string;
+    layoutStarterId?: string;
   };
   contentFidelity?: {
     passed: boolean;
@@ -192,6 +193,7 @@ const CloneJobSchema = new Schema<ICloneJob>(
       category: String,
       variant: String,
       reason: String,
+      layoutStarterId: String,
     },
     contentFidelity: { type: Schema.Types.Mixed },
     generatedSiteValidation: { type: Schema.Types.Mixed },

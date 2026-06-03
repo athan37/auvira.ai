@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api/projectAccess';
-import { normalizeTemplateSelection } from '@/lib/builder/normalizeTemplateVariant';
-import { OWNER_TEMPLATE_REASON } from '@/lib/builder/ownerTemplateSelection';
+import { buildCloneSuggestedTemplate } from '@/lib/clone/cloneTemplateSelection';
 import { CloneJob } from '@/lib/db/models/CloneJob';
 import mongoose from 'mongoose';
 
@@ -15,21 +14,23 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { url, projectName, templateCategory, templateVariant } = body;
+    const { url, projectName, templateCategory, templateVariant, layoutStarterId } = body;
 
     if (!url) {
       return NextResponse.json({ ok: false, error: 'url is required' }, { status: 400 });
     }
 
-    let suggestedTemplate: { category: string; variant: string; reason: string } | undefined;
-    if (templateCategory && templateVariant) {
-      const normalized = normalizeTemplateSelection(templateCategory, templateVariant);
-      suggestedTemplate = {
-        category: normalized.category,
-        variant: normalized.variant,
-        reason: OWNER_TEMPLATE_REASON,
-      };
-    }
+    const suggestedTemplate =
+      templateCategory && templateVariant
+        ? buildCloneSuggestedTemplate({
+            templateCategory,
+            templateVariant,
+            layoutStarterId,
+            themeOwnerSelected: true,
+          })
+        : layoutStarterId
+        ? buildCloneSuggestedTemplate({ layoutStarterId })
+        : undefined;
 
     const job = new CloneJob({
       ownerId: new mongoose.Types.ObjectId(userId),

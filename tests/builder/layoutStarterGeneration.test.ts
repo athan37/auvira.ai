@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { getDefaultDesignBrief } from '@/lib/agent/generateDesignBriefAgent';
 import type { SiteSpec } from '@/lib/agent/schemas';
 import { generateWebsiteFiles } from '@/lib/builder/generateWebsiteFiles';
-import { getLayoutStarters } from '@/lib/builder/layoutStarters';
+import { getLayoutStarter, getLayoutStarters } from '@/lib/builder/layoutStarters';
 import { validateGeneratedFiles } from '@/lib/builder/validateGeneratedFiles';
 
 const sampleSpec: SiteSpec = {
@@ -76,4 +76,33 @@ describe('layout starter generation contract', () => {
       }
     });
   }
+
+  it('uses color template variant independently from layout starter variant', () => {
+    const starter = getLayoutStarter('centered-minimal')!;
+    const designBrief = {
+      ...getDefaultDesignBrief('general-service'),
+      layoutStrategy: starter.layoutStrategy,
+    };
+    const specWithoutCustomBg: SiteSpec = {
+      ...sampleSpec,
+      designDirection: { tone: 'professional', layout: 'modern', colors: [] },
+    };
+
+    const generated = generateWebsiteFiles(
+      specWithoutCustomBg,
+      'decoupled-layout-color',
+      designBrief,
+      {
+        category: 'restaurant',
+        variant: 'restaurant-warm',
+        reason: 'contract test',
+      },
+      starter
+    );
+
+    const page = generated.files.find((f) => f.filePath === 'src/app/page.tsx')?.content ?? '';
+    expect(page).toContain('"heroStyle":"centered"');
+    expect(page).toContain('bg-[#FFFBEB]');
+    expect(validateGeneratedFiles(generated.files)).toEqual([]);
+  });
 });

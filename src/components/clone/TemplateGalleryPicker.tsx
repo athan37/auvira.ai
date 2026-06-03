@@ -10,6 +10,7 @@ interface Props {
   disabled?: boolean;
   title?: string;
   description?: string;
+  hideHeader?: boolean;
 }
 
 /** Thumbnail grid for picking a website color theme (clone, scratch, or review). */
@@ -20,15 +21,18 @@ export function TemplateGalleryPicker({
   disabled = false,
   title = 'Choose a color theme',
   description = 'Pick the look for your new site. You can change it again before building.',
+  hideHeader = false,
 }: Props) {
   const templates = getTemplateGallery();
 
   return (
     <div className="space-y-2">
-      <div>
-        <h3 className="text-sm font-semibold text-zinc-900">{title}</h3>
-        <p className="text-xs text-zinc-500 mt-0.5">{description}</p>
-      </div>
+      {!hideHeader && (
+        <div>
+          <h3 className="text-sm font-semibold text-zinc-900">{title}</h3>
+          <p className="text-xs text-zinc-500 mt-0.5">{description}</p>
+        </div>
+      )}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         {templates.map((entry) => {
           const selected =

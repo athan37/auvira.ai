@@ -74,15 +74,28 @@ export function convertPlanToSiteSpec(
     if (intake.email) contactItems.push(intake.email);
     if (intake.address) contactItems.push(intake.address);
 
-    // Check if contact section already exists
-    const hasContactSection = sections.some(s => s.type === 'contact');
-    if (!hasContactSection) {
+    const contactSection = sections.find((s) => s.type === 'contact');
+    if (!contactSection) {
       sections.push({
         type: 'contact',
         title: 'Contact Us',
         body: `Get in touch with ${websitePlan.businessName}. We serve ${intake.location || 'your area'}.`,
         items: contactItems,
       });
+    } else {
+      const existing = (contactSection.items as string[]) || [];
+      const merged = [...existing];
+      for (const item of contactItems) {
+        const normalized = item.trim().toLowerCase();
+        const alreadyListed = merged.some(
+          (entry) =>
+            entry.trim().toLowerCase() === normalized ||
+            entry.includes(item) ||
+            item.includes(entry)
+        );
+        if (!alreadyListed) merged.push(item);
+      }
+      contactSection.items = merged;
     }
   }
 

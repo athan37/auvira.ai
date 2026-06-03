@@ -2,32 +2,36 @@
 
 import { cn } from '@/lib/cn';
 import {
-  getLayoutStarterThemeLabel,
   getLayoutStartersByCategory,
   recommendLayoutStarterForIndustry,
   type LayoutStarter,
   type LayoutStarterId,
 } from '@/lib/builder/layoutStarters';
-import { getTemplateGallery } from '@/lib/builder/templateGallery';
 
 interface Props {
   selectedId?: LayoutStarterId | null;
   onSelect: (starter: LayoutStarter) => void;
   disabled?: boolean;
   industry?: string;
+  hideHeader?: boolean;
 }
 
-const ACCENT_BY_VARIANT = Object.fromEntries(
-  getTemplateGallery().map((entry) => [entry.variant, entry.accentColor])
-) as Record<string, string>;
+const DEFAULT_LAYOUT_PREVIEW_ACCENT = '#64748B';
 
-function LayoutThumbnail({ heroStyle, accent }: { heroStyle: LayoutStarter['heroStyle']; accent: string }) {
+/** Wireframe hero preview for layout starter cards and design panel. */
+export function LayoutThumbnail({
+  heroStyle,
+  accentColor = DEFAULT_LAYOUT_PREVIEW_ACCENT,
+}: {
+  heroStyle: LayoutStarter['heroStyle'];
+  accentColor?: string;
+}) {
   if (heroStyle === 'centered') {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-1 px-3">
         <div className="h-1.5 w-10 rounded bg-white/80" />
         <div className="h-1 w-16 rounded bg-white/50" />
-        <div className="mt-1 h-2 w-8 rounded-full" style={{ backgroundColor: accent }} />
+        <div className="mt-1 h-2 w-8 rounded-full" style={{ backgroundColor: accentColor }} />
       </div>
     );
   }
@@ -36,7 +40,7 @@ function LayoutThumbnail({ heroStyle, accent }: { heroStyle: LayoutStarter['hero
     return (
       <div className="flex h-full flex-col justify-center gap-1 px-3">
         <div className="h-1.5 w-12 rounded bg-white/80" />
-        <div className="h-2.5 w-14 rounded-full" style={{ backgroundColor: accent }} />
+        <div className="h-2.5 w-14 rounded-full" style={{ backgroundColor: accentColor }} />
       </div>
     );
   }
@@ -74,24 +78,32 @@ function LayoutThumbnail({ heroStyle, accent }: { heroStyle: LayoutStarter['hero
   );
 }
 
-/** Grouped layout + theme starter gallery for scratch intake. */
-export function StarterGalleryPicker({ selectedId, onSelect, disabled = false, industry = '' }: Props) {
+/** Grouped layout starter gallery for scratch intake (structure/hero only). */
+export function StarterGalleryPicker({
+  selectedId,
+  onSelect,
+  disabled = false,
+  industry = '',
+  hideHeader = false,
+}: Props) {
   const grouped = getLayoutStartersByCategory();
   const recommended = industry.trim() ? recommendLayoutStarterForIndustry(industry) : null;
 
   return (
     <div className="space-y-4">
-      <div>
-        <h3 className="text-sm font-semibold text-zinc-900">Choose a layout starter</h3>
-        <p className="text-xs text-zinc-500 mt-0.5">
-          Each starter pairs a hero layout with a color theme. Pick one to start from.
-        </p>
-        {recommended && (
-          <p className="text-xs text-indigo-600 mt-1">
-            Recommended for {industry.trim()}: {recommended.name}
+      {!hideHeader && (
+        <div>
+          <h3 className="text-sm font-semibold text-zinc-900">Choose a layout template</h3>
+          <p className="text-xs text-zinc-500 mt-0.5">
+            Pick the page structure and hero style. Color theme is chosen separately below.
           </p>
-        )}
-      </div>
+          {recommended && (
+            <p className="text-xs text-indigo-600 mt-1">
+              Recommended for {industry.trim()}: {recommended.name}
+            </p>
+          )}
+        </div>
+      )}
 
       {Object.entries(grouped).map(([useCase, starters]) => (
         <div key={useCase} className="space-y-2">
@@ -99,7 +111,6 @@ export function StarterGalleryPicker({ selectedId, onSelect, disabled = false, i
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {starters.map((starter) => {
               const selected = starter.id === selectedId;
-              const accent = ACCENT_BY_VARIANT[starter.variant] ?? '#2563EB';
               const isRecommended = recommended?.id === starter.id;
               return (
                 <button
@@ -118,17 +129,14 @@ export function StarterGalleryPicker({ selectedId, onSelect, disabled = false, i
                   <div
                     className="h-12 rounded-lg mb-2 relative overflow-hidden"
                     style={{
-                      background: `linear-gradient(135deg, ${accent} 0%, #0f172a 100%)`,
+                      background: `linear-gradient(135deg, ${DEFAULT_LAYOUT_PREVIEW_ACCENT} 0%, #0f172a 100%)`,
                     }}
                   >
-                    <LayoutThumbnail heroStyle={starter.heroStyle} accent={accent} />
+                    <LayoutThumbnail heroStyle={starter.heroStyle} />
                   </div>
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-zinc-900">{starter.name}</p>
-                      <p className="text-xs text-zinc-500 mt-0.5">
-                        Theme: {getLayoutStarterThemeLabel(starter)}
-                      </p>
                     </div>
                     {isRecommended && (
                       <span className="shrink-0 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">

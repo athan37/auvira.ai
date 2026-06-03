@@ -6,12 +6,14 @@ import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { AppShell } from '@/components/layout/AppShell';
 import { TemplateGalleryPicker } from '@/components/clone/TemplateGalleryPicker';
+import { StarterGalleryPicker } from '@/components/scratch/StarterGalleryPicker';
 import { Alert } from '@/components/ui/Alert';
 import { Button } from '@/components/ui/Button';
 import { Card, CardBody } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { PageContainer } from '@/components/ui/PageContainer';
 import { Spinner } from '@/components/ui/Spinner';
+import type { LayoutStarter } from '@/lib/builder/layoutStarters';
 import { getTemplateGallery, type TemplateGalleryEntry } from '@/lib/builder/templateGallery';
 
 export default function NewClonePage() {
@@ -24,6 +26,7 @@ export default function NewClonePage() {
 
   const [url, setUrl] = useState('');
   const [projectName, setProjectName] = useState('');
+  const [selectedStarter, setSelectedStarter] = useState<LayoutStarter | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateGalleryEntry>(defaultTheme);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +60,7 @@ export default function NewClonePage() {
           projectName: projectName.trim(),
           templateCategory: selectedTemplate.category,
           templateVariant: selectedTemplate.variant,
+          layoutStarterId: selectedStarter?.id,
         }),
       });
 
@@ -88,8 +92,8 @@ export default function NewClonePage() {
           <CardBody className="p-8">
             <h1 className="text-2xl font-bold text-zinc-900 mb-2">Clone a website</h1>
             <p className="text-zinc-600 mb-6">
-              Paste your current site URL and pick a color theme. We copy your content into the new
-              look — then you review and publish.
+              Paste your current site URL, then pick a layout template and color theme. We copy your
+              content into the new look — then you review and publish.
             </p>
 
             <form onSubmit={handleStart} className="space-y-6">
@@ -123,19 +127,25 @@ export default function NewClonePage() {
                 />
               </div>
 
+              <StarterGalleryPicker
+                selectedId={selectedStarter?.id ?? null}
+                onSelect={setSelectedStarter}
+                disabled={loading}
+              />
+
               <TemplateGalleryPicker
                 selectedCategory={selectedTemplate.category}
                 selectedVariant={selectedTemplate.variant}
                 onSelect={setSelectedTemplate}
                 disabled={loading}
-                description="Same themes as “start from template” — your cloned site will use this color style."
+                description="Pick colors and typography mood independently from the layout above."
               />
 
               {error && <Alert variant="error">{error}</Alert>}
 
               <div className="flex flex-wrap gap-3 pt-2">
                 <Button type="submit" disabled={loading || !url.trim()}>
-                  {loading ? 'Starting clone…' : 'Start clone with this theme'}
+                  {loading ? 'Starting clone…' : 'Start clone'}
                 </Button>
                 <Link href="/projects/new/scratch">
                   <Button type="button" variant="secondary">
@@ -154,8 +164,8 @@ export default function NewClonePage() {
               <h3 className="text-sm font-medium text-zinc-700 mb-2">How it works</h3>
               <ol className="text-sm text-zinc-500 space-y-1 list-decimal list-inside">
                 <li>Crawl your existing site for content and contact info</li>
-                <li>Review the proposed plan (change theme anytime before build)</li>
-                <li>Build a draft preview in your chosen colors</li>
+                <li>Review the proposed plan (change layout or theme anytime before build)</li>
+                <li>Build a draft preview with your chosen structure and colors</li>
                 <li>Publish your live site when ready</li>
               </ol>
             </div>

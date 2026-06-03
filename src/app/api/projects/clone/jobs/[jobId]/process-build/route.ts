@@ -4,7 +4,7 @@ import { CloneJob, BUILD_STEPS } from '@/lib/db/models/CloneJob';
 import { getLLMClient } from '@/lib/llm/llmClient';
 import { buildGenerateSiteSpecPrompt } from '@/lib/agent/prompts';
 import { generateDesignBriefAgent, getDefaultDesignBrief } from '@/lib/agent/generateDesignBriefAgent';
-import { generateWebsiteFiles } from '@/lib/builder/generateWebsiteFiles';
+import { generateCloneWebsiteFiles } from '@/lib/clone/cloneTemplateSelection';
 import { validateGeneratedFiles } from '@/lib/builder/validateGeneratedFiles';
 import { validateGeneratedSite } from '@/lib/builder/validateGeneratedSite';
 import { createGitLabProject } from '@/lib/gitlab/createProject';
@@ -127,9 +127,13 @@ export async function POST(
       );
     }
 
-    const template = job.suggestedTemplate || { category: 'general-service', variant: 'modern-clean' };
     const uniqueName = generateUniqueProjectName(job.projectName || (job.businessProfile as any)?.businessName || 'generated-site');
-    const generated = generateWebsiteFiles(siteSpec as unknown as import('@/lib/agent/schemas').SiteSpec, uniqueName, designBrief, template);
+    const generated = generateCloneWebsiteFiles(
+      siteSpec as unknown as import('@/lib/agent/schemas').SiteSpec,
+      uniqueName,
+      designBrief,
+      job.suggestedTemplate
+    );
     await markStepDone(jobId, 'generate_files');
     await appendLog(jobId, 'building', `Generated ${generated.files.length} files`);
 

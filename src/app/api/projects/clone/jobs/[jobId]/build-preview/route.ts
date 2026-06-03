@@ -4,7 +4,7 @@ import { CloneJob, PREVIEW_STEPS, BUILD_SUMMARY_ITEMS, type IBuildSummaryItem } 
 import { getLLMClient } from '@/lib/llm/llmClient';
 import { buildGenerateSiteSpecPrompt } from '@/lib/agent/prompts';
 import { generateDesignBriefAgent, getDefaultDesignBrief } from '@/lib/agent/generateDesignBriefAgent';
-import { generateWebsiteFiles } from '@/lib/builder/generateWebsiteFiles';
+import { generateCloneWebsiteFiles } from '@/lib/clone/cloneTemplateSelection';
 import { validateGeneratedSite } from '@/lib/builder/validateGeneratedSite';
 import { waitForPreviewReady } from '@/lib/preview/waitForPreviewReady';
 import { spawn, ChildProcess } from 'child_process';
@@ -15,7 +15,6 @@ import { getNpmPath } from '@/lib/runtime/nodeRuntime';
 import { isVercelServerless } from '@/lib/runtime/isVercelServerless';
 import { isCloneSandboxPreviewEnabled } from '@/lib/runtime/isCloneSandboxPreviewEnabled';
 import { hasCriticalFidelityFailures } from '@/lib/agent/validateContentFidelity';
-import type { TemplateSelection } from '@/lib/agent/selectTemplateAgent';
 import { ensureClonePreviewProject } from '@/lib/clone/persistClonePreview';
 
 export const runtime = 'nodejs';
@@ -291,13 +290,12 @@ export async function POST(
     }
 
     const uniqueName = generateUniqueProjectName(job.projectName || (job.businessProfile as any)?.businessName || 'generated-site');
-    const rawTemplate = job.suggestedTemplate || { category: 'general-service', variant: 'modern-clean' };
-    const { normalizeTemplateSelection } = await import('@/lib/builder/normalizeTemplateVariant');
-    const template: TemplateSelection = {
-      ...normalizeTemplateSelection(rawTemplate.category, rawTemplate.variant),
-      reason: rawTemplate.reason || 'AI suggested',
-    };
-    const generated = generateWebsiteFiles(siteSpec as unknown as import('@/lib/agent/schemas').SiteSpec, uniqueName, designBrief, template);
+    const generated = generateCloneWebsiteFiles(
+      siteSpec as unknown as import('@/lib/agent/schemas').SiteSpec,
+      uniqueName,
+      designBrief,
+      job.suggestedTemplate
+    );
     await markPreviewStepDone(jobId, 'create_homepage');
 
     // Services summary

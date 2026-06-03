@@ -3,10 +3,7 @@ import { join } from 'path';
 import type { ICloneJob } from '@/lib/db/models/CloneJob';
 import { CloneJob } from '@/lib/db/models/CloneJob';
 import { generateDesignBriefAgent, getDefaultDesignBrief } from '@/lib/agent/generateDesignBriefAgent';
-import { generateWebsiteFiles } from '@/lib/builder/generateWebsiteFiles';
-import { normalizeTemplateSelection } from '@/lib/builder/normalizeTemplateVariant';
-import type { SiteSpec } from '@/lib/agent/schemas';
-import type { TemplateSelection } from '@/lib/agent/selectTemplateAgent';
+import { generateCloneWebsiteFiles } from '@/lib/clone/cloneTemplateSelection';
 import { readWorkspaceFiles, type WorkspaceFile } from '@/lib/clone/persistClonePreview';
 import { scratchPath } from '@/lib/runtime/scratchDir';
 
@@ -51,13 +48,12 @@ export async function regenerateClonePreviewFilesAsync(job: ICloneJob): Promise<
     designBrief = getDefaultDesignBrief(industryFromProfile(bp));
   }
 
-  const rawTemplate = job.suggestedTemplate || { category: 'general-service', variant: 'modern-clean' };
-  const template: TemplateSelection = {
-    ...normalizeTemplateSelection(rawTemplate.category, rawTemplate.variant),
-    reason: rawTemplate.reason || 'Saved template',
-  };
-
-  const generated = generateWebsiteFiles(siteSpec, businessName, designBrief, template);
+  const generated = generateCloneWebsiteFiles(
+    siteSpec,
+    businessName,
+    designBrief,
+    job.suggestedTemplate
+  );
   return generated.files.map((f) => ({ filePath: f.filePath, content: f.content }));
 }
 

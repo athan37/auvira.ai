@@ -11,6 +11,19 @@ export function isReservedWorkspacePreviewPort(port: number): boolean {
   return port === getSiteAgentDevPort();
 }
 
+/** Match visible text in HTML including basic entity encoding (`&` → `&amp;`, etc.). */
+export function htmlIncludesText(html: string, text: string): boolean {
+  if (!text) return false;
+  if (html.includes(text)) return true;
+  const encoded = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+  return encoded !== text && html.includes(encoded);
+}
+
 /** HTML signatures of the Site Agent shell, not a customer workspace site. */
 export function isSiteAgentShellHtml(html: string): boolean {
   const lower = html.toLowerCase();
@@ -95,7 +108,9 @@ export async function checkWorkspacePreviewHealthy(
       businessName.slice(0, Math.min(40, businessName.length)),
       businessName.slice(0, 16),
     ].filter((p, i, arr) => p.length >= 6 && arr.indexOf(p) === i);
-    return probes.some((p) => html.includes(p));
+    if (probes.some((p) => htmlIncludesText(html, p))) {
+      return true;
+    }
   }
 
   return html.includes('/_next/') || html.includes('siteConfig');

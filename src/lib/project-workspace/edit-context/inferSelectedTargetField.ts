@@ -1,6 +1,11 @@
 import { classifyEditWhat } from '@/lib/project-workspace/edit-context/classifyEditWhat';
 import type { EditWhatKind } from '@/lib/project-workspace/edit-shared/types';
 import { heroFieldPath, sectionFieldPath, sectionItemFieldPath } from './configFieldPaths';
+import {
+  extractReplacementValue,
+  inferPinnedContactSectionCopy,
+  stripPinnedTargetSuffix,
+} from './pinnedContactSectionCopy';
 import type { SelectedTargetContext } from './selectedTargetContext';
 
 export interface InferredFieldEdit {
@@ -13,13 +18,7 @@ export interface InferredFieldEdit {
 }
 
 function extractQuotedValue(message: string): string | null {
-  const quoted = message.match(/\bto\s+["']([^"']+)["']/i);
-  if (quoted?.[1]) return quoted[1].trim();
-  const changeTitle = message.match(
-    /\b(?:change|update|set|make)\s+(?:the\s+)?(?:title|headline)\s+(?:to\s+)?["']?([^"'.]+?)["']?\s*$/i
-  );
-  if (changeTitle?.[1]) return changeTitle[1].trim();
-  return null;
+  return extractReplacementValue(message);
 }
 
 function wantsTitle(message: string): boolean {
@@ -128,8 +127,13 @@ export function inferSelectedTargetField(
     return { fieldPath: '', confidence: 'high', reason: 'Style edit — skip copy inference', skipCopyInference: true };
   }
 
+  const normalizedMessage = stripPinnedTargetSuffix(message);
+  if (/\b(phone|number|email|address)\b/i.test(normalizedMessage)) {
+    return null;
+  }
+
   if (ctx.element?.fieldPath) {
-    const value = extractQuotedValue(message) ?? undefined;
+    const value = extractReplacementValue(message) ?? undefined;
     return {
       fieldPath: ctx.element.fieldPath,
       value,
@@ -138,8 +142,18 @@ export function inferSelectedTargetField(
     };
   }
 
+  const pinnedContactCopy = inferPinnedContactSectionCopy(message, ctx);
+  if (pinnedContactCopy) {
+    return {
+      fieldPath: pinnedContactCopy.fieldPath,
+      value: pinnedContactCopy.value,
+      confidence: 'high',
+      reason: 'Pinned contact section copy (contact information wording)',
+    };
+  }
+
   if (ctx.recommendedDefaultField && !wantsTitle(message) && !wantsSubtitle(message) && !wantsBody(message)) {
-    const value = extractQuotedValue(message) ?? undefined;
+    const value = extractReplacementValue(message) ?? undefined;
     if (value) {
       return {
         fieldPath: ctx.recommendedDefaultField.fieldPath,
@@ -150,7 +164,7 @@ export function inferSelectedTargetField(
     }
   }
 
-  const value = extractQuotedValue(message) ?? undefined;
+  const value = extractReplacementValue(message) ?? undefined;
 
   if (wantsImage(message)) {
     const fieldPath = pickImagePath(ctx);

@@ -4,8 +4,6 @@ import { CloneJob } from '@/lib/db/models/CloneJob';
 import { normalizeTemplateSelection } from '@/lib/builder/normalizeTemplateVariant';
 import { OWNER_TEMPLATE_REASON } from '@/lib/builder/ownerTemplateSelection';
 import mongoose from 'mongoose';
-
-/** Owner overrides suggested template before build preview. */
 export async function POST(
   request: NextRequest,
   { params }: { params: { jobId: string } }
@@ -24,9 +22,19 @@ export async function POST(
 
   const normalized = normalizeTemplateSelection(category, variant);
 
+  const existingJob = await CloneJob.findOne({
+    _id: new mongoose.Types.ObjectId(params.jobId),
+    ownerId: new mongoose.Types.ObjectId(authResult.userId),
+    status: 'review_ready',
+  });
+
+  if (!existingJob) {
+    return NextResponse.json({ ok: false, error: 'Job not found or not in review state' }, { status: 404 });
+  }
+
   const job = await CloneJob.findOneAndUpdate(
     {
-      _id: new mongoose.Types.ObjectId(params.jobId),
+      _id: existingJob._id,
       ownerId: new mongoose.Types.ObjectId(authResult.userId),
       status: 'review_ready',
     },
@@ -36,6 +44,7 @@ export async function POST(
           category: normalized.category,
           variant: normalized.variant,
           reason: reason || OWNER_TEMPLATE_REASON,
+          layoutStarterId: existingJob.suggestedTemplate?.layoutStarterId,
         },
       },
     },

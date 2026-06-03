@@ -93,6 +93,7 @@ export async function POST(
         category: template.category,
         variant: template.variant,
         reason: template.reason,
+        layoutStarterId: job.suggestedTemplate?.layoutStarterId,
       };
     }
 

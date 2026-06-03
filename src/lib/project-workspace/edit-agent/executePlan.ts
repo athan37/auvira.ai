@@ -76,7 +76,7 @@ export async function executePlan(
   const changedFiles: string[] = [];
   const summaries: string[] = [];
 
-  const planVerification = buildVerificationContractFromPlan(plan);
+  const planVerification = buildVerificationContractFromPlan(plan, editContext.effectiveMessage);
   const editContextWithPlanChecks: EditContext = {
     ...editContext,
     verificationContract: mergeVerificationContracts(

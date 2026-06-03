@@ -12,6 +12,11 @@ import { updateCopyFieldTool } from './updateCopyField';
 import { updateConfigFieldTool } from './updateConfigField';
 import { getSiteModelTool, replaceImageTool, updateThemeTool } from './updateTheme';
 import { verifySourceInvariantsTool } from './verifySourceInvariants';
+import {
+  resolveContactUpdateField,
+  resolveContactUpdateValue,
+} from '@/lib/project-workspace/edit-context/resolveContactUpdateField';
+import { stripPinnedTargetSuffix } from '@/lib/project-workspace/edit-context/pinnedContactSectionCopy';
 import type { DomainToolContext, DomainToolHandler, DomainToolName, DomainToolResult } from './types';
 
 const HANDLERS: Record<DomainToolName, DomainToolHandler> = {
@@ -59,16 +64,9 @@ export function paramsForSkill(
   const merged = { ...target, ...params };
 
   if (skill === 'update_contact') {
-    const field =
-      (merged.field as string) ??
-      (/\bphone\b/i.test(editContext.effectiveMessage)
-        ? 'phone'
-        : /\bemail\b/i.test(editContext.effectiveMessage)
-          ? 'email'
-          : /\baddress\b/i.test(editContext.effectiveMessage)
-            ? 'address'
-            : 'phone');
-    return { field, value: merged.value ?? merged[field] ?? merged.phone ?? merged.email };
+    const message = stripPinnedTargetSuffix(editContext.effectiveMessage);
+    const field = resolveContactUpdateField(merged, message);
+    return { field, value: resolveContactUpdateValue(merged, field) };
   }
 
   if (skill === 'update_hero') {

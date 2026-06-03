@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { WebsitePlan } from '@/lib/agent/schemas';
-import { applyLayoutStarterToPlan } from '@/lib/scratch/applyLayoutStarterToPlan';
+import { OWNER_TEMPLATE_REASON } from '@/lib/builder/ownerTemplateSelection';
+import { applyThemeToPlan } from '@/lib/scratch/applyThemeToPlan';
 
 const basePlan: WebsitePlan = {
   businessName: 'Test Co',
@@ -24,20 +25,17 @@ const basePlan: WebsitePlan = {
     category: 'general-service',
     variant: 'modern-clean',
     reason: 'LLM suggestion',
+    layoutStarterId: 'centered-minimal',
   },
   riskWarnings: [],
 };
 
-describe('applyLayoutStarterToPlan', () => {
-  it('sets layoutStarterId without overwriting color theme', () => {
-    const plan = applyLayoutStarterToPlan(basePlan, 'phone-first-service');
-    expect(plan.suggestedTemplate.layoutStarterId).toBe('phone-first-service');
-    expect(plan.suggestedTemplate.variant).toBe('modern-clean');
-    expect(plan.suggestedTemplate.reason).toBe('LLM suggestion');
-  });
-
-  it('uses default starter when id is missing', () => {
-    const plan = applyLayoutStarterToPlan(basePlan);
+describe('applyThemeToPlan', () => {
+  it('sets color theme without changing layoutStarterId', () => {
+    const plan = applyThemeToPlan(basePlan, 'restaurant', 'restaurant-warm');
+    expect(plan.suggestedTemplate.variant).toBe('restaurant-warm');
+    expect(plan.suggestedTemplate.category).toBe('restaurant');
     expect(plan.suggestedTemplate.layoutStarterId).toBe('centered-minimal');
+    expect(plan.suggestedTemplate.reason).toBe(OWNER_TEMPLATE_REASON);
   });
 });

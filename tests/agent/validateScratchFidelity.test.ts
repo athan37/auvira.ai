@@ -44,20 +44,19 @@ function planWithContact(phone: string, email: string): WebsitePlan {
 }
 
 describe('validateScratchFidelity', () => {
-  it('passes when plan includes intake phone and email', () => {
+  it('passes when plan omits phone and email (applied from intake at build)', () => {
     const result = validateScratchFidelity(
-      planWithContact('512-555-0100', 'owner@loopco.test'),
+      planWithContact('', 'not-in-plan@example.com'),
       intake
     );
     expect(result.ok).toBe(true);
   });
 
-  it('fails when plan omits intake phone', () => {
-    const result = validateScratchFidelity(
-      planWithContact('', 'owner@loopco.test'),
-      intake
-    );
+  it('fails when plan adds testimonials not mentioned in intake', () => {
+    const plan = planWithContact('', '');
+    plan.contentPlan!.sections = [{ type: 'testimonials', title: 'Reviews', contentNotes: 'Great' }];
+    const result = validateScratchFidelity(plan, intake);
     expect(result.ok).toBe(false);
-    expect(result.issues.some((i) => /phone/i.test(i))).toBe(true);
+    expect(result.issues.some((i) => /testimonial/i.test(i))).toBe(true);
   });
 });

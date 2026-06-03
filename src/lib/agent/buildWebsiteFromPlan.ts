@@ -17,6 +17,7 @@ import {
   getLayoutStarter,
   type LayoutStarter,
 } from '@/lib/builder/layoutStarters';
+import { normalizeTemplateSelection } from '@/lib/builder/normalizeTemplateVariant';
 
 export interface StageLog {
   stage: string;
@@ -187,9 +188,13 @@ export async function buildWebsiteFromPlan(
   };
   logStage(stageLogs, 'design_brief_done', logPrefix, Date.now() - startTime);
 
+  const normalizedTemplate = normalizeTemplateSelection(
+    websitePlan.suggestedTemplate?.category ?? layoutStarter.category,
+    websitePlan.suggestedTemplate?.variant ?? 'modern-clean'
+  );
   const template: TemplateSelection = {
-    category: layoutStarter.category,
-    variant: layoutStarter.variant,
+    category: normalizedTemplate.category,
+    variant: normalizedTemplate.variant,
     reason:
       websitePlan.suggestedTemplate?.reason ||
       (input.layoutStarterId ? 'Selected by owner' : 'Default template selected.'),

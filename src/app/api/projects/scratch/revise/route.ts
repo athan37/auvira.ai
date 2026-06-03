@@ -3,7 +3,7 @@ import { requireAuth } from '@/lib/api/projectAccess';
 import { resolveScratchIntake } from '@/lib/agent/buildWebsiteFromPlan';
 import { reviseWebsitePlanAgent } from '@/lib/agent/reviseWebsitePlanAgent';
 import type { ScratchIntake, WebsitePlan } from '@/lib/agent/schemas';
-import { applyLayoutStarterToPlan } from '@/lib/scratch/applyLayoutStarterToPlan';
+import { applyScratchTemplateSelectionToPlan } from '@/lib/scratch/applyScratchTemplateSelectionToPlan';
 
 export const runtime = 'nodejs';
 
@@ -21,11 +21,15 @@ export async function POST(request: NextRequest) {
       websitePlan,
       instruction,
       layoutStarterId,
+      templateCategory,
+      templateVariant,
       intake: intakeBody,
     } = body as {
       websitePlan: WebsitePlan;
       instruction?: string;
       layoutStarterId?: string;
+      templateCategory?: string;
+      templateVariant?: string;
       intake?: Partial<ScratchIntake>;
     };
 
@@ -40,10 +44,11 @@ export async function POST(request: NextRequest) {
 
     const intake = resolveScratchIntake(websitePlan, intakeBody);
     const result = await reviseWebsitePlanAgent(intake, websitePlan, revisionInstruction);
-    const revisedPlan = applyLayoutStarterToPlan(
-      result.data,
-      layoutStarterId ?? websitePlan.suggestedTemplate?.layoutStarterId
-    );
+    const revisedPlan = applyScratchTemplateSelectionToPlan(result.data, {
+      layoutStarterId: layoutStarterId ?? websitePlan.suggestedTemplate?.layoutStarterId,
+      templateCategory: templateCategory ?? websitePlan.suggestedTemplate?.category,
+      templateVariant: templateVariant ?? websitePlan.suggestedTemplate?.variant,
+    });
 
     return NextResponse.json({
       ok: true,

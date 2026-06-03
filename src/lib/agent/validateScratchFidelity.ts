@@ -2,30 +2,14 @@ import type { WebsitePlan, ScratchIntake } from './schemas';
 import type { ScratchValidationResult } from './schemas';
 
 /**
- * Ensures the website plan stays aligned with owner-provided intake (no invented contact facts).
+ * Ensures the website plan stays aligned with owner-provided intake for structural content.
+ * Phone and email are applied from intake at build time and are not required in the plan JSON.
  */
 export function validateScratchFidelity(
   websitePlan: WebsitePlan,
   intake: ScratchIntake
 ): ScratchValidationResult {
   const issues: string[] = [];
-  const planJson = JSON.stringify(websitePlan).toLowerCase();
-
-  const userPhone = (intake.phone || '').replace(/\D/g, '');
-  const userEmail = (intake.email || '').trim().toLowerCase();
-
-  if (userPhone && userPhone.length >= 7) {
-    const planDigits = planJson.replace(/\D/g, '');
-    if (!planDigits.includes(userPhone) && !planJson.includes(intake.phone!.toLowerCase())) {
-      issues.push('Plan does not include the phone number provided in intake.');
-    }
-  }
-
-  if (userEmail && userEmail.includes('@')) {
-    if (!planJson.includes(userEmail)) {
-      issues.push('Plan does not include the email provided in intake.');
-    }
-  }
 
   const hasTestimonialsSection = websitePlan.contentPlan?.sections?.some(
     (s) => s.type === 'testimonials' || /testimonial|review/i.test(s.title)
