@@ -88,9 +88,9 @@ describe('section title copy edit (Our Products)', () => {
 
     const deterministic = buildDeterministicPlan(built.context);
     expect(deterministic?.needsClarification).not.toBe(true);
-    expect(deterministic?.steps[0]?.skill).toBe('update_section_copy');
+    expect(deterministic?.steps[0]?.skill).toBe('update_config_field');
+    expect(deterministic?.steps[0]?.params?.fieldPath).toBe('sections[0].title');
     expect(deterministic?.steps[0]?.params?.value).toBe(NEW_TITLE);
-    expect(deterministic?.steps[0]?.params?.sectionIndex).toBe(0);
 
     const planResult = await planEdit({
       editContext: built.context,
@@ -98,7 +98,8 @@ describe('section title copy edit (Our Products)', () => {
       deterministicOnly: true,
     });
     expect(planResult.ok).toBe(true);
-    expect(planResult.plan?.steps[0]?.skill).toBe('update_section_copy');
+    expect(planResult.plan?.steps[0]?.skill).toBe('update_config_field');
+    expect(planResult.plan?.steps[0]?.params?.fieldPath).toBe('sections[0].title');
   });
 
   it('does not trigger duplicate business/hero clarification when names match', async () => {
@@ -165,10 +166,9 @@ describe('section title copy edit (Our Products)', () => {
 
     const plan = buildDeterministicPlan(built.context);
     expect(plan?.needsClarification).not.toBe(true);
-    expect(plan?.steps[0]?.skill).toBe('update_section_copy');
-    expect(plan?.steps[0]?.params?.field).toBe('title');
+    expect(plan?.steps[0]?.skill).toBe('update_config_field');
+    expect(plan?.steps[0]?.params?.fieldPath).toBe('sections[0].title');
     expect(plan?.steps[0]?.params?.value).toBe(NEW_TITLE);
-    expect(plan?.steps[0]?.params?.sectionIndex).toBe(0);
 
     const result = await executePlan(plan!, built.context, {
       workspacePath,

@@ -47,12 +47,20 @@ export async function updateConfigFieldTool(
   }
 
   const updated = updateConfigFieldInSource(content, fieldPath, value);
-  if (!updated || updated === content) {
+  if (!updated) {
     return {
       ok: false,
       changedFiles: [],
       summary: '',
       invariantErrors: [`No change applied for ${fieldPath}`],
+    };
+  }
+  if (updated === content) {
+    return {
+      ok: true,
+      changedFiles: [],
+      summary: `${fieldPath} already set to the requested value.`,
+      evidence: { fieldPath, value },
     };
   }
 

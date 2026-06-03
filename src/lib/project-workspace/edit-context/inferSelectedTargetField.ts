@@ -3,9 +3,8 @@ import type { EditWhatKind } from '@/lib/project-workspace/edit-shared/types';
 import { heroFieldPath, sectionFieldPath, sectionItemFieldPath } from './configFieldPaths';
 import {
   extractReplacementValue,
-  inferPinnedContactSectionCopy,
   stripPinnedTargetSuffix,
-} from './pinnedContactSectionCopy';
+} from './configTextEditUtils';
 import type { SelectedTargetContext } from './selectedTargetContext';
 
 export interface InferredFieldEdit {
@@ -139,16 +138,6 @@ export function inferSelectedTargetField(
       value,
       confidence: 'high',
       reason: 'UI-pinned element field path',
-    };
-  }
-
-  const pinnedContactCopy = inferPinnedContactSectionCopy(message, ctx);
-  if (pinnedContactCopy) {
-    return {
-      fieldPath: pinnedContactCopy.fieldPath,
-      value: pinnedContactCopy.value,
-      confidence: 'high',
-      reason: 'Pinned contact section copy (contact information wording)',
     };
   }
 

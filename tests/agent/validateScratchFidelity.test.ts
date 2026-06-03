@@ -54,7 +54,7 @@ describe('validateScratchFidelity', () => {
 
   it('fails when plan adds testimonials not mentioned in intake', () => {
     const plan = planWithContact('', '');
-    plan.contentPlan!.sections = [{ type: 'testimonials', title: 'Reviews', purpose: 'Social proof', contentNotes: ['Great'] }];
+    plan.contentPlan!.sections = [{ type: 'testimonials', title: 'Reviews', contentNotes: 'Great' }];
     const result = validateScratchFidelity(plan, intake);
     expect(result.ok).toBe(false);
     expect(result.issues.some((i) => /testimonial/i.test(i))).toBe(true);

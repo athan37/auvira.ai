@@ -336,7 +336,7 @@ function ContactSection({ section, sectionIndex }: { section: SiteSection; secti
             </div>
           </div>
           <div className={"rounded-[2rem] border p-8 shadow-2xl " + resolveSectionCardClass(section, preset)}>
-            <h3 className="text-xl font-bold">Contact Information</h3>
+            <h3 className="text-xl font-bold">{section.subtitle || 'Contact Information'}</h3>
             <div className="mt-6 space-y-4">
               {contact.phone && <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-200">{contact.phone}</div>}
               {contact.email && <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-200">{contact.email}</div>}

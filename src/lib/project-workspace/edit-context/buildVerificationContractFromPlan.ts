@@ -2,16 +2,26 @@ import type { EditPlan } from '@/lib/project-workspace/planner/editPlan.schema';
 import type { VerificationCheck, VerificationContract } from './types';
 import { mergedStepParams } from '@/lib/project-workspace/planner/editStepParams.schema';
 import {
-  resolveContactUpdateField,
-  resolveContactUpdateValue,
-} from './resolveContactUpdateField';
-import { stripPinnedTargetSuffix } from './pinnedContactSectionCopy';
+  fieldPathFromPlanStep,
+  valueFromPlanStep,
+} from './resolveConfigTextEdit';
+import { parseConfigFieldPath } from './configFieldPaths';
 
 function coerceIndex(value: unknown): number | undefined {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   if (typeof value === 'string' && Number.isFinite(Number(value))) return Number(value);
   return undefined;
 }
+
+const COPY_SKILLS = new Set([
+  'update_section_copy',
+  'update_config_field',
+  'update_section_item_copy',
+  'update_cta_label',
+  'update_contact',
+  'update_hero',
+  'update_business_name',
+]);
 
 /**
  * Build hard verification checks from executed plan steps (not only user message).
@@ -41,62 +51,22 @@ export function buildVerificationContractFromPlan(
             (merged.backgroundColor as string | undefined),
         });
       }
+      continue;
     }
 
-    if (step.skill === 'update_contact') {
-      const field = resolveContactUpdateField(merged, message ? stripPinnedTargetSuffix(message) : message);
-      checks.push({
-        kind: 'contact_field',
-        field,
-        expectedValue: resolveContactUpdateValue(merged, field),
-      });
-    }
-
-    if (step.skill === 'update_hero') {
-      const field = (merged.field as string) ?? 'headline';
-      const value = merged.value ?? merged[field] ?? merged.headline;
-      if (value) {
-        checks.push({
-          kind: 'hero_field',
-          field,
-          expectedValue: String(value),
-        });
-      }
-    }
-
-    if (step.skill === 'update_business_name') {
-      const value = merged.value ?? merged.businessName;
-      if (value) {
-        checks.push({
-          kind: 'business_name',
-          expectedValue: String(value),
-        });
-      }
-    }
-
-    const copySkills = new Set([
-      'update_section_copy',
-      'update_config_field',
-      'update_section_item_copy',
-      'update_cta_label',
-    ]);
-    if (copySkills.has(step.skill)) {
-      const fieldPath =
-        (merged.fieldPath as string | undefined) ??
-        (merged.field === 'title' || merged.field === 'body'
-          ? merged.sectionIndex != null
-            ? `sections[${merged.sectionIndex}].${merged.field}`
-            : undefined
-          : undefined);
-      const value = merged.value ?? merged[merged.field as string];
-      if (fieldPath && value) {
+    if (COPY_SKILLS.has(step.skill)) {
+      const fieldPath = fieldPathFromPlanStep(step.skill, merged, message);
+      const expectedValue = fieldPath ? valueFromPlanStep(step.skill, merged, fieldPath) : undefined;
+      if (fieldPath && expectedValue) {
+        const parsed = parseConfigFieldPath(fieldPath);
         checks.push({
           kind: 'copy_field',
           field: fieldPath,
-          sectionIndex: coerceIndex(merged.sectionIndex),
-          expectedValue: String(value),
+          sectionIndex: parsed?.sectionIndex ?? coerceIndex(merged.sectionIndex),
+          expectedValue,
         });
       }
+      continue;
     }
   }
 

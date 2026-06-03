@@ -18,7 +18,7 @@ import { StarterGalleryPicker } from '@/components/scratch/StarterGalleryPicker'
 import { CloneDeployInterstitial } from '@/components/clone/CloneDeployInterstitial';
 import { PublishActions } from '@/components/owner/PublishActions';
 import type { TemplateGalleryEntry } from '@/lib/builder/templateGallery';
-import { getLayoutStarter, type LayoutStarter, type LayoutStarterId } from '@/lib/builder/layoutStarters';
+import type { LayoutStarter, LayoutStarterId } from '@/lib/builder/layoutStarters';
 import { getClonePreviewProjectPath } from '@/lib/clone/cloneBuildPreviewResponse';
 
 interface CrawlPage {
@@ -543,11 +543,7 @@ export default function CloneJobPage() {
             {isReviewReady && job.suggestedTemplate && (
               <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-4">
                 <StarterGalleryPicker
-                  selectedId={
-                    selectedLayoutId ??
-                    getLayoutStarter(job.suggestedTemplate.layoutStarterId ?? '')?.id ??
-                    null
-                  }
+                  selectedId={selectedLayoutId ?? job.suggestedTemplate.layoutStarterId ?? null}
                   onSelect={handleLayoutSelect}
                   disabled={approving}
                   industry={job.extractedFactsSummary?.industry || ''}

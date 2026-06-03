@@ -16,7 +16,7 @@ import {
   resolveContactUpdateField,
   resolveContactUpdateValue,
 } from '@/lib/project-workspace/edit-context/resolveContactUpdateField';
-import { stripPinnedTargetSuffix } from '@/lib/project-workspace/edit-context/pinnedContactSectionCopy';
+import { stripPinnedTargetSuffix } from '@/lib/project-workspace/edit-context/configTextEditUtils';
 import type { DomainToolContext, DomainToolHandler, DomainToolName, DomainToolResult } from './types';
 
 const HANDLERS: Record<DomainToolName, DomainToolHandler> = {

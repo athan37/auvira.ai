@@ -12,7 +12,7 @@ import { runWebsiteEditAgent } from '@/lib/project-workspace/edit-agent';
 import { executePlan } from '@/lib/project-workspace/edit-agent/executePlan';
 import { buildEditContext } from '@/lib/project-workspace/edit-context/buildEditContext';
 import { buildDeterministicPlan } from '@/lib/project-workspace/edit-agent/deterministicPlan';
-import { rewriteMisroutedContactCopyPlan } from '@/lib/project-workspace/planner/rewriteMisroutedContactCopyPlan';
+import { normalizeMisroutedCopyPlan } from '@/lib/project-workspace/edit-agent/planFromConfigTextEdit';
 import { planEdit } from '@/lib/project-workspace/planner/planEdit';
 import {
   createSyntheticWorkspace,
@@ -128,7 +128,7 @@ describe('contact section copy regression (Get Started Today)', () => {
     expect(plan?.needsClarification).toBe(false);
     expect(plan?.steps[0]?.skill).toBe('update_config_field');
     expect(plan?.steps[0]?.params).toMatchObject({
-      fieldPath: 'sections[0].body',
+      fieldPath: 'sections[0].subtitle',
       value: 'helllo this is david',
     });
   });
@@ -175,7 +175,7 @@ describe('contact section copy regression (Get Started Today)', () => {
     expect(readContactFields(after)).toEqual(USER_CONTACT);
 
     const sections = parseSections(after);
-    expect(String(sections[0]?.body ?? '')).toBe('helllo this is david');
+    expect(String(sections[0]?.subtitle ?? '')).toBe('helllo this is david');
     expect(String(sections[0]?.title ?? '')).toBe('Get Started Today');
   });
 
@@ -200,7 +200,7 @@ describe('contact section copy regression (Get Started Today)', () => {
       ],
     };
 
-    const plan = rewriteMisroutedContactCopyPlan(misrouted, built.context);
+    const plan = normalizeMisroutedCopyPlan(misrouted, built.context);
     const result = await executePlan(plan, built.context, {
       workspacePath,
       ownerMessage: OWNER_MESSAGE,
@@ -213,7 +213,7 @@ describe('contact section copy regression (Get Started Today)', () => {
 
     const after = await readSyntheticFile(workspacePath, 'src/lib/siteConfig.ts');
     expect(readContactFields(after)).toEqual(USER_CONTACT);
-    expect(String(parseSections(after)[0]?.body ?? '')).toBe('helllo this is david');
+    expect(String(parseSections(after)[0]?.subtitle ?? '')).toBe('helllo this is david');
   });
 
   it('explicit email edit on pinned contact section still updates siteConfig.contact.email', async () => {

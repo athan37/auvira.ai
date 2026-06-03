@@ -7,9 +7,11 @@ import {
   heroFieldPath,
   parseConfigFieldPath,
   readConfigFieldValue,
-  sectionFieldPath,
-  sectionItemFieldPath,
 } from './configFieldPaths';
+import {
+  enumerateAllowlistedFields,
+  filterFieldsToSection,
+} from './enumerateAllowlistedFields';
 import type { EditTarget } from './types';
 
 export type EditableFieldConfidence = 'high' | 'medium' | 'low';
@@ -93,87 +95,38 @@ function asRecord(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
-function pushField(
-  fields: EditableFieldDescriptor[],
-  fieldPath: string,
-  label: string,
-  currentValue: unknown,
-  confidence: EditableFieldConfidence,
-  reason: string
-): void {
-  if (fields.some((f) => f.fieldPath === fieldPath)) return;
-  fields.push({ fieldPath, label, currentValue, confidence, reason });
-}
-
-function buildHeroFields(config: Record<string, unknown>): EditableFieldDescriptor[] {
-  const hero = asRecord(config.hero);
-  const fields: EditableFieldDescriptor[] = [];
-  for (const field of ['headline', 'subheadline', 'tagline'] as const) {
-    pushField(
-      fields,
-      heroFieldPath(field),
-      `Hero ${field}`,
-      hero?.[field],
-      'high',
-      'Hero text field'
-    );
-  }
-  return fields;
+function buildHeroFields(siteConfigContent: string): EditableFieldDescriptor[] {
+  return enumerateAllowlistedFields(siteConfigContent)
+    .filter((entry) => entry.scope === 'hero')
+    .map((entry) => ({
+      fieldPath: entry.fieldPath,
+      label: `Hero ${entry.field}`,
+      currentValue: entry.value,
+      confidence: 'high' as const,
+      reason: 'Hero text field',
+    }));
 }
 
 function buildSectionFields(
-  config: Record<string, unknown>,
+  siteConfigContent: string,
   sectionIndex: number
 ): EditableFieldDescriptor[] {
-  const sections = Array.isArray(config.sections)
-    ? (config.sections as Array<Record<string, unknown>>)
-    : [];
-  const section = sections[sectionIndex];
-  if (!section) return [];
-
-  const fields: EditableFieldDescriptor[] = [];
-  for (const field of ['title', 'subtitle', 'body'] as const) {
-    if (section[field] != null && String(section[field]).trim()) {
-      pushField(
-        fields,
-        sectionFieldPath(sectionIndex, field),
-        `Section ${field}`,
-        section[field],
-        field === 'title' ? 'high' : 'medium',
-        `Section-level ${field}`
-      );
-    }
-  }
-
-  if (!section.title && section.body) {
-    pushField(
-      fields,
-      sectionFieldPath(sectionIndex, 'body'),
-      'Section body',
-      section.body,
-      'high',
-      'Primary text field (no title on section)'
-    );
-  }
-
-  const items = Array.isArray(section.items)
-    ? (section.items as Array<Record<string, unknown>>)
-    : [];
-  items.forEach((item, itemIndex) => {
-    for (const field of ['title', 'description', 'label', 'imageUrl', 'alt', 'href'] as const) {
-      if (item[field] == null || !String(item[field]).trim()) continue;
-      pushField(
-        fields,
-        sectionItemFieldPath(sectionIndex, itemIndex, field),
-        `Item ${itemIndex + 1} ${field}`,
-        item[field],
-        field === 'title' || field === 'label' ? 'high' : 'medium',
-        `Section item ${itemIndex} ${field}`
-      );
-    }
-  });
-
-  return fields;
+  return filterFieldsToSection(enumerateAllowlistedFields(siteConfigContent), sectionIndex).map(
+    (entry) => ({
+      fieldPath: entry.fieldPath,
+      label:
+        entry.scope === 'sectionItem'
+          ? `Item ${(entry.itemIndex ?? 0) + 1} ${entry.field}`
+          : `Section ${entry.field}`,
+      currentValue: entry.value,
+      confidence:
+        entry.field === 'title' || entry.field === 'label' ? ('high' as const) : ('medium' as const),
+      reason:
+        entry.scope === 'sectionItem'
+          ? `Section item ${entry.itemIndex} ${entry.field}`
+          : `Section-level ${entry.field}`,
+    })
+  );
 }
 
 function buildStyleTargets(
@@ -225,9 +178,9 @@ export function buildSelectedTargetContext(
 
   const editableFields =
     selectedTarget.kind === 'hero'
-      ? buildHeroFields(configObject)
+      ? buildHeroFields(siteConfigContent)
       : target.sectionIndex != null
-        ? buildSectionFields(configObject, target.sectionIndex)
+        ? buildSectionFields(siteConfigContent, target.sectionIndex)
         : [];
 
   let sectionSlice: SelectedTargetContext['section'];

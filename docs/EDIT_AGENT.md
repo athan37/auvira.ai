@@ -32,6 +32,7 @@ buildEditContext → resolveEditTarget → planEdit → executePlan → domain t
 
 ## Gaps / future work
 
+- **Unified config copy editing** — see [`UNIFIED_CONFIG_EDIT_PLAN.md`](./UNIFIED_CONFIG_EDIT_PLAN.md) (replace section-type heuristics with ConfigFieldIndex + `resolveConfigTextEdit`)
 - `remove_section`, `reorder_sections`, `replace_image` — clarify or stub
 - Section-aware gradient from current background color
 

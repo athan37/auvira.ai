@@ -233,7 +233,7 @@ export function generatePageHtml(siteSpec: SiteSpec, projectName: string, previe
         </div>
         <div class="contact-grid">
           <div class="contact-info">
-            <h3 class="contact-info__title">Contact Information</h3>
+            <h3 class="contact-info__title">${escapeHtml(section.subtitle || 'Contact Information')}</h3>
             ${phone ? `
               <div class="contact-info__item">
                 <div class="contact-info__item-icon">📞</div>

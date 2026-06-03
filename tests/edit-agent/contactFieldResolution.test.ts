@@ -17,8 +17,8 @@ describe('update_contact field resolution', () => {
       effectiveMessage: message,
     } as never);
 
-    const check = verification.checks.find((c) => c.kind === 'contact_field');
-    expect(check?.field).toBe(execParams.field);
+    const check = verification.checks.find((c) => c.kind === 'copy_field');
+    expect(check?.field).toBe(`contact.${execParams.field}`);
     expect(check?.expectedValue).toBe(execParams.value);
   });
 });

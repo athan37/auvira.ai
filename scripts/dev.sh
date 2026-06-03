@@ -20,4 +20,4 @@ if lsof -ti :"$PORT" >/dev/null 2>&1; then
   fi
 fi
 
-exec next dev -p "$PORT"
+exec next dev -H 0.0.0.0 -p "$PORT"

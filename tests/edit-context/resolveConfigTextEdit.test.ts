@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { buildDeterministicPlan } from '@/lib/project-workspace/edit-agent/deterministicPlan';
-import { inferSelectedTargetField } from '@/lib/project-workspace/edit-context/inferSelectedTargetField';
+import { normalizeMisroutedCopyPlan } from '@/lib/project-workspace/edit-agent/planFromConfigTextEdit';
+import { buildSelectedTargetContext } from '@/lib/project-workspace/edit-context/selectedTargetContext';
 import {
   extractReplacementValue,
-  isPinnedContactSectionCopyIntent,
   stripPinnedTargetSuffix,
-} from '@/lib/project-workspace/edit-context/pinnedContactSectionCopy';
-import { buildSelectedTargetContext } from '@/lib/project-workspace/edit-context/selectedTargetContext';
-import { rewriteMisroutedContactCopyPlan } from '@/lib/project-workspace/planner/rewriteMisroutedContactCopyPlan';
+} from '@/lib/project-workspace/edit-context/configTextEditUtils';
+import { enumerateAllowlistedFields } from '@/lib/project-workspace/edit-context/enumerateAllowlistedFields';
+import { resolveConfigTextEdit } from '@/lib/project-workspace/edit-context/resolveConfigTextEdit';
 import { buildSiteSectionCatalog } from '@/lib/project-workspace/edit-shared/siteSectionCatalog';
 import type { EditContext } from '@/lib/project-workspace/edit-context/types';
 
@@ -75,7 +75,7 @@ function contactEditContext(message: string): EditContext {
   } as unknown as EditContext;
 }
 
-describe('pinnedContactSectionCopy', () => {
+describe('resolveConfigTextEdit', () => {
   it('strips UI-selected suffix before extracting values', () => {
     expect(
       extractReplacementValue(
@@ -85,13 +85,34 @@ describe('pinnedContactSectionCopy', () => {
     expect(stripPinnedTargetSuffix('hello (UI-selected section: index 0)')).toBe('hello');
   });
 
-  it('extracts unquoted replacement values', () => {
-    expect(
-      extractReplacementValue('change contact information to helllo this is david')
-    ).toBe('helllo this is david');
+  it('Mode B resolves quoted find/replace across allowlisted fields', () => {
+    const result = resolveConfigTextEdit({
+      message: 'change "Ready to get started? Reach out anytime." to "Updated body copy"',
+      siteConfigContent: contactSiteConfig,
+      pinnedSectionIndex: 0,
+    });
+    expect(result.kind).toBe('apply');
+    if (result.kind === 'apply') {
+      expect(result.fieldPath).toBe('sections[0].body');
+      expect(result.value).toBe('Updated body copy');
+      expect(result.mode).toBe('find_replace');
+    }
   });
 
-  it('detects pinned contact section copy intent', () => {
+  it('Mode C resolves typed email edits', () => {
+    const result = resolveConfigTextEdit({
+      message: 'change email to david@example.com',
+      siteConfigContent: contactSiteConfig,
+      pinnedSectionIndex: 0,
+    });
+    expect(result.kind).toBe('apply');
+    if (result.kind === 'apply') {
+      expect(result.fieldPath).toBe('contact.email');
+      expect(result.value).toBe('david@example.com');
+    }
+  });
+
+  it('Mode A resolves pinned contact section copy to section subtitle (inner card heading)', () => {
     const ctx = buildSelectedTargetContext({
       selectedTarget: contactSelectedTarget,
       siteConfigContent: contactSiteConfig,
@@ -99,48 +120,41 @@ describe('pinnedContactSectionCopy', () => {
       catalog: buildSiteSectionCatalog(contactSiteConfig, ''),
       target: contactEditContext('').target,
     });
-    expect(
-      isPinnedContactSectionCopyIntent(
-        'change contact information to helllo this is david',
-        ctx ?? undefined
-      )
-    ).toBe(true);
-    expect(
-      isPinnedContactSectionCopyIntent('change email to new@example.com', ctx ?? undefined)
-    ).toBe(false);
-  });
-
-  it('infers section body for vague contact information copy', () => {
-    const ctx = buildSelectedTargetContext({
-      selectedTarget: contactSelectedTarget,
+    const result = resolveConfigTextEdit({
+      message: 'change contact information to helllo this is david',
       siteConfigContent: contactSiteConfig,
-      pageContent: '',
-      catalog: buildSiteSectionCatalog(contactSiteConfig, ''),
-      target: contactEditContext('').target,
+      pinnedSectionIndex: 0,
+      selectedTargetContext: ctx ?? undefined,
     });
-    const inferred = inferSelectedTargetField(
-      'change contact information to helllo this is david',
-      ctx ?? undefined
-    );
-    expect(inferred?.fieldPath).toBe('sections[0].body');
-    expect(inferred?.value).toBe('helllo this is david');
+    expect(result.kind).toBe('apply');
+    if (result.kind === 'apply') {
+      expect(result.fieldPath).toBe('sections[0].subtitle');
+      expect(result.value).toBe('helllo this is david');
+      expect(result.mode).toBe('set_field');
+    }
   });
 
-  it('buildDeterministicPlan uses update_config_field for pinned contact copy', () => {
+  it('enumerateAllowlistedFields indexes contact and section fields', () => {
+    const entries = enumerateAllowlistedFields(contactSiteConfig);
+    expect(entries.some((e) => e.fieldPath === 'contact.email')).toBe(true);
+    expect(entries.some((e) => e.fieldPath === 'sections[0].body')).toBe(true);
+  });
+
+  it('buildDeterministicPlan uses update_config_field via unified resolver', () => {
     const plan = buildDeterministicPlan(
       contactEditContext('change contact information to helllo this is david')
     );
     expect(plan?.needsClarification).toBe(false);
     expect(plan?.steps[0]?.skill).toBe('update_config_field');
     expect(plan?.steps[0]?.params).toMatchObject({
-      fieldPath: 'sections[0].body',
+      fieldPath: 'sections[0].subtitle',
       value: 'helllo this is david',
     });
   });
 
-  it('rewrites misrouted update_contact plans to section copy', () => {
+  it('normalizeMisroutedCopyPlan rewrites misrouted update_contact plans', () => {
     const editContext = contactEditContext('change contact information to helllo this is david');
-    const rewritten = rewriteMisroutedContactCopyPlan(
+    const rewritten = normalizeMisroutedCopyPlan(
       {
         planVersion: 'website-agent',
         needsClarification: false,
@@ -155,7 +169,7 @@ describe('pinnedContactSectionCopy', () => {
     );
     expect(rewritten.steps[0]?.skill).toBe('update_config_field');
     expect(rewritten.steps[0]?.params).toMatchObject({
-      fieldPath: 'sections[0].body',
+      fieldPath: 'sections[0].subtitle',
       value: 'helllo this is david',
     });
   });

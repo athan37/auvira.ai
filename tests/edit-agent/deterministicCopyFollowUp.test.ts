@@ -78,7 +78,8 @@ describe('deterministic copy follow-ups', () => {
         } as unknown as EditContext['siteModel'],
       })
     );
-    expect(plan?.steps[0]?.skill).toBe('update_business_name');
+    expect(plan?.steps[0]?.skill).toBe('update_config_field');
+    expect(plan?.steps[0]?.params?.fieldPath).toBe('businessName');
     expect(plan?.steps[0]?.params?.value).toBe('New Co');
   });
 });

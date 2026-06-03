@@ -9,13 +9,14 @@ import type {
   VerificationCheck,
   VerificationCheckKind,
 } from '@/lib/project-workspace/edit-context/types';
+import { fieldPathFromPlanStep } from '@/lib/project-workspace/edit-context/resolveConfigTextEdit';
 import { runRestrictedCustomCodeEdit } from './restrictedFallback';
 
 const CHECKS_BY_SKILL: Partial<Record<string, VerificationCheckKind[]>> = {
   update_section_style: ['section_background', 'generic'],
-  update_contact: ['contact_field', 'generic'],
-  update_hero: ['hero_field', 'generic'],
-  update_business_name: ['business_name', 'generic'],
+  update_contact: ['contact_field', 'copy_field', 'generic'],
+  update_hero: ['hero_field', 'copy_field', 'generic'],
+  update_business_name: ['business_name', 'copy_field', 'generic'],
   update_section_copy: ['copy_field', 'generic'],
   update_config_field: ['copy_field', 'generic'],
   update_section_item_copy: ['copy_field', 'generic'],
@@ -24,10 +25,26 @@ const CHECKS_BY_SKILL: Partial<Record<string, VerificationCheckKind[]>> = {
 
 function verificationChecksForStep(
   skill: string,
-  checks: VerificationCheck[]
+  stepParams: Record<string, unknown>,
+  checks: VerificationCheck[],
+  message?: string
 ): VerificationCheck[] {
   const allowed = CHECKS_BY_SKILL[skill] ?? ['generic'];
-  const filtered = checks.filter((c) => allowed.includes(c.kind));
+  const stepFieldPath = fieldPathFromPlanStep(skill, stepParams, message);
+  const filtered = checks.filter((c) => {
+    if (!allowed.includes(c.kind)) return false;
+    if (c.kind === 'copy_field' && stepFieldPath && c.field !== stepFieldPath) return false;
+    if (c.kind === 'hero_field' && stepFieldPath && c.field !== stepFieldPath.replace(/^hero\./, '')) {
+      return false;
+    }
+    if (c.kind === 'business_name' && stepFieldPath && stepFieldPath !== 'businessName') {
+      return false;
+    }
+    if (c.kind === 'contact_field' && stepFieldPath?.startsWith('contact.')) {
+      return c.field === stepFieldPath.replace(/^contact\./, '');
+    }
+    return true;
+  });
   return filtered.length > 0 ? filtered : [{ kind: 'generic' }];
 }
 
@@ -126,7 +143,9 @@ export async function executeStep(
         verificationContract: {
           checks: verificationChecksForStep(
             step.skill,
-            toolCtx.editContext.verificationContract.checks
+            params,
+            toolCtx.editContext.verificationContract.checks,
+            toolCtx.editContext.effectiveMessage
           ),
         },
       },

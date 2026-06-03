@@ -13,6 +13,11 @@ export interface ParsedSiteConfig {
     address?: string;
   };
   businessName?: string;
+  hero?: {
+    headline?: string;
+    subheadline?: string;
+    tagline?: string;
+  };
   sections: Array<{
     id?: string;
     analyticsId?: string;
@@ -85,10 +90,21 @@ export function parseSiteConfigSource(content: string): ParsedSiteConfig | null 
     const raw = new Function(`return (${literal})`)() as Record<string, unknown>;
     const sections = Array.isArray(raw.sections) ? raw.sections : [];
     const contact = (raw.contact as ParsedSiteConfig['contact']) ?? {};
+    const heroRaw = raw.hero as Record<string, unknown> | undefined;
+    const hero =
+      heroRaw && typeof heroRaw === 'object'
+        ? {
+            headline: typeof heroRaw.headline === 'string' ? heroRaw.headline : undefined,
+            subheadline:
+              typeof heroRaw.subheadline === 'string' ? heroRaw.subheadline : undefined,
+            tagline: typeof heroRaw.tagline === 'string' ? heroRaw.tagline : undefined,
+          }
+        : undefined;
     return {
       businessName:
         typeof raw.businessName === 'string' ? raw.businessName : undefined,
       contact,
+      hero,
       sections: sections as ParsedSiteConfig['sections'],
     };
   } catch {

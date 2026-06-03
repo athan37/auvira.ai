@@ -1,6 +1,5 @@
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import type { SiteSpec } from '@/lib/agent/schemas';
 import type { ICloneJob } from '@/lib/db/models/CloneJob';
 import { CloneJob } from '@/lib/db/models/CloneJob';
 import { generateDesignBriefAgent, getDefaultDesignBrief } from '@/lib/agent/generateDesignBriefAgent';

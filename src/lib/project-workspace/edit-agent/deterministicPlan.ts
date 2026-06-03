@@ -1,6 +1,8 @@
 import { classifyEditWhat } from '@/lib/project-workspace/edit-context/classifyEditWhat';
 import { inferPresentationStyleTarget } from '@/lib/project-workspace/edit-context/inferPresentationStyleTarget';
 import { inferSelectedTargetField } from '@/lib/project-workspace/edit-context/inferSelectedTargetField';
+import { isUnifiedCopyEditEnabled } from '@/lib/project-workspace/edit-context/unifiedCopyEditFlag';
+import { planFromConfigTextEdit } from '@/lib/project-workspace/edit-agent/planFromConfigTextEdit';
 import { extractSectionBackgroundClassFromMessage } from '@/lib/builder/sectionPresentation';
 import {
   extractBackgroundColorFromMessage,
@@ -221,7 +223,7 @@ export function buildDeterministicPlan(editContext: EditContext): EditPlan | nul
   const heroStyle = planHeroBackgroundStyle(editContext);
   if (heroStyle) return heroStyle;
 
-  if (editContext.selectedTarget && editContext.selectedTargetContext) {
+  if (!isUnifiedCopyEditEnabled() && editContext.selectedTarget && editContext.selectedTargetContext) {
     const inferred = inferSelectedTargetField(
       message,
       editContext.selectedTargetContext,
@@ -270,51 +272,53 @@ export function buildDeterministicPlan(editContext: EditContext): EditPlan | nul
     }
   }
 
-  const sectionCopy = parseSectionTitleCopyEdit(message);
-  if (
-    sectionCopy &&
-    what === 'copy' &&
-    editContext.target.sectionIndex != null &&
-    editContext.target.confidence !== 'low'
-  ) {
-    const sectionIndex = editContext.target.sectionIndex;
-    return {
-      planVersion: 'website-agent',
-      needsClarification: false,
-      intent: 'copy',
-      targets: [
-        {
-          kind: 'section',
-          sectionIndex,
-          sectionTitle: editContext.target.title,
-          sectionType: editContext.target.sectionType,
-        },
-      ],
-      verification: [
-        {
-          kind: 'copy_field',
-          sectionIndex,
-          field: sectionCopy.field,
-          expectedValue: sectionCopy.value,
-        },
-      ],
-      risk: { level: editContext.riskFlags.level, reasons: editContext.riskFlags.reasons },
-      steps: [
-        {
-          skill: 'update_section_copy',
-          target: {
+  if (!isUnifiedCopyEditEnabled()) {
+    const sectionCopy = parseSectionTitleCopyEdit(message);
+    if (
+      sectionCopy &&
+      what === 'copy' &&
+      editContext.target.sectionIndex != null &&
+      editContext.target.confidence !== 'low'
+    ) {
+      const sectionIndex = editContext.target.sectionIndex;
+      return {
+        planVersion: 'website-agent',
+        needsClarification: false,
+        intent: 'copy',
+        targets: [
+          {
+            kind: 'section',
             sectionIndex,
-            title: editContext.target.title,
+            sectionTitle: editContext.target.title,
             sectionType: editContext.target.sectionType,
           },
-          params: {
+        ],
+        verification: [
+          {
+            kind: 'copy_field',
             sectionIndex,
             field: sectionCopy.field,
-            value: sectionCopy.value,
+            expectedValue: sectionCopy.value,
           },
-        },
-      ],
-    };
+        ],
+        risk: { level: editContext.riskFlags.level, reasons: editContext.riskFlags.reasons },
+        steps: [
+          {
+            skill: 'update_section_copy',
+            target: {
+              sectionIndex,
+              title: editContext.target.title,
+              sectionType: editContext.target.sectionType,
+            },
+            params: {
+              sectionIndex,
+              field: sectionCopy.field,
+              value: sectionCopy.value,
+            },
+          },
+        ],
+      };
+    }
   }
 
   const trimmed = message.trim();
@@ -323,7 +327,12 @@ export function buildDeterministicPlan(editContext: EditContext): EditPlan | nul
     if (duplicatePlan) return duplicatePlan;
   }
 
-  if (siteConfigContent) {
+  if (isUnifiedCopyEditEnabled()) {
+    const unified = planFromConfigTextEdit(editContext);
+    if (unified) return unified;
+  }
+
+  if (!isUnifiedCopyEditEnabled() && siteConfigContent) {
     const quoted = parseQuotedReplacement(message, siteConfigContent);
     if (quoted) {
       if (quoted.field === 'businessName') {
@@ -438,37 +447,39 @@ export function buildDeterministicPlan(editContext: EditContext): EditPlan | nul
     }
   }
 
-  const contact = parseContactField(message);
-  if (contact) {
-    return {
-      planVersion: 'website-agent',
-      needsClarification: false,
-      intent: 'contact',
-      verification: [{ kind: 'contact_field', field: contact.field, expectedValue: contact.value }],
-      risk: { level: editContext.riskFlags.level, reasons: editContext.riskFlags.reasons },
-      steps: [
-        {
-          skill: 'update_contact',
-          params: { [contact.field]: contact.value, field: contact.field, value: contact.value },
-        },
-      ],
-    };
-  }
+  if (!isUnifiedCopyEditEnabled()) {
+    const contact = parseContactField(message);
+    if (contact) {
+      return {
+        planVersion: 'website-agent',
+        needsClarification: false,
+        intent: 'contact',
+        verification: [{ kind: 'contact_field', field: contact.field, expectedValue: contact.value }],
+        risk: { level: editContext.riskFlags.level, reasons: editContext.riskFlags.reasons },
+        steps: [
+          {
+            skill: 'update_contact',
+            params: { [contact.field]: contact.value, field: contact.field, value: contact.value },
+          },
+        ],
+      };
+    }
 
-  const hero = parseHeroValue(message);
-  if (hero && editContext.target.kind === 'hero') {
-    return {
-      planVersion: 'website-agent',
-      needsClarification: false,
-      intent: 'copy',
-      targets: [{ kind: 'hero', field: hero.field }],
-      steps: [
-        {
-          skill: 'update_hero',
-          params: { [hero.field]: hero.value, field: hero.field, value: hero.value },
-        },
-      ],
-    };
+    const hero = parseHeroValue(message);
+    if (hero && editContext.target.kind === 'hero') {
+      return {
+        planVersion: 'website-agent',
+        needsClarification: false,
+        intent: 'copy',
+        targets: [{ kind: 'hero', field: hero.field }],
+        steps: [
+          {
+            skill: 'update_hero',
+            params: { [hero.field]: hero.value, field: hero.field, value: hero.value },
+          },
+        ],
+      };
+    }
   }
 
   const addService = message.match(/\badd\s+(.+?)\s+to\s+services\b/i);
