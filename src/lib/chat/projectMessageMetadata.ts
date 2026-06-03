@@ -50,6 +50,8 @@ export interface ProjectMessageMetadata {
   editFocusStack?: EditFocusStack;
   /** Preview section pinned when the user sent this message (drag-to-chat). */
   selectedTarget?: SelectedTargetInput;
+  /** Surface picked from explorer clarification (maps to fieldPath server-side). */
+  selectedSurfaceId?: string;
 }
 
 export interface ChatApiMessage {

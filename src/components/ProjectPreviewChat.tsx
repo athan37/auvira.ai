@@ -276,6 +276,10 @@ function selectedTargetFromSection(section: SelectedSection): SelectedTargetInpu
     sectionIndex: section.sectionIndex,
     sectionType: section.sectionType,
     sectionTitle: section.sectionTitle,
+    fieldPath: section.fieldPath,
+    itemIndex: section.itemIndex,
+    elementKind: section.elementKind,
+    elementLabel: section.elementLabel,
   };
 }
 

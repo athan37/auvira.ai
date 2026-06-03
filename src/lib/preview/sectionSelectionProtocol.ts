@@ -22,6 +22,11 @@ export interface SelectedSectionPayload {
   sectionIndex: number;
   sectionType: string;
   sectionTitle?: string;
+  /** Optional inner-element pin from preview bridge drag. */
+  elementKind?: string;
+  elementLabel?: string;
+  fieldPath?: string;
+  itemIndex?: number;
 }
 
 /** Context-menu payload includes iframe viewport coordinates for parent menu placement. */
@@ -37,6 +42,10 @@ export interface SelectedSection {
   sectionIndex?: number;
   sectionType: string;
   sectionTitle?: string;
+  elementKind?: string;
+  elementLabel?: string;
+  fieldPath?: string;
+  itemIndex?: number;
 }
 
 export interface SiteSectionSelectedMessage {
@@ -116,12 +125,24 @@ function parseSelectedSectionPayload(payload: Record<string, unknown>): Selected
     return null;
   }
 
+  const elementKind = isNonEmptyString(payload.elementKind) ? payload.elementKind.trim() : undefined;
+  const elementLabel = isNonEmptyString(payload.elementLabel) ? payload.elementLabel.trim() : undefined;
+  const fieldPath = isNonEmptyString(payload.fieldPath) ? payload.fieldPath.trim() : undefined;
+  const itemIndex =
+    typeof payload.itemIndex === 'number' && Number.isFinite(payload.itemIndex)
+      ? payload.itemIndex
+      : undefined;
+
   return {
     sectionId: payload.sectionId.trim(),
     analyticsId: isNonEmptyString(payload.analyticsId) ? payload.analyticsId.trim() : undefined,
     sectionIndex: payload.sectionIndex,
     sectionType: payload.sectionType.trim(),
     sectionTitle: isNonEmptyString(payload.sectionTitle) ? payload.sectionTitle.trim() : undefined,
+    elementKind,
+    elementLabel,
+    fieldPath,
+    itemIndex,
   };
 }
 
@@ -168,6 +189,10 @@ export function selectedSectionFromPayload(payload: SelectedSectionPayload): Sel
     sectionIndex: kind === 'section' ? payload.sectionIndex : undefined,
     sectionType: payload.sectionType,
     sectionTitle: payload.sectionTitle,
+    elementKind: payload.elementKind,
+    elementLabel: payload.elementLabel,
+    fieldPath: payload.fieldPath,
+    itemIndex: payload.itemIndex,
   };
 }
 

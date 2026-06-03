@@ -113,6 +113,7 @@ export function generatePageHtml(siteSpec: SiteSpec, projectName: string, previe
   const testimonials = siteSpec.sections.find((s: any) => s.type === 'testimonials');
   const faq = siteSpec.sections.find((s: any) => s.type === 'faq');
   const contact = siteSpec.sections.find((s: any) => s.type === 'contact');
+  const contactSectionIndex = siteSpec.sections.findIndex((s: any) => s.type === 'contact');
   const booking = siteSpec.sections.find((s: any) => s.type === 'booking');
 
   const primaryCTA = siteSpec.primaryCTA || 'Get Started';
@@ -224,16 +225,17 @@ export function generatePageHtml(siteSpec: SiteSpec, projectName: string, previe
   ` : '';
 
   // Contact / CTA section
+  const contactIdx = contactSectionIndex >= 0 ? contactSectionIndex : 0;
   const contactSection = `
-    <section class="contact-section section" id="contact">
+    <section class="contact-section section" id="contact" data-site-section-type="contact" data-site-section-index="${contactIdx}">
       <div class="container">
         <div class="section__header">
-          <h2 class="section__title">${escapeHtml(contact?.title || 'Get in Touch')}</h2>
-          <p class="section__subtitle">${escapeHtml(contact?.body || 'We\'re here to help with all your needs.')}</p>
+          <h2 class="section__title" data-site-element-kind="heading" data-site-element-label="Section title" data-site-config-field-path="sections[${contactIdx}].title">${escapeHtml(contact?.title || 'Get in Touch')}</h2>
+          <p class="section__subtitle" data-site-element-kind="body" data-site-element-label="Section intro" data-site-config-field-path="sections[${contactIdx}].body">${escapeHtml(contact?.body || 'We\'re here to help with all your needs.')}</p>
         </div>
         <div class="contact-grid">
-          <div class="contact-info">
-            <h3 class="contact-info__title">${escapeHtml(section.subtitle || 'Contact Information')}</h3>
+          <div class="contact-info" data-site-element-kind="panel" data-site-element-label="Inner contact card" data-site-config-field-path="sections[${contactIdx}].presentation.cardClass">
+            <h3 class="contact-info__title" data-site-element-kind="heading" data-site-element-label="Contact Information" data-site-config-field-path="sections[${contactIdx}].subtitle">${escapeHtml((contact as { subtitle?: string } | undefined)?.subtitle || 'Contact Information')}</h3>
             ${phone ? `
               <div class="contact-info__item">
                 <div class="contact-info__item-icon">📞</div>

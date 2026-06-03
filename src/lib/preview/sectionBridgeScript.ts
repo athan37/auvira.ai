@@ -2,7 +2,7 @@
  * Preview iframe bridge script (served externally to avoid inline-script CSP blocks).
  */
 
-export const PREVIEW_SECTION_BRIDGE_VERSION = 15;
+export const PREVIEW_SECTION_BRIDGE_VERSION = 16;
 
 const HIGHLIGHT_CLASS = 'site-editor-section-highlight';
 const HOVER_CLASS = 'site-editor-section-hover';

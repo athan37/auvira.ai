@@ -54,6 +54,28 @@ export function wasSectionListClarificationAsked(history: ConversationTurn[]): b
   );
 }
 
+/** True when assistant asked which inner surface to edit (explorer clarifier). */
+export function wasSurfaceClarificationAsked(history: ConversationTurn[]): boolean {
+  return history.some(
+    (m) =>
+      m.role === 'assistant' &&
+      /Which part of \*\*/i.test(m.content) &&
+      /\bInner card heading\b|\bSection intro\b/i.test(m.content)
+  );
+}
+
+/** Parse numbered surface clarify line: `1. Inner card heading ("Contact Information")`. */
+export function extractSurfaceLabelFromClarifyReply(
+  assistantContent: string,
+  pick: number
+): string | null {
+  for (const line of assistantContent.split('\n')) {
+    const match = line.match(new RegExp(`^\\s*${pick}\\.\\s+(.+?)(?:\\s+\\(|$)`));
+    if (match?.[1]) return match[1].trim();
+  }
+  return null;
+}
+
 function findPriorUserMessage(
   history: ConversationTurn[],
   excludeContent?: string
@@ -169,6 +191,42 @@ function mergeTestimonialOptionReply(message: string, history: ConversationTurn[
   }
 
   return null;
+}
+
+function mergeSurfaceClarificationReply(message: string, history: ConversationTurn[]): string | null {
+  if (!wasSurfaceClarificationAsked(history)) return null;
+
+  const trimmed = message.trim();
+  const numMatch = trimmed.match(/^(\d)\s*(?:—|$|\b)/);
+  const assistant = lastAssistantTurn(history);
+  if (!assistant) return null;
+
+  let surfaceLabel: string | null = null;
+  if (numMatch) {
+    surfaceLabel = extractSurfaceLabelFromClarifyReply(
+      assistant.content,
+      parseInt(numMatch[1], 10)
+    );
+  } else {
+    for (const line of assistant.content.split('\n')) {
+      const labelMatch = line.match(/^\s*\d+\.\s+(.+?)(?:\s+\(|$)/);
+      if (labelMatch?.[1] && trimmed.toLowerCase().includes(labelMatch[1].trim().toLowerCase())) {
+        surfaceLabel = labelMatch[1].trim();
+        break;
+      }
+    }
+    if (!surfaceLabel && trimmed.length >= 3 && trimmed.length < 80) {
+      surfaceLabel = trimmed;
+    }
+  }
+
+  if (!surfaceLabel) return null;
+
+  const prior = findPriorUserMessage(history, message);
+  if (prior) {
+    return `${prior.content} (target surface: ${surfaceLabel})`;
+  }
+  return `${trimmed} (target surface: ${surfaceLabel})`;
 }
 
 function mergeSectionNumberReply(message: string, history: ConversationTurn[]): string | null {
@@ -351,6 +409,7 @@ export function resolveEffectiveEditMessage(
 
   return (
     mergeTestimonialOptionReply(message, recent) ??
+    mergeSurfaceClarificationReply(message, recent) ??
     mergeSectionNumberReply(message, recent) ??
     mergeSameSectionPinReply(message, recent) ??
     mergeCompoundImageEditMessage(message) ??

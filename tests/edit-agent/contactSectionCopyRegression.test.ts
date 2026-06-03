@@ -7,6 +7,7 @@
 import path from 'path';
 import { promises as fs } from 'fs';
 import { afterEach, describe, expect, it } from 'vitest';
+import { PAGE_TSX_TEMPLATE } from '@/lib/builder/pageTemplate';
 import { stableAnalyticsIdForSection } from '@/lib/analytics/generated-sites/ensureAnalyticsIds';
 import { runWebsiteEditAgent } from '@/lib/project-workspace/edit-agent';
 import { executePlan } from '@/lib/project-workspace/edit-agent/executePlan';
@@ -114,7 +115,14 @@ describe('contact section copy regression (Get Started Today)', () => {
     expect(built.context.target.sectionType).toBe('contact');
   });
 
-  it('deterministic plan targets section body via update_config_field', async () => {
+  it('page template exposes inner card heading element attrs for drag pin', () => {
+    expect(PAGE_TSX_TEMPLATE).toContain('data-site-config-field-path');
+    expect(PAGE_TSX_TEMPLATE).toMatch(/sections\[.*\]\.subtitle/);
+    expect(PAGE_TSX_TEMPLATE).toContain('SITE_ELEMENT_ATTRS');
+    expect(PAGE_TSX_TEMPLATE).toContain("Contact Information");
+  });
+
+  it('deterministic plan targets inner card subtitle via update_config_field', async () => {
     workspacePath = await createGetStartedTodayWorkspace();
     const built = await buildEditContext({
       workspacePath,

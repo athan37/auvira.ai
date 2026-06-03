@@ -289,6 +289,9 @@ function resolveSetFieldMode(
   const top = scored[0]!;
   const second = scored[1];
   if (second && top.score - second.score < MIN_SCORE_MARGIN) {
+    if (pinnedSectionIndex != null) {
+      return { kind: 'none' };
+    }
     return buildAmbiguousFieldClarification(
       scored.slice(0, 5).map((s) => s.entry),
       value

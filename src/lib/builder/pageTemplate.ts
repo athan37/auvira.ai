@@ -26,6 +26,16 @@ function SITE_SECTION_DATA_ATTRS(section: SiteSection, sectionIndex: number) {
   };
 }
 
+function SITE_ELEMENT_ATTRS(opts: { kind: string; label: string; fieldPath: string; itemIndex?: number }) {
+  const attrs: Record<string, string> = {
+    "data-site-element-kind": opts.kind,
+    "data-site-element-label": opts.label,
+    "data-site-config-field-path": opts.fieldPath,
+  };
+  if (opts.itemIndex != null) attrs["data-site-item-index"] = String(opts.itemIndex);
+  return attrs;
+}
+
 ${SECTION_PRESENTATION_RUNTIME}
 
 // Navigation component
@@ -324,8 +334,16 @@ function ContactSection({ section, sectionIndex }: { section: SiteSection; secti
         <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
           <div>
             <p className={"mb-4 text-xs font-bold uppercase tracking-[0.28em] " + preset.heroEyebrow}>Get in Touch</p>
-            <h2 className="font-bold text-4xl tracking-tight md:text-6xl">{section.title}</h2>
-            {section.body && <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-300">{section.body}</p>}
+            <h2
+              className="font-bold text-4xl tracking-tight md:text-6xl"
+              {...SITE_ELEMENT_ATTRS({ kind: "heading", label: "Section title", fieldPath: "sections[" + sectionIndex + "].title" })}
+            >{section.title}</h2>
+            {section.body && (
+              <p
+                className="mt-6 max-w-2xl text-lg leading-8 text-slate-300"
+                {...SITE_ELEMENT_ATTRS({ kind: "body", label: "Section intro", fieldPath: "sections[" + sectionIndex + "].body" })}
+              >{section.body}</p>
+            )}
             <div className="mt-8 flex flex-col sm:flex-row gap-4">
               {siteConfig.hero.primaryCta && (
                 <a href="#contact" className={"inline-flex items-center justify-center rounded-full px-6 py-3 text-sm font-bold shadow-lg shadow-black/20 transition hover:-translate-y-0.5 " + preset.primaryButton}>{siteConfig.hero.primaryCta}</a>
@@ -335,8 +353,14 @@ function ContactSection({ section, sectionIndex }: { section: SiteSection; secti
               )}
             </div>
           </div>
-          <div className={"rounded-[2rem] border p-8 shadow-2xl " + resolveSectionCardClass(section, preset)}>
-            <h3 className="text-xl font-bold">{section.subtitle || 'Contact Information'}</h3>
+          <div
+            className={"rounded-[2rem] border p-8 shadow-2xl " + resolveSectionCardClass(section, preset)}
+            {...SITE_ELEMENT_ATTRS({ kind: "panel", label: "Inner contact card", fieldPath: "sections[" + sectionIndex + "].presentation.cardClass" })}
+          >
+            <h3
+              className="text-xl font-bold"
+              {...SITE_ELEMENT_ATTRS({ kind: "heading", label: "Contact Information", fieldPath: "sections[" + sectionIndex + "].subtitle" })}
+            >{section.subtitle || 'Contact Information'}</h3>
             <div className="mt-6 space-y-4">
               {contact.phone && <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-200">{contact.phone}</div>}
               {contact.email && <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-200">{contact.email}</div>}
@@ -410,8 +434,16 @@ function GenericSection({ section, sectionIndex }: { section: SiteSection; secti
     <section id={slugify(section.title)} {...SITE_SECTION_DATA_ATTRS(section, sectionIndex)} className={"px-4 py-20 sm:px-6 lg:px-8 " + resolveSectionBackground(section, preset)}>
       <div className="mx-auto max-w-7xl">
         <div className="mx-auto max-w-3xl text-center mb-14">
-          <h2 className={"text-3xl font-semibold tracking-tight md:text-5xl " + resolveSectionTitleClass(section, preset)}>{section.title}</h2>
-          {section.body && <p className={"mt-5 text-lg leading-8 " + resolveSectionBodyClass(section, preset)}>{section.body}</p>}
+          <h2
+            className={"text-3xl font-semibold tracking-tight md:text-5xl " + resolveSectionTitleClass(section, preset)}
+            {...SITE_ELEMENT_ATTRS({ kind: "heading", label: "Section title", fieldPath: "sections[" + sectionIndex + "].title" })}
+          >{section.title}</h2>
+          {section.body && (
+            <p
+              className={"mt-5 text-lg leading-8 " + resolveSectionBodyClass(section, preset)}
+              {...SITE_ELEMENT_ATTRS({ kind: "body", label: "Section intro", fieldPath: "sections[" + sectionIndex + "].body" })}
+            >{section.body}</p>
+          )}
         </div>
         {section.items?.some((item) => (item as { imageUrl?: string }).imageUrl) && (
           <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">

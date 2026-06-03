@@ -13,6 +13,7 @@ import { buildDeterministicPlan } from '@/lib/project-workspace/edit-agent/deter
 import { guardUnsupportedPlanSkills } from './validatePlanSkills';
 import { guardEditPlanSemantics } from './validateEditPlanSemantics';
 import { normalizeMisroutedCopyPlan } from '@/lib/project-workspace/edit-agent/planFromConfigTextEdit';
+import { tryExplorerPlan } from '@/lib/project-workspace/edit-agent/tryExplorerPlan';
 import { isUnifiedCopyEditEnabled } from '@/lib/project-workspace/edit-context/unifiedCopyEditFlag';
 
 const PLAN_MAX_TOKENS = parseInt(process.env.WEBSITE_EDIT_MAX_TOKENS || '4096', 10);
@@ -65,7 +66,7 @@ export async function planEdit(input: PlanEditInputUnion): Promise<PlanEditResul
   const skillGuardOptions = { hasAttachments };
 
   const deterministic = buildDeterministicPlan(editContext);
-  if (deterministic) {
+  if (deterministic && !deterministic.needsClarification) {
     const parsed = EditPlanSchema.safeParse(normalizeEditPlanPayload(deterministic));
     if (parsed.success) {
       const guarded = guardUnsupportedPlanSkills(parsed.data, skillGuardOptions);
@@ -75,6 +76,29 @@ export async function planEdit(input: PlanEditInputUnion): Promise<PlanEditResul
       return {
         ok: true,
         plan: guardEditPlanSemantics(normalized, editContext),
+      };
+    }
+  }
+
+  const explorerPlan = await tryExplorerPlan(editContext);
+  if (explorerPlan) {
+    const parsed = EditPlanSchema.safeParse(normalizeEditPlanPayload(explorerPlan));
+    if (parsed.success) {
+      const guarded = guardUnsupportedPlanSkills(parsed.data, skillGuardOptions);
+      return {
+        ok: true,
+        plan: guardEditPlanSemantics(guarded, editContext),
+      };
+    }
+  }
+
+  if (deterministic?.needsClarification) {
+    const parsed = EditPlanSchema.safeParse(normalizeEditPlanPayload(deterministic));
+    if (parsed.success) {
+      const guarded = guardUnsupportedPlanSkills(parsed.data, skillGuardOptions);
+      return {
+        ok: true,
+        plan: guardEditPlanSemantics(guarded, editContext),
       };
     }
   }
