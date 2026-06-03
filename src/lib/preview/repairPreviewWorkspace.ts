@@ -2,6 +2,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { instrumentGeneratedSite } from '@/lib/analytics/generated-sites/instrumentGeneratedSite';
 import { repairPageTsxStructure } from '@/lib/project-workspace/repairPageTsxStructure';
+import { repairContactSectionSubtitleInPage } from '@/lib/preview/repairContactSectionSubtitle';
 import { repairSiteConfigTypesInWorkspace } from '@/lib/preview/repairSiteConfigTypes';
 import { repairSectionPresentationWiringInWorkspace } from '@/lib/project-workspace/edit-shared/legacySectionPresentation';
 
@@ -17,10 +18,23 @@ export async function repairPreviewWorkspace(workspacePath: string): Promise<voi
 
   const pagePath = path.join(workspacePath, 'src/app/page.tsx');
   try {
-    const page = await fs.readFile(pagePath, 'utf-8');
+    let page = await fs.readFile(pagePath, 'utf-8');
+    let pageChanged = false;
+
+    const subtitleRepair = repairContactSectionSubtitleInPage(page);
+    if (subtitleRepair.repaired) {
+      page = subtitleRepair.content;
+      pageChanged = true;
+    }
+
     const { content, repaired } = repairPageTsxStructure(page);
     if (repaired) {
-      await fs.writeFile(pagePath, content, 'utf-8');
+      page = content;
+      pageChanged = true;
+    }
+
+    if (pageChanged) {
+      await fs.writeFile(pagePath, page, 'utf-8');
     }
   } catch {
     /* optional */

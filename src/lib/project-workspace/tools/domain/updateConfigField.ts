@@ -4,8 +4,22 @@ import {
   writeWorkspaceRel,
 } from '@/lib/project-workspace/edit-shared/strategyContext';
 import { updateConfigFieldInSource } from '@/lib/project-workspace/siteConfigMutations';
-import { parseConfigFieldPath } from '@/lib/project-workspace/edit-context/configFieldPaths';
+import {
+  parseConfigFieldPath,
+  readConfigFieldValue,
+} from '@/lib/project-workspace/edit-context/configFieldPaths';
+import { parseSiteConfigSource } from '@/lib/site-manager/siteConfigParser';
 import type { DomainToolContext, DomainToolResult } from './types';
+
+function currentFieldValue(content: string, fieldPath: string): string | null {
+  const parsed = parseConfigFieldPath(fieldPath);
+  if (!parsed) return null;
+  const config = parseSiteConfigSource(content);
+  if (!config) return null;
+  const raw = readConfigFieldValue(config as unknown as Record<string, unknown>, parsed);
+  if (raw == null) return '';
+  return String(raw).trim();
+}
 
 /**
  * Update an allowlisted siteConfig field by canonical path (e.g. sections[2].title).
@@ -48,6 +62,15 @@ export async function updateConfigFieldTool(
 
   const updated = updateConfigFieldInSource(content, fieldPath, value);
   if (!updated) {
+    const current = currentFieldValue(content, fieldPath);
+    if (current === value) {
+      return {
+        ok: true,
+        changedFiles: [],
+        summary: `${fieldPath} already set to the requested value.`,
+        evidence: { fieldPath, value },
+      };
+    }
     return {
       ok: false,
       changedFiles: [],

@@ -1,5 +1,6 @@
 import { getSandboxGateway } from './sandboxWorkspaceGateway';
 import { repairPageTsxStructure } from '@/lib/project-workspace/repairPageTsxStructure';
+import { repairContactSectionSubtitleInPage } from '@/lib/preview/repairContactSectionSubtitle';
 import { repairSiteConfigTypesViaGateway } from '@/lib/preview/repairSiteConfigTypes';
 import { sanitizeAgentMarkerFilesInWorkspace } from '@/lib/site-manager/siteConfigAgentMarkers';
 
@@ -81,9 +82,23 @@ export async function repairPreviewSandbox(projectId: string): Promise<void> {
 
   const page = await ops.read('src/app/page.tsx');
   if (page) {
-    const { content, repaired } = repairPageTsxStructure(page);
+    let next = page;
+    let changed = false;
+
+    const subtitleRepair = repairContactSectionSubtitleInPage(next);
+    if (subtitleRepair.repaired) {
+      next = subtitleRepair.content;
+      changed = true;
+    }
+
+    const { content, repaired } = repairPageTsxStructure(next);
     if (repaired) {
-      await ops.write('src/app/page.tsx', content);
+      next = content;
+      changed = true;
+    }
+
+    if (changed) {
+      await ops.write('src/app/page.tsx', next);
     }
   }
 }

@@ -43,6 +43,15 @@ describe('updateConfigFieldInSource', () => {
     const updated = updateConfigFieldInSource(siteConfig, 'sections[0].unknown', 'x');
     expect(updated).toBeNull();
   });
+
+  it('returns null when section field already equals requested value', () => {
+    const withSubtitle = updateConfigFieldInSource(
+      siteConfig,
+      'sections[0].title',
+      'Old Title'
+    );
+    expect(withSubtitle).toBeNull();
+  });
 });
 
 describe('configFieldPaths', () => {

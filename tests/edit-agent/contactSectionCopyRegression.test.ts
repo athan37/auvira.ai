@@ -8,7 +8,10 @@ import path from 'path';
 import { promises as fs } from 'fs';
 import { afterEach, describe, expect, it } from 'vitest';
 import { PAGE_TSX_TEMPLATE } from '@/lib/builder/pageTemplate';
+import { repairContactSectionSubtitleInPage } from '@/lib/preview/repairContactSectionSubtitle';
+import { repairPreviewWorkspace } from '@/lib/preview/repairPreviewWorkspace';
 import { stableAnalyticsIdForSection } from '@/lib/analytics/generated-sites/ensureAnalyticsIds';
+import { extractReplacementValue } from '@/lib/project-workspace/edit-context/configTextEditUtils';
 import { runWebsiteEditAgent } from '@/lib/project-workspace/edit-agent';
 import { executePlan } from '@/lib/project-workspace/edit-agent/executePlan';
 import { buildEditContext } from '@/lib/project-workspace/edit-context/buildEditContext';
@@ -31,6 +34,8 @@ const CONTACT_SECTION = {
 const CONTACT_ANALYTICS_ID = stableAnalyticsIdForSection(CONTACT_SECTION, 0);
 
 const OWNER_MESSAGE = 'change contact information to helllo this is david';
+const CARD_TITLE_MESSAGE =
+  'change "contact information" card\'s title to helllo this is david';
 const PINNED_TARGET = {
   kind: 'section' as const,
   sectionIndex: 0,
@@ -77,6 +82,76 @@ async function createGetStartedTodayWorkspace(): Promise<string> {
   return workspacePath;
 }
 
+/** Mirror project 6a1f96b65872cf542bda0d08: contact section at index 4. */
+async function createGetStartedTodayAtIndexFourWorkspace(options?: {
+  subtitle?: string;
+}): Promise<string> {
+  const contactSection = {
+    type: 'contact' as const,
+    title: 'Get Started Today',
+    body: 'Encourage action and provide contact options',
+  };
+  const contactAnalyticsId = stableAnalyticsIdForSection(contactSection, 4);
+  const subtitle = options?.subtitle ?? '';
+
+  const workspacePath = await createSyntheticWorkspace({
+    site: {
+      businessName: 'Beverage Delivery Co',
+      sections: [
+        { type: 'generic', title: 'Why Choose Drink' },
+        { type: 'services', title: 'Our Delivery Services' },
+        { type: 'generic', title: 'How It Works' },
+        { type: 'generic', title: 'Delivery Coverage' },
+        { type: 'contact', title: 'Get Started Today' },
+      ],
+    },
+    pageMode: 'wired',
+    tailwind: 'canonical',
+  });
+
+  const siteConfig = `export const siteConfig = {
+  businessName: 'Beverage Delivery Co',
+  hero: { headline: 'Hero', subheadline: 'Tagline' },
+  contact: {
+    phone: ${JSON.stringify(USER_CONTACT.phone)},
+    email: ${JSON.stringify(USER_CONTACT.email)},
+  },
+  sections: [
+    { type: 'generic', title: 'Why Choose Drink', body: 'Value props', analyticsId: 's0' },
+    { type: 'services', title: 'Our Delivery Services', body: 'Services', analyticsId: 's1' },
+    { type: 'generic', title: 'How It Works', body: 'Steps', analyticsId: 's2' },
+    { type: 'generic', title: 'Delivery Coverage', body: 'Areas', analyticsId: 's3' },
+    {
+      type: 'contact',
+      title: 'Get Started Today',
+      body: 'Encourage action and provide contact options',
+      subtitle: ${JSON.stringify(subtitle)},
+      analyticsId: ${JSON.stringify(contactAnalyticsId)},
+      presentation: { backgroundClass: 'bg-red-600', cardClass: 'bg-blue-600' },
+      items: [],
+    },
+  ],
+};`;
+
+  await fs.writeFile(path.join(workspacePath, 'src/lib/siteConfig.ts'), siteConfig, 'utf-8');
+  return workspacePath;
+}
+
+const PINNED_CONTACT_INDEX_FOUR = {
+  kind: 'section' as const,
+  sectionIndex: 4,
+  sectionType: 'contact',
+  sectionTitle: 'Get Started Today',
+  sectionId: stableAnalyticsIdForSection(
+    { type: 'contact', title: 'Get Started Today' },
+    4
+  ),
+  analyticsId: stableAnalyticsIdForSection(
+    { type: 'contact', title: 'Get Started Today' },
+    4
+  ),
+};
+
 function readContactFields(siteConfig: string): { phone?: string; email?: string } {
   const readField = (field: 'phone' | 'email') => {
     const unquotedKeyDoubleValue = siteConfig.match(
@@ -120,6 +195,29 @@ describe('contact section copy regression (Get Started Today)', () => {
     expect(PAGE_TSX_TEMPLATE).toMatch(/sections\[.*\]\.subtitle/);
     expect(PAGE_TSX_TEMPLATE).toContain('SITE_ELEMENT_ATTRS');
     expect(PAGE_TSX_TEMPLATE).toContain("Contact Information");
+  });
+
+  it('preview repair wires legacy page.tsx contact card to section.subtitle', async () => {
+    workspacePath = await createGetStartedTodayAtIndexFourWorkspace({
+      subtitle: 'helllo this is david',
+    });
+    const pagePath = path.join(workspacePath, 'src/app/page.tsx');
+    const legacySnippet =
+      '<h3 className="text-xl font-bold">Contact Information</h3>';
+    const wiredSnippet =
+      "<h3 className=\"text-xl font-bold\">{section.subtitle || 'Contact Information'}</h3>";
+    let page = await fs.readFile(pagePath, 'utf-8');
+    if (page.includes(wiredSnippet)) {
+      page = page.replace(wiredSnippet, legacySnippet);
+    } else if (!page.includes(legacySnippet)) {
+      page = page.replace('</main>', `${legacySnippet}\n    </main>`);
+    }
+    await fs.writeFile(pagePath, page, 'utf-8');
+
+    await repairPreviewWorkspace(workspacePath);
+    const repaired = await fs.readFile(pagePath, 'utf-8');
+    expect(repaired).toContain("{section.subtitle || 'Contact Information'}");
+    expect(repairContactSectionSubtitleInPage(repaired).repaired).toBe(false);
   });
 
   it('deterministic plan targets inner card subtitle via update_config_field', async () => {
@@ -243,6 +341,79 @@ describe('contact section copy regression (Get Started Today)', () => {
     expect(readContactFields(after).email).toBe('david@example.com');
     expect(readContactFields(after).phone).toBe(USER_CONTACT.phone);
     expect(String(parseSections(after)[0]?.body ?? '')).toContain('Ready to get started');
+  });
+});
+
+describe('contact card title copy (project 6a1f96 — sections[4].subtitle)', () => {
+  let workspacePath: string | undefined;
+
+  afterEach(async () => {
+    if (workspacePath) {
+      await destroySyntheticWorkspace(workspacePath);
+      workspacePath = undefined;
+    }
+  });
+
+  it('extracts replacement from card title phrasing', () => {
+    expect(extractReplacementValue(CARD_TITLE_MESSAGE)).toBe('helllo this is david');
+  });
+
+  it('deterministic plan targets sections[4].subtitle for pinned Get Started Today', async () => {
+    workspacePath = await createGetStartedTodayAtIndexFourWorkspace();
+    const built = await buildEditContext({
+      workspacePath,
+      mode: 'gitlab',
+      ownerMessage: CARD_TITLE_MESSAGE,
+      infraBaselineReady: true,
+      selectedTarget: PINNED_CONTACT_INDEX_FOUR,
+    });
+
+    expect(built.context.target.sectionIndex).toBe(4);
+    const plan = buildDeterministicPlan(built.context);
+    expect(plan?.needsClarification).toBe(false);
+    expect(plan?.steps[0]?.skill).toBe('update_config_field');
+    expect(plan?.steps[0]?.params).toMatchObject({
+      fieldPath: 'sections[4].subtitle',
+      value: 'helllo this is david',
+    });
+  });
+
+  it('runWebsiteEditAgent succeeds when subtitle already matches (idempotent retry)', async () => {
+    workspacePath = await createGetStartedTodayAtIndexFourWorkspace({
+      subtitle: 'helllo this is david',
+    });
+    const before = await readSyntheticFile(workspacePath, 'src/lib/siteConfig.ts');
+
+    const result = await runWebsiteEditAgent({
+      workspacePath,
+      ownerMessage: CARD_TITLE_MESSAGE,
+      projectId: '6a1f96b65872cf542bda0d08',
+      mode: 'gitlab',
+      infraBaselineReady: true,
+      selectedTarget: PINNED_CONTACT_INDEX_FOUR,
+    });
+
+    assertV3EditSucceeded(result, result.error ?? result.ownerMessage);
+    const after = await readSyntheticFile(workspacePath, 'src/lib/siteConfig.ts');
+    expect(after).toBe(before);
+    expect(String(parseSections(after)[4]?.subtitle ?? '')).toBe('helllo this is david');
+  });
+
+  it('runWebsiteEditAgent applies subtitle on first edit from card title phrasing', async () => {
+    workspacePath = await createGetStartedTodayAtIndexFourWorkspace();
+    const result = await runWebsiteEditAgent({
+      workspacePath,
+      ownerMessage: CARD_TITLE_MESSAGE,
+      projectId: '6a1f96-contact-card-title',
+      mode: 'gitlab',
+      infraBaselineReady: true,
+      selectedTarget: PINNED_CONTACT_INDEX_FOUR,
+    });
+
+    assertV3EditSucceeded(result, result.error ?? result.ownerMessage);
+    expect(result.changedFiles).toContain('src/lib/siteConfig.ts');
+    const after = await readSyntheticFile(workspacePath, 'src/lib/siteConfig.ts');
+    expect(String(parseSections(after)[4]?.subtitle ?? '')).toBe('helllo this is david');
   });
 });
 
