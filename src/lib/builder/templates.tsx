@@ -437,9 +437,7 @@ pages:
  */
 export function generateSiteConfig(siteSpec: SiteSpec): string {
   // Extract contact info from sections
-  const contactItems = (siteSpec.sections.find((s) => s.type === 'contact')?.items || []).map((item) =>
-    typeof item === 'string' ? item : item.title
-  );
+  const contactItems = siteSpec.sections.find((s) => s.type === 'contact')?.items ?? [];
   const phoneItem =
     contactItems.find(
       (i) =>

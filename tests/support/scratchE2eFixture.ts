@@ -9,7 +9,12 @@ export const scratchE2eBaseWebsitePlan: WebsitePlan = {
   positioning: 'Fast, reliable plumbing for homeowners in Austin.',
   targetCustomers: ['Homeowners', 'Property managers'],
   primaryGoal: 'Get more leads',
-  recommendedPagesOrSections: ['hero', 'services', 'about', 'contact'],
+  recommendedPagesOrSections: [
+    { name: 'Hero', type: 'hero', priority: 1 },
+    { name: 'Services', type: 'services', priority: 2 },
+    { name: 'About', type: 'about', priority: 3 },
+    { name: 'Contact', type: 'contact', priority: 4 },
+  ],
   contentPlan: {
     hero: {
       headline: 'Trusted Plumbing in Austin',

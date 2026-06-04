@@ -23,6 +23,7 @@ export interface ParsedSiteConfig {
     analyticsId?: string;
     type?: string;
     title?: string;
+    subtitle?: string;
     body?: string;
     items?: Array<{ title?: string; description?: string; imageUrl?: string }>;
   }>;
