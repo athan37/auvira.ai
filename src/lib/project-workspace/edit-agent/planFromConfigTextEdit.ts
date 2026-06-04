@@ -3,6 +3,8 @@ import type { EditPlan } from '@/lib/project-workspace/planner/editPlan.schema';
 import {
   resolveConfigTextEdit,
   type ConfigTextEditApply,
+  fieldPathFromPlanStep,
+  valueFromPlanStep,
 } from '@/lib/project-workspace/edit-context/resolveConfigTextEdit';
 import { parseConfigFieldPath } from '@/lib/project-workspace/edit-context/configFieldPaths';
 
@@ -85,7 +87,15 @@ export function normalizeMisroutedCopyPlan(plan: EditPlan, editContext: EditCont
   if (plan.needsClarification || plan.steps.length !== 1) return plan;
 
   const step = plan.steps[0];
-  const copySkills = new Set(['update_contact', 'update_hero', 'update_business_name', 'update_section_copy']);
+  const copySkills = new Set([
+    'update_contact',
+    'update_hero',
+    'update_business_name',
+    'update_section_copy',
+    'update_config_field',
+    'update_section_item_copy',
+    'update_cta_label',
+  ]);
   if (!step || !copySkills.has(step.skill)) return plan;
 
   const resolved = resolveConfigTextEdit({
@@ -98,6 +108,21 @@ export function normalizeMisroutedCopyPlan(plan: EditPlan, editContext: EditCont
   if (resolved.kind !== 'apply') return plan;
   if (resolved.mode === 'typed_field' && step.skill === 'update_contact') return plan;
   if (resolved.fieldPath.startsWith('contact.') && step.skill === 'update_contact') return plan;
+
+  const mergedParams = { ...(step.params ?? {}), ...(step.target ?? {}) };
+  const currentFieldPath = fieldPathFromPlanStep(
+    step.skill,
+    mergedParams,
+    editContext.effectiveMessage
+  );
+  if (
+    step.skill === 'update_config_field' &&
+    currentFieldPath &&
+    currentFieldPath === resolved.fieldPath &&
+    valueFromPlanStep(step.skill, mergedParams, currentFieldPath) === resolved.value
+  ) {
+    return plan;
+  }
 
   return buildApplyPlan(editContext, resolved);
 }

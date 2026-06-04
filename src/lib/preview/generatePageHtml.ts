@@ -237,19 +237,19 @@ export function generatePageHtml(siteSpec: SiteSpec, projectName: string, previe
           <div class="contact-info" data-site-element-kind="panel" data-site-element-label="Inner contact card" data-site-config-field-path="sections[${contactIdx}].presentation.cardClass">
             <h3 class="contact-info__title" data-site-element-kind="heading" data-site-element-label="Contact Information" data-site-config-field-path="sections[${contactIdx}].subtitle">${escapeHtml((contact as { subtitle?: string } | undefined)?.subtitle || 'Contact Information')}</h3>
             ${phone ? `
-              <div class="contact-info__item">
+              <div class="contact-info__item" data-site-element-kind="contact_field" data-site-element-label="Phone in card" data-site-config-field-path="contact.phone">
                 <div class="contact-info__item-icon">📞</div>
                 <div class="contact-info__item-text">${escapeHtml(phone)}</div>
               </div>
             ` : ''}
             ${email ? `
-              <div class="contact-info__item">
+              <div class="contact-info__item" data-site-element-kind="contact_field" data-site-element-label="Email in card" data-site-config-field-path="contact.email">
                 <div class="contact-info__item-icon">✉️</div>
                 <div class="contact-info__item-text">${escapeHtml(email)}</div>
               </div>
             ` : ''}
             <div style="margin-top: 24px;">
-              <a href="#contact" class="btn btn--accent" style="display: inline-block; margin-bottom: 12px;">${escapeHtml(ctaText)}</a>
+              <a href="#contact" class="btn btn--accent" style="display: inline-block; margin-bottom: 12px;" data-site-element-kind="button" data-site-element-label="Primary button" data-site-config-field-path="hero.primaryCta">${escapeHtml(ctaText)}</a>
             </div>
           </div>
           <div class="contact-form">

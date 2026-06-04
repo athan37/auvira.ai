@@ -17,6 +17,8 @@ export interface ParsedSiteConfig {
     headline?: string;
     subheadline?: string;
     tagline?: string;
+    primaryCta?: string;
+    secondaryCta?: string;
   };
   sections: Array<{
     id?: string;
@@ -99,6 +101,10 @@ export function parseSiteConfigSource(content: string): ParsedSiteConfig | null 
             subheadline:
               typeof heroRaw.subheadline === 'string' ? heroRaw.subheadline : undefined,
             tagline: typeof heroRaw.tagline === 'string' ? heroRaw.tagline : undefined,
+            primaryCta:
+              typeof heroRaw.primaryCta === 'string' ? heroRaw.primaryCta : undefined,
+            secondaryCta:
+              typeof heroRaw.secondaryCta === 'string' ? heroRaw.secondaryCta : undefined,
           }
         : undefined;
     return {

@@ -60,6 +60,8 @@ import {
   logEditTimingSummary,
 } from '@/lib/project-workspace/editTiming';
 import { migrateSubtitleStyleMarkersInSource } from '@/lib/project-workspace/siteConfigMutations';
+import { detectCopyEditAlreadyApplied } from '@/lib/project-workspace/edit-context/detectCopyEditAlreadyApplied';
+import { tryDeterministicCopyFallback } from '@/lib/project-workspace/edit-context/tryDeterministicCopyFallback';
 import { promises as fs } from 'fs';
 import path from 'path';
 import crypto from 'crypto';
@@ -572,12 +574,70 @@ export async function POST(
         }
 
         if (changedPaths.length === 0) {
-          emit('step', { id: 'validate', label: 'Checking the preview', status: 'failed' });
-          emit('step', { id: 'finish', label: 'Preview not updated', status: 'failed' });
-          await fail("I couldn't detect any changes from that request.", {
-            stage: 'no_changes',
-          });
-          return;
+          let siteConfigForCheck = '';
+          try {
+            siteConfigForCheck = (await gateway.readFile('src/lib/siteConfig.ts')) ?? '';
+          } catch {
+            /* optional */
+          }
+
+          const alreadyApplied = siteConfigForCheck
+            ? detectCopyEditAlreadyApplied(
+                siteConfigForCheck,
+                message,
+                selectedTarget ?? undefined
+              )
+            : { applied: false };
+
+          if (alreadyApplied.applied) {
+            await appendEditJobLog(jobId, 'edit_already_applied', 'Requested copy already in siteConfig', {
+              fieldPath: alreadyApplied.fieldPath,
+              expectedValue: alreadyApplied.expectedValue,
+            });
+            agentResult.summary =
+              agentResult.summary ||
+              `The ${alreadyApplied.fieldPath ?? 'field'} is already set to "${alreadyApplied.expectedValue}". Refreshing preview.`;
+            agentResult.ownerMessage = agentResult.summary;
+            changedPaths.push('src/lib/siteConfig.ts');
+          } else if ((agentResult.changedFiles?.length ?? 0) > 0) {
+            await appendEditJobLog(jobId, 'agent_changed_files_fallback', 'Using agent changedFiles (hash diff empty)', {
+              paths: agentResult.changedFiles,
+            });
+            for (const rel of agentResult.changedFiles ?? []) {
+              if (!changedPaths.includes(rel)) changedPaths.push(rel);
+            }
+          } else {
+            const fallback = await tryDeterministicCopyFallback({
+              gateway,
+              message,
+              selectedTarget: selectedTarget ?? undefined,
+            });
+            if (fallback.applied) {
+              await appendEditJobLog(jobId, 'deterministic_copy_fallback', 'Applied deterministic copy fallback', {
+                fieldPath: fallback.fieldPath,
+                value: fallback.value,
+              });
+              afterHashes = await computeHashes(gateway, source);
+              changedPaths = getChangedPathsFromHashes(beforeHashes, afterHashes);
+              if (changedPaths.length === 0) {
+                changedPaths.push('src/lib/siteConfig.ts');
+              }
+            } else {
+              emit('step', { id: 'validate', label: 'Checking the preview', status: 'failed' });
+              emit('step', { id: 'finish', label: 'Preview not updated', status: 'failed' });
+              await fail("I couldn't detect any changes from that request.", {
+                stage: 'no_changes',
+                extra: {
+                  strategy: agentResult.strategy,
+                  agentChangedFiles: agentResult.changedFiles,
+                  agentSummary: agentResult.summary,
+                  selectedTargetPresent: Boolean(selectedTarget),
+                  fallbackError: fallback.error,
+                },
+              });
+              return;
+            }
+          }
         }
 
         if (attachments.length > 0) {

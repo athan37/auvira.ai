@@ -61,6 +61,25 @@ async function setSetupStage(
   );
 }
 
+/**
+ * Same health probe the preview proxy uses: HTTP + workspace HTML/chunk checks.
+ * Keeps status/bootstrap "ready" in sync with what the iframe proxy can serve.
+ */
+export async function checkProjectWorkspacePreviewHealthy(
+  project: IWebsiteProject
+): Promise<boolean> {
+  const port = project.preview?.port;
+  if (!port || project.preview?.status !== 'ready') {
+    return false;
+  }
+  if (isReservedWorkspacePreviewPort(port)) {
+    return false;
+  }
+  const workspacePath =
+    project.preview?.workspacePath?.trim() || getGitWorkspacePath(project._id.toString());
+  return checkWorkspacePreviewHealthy(port, workspacePath);
+}
+
 /** Returns false if the dev server does not respond (stale/hung process). */
 export async function checkPreviewHealthy(port: number, timeoutMs = 8000): Promise<boolean> {
   return new Promise((resolve) => {

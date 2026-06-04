@@ -7,6 +7,7 @@ import {
   buildSiteSectionHighlightMessage,
   parseSiteSectionDismissMessage,
   parseSiteSectionDragStartMessage,
+  parseSiteSectionPointerDownMessage,
   type ParentToIframeSectionMessage,
   type SelectedSection,
   type SiteSectionContextPayload,
@@ -52,10 +53,23 @@ interface Props {
   focusSectionNonce?: number;
   onSelectedSectionChange?: (section: SelectedSection | null) => void;
   onSectionDragStart?: (payload: SiteSectionContextPayload, screenX: number, screenY: number) => void;
+  onSectionPointerDown?: (payload: SiteSectionContextPayload, screenX: number, screenY: number) => void;
   onSectionHighlightDismiss?: () => void;
 }
 
 const STAGE_ORDER = ['idle', 'cloning', 'installing', 'starting_server', 'ready'] as const;
+
+function isPreviewLoadingStub(doc: Document | null | undefined): boolean {
+  if (!doc) return false;
+  const title = doc.title?.trim().toLowerCase() ?? '';
+  if (title === 'loading preview') return true;
+  const bodyText = doc.body?.textContent ?? '';
+  return (
+    bodyText.includes('Preview server stopped responding') ||
+    bodyText.includes('Preview server is not running') ||
+    bodyText.includes('Preview Unavailable')
+  );
+}
 
 function stageProgress(stage: string): number {
   const idx = STAGE_ORDER.indexOf(stage as (typeof STAGE_ORDER)[number]);
@@ -77,6 +91,7 @@ export function ProjectPreviewFrame({
   focusSectionNonce = 0,
   onSelectedSectionChange,
   onSectionDragStart,
+  onSectionPointerDown,
   onSectionHighlightDismiss,
 }: Props) {
   const onReadyChangeRef = useRef(onReadyChange);
@@ -166,6 +181,7 @@ export function ProjectPreviewFrame({
     }
   }, [projectId]);
   const bootstrapStarted = useRef(false);
+  const previewRestartInFlight = useRef(false);
   const pollCountRef = useRef(0);
   const pageVisible = usePageVisible();
 
@@ -182,6 +198,8 @@ export function ProjectPreviewFrame({
       if (!data.ok) {
         setSetupError(data.error || 'Workspace setup failed');
         setSetupStage('failed');
+      } else if (data.stage) {
+        applyStatus(data as WorkspaceStatus);
       }
     } catch {
       setSetupError('Network error while setting up workspace');
@@ -189,6 +207,21 @@ export function ProjectPreviewFrame({
     }
     return false;
   }, [projectId, applyStatus]);
+
+  const restartPreviewIfStub = useCallback(async () => {
+    if (previewRestartInFlight.current || bootstrapStarted.current) return;
+    previewRestartInFlight.current = true;
+    bootstrapStarted.current = true;
+    setPreviewReady(false);
+    setSetupStage('starting_server');
+    setSetupLabel('Restarting preview server…');
+    try {
+      await startBootstrap();
+    } finally {
+      bootstrapStarted.current = false;
+      previewRestartInFlight.current = false;
+    }
+  }, [startBootstrap]);
 
   const pollStatus = useCallback(async (): Promise<WorkspaceStatus | null> => {
     try {
@@ -214,7 +247,7 @@ export function ProjectPreviewFrame({
 
       const initial = await pollStatus();
       if (cancelled) return;
-      if (initial?.ready) {
+      if (initial?.ready && initial.previewHealthy !== false) {
         applyStatus(initial);
         return;
       }
@@ -316,6 +349,18 @@ export function ProjectPreviewFrame({
         return;
       }
 
+      const pointerDown = parseSiteSectionPointerDownMessage(event.data);
+      if (pointerDown && selectionAvailable) {
+        const rect = iframeRef.current?.getBoundingClientRect();
+        if (!rect) return;
+        onSectionPointerDown?.(
+          pointerDown.payload,
+          rect.left + pointerDown.payload.clientX,
+          rect.top + pointerDown.payload.clientY
+        );
+        return;
+      }
+
       const dismiss = parseSiteSectionDismissMessage(event.data);
       if (dismiss && selectionAvailable) {
         onSectionHighlightDismiss?.();
@@ -327,7 +372,7 @@ export function ProjectPreviewFrame({
       window.removeEventListener('message', onMessage);
       if (chunkRetryTimerRef.current) clearTimeout(chunkRetryTimerRef.current);
     };
-  }, [editInProgress, onSectionDragStart, onSectionHighlightDismiss, selectionAvailable]);
+  }, [editInProgress, onSectionDragStart, onSectionPointerDown, onSectionHighlightDismiss, selectionAvailable]);
 
   const handleRefresh = () => {
     setIframeLoading(true);
@@ -454,6 +499,11 @@ export function ProjectPreviewFrame({
               chunkRetryCountRef.current = 0;
               lastHighlightRef.current = { id: null, hover: false };
               if (selectionAvailable) {
+                const doc = iframeRef.current?.contentDocument;
+                if (isPreviewLoadingStub(doc)) {
+                  void restartPreviewIfStub();
+                  return;
+                }
                 const highlightId = hoverSectionId ?? focusSectionId ?? null;
                 const hover = Boolean(highlightId && hoverSectionId === highlightId);
                 if (highlightId) {

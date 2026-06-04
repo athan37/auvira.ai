@@ -84,4 +84,24 @@ describe('exploreSectionTargetDeterministic', () => {
       expect(result.value).toBe('pinned value');
     }
   });
+
+  it('routes get in touch btn phrase to hero.primaryCta', () => {
+    const configWithCta = SITE_CONFIG.replace(
+      "hero: { headline: 'Hero', subheadline: '' }",
+      "hero: { headline: 'Hero', subheadline: '', primaryCta: 'Get in Touch' }"
+    );
+    const result = exploreSectionTargetDeterministic(
+      minimalContext({
+        effectiveMessage:
+          'change get in touch btn to Contact Us (UI-selected section: Get Started Today)',
+        ownerMessage: 'change get in touch btn to Contact Us',
+        siteModel: { workspacePath: '/tmp/ws', mode: 'gitlab', siteConfigContent: configWithCta },
+      })
+    );
+    expect(result.kind).toBe('apply');
+    if (result.kind === 'apply') {
+      expect(result.fieldPath).toBe('hero.primaryCta');
+      expect(result.value).toBe('Contact Us');
+    }
+  });
 });

@@ -11,7 +11,7 @@ export interface ParsedConfigFieldPath {
 }
 
 const FIELD_PATH_RE =
-  /^(hero\.(headline|subheadline|tagline)|businessName|contact\.(phone|email|address)|sections\[(\d+)\]\.(title|subtitle|body)|sections\[(\d+)\]\.items\[(\d+)\]\.(title|description|imageUrl|alt|label|href))$/;
+  /^(hero\.(headline|subheadline|tagline|primaryCta|secondaryCta)|businessName|contact\.(phone|email|address)|sections\[(\d+)\]\.(title|subtitle|body)|sections\[(\d+)\]\.items\[(\d+)\]\.(title|description|imageUrl|alt|label|href))$/;
 
 /** Parse and validate an allowlisted config field path. */
 export function parseConfigFieldPath(fieldPath: string): ParsedConfigFieldPath | null {

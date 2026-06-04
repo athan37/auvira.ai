@@ -16,6 +16,12 @@ import {
   resolveContactUpdateValue,
 } from './resolveContactUpdateField';
 import type { SelectedTargetContext } from './selectedTargetContext';
+import type { SelectedTargetInput } from '@/lib/project-workspace/edit-shared/selectedTargetTypes';
+import { buildSectionElementCatalog } from './sectionElementRegistry';
+import {
+  extractTargetPhrase,
+  matchSectionElementPhrase,
+} from './matchSectionElementPhrase';
 
 export type ConfigTextEditMode = 'find_replace' | 'typed_field' | 'set_field';
 
@@ -171,7 +177,8 @@ function scoreFieldCandidate(
   tokens: string[],
   pinnedSectionIndex?: number | null,
   mentionsContactField?: boolean,
-  mentionsContactPanel?: boolean
+  mentionsContactPanel?: boolean,
+  mentionsContactCard?: boolean
 ): number {
   let score = 0;
   if (pinnedSectionIndex != null && entry.sectionIndex === pinnedSectionIndex) {
@@ -191,6 +198,15 @@ function scoreFieldCandidate(
     entry.field === 'subtitle'
   ) {
     score += 50;
+  }
+
+  if (
+    mentionsContactPanel &&
+    mentionsContactCard &&
+    entry.sectionType === 'contact' &&
+    entry.field === 'title'
+  ) {
+    score -= 80;
   }
 
   if (entry.scope === 'contact' && mentionsContactField) {
@@ -220,6 +236,36 @@ function buildAmbiguousFieldClarification(
 }
 
 /** Mode A: pinned section + implicit target + replacement value. */
+function resolveElementPhraseApply(
+  message: string,
+  siteConfigContent: string,
+  pinnedSectionIndex: number,
+  selectedTarget?: SelectedTargetInput
+): ConfigTextEditApply | null {
+  const phraseExtract = extractTargetPhrase(message);
+  if (!phraseExtract) return null;
+
+  const catalog = buildSectionElementCatalog(siteConfigContent, pinnedSectionIndex, {
+    selectedTarget: selectedTarget ?? undefined,
+  });
+  const elementMatch = matchSectionElementPhrase(
+    phraseExtract.targetPhrase,
+    catalog,
+    message,
+    phraseExtract.value
+  );
+  if (elementMatch.kind !== 'apply') return null;
+
+  return {
+    kind: 'apply',
+    fieldPath: elementMatch.fieldPath,
+    value: elementMatch.value,
+    mode: 'set_field',
+    confidence: 'high',
+    reason: elementMatch.reason,
+  };
+}
+
 function resolveSetFieldMode(
   message: string,
   entries: AllowlistedFieldEntry[],
@@ -232,6 +278,20 @@ function resolveSetFieldMode(
   if (!value) return { kind: 'none' };
 
   const ctx = input.selectedTargetContext;
+  const pinnedSectionIndex = input.pinnedSectionIndex ?? ctx?.resolved.sectionIndex;
+
+  // Explicit element phrase ("get in touch btn", "contact information title of the card")
+  // wins over a stale UI-pinned fieldPath from a prior drag.
+  if (pinnedSectionIndex != null && input.siteConfigContent.trim()) {
+    const phraseApply = resolveElementPhraseApply(
+      message,
+      input.siteConfigContent,
+      pinnedSectionIndex,
+      ctx?.target
+    );
+    if (phraseApply) return phraseApply;
+  }
+
   if (ctx?.element?.fieldPath) {
     return {
       kind: 'apply',
@@ -243,10 +303,10 @@ function resolveSetFieldMode(
     };
   }
 
-  const pinnedSectionIndex = input.pinnedSectionIndex ?? ctx?.resolved.sectionIndex;
   const normalized = normalizeMessage(message);
   const mentionsContactField = /\b(phone|number|email|address)\b/i.test(normalized);
   const mentionsContactPanel = /\bcontact\s+information\b|\bcontact\s+info\b/i.test(normalized);
+  const mentionsContactCard = /\bcard\b|\bpanel\b|\binner\b/i.test(normalized);
 
   if (mentionsContactField) return { kind: 'none' };
 
@@ -266,7 +326,8 @@ function resolveSetFieldMode(
         tokens,
         pinnedSectionIndex,
         mentionsContactField,
-        mentionsContactPanel
+        mentionsContactPanel,
+        mentionsContactCard
       ),
     }))
     .filter((s) => s.score > 0)

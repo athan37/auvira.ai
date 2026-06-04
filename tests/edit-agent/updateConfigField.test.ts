@@ -61,4 +61,9 @@ describe('configFieldPaths', () => {
     const config = parseSiteConfigSource(siteConfig) as unknown as Record<string, unknown>;
     expect(readConfigFieldValue(config, parsed!)).toBe('Old Title');
   });
+
+  it('parses hero primaryCta and secondaryCta paths', () => {
+    expect(parseConfigFieldPath('hero.primaryCta')?.field).toBe('primaryCta');
+    expect(parseConfigFieldPath('hero.secondaryCta')?.field).toBe('secondaryCta');
+  });
 });

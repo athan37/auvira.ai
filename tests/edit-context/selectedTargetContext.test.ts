@@ -79,6 +79,8 @@ describe('buildSelectedTargetContext', () => {
       'hero.headline',
       'hero.subheadline',
       'hero.tagline',
+      'hero.primaryCta',
+      'hero.secondaryCta',
     ]);
     expect(ctx?.recommendedDefaultField?.fieldPath).toBe('hero.headline');
   });

@@ -5,6 +5,7 @@
 export const PREVIEW_SECTION_MSG = {
   SELECTED: 'SITE_SECTION_SELECTED',
   DRAG_START: 'SITE_SECTION_DRAG_START',
+  POINTER_DOWN: 'SITE_SECTION_POINTER_DOWN',
   HIGHLIGHT: 'SITE_SECTION_HIGHLIGHT',
   FOCUS: 'SITE_SECTION_FOCUS',
   DISMISS: 'SITE_SECTION_DISMISS',
@@ -58,6 +59,11 @@ export interface SiteSectionDragStartMessage {
   payload: SiteSectionContextPayload;
 }
 
+export interface SiteSectionPointerDownMessage {
+  type: typeof PREVIEW_SECTION_MSG.POINTER_DOWN;
+  payload: SiteSectionContextPayload;
+}
+
 export interface SiteSectionHighlightMessage {
   type: typeof PREVIEW_SECTION_MSG.HIGHLIGHT;
   payload: { sectionId: string; hover?: boolean };
@@ -94,6 +100,7 @@ export type ParentToIframeSectionMessage =
 export type IframeToParentSectionMessage =
   | SiteSectionSelectedMessage
   | SiteSectionDragStartMessage
+  | SiteSectionPointerDownMessage
   | SiteSectionDismissMessage;
 
 const ALLOWED_PARENT_TYPES = new Set<string>([
@@ -107,6 +114,7 @@ const ALLOWED_PARENT_TYPES = new Set<string>([
 const ALLOWED_IFRAME_TYPES = new Set<string>([
   PREVIEW_SECTION_MSG.SELECTED,
   PREVIEW_SECTION_MSG.DRAG_START,
+  PREVIEW_SECTION_MSG.POINTER_DOWN,
   PREVIEW_SECTION_MSG.DISMISS,
 ]);
 
@@ -166,6 +174,19 @@ export function parseSiteSectionDragStartMessage(data: unknown): SiteSectionDrag
   if (!parsed) return null;
 
   return { type: PREVIEW_SECTION_MSG.DRAG_START, payload: parsed };
+}
+
+/** Parse iframe → parent SITE_SECTION_POINTER_DOWN message (drag threshold tracked in parent). */
+export function parseSiteSectionPointerDownMessage(
+  data: unknown
+): SiteSectionPointerDownMessage | null {
+  if (!isRecord(data) || data.type !== PREVIEW_SECTION_MSG.POINTER_DOWN) return null;
+  if (!isRecord(data.payload)) return null;
+
+  const parsed = parseContextPayload(data.payload);
+  if (!parsed) return null;
+
+  return { type: PREVIEW_SECTION_MSG.POINTER_DOWN, payload: parsed };
 }
 
 function parseContextPayload(payload: Record<string, unknown>): SiteSectionContextPayload | null {

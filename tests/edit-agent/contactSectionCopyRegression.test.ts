@@ -62,7 +62,7 @@ async function createGetStartedTodayWorkspace(): Promise<string> {
 
   const siteConfig = `export const siteConfig = {
   businessName: 'Scratch Demo Co',
-  hero: { headline: 'Synthetic hero', subheadline: 'Synthetic tagline' },
+  hero: { headline: 'Synthetic hero', subheadline: 'Synthetic tagline', primaryCta: 'Get in Touch' },
   contact: {
     phone: ${JSON.stringify(USER_CONTACT.phone)},
     email: ${JSON.stringify(USER_CONTACT.email)},
@@ -195,6 +195,8 @@ describe('contact section copy regression (Get Started Today)', () => {
     expect(PAGE_TSX_TEMPLATE).toMatch(/sections\[.*\]\.subtitle/);
     expect(PAGE_TSX_TEMPLATE).toContain('SITE_ELEMENT_ATTRS');
     expect(PAGE_TSX_TEMPLATE).toContain("Contact Information");
+    expect(PAGE_TSX_TEMPLATE).toContain('hero.primaryCta');
+    expect(PAGE_TSX_TEMPLATE).toContain('contact.phone');
   });
 
   it('preview repair wires legacy page.tsx contact card to section.subtitle', async () => {
@@ -397,6 +399,22 @@ describe('contact card title copy (project 6a1f96 — sections[4].subtitle)', ()
     const after = await readSyntheticFile(workspacePath, 'src/lib/siteConfig.ts');
     expect(after).toBe(before);
     expect(String(parseSections(after)[4]?.subtitle ?? '')).toBe('helllo this is david');
+  });
+
+  it('runWebsiteEditAgent applies primary CTA from pinned contact + btn phrase', async () => {
+    workspacePath = await createGetStartedTodayWorkspace();
+    const result = await runWebsiteEditAgent({
+      workspacePath,
+      ownerMessage: 'change get in touch btn to Contact Us',
+      projectId: 'contact-primary-cta-btn',
+      mode: 'gitlab',
+      infraBaselineReady: true,
+      selectedTarget: PINNED_TARGET,
+    });
+
+    assertV3EditSucceeded(result, result.error ?? result.ownerMessage);
+    const after = await readSyntheticFile(workspacePath, 'src/lib/siteConfig.ts');
+    expect(after).toMatch(/"primaryCta"\s*:\s*"Contact Us"/);
   });
 
   it('runWebsiteEditAgent applies subtitle on first edit from card title phrasing', async () => {

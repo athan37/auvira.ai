@@ -179,7 +179,7 @@ export function validateGeneratedPageTsx(content: string | undefined): Generated
     errors.push({ file: 'src/app/page.tsx', error: 'Markdown heading artifacts found in generated page' });
   }
 
-  if (/<p className="text-slate-600 italic">"\{item\.description/.test(content)) {
+  if (/>"\{item\.description/.test(content) || /italic[\s\S]{0,200}>"\{item\.description/.test(content)) {
     errors.push({
       file: 'src/app/page.tsx',
       error: 'Testimonials use unescaped JSX quote entities; use &ldquo;/&rdquo;',

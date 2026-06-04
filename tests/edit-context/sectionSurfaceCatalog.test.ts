@@ -26,6 +26,15 @@ describe('buildSectionSurfaceCatalog', () => {
     expect(subtitle?.source).toBe('renderer_fallback');
   });
 
+  it('includes primary CTA button surface for contact sections', () => {
+    const configWithCta = CONTACT_CONFIG.replace(
+      "hero: { headline: 'Hero', subheadline: '' }",
+      "hero: { headline: 'Hero', subheadline: '', primaryCta: 'Get in Touch' }"
+    );
+    const surfaces = buildSectionSurfaceCatalog(configWithCta, 0);
+    expect(surfaces.some((s) => s.fieldPath === 'hero.primaryCta')).toBe(true);
+  });
+
   it('includes presentation style surfaces', () => {
     const surfaces = buildSectionSurfaceCatalog(CONTACT_CONFIG, 0);
     expect(surfaces.some((s) => s.fieldPath.endsWith('presentation.cardClass'))).toBe(true);

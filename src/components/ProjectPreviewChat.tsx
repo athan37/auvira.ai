@@ -5,7 +5,7 @@ import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { Alert } from '@/components/ui/Alert';
 import { Button } from '@/components/ui/Button';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
-import { Input } from '@/components/ui/Input';
+import { Textarea } from '@/components/ui/Input';
 import { cn } from '@/lib/cn';
 import EditErrorTrace from '@/components/project/EditErrorTrace';
 import { PreviewTargetChip } from '@/components/project/PreviewTargetChip';
@@ -308,7 +308,7 @@ function ChatMessageBubble({
     <div className={cn('flex', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
       <div
         className={cn(
-          'flex max-w-[85%] flex-col gap-1',
+          'flex max-w-[92%] flex-col gap-1.5',
           msg.role === 'user' ? 'items-end' : 'items-start'
         )}
       >
@@ -473,6 +473,7 @@ export function ProjectPreviewChat({
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chipAnchorRef = useRef<HTMLDivElement>(null);
+  const chatFormRef = useRef<HTMLFormElement>(null);
   const chatInputId = `project-chat-input-${projectId}`;
 
   const refocusChatInput = useCallback(() => {
@@ -992,7 +993,7 @@ export function ProjectPreviewChat({
           )}
         </div>
 
-        <form onSubmit={handleSubmit} className="p-3 border-t border-zinc-200/80 shrink-0 space-y-2">
+        <form ref={chatFormRef} onSubmit={handleSubmit} className="p-3 border-t border-zinc-200/80 shrink-0 space-y-2">
           <div ref={chipAnchorRef}>
             <PreviewTargetHint
               visible={showTargetHint}
@@ -1017,9 +1018,6 @@ export function ProjectPreviewChat({
                   }
                   refocusInput={refocusChatInput}
                 />
-                <p className="text-[10px] text-zinc-500 mb-2">
-                  Type your edit below — e.g. make it red
-                </p>
               </>
             ) : null}
           </div>
@@ -1045,6 +1043,30 @@ export function ProjectPreviewChat({
             </div>
           )}
           {uploadError && <p className="text-xs text-red-600">{uploadError}</p>}
+          <Textarea
+            id={chatInputId}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                if (
+                  !inputDisabled &&
+                  (input.trim().length > 0 || pendingImages.length > 0)
+                ) {
+                  chatFormRef.current?.requestSubmit();
+                }
+              }
+            }}
+            placeholder={
+              previewReady
+                ? 'e.g. Add this photo to the hero… (Shift+Enter for a new line)'
+                : 'Waiting for preview…'
+            }
+            disabled={inputDisabled}
+            rows={4}
+            className="min-h-[6.5rem] max-h-52 resize-y text-sm leading-relaxed"
+          />
           <div className="flex gap-2">
             <input
               ref={fileInputRef}
@@ -1067,21 +1089,9 @@ export function ProjectPreviewChat({
             >
               <ImageAttachIcon className="h-5 w-5" />
             </Button>
-            <Input
-              id={chatInputId}
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder={
-                previewReady
-                  ? 'e.g. Add this photo to the hero…'
-                  : 'Waiting for preview…'
-              }
-              disabled={inputDisabled}
-              className="flex-1"
-            />
             <Button
               type="submit"
+              className="flex-1 sm:flex-none"
               disabled={(!input.trim() && pendingImages.length === 0) || inputDisabled}
             >
               {sending ? '…' : 'Send'}

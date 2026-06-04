@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   parseSiteSectionDragStartMessage,
+  parseSiteSectionPointerDownMessage,
   selectedSectionFromPayload,
 } from '@/lib/preview/sectionSelectionProtocol';
 
@@ -25,5 +26,24 @@ describe('sectionSelectionProtocol element pin', () => {
     const section = selectedSectionFromPayload(msg!.payload);
     expect(section.fieldPath).toBe('sections[4].subtitle');
     expect(section.elementLabel).toBe('Contact Information');
+  });
+
+  it('parses element fields on pointer down', () => {
+    const msg = parseSiteSectionPointerDownMessage({
+      type: 'SITE_SECTION_POINTER_DOWN',
+      payload: {
+        sectionId: 'contact-1',
+        sectionIndex: 0,
+        sectionType: 'contact',
+        sectionTitle: 'Get Started Today',
+        clientX: 10,
+        clientY: 20,
+        elementKind: 'button',
+        elementLabel: 'Primary button',
+        fieldPath: 'hero.primaryCta',
+      },
+    });
+    expect(msg?.payload.fieldPath).toBe('hero.primaryCta');
+    expect(msg?.payload.elementKind).toBe('button');
   });
 });

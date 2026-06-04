@@ -85,9 +85,12 @@ export async function planEdit(input: PlanEditInputUnion): Promise<PlanEditResul
     const parsed = EditPlanSchema.safeParse(normalizeEditPlanPayload(explorerPlan));
     if (parsed.success) {
       const guarded = guardUnsupportedPlanSkills(parsed.data, skillGuardOptions);
+      const normalized = isUnifiedCopyEditEnabled()
+        ? normalizeMisroutedCopyPlan(guarded, editContext)
+        : guarded;
       return {
         ok: true,
-        plan: guardEditPlanSemantics(guarded, editContext),
+        plan: guardEditPlanSemantics(normalized, editContext),
       };
     }
   }

@@ -7,6 +7,11 @@ import {
   type SectionSurface,
   type SectionSurfaceEditFamily,
 } from './sectionSurfaceCatalog';
+import { buildSectionElementCatalog } from './sectionElementRegistry';
+import {
+  extractTargetPhrase,
+  matchSectionElementPhrase,
+} from './matchSectionElementPhrase';
 
 const PIN_BOOST = 100;
 const SYNONYM_BOOST = 40;
@@ -124,6 +129,35 @@ export function exploreSectionTargetDeterministic(
   const catalog = buildSectionSurfaceCatalog(siteConfigContent, sectionIndex, {
     selectedTarget: editContext.selectedTarget,
   });
+
+  const phraseExtract = extractTargetPhrase(message);
+  if (phraseExtract && editFamily === 'copy') {
+    const elementCatalog = buildSectionElementCatalog(siteConfigContent, sectionIndex, {
+      selectedTarget: editContext.selectedTarget,
+    });
+    const elementMatch = matchSectionElementPhrase(
+      phraseExtract.targetPhrase,
+      elementCatalog,
+      message,
+      phraseExtract.value
+    );
+    if (elementMatch.kind === 'apply') {
+      return {
+        kind: 'apply',
+        fieldPath: elementMatch.fieldPath,
+        value: elementMatch.value,
+        surface: elementMatch.surface,
+        reason: elementMatch.reason,
+      };
+    }
+    if (elementMatch.kind === 'clarify') {
+      return {
+        kind: 'needs_llm',
+        candidates: elementMatch.candidates,
+        value: elementMatch.value,
+      };
+    }
+  }
 
   let surfaces = catalog.filter((s) => s.editFamily === editFamily);
   if (surfaces.length === 0) surfaces = catalog.filter((s) => s.editFamily === 'copy');

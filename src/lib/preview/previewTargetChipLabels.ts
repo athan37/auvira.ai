@@ -1,7 +1,27 @@
 import type { SelectedTargetInput } from '@/lib/project-workspace/edit-shared/selectedTargetTypes';
 import { parseConfigFieldPath } from '@/lib/project-workspace/edit-context/configFieldPaths';
+import { sectionTypeLabel } from '@/lib/preview/previewTargetVisuals';
 
 export type PreviewTargetChipVariant = 'pinned' | 'used';
+
+export interface PreviewTargetLayers {
+  /** Top-level target (section, hero, etc.). */
+  parent: string;
+  /** Nested element/field labels under the parent. */
+  children: string[];
+}
+
+export interface PreviewTargetDisplayElement {
+  kind?: string;
+  label: string;
+}
+
+/** Structured labels for composer target card UI. */
+export interface PreviewTargetDisplay {
+  scopeLabel: string;
+  title: string;
+  element?: PreviewTargetDisplayElement;
+}
 
 function fieldPathLabel(fieldPath: string): string | null {
   const parsed = parseConfigFieldPath(fieldPath);
@@ -14,34 +34,107 @@ function fieldPathLabel(fieldPath: string): string | null {
   return parsed.field;
 }
 
-/** Human-readable target name without variant prefix (e.g. "Hero", "Services › title"). */
-export function formatPreviewTargetLabel(target: SelectedTargetInput): string {
+function sectionParentLabel(target: SelectedTargetInput): string {
+  const title = target.sectionTitle?.trim();
+  const type = target.sectionType?.trim();
+  if (title && type && title.toLowerCase() !== type.toLowerCase()) {
+    return `${type}: ${title}`;
+  }
+  return title || type || 'Section';
+}
+
+function nestedChildLabels(target: SelectedTargetInput): string[] {
+  if (target.elementLabel?.trim()) {
+    return [target.elementLabel.trim()];
+  }
+  if (target.fieldPath) {
+    const fieldLabel = fieldPathLabel(target.fieldPath);
+    if (fieldLabel) return [fieldLabel];
+  }
+  if (target.elementKind) {
+    return [target.elementKind];
+  }
+  return [];
+}
+
+function resolveElementDisplay(target: SelectedTargetInput): PreviewTargetDisplayElement | undefined {
+  if (target.elementLabel?.trim()) {
+    return { kind: target.elementKind, label: target.elementLabel.trim() };
+  }
+  if (target.fieldPath) {
+    const fieldLabel = fieldPathLabel(target.fieldPath);
+    if (fieldLabel) return { kind: target.elementKind, label: fieldLabel };
+  }
+  if (target.elementKind) {
+    return { kind: target.elementKind, label: target.elementKind };
+  }
+  return undefined;
+}
+
+/** Structured display model for pinned target card (badge + title + optional element). */
+export function formatPreviewTargetDisplay(target: SelectedTargetInput): PreviewTargetDisplay {
   if (target.kind === 'hero') {
-    const fieldLabel = target.fieldPath ? fieldPathLabel(target.fieldPath) : null;
-    return fieldLabel ? `Hero › ${fieldLabel}` : 'Hero';
+    const element = resolveElementDisplay(target);
+    if (element?.label.toLowerCase() === 'hero') {
+      return { scopeLabel: 'Hero', title: 'Hero' };
+    }
+    return {
+      scopeLabel: 'Hero',
+      title: target.sectionTitle?.trim() || 'Hero',
+      element,
+    };
   }
 
   const title = target.sectionTitle?.trim();
   const type = target.sectionType?.trim();
-  const sectionLabel =
+  const scopeLabel = sectionTypeLabel(type);
+  const displayTitle =
     title && type && title.toLowerCase() !== type.toLowerCase()
-      ? `${type}: ${title}`
-      : title || type || 'Section';
+      ? title
+      : title || scopeLabel;
 
-  if (target.elementLabel?.trim()) {
-    return `${sectionLabel} › ${target.elementLabel.trim()}`;
+  return {
+    scopeLabel,
+    title: displayTitle,
+    element: resolveElementDisplay(target),
+  };
+}
+
+/** Compact breadcrumb for used-variant pill (Contact · Title › Element). */
+export function formatPreviewTargetBreadcrumb(target: SelectedTargetInput): string {
+  const display = formatPreviewTargetDisplay(target);
+  const parts = [display.scopeLabel];
+  if (display.title && display.title.toLowerCase() !== display.scopeLabel.toLowerCase()) {
+    parts.push(display.title);
+  }
+  const base = parts.join(' · ');
+  if (display.element?.label) {
+    return `${base} › ${display.element.label}`;
+  }
+  return base;
+}
+
+/** Parent + nested child layers for chip UI (X stays on parent row only). */
+export function formatPreviewTargetLayers(target: SelectedTargetInput): PreviewTargetLayers {
+  if (target.kind === 'hero') {
+    const children = nestedChildLabels(target);
+    if (children.length === 1 && children[0]?.toLowerCase() === 'hero') {
+      return { parent: 'Hero', children: [] };
+    }
+    return { parent: 'Hero', children };
   }
 
-  if (target.fieldPath) {
-    const fieldLabel = fieldPathLabel(target.fieldPath);
-    if (fieldLabel) return `${sectionLabel} › ${fieldLabel}`;
-  }
+  return {
+    parent: sectionParentLabel(target),
+    children: nestedChildLabels(target),
+  };
+}
 
-  if (target.elementKind) {
-    return `${sectionLabel} › ${target.elementKind}`;
-  }
-
-  return sectionLabel;
+/** Human-readable target name without variant prefix (e.g. "Hero", "Services › title"). */
+export function formatPreviewTargetLabel(target: SelectedTargetInput): string {
+  const { parent, children } = formatPreviewTargetLayers(target);
+  if (children.length === 0) return parent;
+  return `${parent} › ${children.join(' › ')}`;
 }
 
 /** Full chip label including variant prefix (e.g. "Pinned: Services › title"). */

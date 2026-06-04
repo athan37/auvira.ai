@@ -173,4 +173,93 @@ describe('resolveConfigTextEdit', () => {
       value: 'helllo this is david',
     });
   });
+
+  it('normalizeMisroutedCopyPlan rewrites misrouted section title to inner card subtitle', () => {
+    const editContext = contactEditContext(
+      'change contact information title of the card to "this is david"'
+    );
+    const rewritten = normalizeMisroutedCopyPlan(
+      {
+        planVersion: 'website-agent',
+        needsClarification: false,
+        steps: [
+          {
+            skill: 'update_section_copy',
+            params: { sectionIndex: 0, field: 'title', value: 'this is david' },
+          },
+        ],
+      },
+      editContext
+    );
+    expect(rewritten.steps[0]?.skill).toBe('update_config_field');
+    expect(rewritten.steps[0]?.params).toMatchObject({
+      fieldPath: 'sections[0].subtitle',
+      value: 'this is david',
+    });
+  });
+
+  it('normalizeMisroutedCopyPlan rewrites misrouted update_config_field title path', () => {
+    const editContext = contactEditContext(
+      'change contact information title of the card to "this is david"'
+    );
+    const rewritten = normalizeMisroutedCopyPlan(
+      {
+        planVersion: 'website-agent',
+        needsClarification: false,
+        steps: [
+          {
+            skill: 'update_config_field',
+            params: { fieldPath: 'sections[0].title', value: 'this is david' },
+          },
+        ],
+      },
+      editContext
+    );
+    expect(rewritten.steps[0]?.params).toMatchObject({
+      fieldPath: 'sections[0].subtitle',
+      value: 'this is david',
+    });
+  });
+
+  it('explicit btn phrase overrides stale pinned subtitle fieldPath', () => {
+    const config = `export const siteConfig = {
+      businessName: "Demo Co",
+      hero: { headline: "Hero", subheadline: "", primaryCta: "Get in Touch" },
+      contact: { phone: "555", email: "a@b.c" },
+      sections: [
+        {
+          type: "contact",
+          title: "Get Started Today",
+          subtitle: "this is david",
+          body: "Reach out."
+        }
+      ]
+    };`;
+    const ctx = contactEditContext('change get in touch btn to hello click on this');
+    ctx.siteModel.siteConfigContent = config;
+    const pinnedSubtitle = {
+      ...contactSelectedTarget,
+      fieldPath: 'sections[0].subtitle',
+    };
+    ctx.selectedTarget = pinnedSubtitle;
+    ctx.selectedTargetContext = buildSelectedTargetContext({
+      selectedTarget: pinnedSubtitle,
+      siteConfigContent: config,
+      pageContent: '',
+      catalog: buildSiteSectionCatalog(config, ''),
+      target: ctx.target,
+    }) ?? undefined;
+
+    const result = resolveConfigTextEdit({
+      message: 'change get in touch btn to hello click on this',
+      siteConfigContent: config,
+      pinnedSectionIndex: 0,
+      selectedTargetContext: ctx.selectedTargetContext,
+    });
+    expect(result.kind).toBe('apply');
+    if (result.kind === 'apply') {
+      expect(result.fieldPath).toBe('hero.primaryCta');
+      expect(result.value).toBe('hello click on this');
+    }
+  });
 });

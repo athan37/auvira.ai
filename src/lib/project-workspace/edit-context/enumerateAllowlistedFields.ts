@@ -68,12 +68,19 @@ export function enumerateAllowlistedFields(
     });
   }
 
-  for (const field of ['headline', 'subheadline', 'tagline'] as const) {
+  for (const field of ['headline', 'subheadline', 'tagline', 'primaryCta', 'secondaryCta'] as const) {
     const raw = parsed.hero?.[field];
     pushEntry(entries, heroFieldPath(field), raw ?? '', {
       scope: 'hero',
       field,
-      labels: [field, field === 'headline' ? 'title' : field],
+      labels: [
+        field,
+        field === 'headline' ? 'title' : field,
+        ...(field === 'primaryCta'
+          ? ['primary button', 'primary cta', 'cta button', 'get in touch btn', 'call to action']
+          : []),
+        ...(field === 'secondaryCta' ? ['secondary button', 'secondary cta'] : []),
+      ],
     }, { allowEmpty: true });
   }
 

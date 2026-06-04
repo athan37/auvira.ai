@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOwnerProject } from '@/lib/api/projectAccess';
 import {
-  checkPreviewHealthy,
+  checkProjectWorkspacePreviewHealthy,
   getWorkspaceStatusFromProject,
 } from '@/lib/project-workspace/bootstrapProjectPreview';
 import { checkPreviewUrlHealthy } from '@/lib/preview/waitForPreviewReady';
@@ -39,7 +39,7 @@ export async function GET(
   }
 
   if (status.ready && status.previewPort) {
-    const healthy = await checkPreviewHealthy(status.previewPort);
+    const healthy = await checkProjectWorkspacePreviewHealthy(project);
     if (!healthy) {
       return NextResponse.json({
         ok: true,

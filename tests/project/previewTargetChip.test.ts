@@ -1,8 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  formatPreviewTargetBreadcrumb,
   formatPreviewTargetChipText,
+  formatPreviewTargetDisplay,
   formatPreviewTargetLabel,
+  formatPreviewTargetLayers,
 } from '@/lib/preview/previewTargetChipLabels';
+import { sectionTypeLabel } from '@/lib/preview/previewTargetVisuals';
 import {
   activatePreviewTargetChip,
   handlePreviewTargetChipKeyDown,
@@ -41,6 +45,56 @@ describe('previewTargetChipLabels', () => {
         fieldPath: 'sections[2].title',
       })
     ).toBe('CTA: Book Now › title');
+  });
+
+  it('splits parent and nested child layers for element pins', () => {
+    expect(
+      formatPreviewTargetLayers({
+        kind: 'section',
+        sectionId: 'section_contact_1',
+        sectionType: 'contact',
+        sectionTitle: 'Get Started Today',
+        elementLabel: 'Phone button',
+      })
+    ).toEqual({
+      parent: 'contact: Get Started Today',
+      children: ['Phone button'],
+    });
+  });
+
+  it('formatPreviewTargetDisplay splits scope badge, title, and element', () => {
+    expect(
+      formatPreviewTargetDisplay({
+        kind: 'section',
+        sectionId: 'section_contact_1',
+        sectionType: 'contact',
+        sectionTitle: 'Get Started Today',
+        elementKind: 'button',
+        elementLabel: 'Phone button',
+      })
+    ).toEqual({
+      scopeLabel: 'Contact',
+      title: 'Get Started Today',
+      element: { kind: 'button', label: 'Phone button' },
+    });
+  });
+
+  it('formatPreviewTargetBreadcrumb joins scope, title, and element', () => {
+    expect(
+      formatPreviewTargetBreadcrumb({
+        kind: 'section',
+        sectionId: 'section_contact_1',
+        sectionType: 'contact',
+        sectionTitle: 'Get Started Today',
+        elementLabel: 'Phone button',
+      })
+    ).toBe('Contact · Get Started Today › Phone button');
+  });
+
+  it('sectionTypeLabel title-cases known section types', () => {
+    expect(sectionTypeLabel('contact')).toBe('Contact');
+    expect(sectionTypeLabel('faq')).toBe('FAQ');
+    expect(sectionTypeLabel('hero')).toBe('Hero');
   });
 
   it('renders pinned and used chip labels with unified copy', () => {

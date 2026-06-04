@@ -28,12 +28,23 @@ function wantsSubtitle(message: string): boolean {
   return /\b(subtitle|subheadline|tagline)\b/i.test(message);
 }
 
+/** Contact section inner card heading (sections[N].subtitle), not the outer section title. */
+function wantsInnerCardHeading(message: string): boolean {
+  const normalized = stripPinnedTargetSuffix(message);
+  return (
+    (/\bcontact\s+information\b|\bcontact\s+info\b/i.test(normalized) ||
+      /\bcard\s+title\b|\binner\s+card\b/i.test(normalized)) &&
+    /\b(card|panel|inner)\b/i.test(normalized) &&
+    /\b(title|heading)\b/i.test(normalized)
+  );
+}
+
 function wantsBody(message: string): boolean {
   return /\b(body|description|copy|rewrite|wording)\b/i.test(message);
 }
 
 function wantsCta(message: string): boolean {
-  return /\b(cta|button|call to action)\b/i.test(message);
+  return /\b(cta|button|call to action|btn)\b/i.test(message) || /\bget in touch\b/i.test(message);
 }
 
 function wantsImage(message: string): boolean {
@@ -131,8 +142,42 @@ export function inferSelectedTargetField(
     return null;
   }
 
+  const value = extractReplacementValue(message) ?? undefined;
+
+  if (wantsCta(message)) {
+    const fieldPath =
+      ctx.resolved.sectionType === 'contact'
+        ? heroFieldPath('primaryCta')
+        : pickCtaPath(ctx);
+    if (fieldPath) {
+      return {
+        fieldPath,
+        value,
+        confidence: value ? 'high' : 'medium',
+        reason: 'CTA label inference',
+      };
+    }
+  }
+
+  if (wantsInnerCardHeading(message)) {
+    const idx = ctx.resolved.sectionIndex;
+    if (idx != null) {
+      const subtitlePath = sectionFieldPath(idx, 'subtitle');
+      if (
+        ctx.editableFields.some((f) => f.fieldPath === subtitlePath) ||
+        ctx.resolved.sectionType === 'contact'
+      ) {
+        return {
+          fieldPath: subtitlePath,
+          value,
+          confidence: value ? 'high' : 'medium',
+          reason: 'Inner contact card heading inference',
+        };
+      }
+    }
+  }
+
   if (ctx.element?.fieldPath) {
-    const value = extractReplacementValue(message) ?? undefined;
     return {
       fieldPath: ctx.element.fieldPath,
       value,
@@ -142,7 +187,6 @@ export function inferSelectedTargetField(
   }
 
   if (ctx.recommendedDefaultField && !wantsTitle(message) && !wantsSubtitle(message) && !wantsBody(message)) {
-    const value = extractReplacementValue(message) ?? undefined;
     if (value) {
       return {
         fieldPath: ctx.recommendedDefaultField.fieldPath,
@@ -153,21 +197,12 @@ export function inferSelectedTargetField(
     }
   }
 
-  const value = extractReplacementValue(message) ?? undefined;
-
   if (wantsImage(message)) {
     const fieldPath = pickImagePath(ctx);
     if (fieldPath) {
       return { fieldPath, value, confidence: 'medium', reason: 'Image field inference' };
     }
     return null;
-  }
-
-  if (wantsCta(message)) {
-    const fieldPath = pickCtaPath(ctx);
-    if (fieldPath) {
-      return { fieldPath, value, confidence: value ? 'high' : 'medium', reason: 'CTA label inference' };
-    }
   }
 
   if (wantsSubtitle(message)) {

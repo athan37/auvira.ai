@@ -18,11 +18,29 @@ import { Alert } from '@/components/ui/Alert';
 import { Spinner } from '@/components/ui/Spinner';
 import { projectSupportsV3Edits } from '@/lib/project-workspace/requireGitLabProject';
 import { SectionDragGhost } from '@/components/project/SectionDragGhost';
+import { formatPreviewTargetLabel } from '@/lib/preview/previewTargetChipLabels';
 import {
   selectedSectionFromPayload,
   type SelectedSection,
   type SiteSectionContextPayload,
 } from '@/lib/preview/sectionSelectionProtocol';
+
+const SECTION_DRAG_THRESHOLD = 6;
+
+function previewTargetLabelFromSection(section: SelectedSection): string {
+  return formatPreviewTargetLabel({
+    kind: section.kind,
+    sectionId: section.sectionId,
+    analyticsId: section.analyticsId,
+    sectionIndex: section.sectionIndex,
+    sectionType: section.sectionType,
+    sectionTitle: section.sectionTitle,
+    fieldPath: section.fieldPath,
+    itemIndex: section.itemIndex,
+    elementKind: section.elementKind,
+    elementLabel: section.elementLabel,
+  });
+}
 
 interface Deployment {
   provider: string;
@@ -92,6 +110,11 @@ export default function ProjectPage() {
     x: number;
     y: number;
   } | null>(null);
+  const [sectionDragPending, setSectionDragPending] = useState<{
+    payload: SiteSectionContextPayload;
+    startX: number;
+    startY: number;
+  } | null>(null);
   const [isChatDropActive, setIsChatDropActive] = useState(false);
 
   useEffect(() => {
@@ -149,11 +172,7 @@ export default function ProjectPage() {
   const handleSelectedSectionChange = useCallback((section: SelectedSection | null) => {
     setSelectedSection(section);
     if (section) {
-      const label =
-        section.kind === 'hero'
-          ? 'Hero'
-          : section.sectionTitle?.trim() || section.sectionType;
-      setSectionToast(`Added "${label}" to chat`);
+      setSectionToast(`Added "${previewTargetLabelFromSection(section)}" to chat`);
       setFocusChatInputKey((k) => k + 1);
     }
   }, []);
@@ -178,15 +197,27 @@ export default function ProjectPage() {
       }
       sectionDragPayloadRef.current = null;
       setSectionDrag(null);
+      setSectionDragPending(null);
       setIsChatDropActive(false);
     },
     [handleSelectedSectionChange, isPointInChatDropZone]
+  );
+
+  const handleSectionPointerDown = useCallback(
+    (payload: SiteSectionContextPayload, screenX: number, screenY: number) => {
+      sectionDragPayloadRef.current = null;
+      setSectionDrag(null);
+      setSectionDragPending({ payload, startX: screenX, startY: screenY });
+      setIsChatDropActive(isPointInChatDropZone(screenX, screenY));
+    },
+    [isPointInChatDropZone]
   );
 
   const handleSectionDragStart = useCallback(
     (payload: SiteSectionContextPayload, screenX: number, screenY: number) => {
       sectionDragPayloadRef.current = payload;
       setSectionDrag({ payload, x: screenX, y: screenY });
+      setSectionDragPending(null);
       setIsChatDropActive(isPointInChatDropZone(screenX, screenY));
     },
     [isPointInChatDropZone]
@@ -194,11 +225,30 @@ export default function ProjectPage() {
 
   const handleSectionDragMove = useCallback(
     (clientX: number, clientY: number) => {
+      if (sectionDragPending && !sectionDrag) {
+        const dx = clientX - sectionDragPending.startX;
+        const dy = clientY - sectionDragPending.startY;
+        if (dx * dx + dy * dy >= SECTION_DRAG_THRESHOLD * SECTION_DRAG_THRESHOLD) {
+          handleSectionDragStart(sectionDragPending.payload, clientX, clientY);
+          return;
+        }
+        setIsChatDropActive(isPointInChatDropZone(clientX, clientY));
+        return;
+      }
       setSectionDrag((prev) => (prev ? { ...prev, x: clientX, y: clientY } : null));
       setIsChatDropActive(isPointInChatDropZone(clientX, clientY));
     },
-    [isPointInChatDropZone]
+    [sectionDragPending, sectionDrag, handleSectionDragStart, isPointInChatDropZone]
   );
+
+  useEffect(() => {
+    if (!sectionDragPending && !sectionDrag) return;
+    function onWindowMouseUp(event: MouseEvent) {
+      finishSectionDrag(event.clientX, event.clientY);
+    }
+    window.addEventListener('mouseup', onWindowMouseUp);
+    return () => window.removeEventListener('mouseup', onWindowMouseUp);
+  }, [sectionDragPending, sectionDrag, finishSectionDrag]);
 
   useEffect(() => {
     if (!sectionToast) return;
@@ -307,10 +357,11 @@ export default function ProjectPage() {
           {sectionToast}
         </div>
       )}
-      {sectionDrag && (
+      {(sectionDrag || sectionDragPending) && (
         <>
-          <SectionDragGhost payload={sectionDrag.payload} x={sectionDrag.x} y={sectionDrag.y} />
-          {/* Capture pointer after iframe drag starts — parent window misses iframe mouse events */}
+          {sectionDrag ? (
+            <SectionDragGhost payload={sectionDrag.payload} x={sectionDrag.x} y={sectionDrag.y} />
+          ) : null}
           <div
             className="fixed inset-0 z-[99] cursor-grabbing select-none"
             aria-hidden
@@ -333,13 +384,14 @@ export default function ProjectPage() {
             focusSectionNonce={historyFocusNonce}
             onSelectedSectionChange={handleSelectedSectionChange}
             onSectionDragStart={handleSectionDragStart}
+            onSectionPointerDown={handleSectionPointerDown}
             onSectionHighlightDismiss={handleSectionHighlightDismiss}
           />
         </div>
 
         <div
           ref={chatDropZoneRef}
-          className="w-full lg:w-[380px] xl:w-[420px] shrink-0 min-h-[400px] lg:min-h-0 flex flex-col relative"
+          className="w-full lg:w-[440px] xl:w-[520px] shrink-0 min-h-[400px] lg:min-h-0 flex flex-col relative"
         >
           {sectionDrag && (
             <div
@@ -366,7 +418,7 @@ export default function ProjectPage() {
             focusedHistorySectionId={focusedHistorySectionId}
             focusChatInputKey={focusChatInputKey}
             isChatDropActive={isChatDropActive}
-            isSectionDragging={sectionDrag !== null}
+            isSectionDragging={sectionDrag !== null || sectionDragPending !== null}
             needsSave={project.needsSave ?? project.hasUnpublishedChanges}
             hasGitlab={projectSupportsV3Edits(project)}
             gitlabWebUrl={project.gitlab?.webUrl || project.gitlab?.repoUrl}

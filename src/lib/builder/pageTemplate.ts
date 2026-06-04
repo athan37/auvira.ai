@@ -216,15 +216,31 @@ function ServicesSection({ section, sectionIndex }: { section: SiteSection; sect
       <div className="mx-auto max-w-7xl">
         <div className="mx-auto max-w-3xl text-center mb-14">
           <p className={"mb-3 text-xs font-bold uppercase tracking-[0.28em] " + resolveSectionEyebrowClass(section, preset)}>Services</p>
-          <h2 className={"text-3xl font-semibold tracking-tight md:text-5xl " + resolveSectionTitleClass(section, preset)}>{section.title}</h2>
-          {section.body && <p className={"mt-5 text-lg leading-8 " + resolveSectionBodyClass(section, preset)}>{section.body}</p>}
+          <h2
+            className={"text-3xl font-semibold tracking-tight md:text-5xl " + resolveSectionTitleClass(section, preset)}
+            {...SITE_ELEMENT_ATTRS({ kind: "heading", label: "Section title", fieldPath: "sections[" + sectionIndex + "].title" })}
+          >{section.title}</h2>
+          {section.body && (
+            <p
+              className={"mt-5 text-lg leading-8 " + resolveSectionBodyClass(section, preset)}
+              {...SITE_ELEMENT_ATTRS({ kind: "body", label: "Section intro", fieldPath: "sections[" + sectionIndex + "].body" })}
+            >{section.body}</p>
+          )}
         </div>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {section.items?.slice(0, 6).map((item, i) => (
             <div key={i} className={"rounded-3xl border p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-xl " + resolveSectionCardClass(section, preset)}>
               <div className={"mb-5 flex h-12 w-12 items-center justify-center rounded-2xl text-lg font-bold text-white " + preset.iconBadge}>{i + 1}</div>
-              <h3 className="text-lg font-bold text-slate-950">{item.title}</h3>
-              {item.description && <p className="mt-3 text-sm leading-6 text-slate-600">{item.description}</p>}
+              <h3
+                className="text-lg font-bold text-slate-950"
+                {...SITE_ELEMENT_ATTRS({ kind: "item_title", label: "Service card title", fieldPath: "sections[" + sectionIndex + "].items[" + i + "].title", itemIndex: i })}
+              >{item.title}</h3>
+              {item.description && (
+                <p
+                  className="mt-3 text-sm leading-6 text-slate-600"
+                  {...SITE_ELEMENT_ATTRS({ kind: "item_body", label: "Service card description", fieldPath: "sections[" + sectionIndex + "].items[" + i + "].description", itemIndex: i })}
+                >{item.description}</p>
+              )}
             </div>
           ))}
         </div>
@@ -240,14 +256,30 @@ function AboutSection({ section, sectionIndex }: { section: SiteSection; section
       <div className="mx-auto max-w-7xl">
         <div className="mx-auto max-w-3xl text-center mb-14">
           <p className={"mb-3 text-xs font-bold uppercase tracking-[0.28em] " + resolveSectionEyebrowClass(section, preset)}>About</p>
-          <h2 className={"text-3xl font-semibold tracking-tight md:text-5xl " + resolveSectionTitleClass(section, preset)}>{section.title}</h2>
-          {section.body && <p className={"mt-5 text-lg leading-8 " + resolveSectionBodyClass(section, preset)}>{section.body}</p>}
+          <h2
+            className={"text-3xl font-semibold tracking-tight md:text-5xl " + resolveSectionTitleClass(section, preset)}
+            {...SITE_ELEMENT_ATTRS({ kind: "heading", label: "Section title", fieldPath: "sections[" + sectionIndex + "].title" })}
+          >{section.title}</h2>
+          {section.body && (
+            <p
+              className={"mt-5 text-lg leading-8 " + resolveSectionBodyClass(section, preset)}
+              {...SITE_ELEMENT_ATTRS({ kind: "body", label: "Section intro", fieldPath: "sections[" + sectionIndex + "].body" })}
+            >{section.body}</p>
+          )}
         </div>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {section.items?.slice(0, 6).map((item, i) => (
             <div key={i} className={"rounded-3xl border p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-xl " + resolveSectionCardClass(section, preset)}>
-              <h3 className="text-lg font-bold text-slate-950">{item.title}</h3>
-              {item.description && <p className="mt-3 text-sm leading-6 text-slate-600">{item.description}</p>}
+              <h3
+                className="text-lg font-bold text-slate-950"
+                {...SITE_ELEMENT_ATTRS({ kind: "item_title", label: "About card title", fieldPath: "sections[" + sectionIndex + "].items[" + i + "].title", itemIndex: i })}
+              >{item.title}</h3>
+              {item.description && (
+                <p
+                  className="mt-3 text-sm leading-6 text-slate-600"
+                  {...SITE_ELEMENT_ATTRS({ kind: "item_body", label: "About card description", fieldPath: "sections[" + sectionIndex + "].items[" + i + "].description", itemIndex: i })}
+                >{item.description}</p>
+              )}
             </div>
           ))}
         </div>
@@ -263,14 +295,30 @@ function FeaturesSection({ section, sectionIndex }: { section: SiteSection; sect
       <div className="mx-auto max-w-7xl">
         <div className="mx-auto max-w-3xl text-center mb-14">
           <p className={"mb-3 text-xs font-bold uppercase tracking-[0.28em] " + resolveSectionEyebrowClass(section, preset)}>Features</p>
-          <h2 className={"text-3xl font-semibold tracking-tight md:text-5xl " + resolveSectionTitleClass(section, preset)}>{section.title}</h2>
-          {section.body && <p className={"mt-5 text-lg leading-8 " + resolveSectionBodyClass(section, preset)}>{section.body}</p>}
+          <h2
+            className={"text-3xl font-semibold tracking-tight md:text-5xl " + resolveSectionTitleClass(section, preset)}
+            {...SITE_ELEMENT_ATTRS({ kind: "heading", label: "Section title", fieldPath: "sections[" + sectionIndex + "].title" })}
+          >{section.title}</h2>
+          {section.body && (
+            <p
+              className={"mt-5 text-lg leading-8 " + resolveSectionBodyClass(section, preset)}
+              {...SITE_ELEMENT_ATTRS({ kind: "body", label: "Section intro", fieldPath: "sections[" + sectionIndex + "].body" })}
+            >{section.body}</p>
+          )}
         </div>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {section.items?.slice(0, 6).map((item, i) => (
             <div key={i} className={"rounded-3xl border p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-xl " + resolveSectionCardClass(section, preset)}>
-              <h3 className="text-lg font-bold text-slate-950">{item.title}</h3>
-              {item.description && <p className="mt-3 text-sm leading-6 text-slate-600">{item.description}</p>}
+              <h3
+                className="text-lg font-bold text-slate-950"
+                {...SITE_ELEMENT_ATTRS({ kind: "item_title", label: "Feature card title", fieldPath: "sections[" + sectionIndex + "].items[" + i + "].title", itemIndex: i })}
+              >{item.title}</h3>
+              {item.description && (
+                <p
+                  className="mt-3 text-sm leading-6 text-slate-600"
+                  {...SITE_ELEMENT_ATTRS({ kind: "item_body", label: "Feature card description", fieldPath: "sections[" + sectionIndex + "].items[" + i + "].description", itemIndex: i })}
+                >{item.description}</p>
+              )}
             </div>
           ))}
         </div>
@@ -286,14 +334,30 @@ function FaqSection({ section, sectionIndex }: { section: SiteSection; sectionIn
       <div className="mx-auto max-w-7xl">
         <div className="mx-auto max-w-3xl text-center mb-14">
           <p className={"mb-3 text-xs font-bold uppercase tracking-[0.28em] " + resolveSectionEyebrowClass(section, preset)}>FAQ</p>
-          <h2 className={"text-3xl font-semibold tracking-tight md:text-5xl " + resolveSectionTitleClass(section, preset)}>{section.title}</h2>
-          {section.body && <p className={"mt-5 text-lg leading-8 " + resolveSectionBodyClass(section, preset)}>{section.body}</p>}
+          <h2
+            className={"text-3xl font-semibold tracking-tight md:text-5xl " + resolveSectionTitleClass(section, preset)}
+            {...SITE_ELEMENT_ATTRS({ kind: "heading", label: "Section title", fieldPath: "sections[" + sectionIndex + "].title" })}
+          >{section.title}</h2>
+          {section.body && (
+            <p
+              className={"mt-5 text-lg leading-8 " + resolveSectionBodyClass(section, preset)}
+              {...SITE_ELEMENT_ATTRS({ kind: "body", label: "Section intro", fieldPath: "sections[" + sectionIndex + "].body" })}
+            >{section.body}</p>
+          )}
         </div>
         <div className="space-y-4 max-w-3xl mx-auto">
           {section.items?.slice(0, 8).map((item, i) => (
             <div key={i} className={"rounded-2xl border p-6 " + resolveSectionCardClass(section, preset)}>
-              <h3 className="text-lg font-bold text-slate-950">{item.title}</h3>
-              {item.description && <p className="mt-2 text-sm leading-6 text-slate-600">{item.description}</p>}
+              <h3
+                className="text-lg font-bold text-slate-950"
+                {...SITE_ELEMENT_ATTRS({ kind: "item_title", label: "FAQ question", fieldPath: "sections[" + sectionIndex + "].items[" + i + "].title", itemIndex: i })}
+              >{item.title}</h3>
+              {item.description && (
+                <p
+                  className="mt-2 text-sm leading-6 text-slate-600"
+                  {...SITE_ELEMENT_ATTRS({ kind: "item_body", label: "FAQ answer", fieldPath: "sections[" + sectionIndex + "].items[" + i + "].description", itemIndex: i })}
+                >{item.description}</p>
+              )}
             </div>
           ))}
         </div>
@@ -309,14 +373,28 @@ function TestimonialsSection({ section, sectionIndex }: { section: SiteSection; 
       <div className="mx-auto max-w-7xl">
         <div className="mx-auto max-w-3xl text-center mb-14">
           <p className={"mb-3 text-xs font-bold uppercase tracking-[0.28em] " + resolveSectionEyebrowClass(section, preset)}>Testimonials</p>
-          <h2 className={"text-3xl font-semibold tracking-tight md:text-5xl " + resolveSectionTitleClass(section, preset)}>{section.title}</h2>
-          {section.body && <p className={"mt-5 text-lg leading-8 " + resolveSectionBodyClass(section, preset)}>{section.body}</p>}
+          <h2
+            className={"text-3xl font-semibold tracking-tight md:text-5xl " + resolveSectionTitleClass(section, preset)}
+            {...SITE_ELEMENT_ATTRS({ kind: "heading", label: "Section title", fieldPath: "sections[" + sectionIndex + "].title" })}
+          >{section.title}</h2>
+          {section.body && (
+            <p
+              className={"mt-5 text-lg leading-8 " + resolveSectionBodyClass(section, preset)}
+              {...SITE_ELEMENT_ATTRS({ kind: "body", label: "Section intro", fieldPath: "sections[" + sectionIndex + "].body" })}
+            >{section.body}</p>
+          )}
         </div>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {section.items?.slice(0, 6).map((item, i) => (
             <div key={i} className={"rounded-3xl border p-7 shadow-sm " + resolveSectionCardClass(section, preset)}>
-              <p className="text-slate-600 italic">&ldquo;{item.description || 'Great service!'}&rdquo;</p>
-              <p className="mt-4 font-semibold text-slate-950">- {item.title}</p>
+              <p
+                className="text-slate-600 italic"
+                {...SITE_ELEMENT_ATTRS({ kind: "item_body", label: "Testimonial quote", fieldPath: "sections[" + sectionIndex + "].items[" + i + "].description", itemIndex: i })}
+              >&ldquo;{item.description || 'Great service!'}&rdquo;</p>
+              <p
+                className="mt-4 font-semibold text-slate-950"
+                {...SITE_ELEMENT_ATTRS({ kind: "item_title", label: "Testimonial author", fieldPath: "sections[" + sectionIndex + "].items[" + i + "].title", itemIndex: i })}
+              >- {item.title}</p>
             </div>
           ))}
         </div>
@@ -346,10 +424,18 @@ function ContactSection({ section, sectionIndex }: { section: SiteSection; secti
             )}
             <div className="mt-8 flex flex-col sm:flex-row gap-4">
               {siteConfig.hero.primaryCta && (
-                <a href="#contact" className={"inline-flex items-center justify-center rounded-full px-6 py-3 text-sm font-bold shadow-lg shadow-black/20 transition hover:-translate-y-0.5 " + preset.primaryButton}>{siteConfig.hero.primaryCta}</a>
+                <a
+                  href="#contact"
+                  className={"inline-flex items-center justify-center rounded-full px-6 py-3 text-sm font-bold shadow-lg shadow-black/20 transition hover:-translate-y-0.5 " + preset.primaryButton}
+                  {...SITE_ELEMENT_ATTRS({ kind: "button", label: "Primary button", fieldPath: "hero.primaryCta" })}
+                >{siteConfig.hero.primaryCta}</a>
               )}
               {contact.phone && (
-                <a href={"tel:" + contact.phone.replace(/[^0-9]/g, "")} className={"inline-flex items-center justify-center rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-white hover:bg-white/10 " + preset.secondaryButton}>{contact.phone}</a>
+                <a
+                  href={"tel:" + contact.phone.replace(/[^0-9]/g, "")}
+                  className={"inline-flex items-center justify-center rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-white hover:bg-white/10 " + preset.secondaryButton}
+                  {...SITE_ELEMENT_ATTRS({ kind: "button", label: "Phone button", fieldPath: "contact.phone" })}
+                >{contact.phone}</a>
               )}
             </div>
           </div>
@@ -362,9 +448,24 @@ function ContactSection({ section, sectionIndex }: { section: SiteSection; secti
               {...SITE_ELEMENT_ATTRS({ kind: "heading", label: "Contact Information", fieldPath: "sections[" + sectionIndex + "].subtitle" })}
             >{section.subtitle || 'Contact Information'}</h3>
             <div className="mt-6 space-y-4">
-              {contact.phone && <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-200">{contact.phone}</div>}
-              {contact.email && <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-200">{contact.email}</div>}
-              {contact.address && <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-200">{contact.address}</div>}
+              {contact.phone && (
+                <div
+                  className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-200"
+                  {...SITE_ELEMENT_ATTRS({ kind: "contact_field", label: "Phone in card", fieldPath: "contact.phone" })}
+                >{contact.phone}</div>
+              )}
+              {contact.email && (
+                <div
+                  className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-200"
+                  {...SITE_ELEMENT_ATTRS({ kind: "contact_field", label: "Email in card", fieldPath: "contact.email" })}
+                >{contact.email}</div>
+              )}
+              {contact.address && (
+                <div
+                  className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-200"
+                  {...SITE_ELEMENT_ATTRS({ kind: "contact_field", label: "Address in card", fieldPath: "contact.address" })}
+                >{contact.address}</div>
+              )}
             </div>
           </div>
         </div>
@@ -391,12 +492,23 @@ function GallerySection({ section, sectionIndex }: { section: SiteSection; secti
       <div className="mx-auto max-w-7xl">
         <div className="mx-auto max-w-3xl text-center mb-12">
           <p className={"mb-3 text-xs font-bold uppercase tracking-[0.28em] " + resolveSectionEyebrowClass(section, preset)}>Gallery</p>
-          <h2 className={"text-3xl font-semibold tracking-tight md:text-5xl " + resolveSectionTitleClass(section, preset)}>{section.title}</h2>
-          {section.body && <p className={"mt-5 text-lg leading-8 " + resolveSectionBodyClass(section, preset)}>{section.body}</p>}
+          <h2
+            className={"text-3xl font-semibold tracking-tight md:text-5xl " + resolveSectionTitleClass(section, preset)}
+            {...SITE_ELEMENT_ATTRS({ kind: "heading", label: "Section title", fieldPath: "sections[" + sectionIndex + "].title" })}
+          >{section.title}</h2>
+          {section.body && (
+            <p
+              className={"mt-5 text-lg leading-8 " + resolveSectionBodyClass(section, preset)}
+              {...SITE_ELEMENT_ATTRS({ kind: "body", label: "Section intro", fieldPath: "sections[" + sectionIndex + "].body" })}
+            >{section.body}</p>
+          )}
         </div>
         {count > 0 && (
           <div className={gridClass}>
-            {images.map((item, i) => (
+            {(section.items || []).map((item, i) => {
+              const imageUrl = (item as { imageUrl?: string }).imageUrl;
+              if (!imageUrl) return null;
+              return (
               <figure
                 key={i}
                 className={
@@ -406,7 +518,7 @@ function GallerySection({ section, sectionIndex }: { section: SiteSection; secti
                 }
               >
                 <img
-                  src={(item as { imageUrl: string }).imageUrl}
+                  src={imageUrl}
                   alt={(item as { description?: string }).description || section.title || "Gallery image"}
                   className={
                     count === 1
@@ -415,12 +527,16 @@ function GallerySection({ section, sectionIndex }: { section: SiteSection; secti
                   }
                 />
                 {(item as { description?: string }).description ? (
-                  <figcaption className="px-5 py-4 text-sm leading-6 text-slate-600">
+                  <figcaption
+                    className="px-5 py-4 text-sm leading-6 text-slate-600"
+                    {...SITE_ELEMENT_ATTRS({ kind: "image_caption", label: "Gallery caption", fieldPath: "sections[" + sectionIndex + "].items[" + i + "].description", itemIndex: i })}
+                  >
                     {(item as { description: string }).description}
                   </figcaption>
                 ) : null}
               </figure>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
