@@ -5,32 +5,47 @@
 import { buildUniversalBootstrapBridgeScript } from '@/lib/preview/bootstrapPreviewElements';
 import { buildElementCaptureBridgeScript } from '@/lib/preview/captureTargetPreview';
 import {
+  TARGET_PREVIEW_THUMB_DPR,
   TARGET_PREVIEW_THUMB_HEIGHT,
+  TARGET_PREVIEW_THUMB_RENDER_HEIGHT,
+  TARGET_PREVIEW_THUMB_RENDER_WIDTH,
   TARGET_PREVIEW_THUMB_WIDTH,
 } from '@/lib/preview/targetPreviewThumbnail';
 
-export const PREVIEW_SECTION_BRIDGE_VERSION = 27;
+export const PREVIEW_SECTION_BRIDGE_VERSION = 28;
 
 const HIGHLIGHT_CLASS = 'site-editor-section-highlight';
 const HOVER_CLASS = 'site-editor-section-hover';
+const DRAGGABLE_HOVER_CLASS = 'site-editor-draggable-hover';
 
 /** CSS injected into proxied preview HTML alongside the external bridge script. */
 export const PREVIEW_SECTION_SELECTION_STYLES = `<style id="preview-section-selection-styles">
 .${HIGHLIGHT_CLASS},.${HOVER_CLASS}{outline:3px solid #2563eb!important;outline-offset:3px!important;box-shadow:0 0 0 1px #2563eb,inset 0 0 0 9999px rgba(59,130,246,0.28)!important}
+.${DRAGGABLE_HOVER_CLASS}{outline:2px solid rgba(59,130,246,0.55)!important;outline-offset:2px!important}
 .site-editor-preview-bridge section,.site-editor-preview-bridge section[id],.site-editor-preview-bridge [data-site-section-id],.site-editor-preview-bridge [data-analytics-id],.site-editor-preview-bridge [data-site-config-field-path],.site-editor-preview-bridge [data-site-element-kind='contact_field'],.site-editor-preview-bridge main a,.site-editor-preview-bridge main button,.site-editor-preview-bridge main h1,.site-editor-preview-bridge main h2,.site-editor-preview-bridge main h3,.site-editor-preview-bridge main p,.site-editor-preview-bridge nav a{cursor:grab!important}
+.site-editor-preview-bridge.site-editor-dragging{opacity:0.97}
+.site-editor-preview-bridge.site-editor-dragging .${DRAGGABLE_HOVER_CLASS}{outline:none!important}
 .site-editor-preview-bridge.site-editor-dragging section,.site-editor-preview-bridge.site-editor-dragging section[id],.site-editor-preview-bridge.site-editor-dragging [data-site-section-id],.site-editor-preview-bridge.site-editor-dragging [data-analytics-id],.site-editor-preview-bridge.site-editor-dragging [data-site-config-field-path],.site-editor-preview-bridge.site-editor-dragging [data-site-element-kind='contact_field'],.site-editor-preview-bridge.site-editor-dragging main a,.site-editor-preview-bridge.site-editor-dragging main button,.site-editor-preview-bridge.site-editor-dragging main h1,.site-editor-preview-bridge.site-editor-dragging main h2,.site-editor-preview-bridge.site-editor-dragging main h3,.site-editor-preview-bridge.site-editor-dragging main p,.site-editor-preview-bridge.site-editor-dragging nav a{cursor:grabbing!important}
+.site-editor-preview-bridge.site-editor-dragging .site-editor-drag-source{transform:scale(0.98);opacity:0.88;transition:transform 120ms ease-out,opacity 120ms ease-out}
 .site-editor-preview-bridge [data-site-config-field-path]:active,.site-editor-preview-bridge [data-site-element-kind='contact_field']:active,.site-editor-preview-bridge main a:active,.site-editor-preview-bridge main button:active,.site-editor-preview-bridge nav a:active{cursor:grabbing!important}
 </style>`;
 
 /** JavaScript body for the preview section selection bridge (no script tags). */
 export function buildSectionBridgeScriptBody(): string {
   return `(function(){
-var MSG={DRAG_START:"SITE_SECTION_DRAG_START",POINTER_DOWN:"SITE_SECTION_POINTER_DOWN",READY:"SITE_SECTION_BRIDGE_READY",HIGHLIGHT:"SITE_SECTION_HIGHLIGHT",FOCUS:"SITE_SECTION_FOCUS",DISMISS:"SITE_SECTION_DISMISS",CLEAR:"SITE_SECTION_CLEAR_SELECTION",PREVIEW_THUMB:"SITE_SECTION_PREVIEW_THUMB",PARENT_DRAG_START:"SITE_SECTION_PARENT_DRAG_START"};
+var MSG={DRAG_START:"SITE_SECTION_DRAG_START",POINTER_DOWN:"SITE_SECTION_POINTER_DOWN",READY:"SITE_SECTION_BRIDGE_READY",HIGHLIGHT:"SITE_SECTION_HIGHLIGHT",FOCUS:"SITE_SECTION_FOCUS",DISMISS:"SITE_SECTION_DISMISS",CLEAR:"SITE_SECTION_CLEAR_SELECTION",PREVIEW_THUMB:"SITE_SECTION_PREVIEW_THUMB",PARENT_DRAG_START:"SITE_SECTION_PARENT_DRAG_START",DRAG_CANCEL:"SITE_SECTION_DRAG_CANCEL"};
 var HIGHLIGHT="${HIGHLIGHT_CLASS}";
 var HOVER="${HOVER_CLASS}";
 var DRAG_THRESHOLD=6;
 var PREVIEW_THUMB_W=${TARGET_PREVIEW_THUMB_WIDTH};
 var PREVIEW_THUMB_H=${TARGET_PREVIEW_THUMB_HEIGHT};
+var PREVIEW_THUMB_DPR=${TARGET_PREVIEW_THUMB_DPR};
+var PREVIEW_THUMB_RENDER_W=${TARGET_PREVIEW_THUMB_RENDER_WIDTH};
+var PREVIEW_THUMB_RENDER_H=${TARGET_PREVIEW_THUMB_RENDER_HEIGHT};
+var DRAGGABLE_HOVER="${DRAGGABLE_HOVER_CLASS}";
+var CAPTURE_CACHE_TTL=2000;
+var captureCache={};
+var hoverOutlineEl=null;
 var selectedId=null;
 var selectedHover=false;
 var dragState=null;
@@ -513,9 +528,10 @@ function captureRaster(el,clickTarget){
       img.onload=function(){
         try{
           var canvas=document.createElement("canvas");
-          canvas.width=PREVIEW_THUMB_W;canvas.height=PREVIEW_THUMB_H;
+          canvas.width=PREVIEW_THUMB_RENDER_W;canvas.height=PREVIEW_THUMB_RENDER_H;
           var ctx=canvas.getContext("2d");
           if(!ctx){resolve(null);return;}
+          ctx.scale(PREVIEW_THUMB_DPR,PREVIEW_THUMB_DPR);
           ctx.fillStyle="#f4f4f5";
           ctx.fillRect(0,0,PREVIEW_THUMB_W,PREVIEW_THUMB_H);
           var offsetX=Math.round((PREVIEW_THUMB_W-drawW)/2);
@@ -534,11 +550,32 @@ function captureRaster(el,clickTarget){
   }
 }
 
+function captureCacheKey(payload){
+  if(!payload)return "";
+  return (payload.fieldPath||payload.surfaceId||payload.sectionId||"")+"::"+(payload.elementLabel||"");
+}
+
+function readCaptureCache(payload){
+  var key=captureCacheKey(payload);
+  if(!key)return null;
+  var entry=captureCache[key];
+  if(!entry)return null;
+  if(Date.now()-entry.ts>CAPTURE_CACHE_TTL){delete captureCache[key];return null;}
+  return entry.capture;
+}
+
+function writeCaptureCache(payload,capture){
+  var key=captureCacheKey(payload);
+  if(!key||!capture)return;
+  captureCache[key]={capture:capture,ts:Date.now()};
+}
+
 function notifyPreviewThumb(payload,capture){
   if(!capture||!payload)return;
   notify(MSG.PREVIEW_THUMB,{
     sectionId:payload.sectionId,
     surfaceId:payload.surfaceId,
+    fieldPath:payload.fieldPath,
     dataUrl:capture.dataUrl,
     captureKind:capture.captureKind,
     width:capture.width,
@@ -546,18 +583,48 @@ function notifyPreviewThumb(payload,capture){
   });
 }
 
-function captureAndNotifyDragPreview(){
-  if(!dragState||!dragState.el||!dragState.target||!dragState.payload)return;
+function shouldUseElementCapture(payload){
+  if(!payload||payload.pinScope!=="element")return false;
+  var leafKind=captureLeafKind(payload);
+  if(!leafKind)return false;
+  return leafKind==="button"||leafKind==="contact_field"||leafKind==="heading"||leafKind==="body"||leafKind==="item_title"||leafKind==="item_body"||leafKind==="item_card"||leafKind==="image_caption"||leafKind==="panel";
+}
+
+function captureDragPreviewSync(){
+  if(!dragState||!dragState.el||!dragState.target||!dragState.payload)return null;
+  var cached=readCaptureCache(dragState.payload);
+  if(cached)return cached;
   var root=resolvePreviewCaptureRoot(dragState.el,dragState.target,dragState.payload);
   var leafKind=captureLeafKind(dragState.payload);
   var fullSection=shouldCaptureFullSectionPreview(dragState.payload);
-  if(!fullSection&&typeof captureElementStyledPreview==="function"){
+  if(!fullSection&&shouldUseElementCapture(dragState.payload)&&typeof captureElementStyledPreview==="function"){
     var styled=captureElementStyledPreview(root,leafKind);
     if(styled){
-      notifyPreviewThumb(dragState.payload,styled);
-      return;
+      writeCaptureCache(dragState.payload,styled);
+      return styled;
     }
   }
+  if(fullSection){
+    var sketch=captureSectionStyledFallback(root);
+    if(sketch){
+      writeCaptureCache(dragState.payload,sketch);
+      return sketch;
+    }
+  }
+  return null;
+}
+
+function captureAndNotifyDragPreview(){
+  if(!dragState||!dragState.el||!dragState.target||!dragState.payload)return;
+  var sync=captureDragPreviewSync();
+  if(sync){
+    notifyPreviewThumb(dragState.payload,sync);
+    if(!shouldCaptureFullSectionPreview(dragState.payload))return;
+  }
+  var root=resolvePreviewCaptureRoot(dragState.el,dragState.target,dragState.payload);
+  var leafKind=captureLeafKind(dragState.payload);
+  var fullSection=shouldCaptureFullSectionPreview(dragState.payload);
+  if(!fullSection)return;
   captureRaster(root,dragState.target).then(function(raster){
     var capture=raster;
     if(!capture&&isSectionElement(root))capture=captureSectionStyledFallback(root);
@@ -566,8 +633,27 @@ function captureAndNotifyDragPreview(){
       var smaller=captureSectionStyledFallback(root);
       if(smaller)capture=smaller;
     }
+    if(capture)writeCaptureCache(dragState.payload,capture);
     notifyPreviewThumb(dragState.payload,capture);
   });
+}
+
+function clearDraggableHover(){
+  if(hoverOutlineEl){
+    hoverOutlineEl.classList.remove(DRAGGABLE_HOVER);
+    hoverOutlineEl=null;
+  }
+}
+
+function applyDraggableHover(target){
+  if(dragState)return;
+  var root=findDraggableRoot(target);
+  if(!root){clearDraggableHover();return;}
+  var el=root.el;
+  if(hoverOutlineEl===el)return;
+  clearDraggableHover();
+  el.classList.add(DRAGGABLE_HOVER);
+  hoverOutlineEl=el;
 }
 
 function clearHighlight(){
@@ -602,8 +688,17 @@ function notify(type,payload){
   try{window.parent.postMessage({type:type,payload:payload},"*");}catch(e){}
 }
 
-function notifyPointerDown(payload,clientX,clientY){
-  notify(MSG.POINTER_DOWN,Object.assign({},payload,{clientX:clientX,clientY:clientY}));
+function notifyPointerDown(payload,clientX,clientY,grabOffsetX,grabOffsetY){
+  notify(MSG.POINTER_DOWN,Object.assign({},payload,{clientX:clientX,clientY:clientY,grabOffsetX:grabOffsetX,grabOffsetY:grabOffsetY}));
+}
+
+function markDragSource(el){
+  document.querySelectorAll(".site-editor-drag-source").forEach(function(node){node.classList.remove("site-editor-drag-source");});
+  if(el&&el.classList)el.classList.add("site-editor-drag-source");
+}
+
+function clearDragSource(){
+  document.querySelectorAll(".site-editor-drag-source").forEach(function(node){node.classList.remove("site-editor-drag-source");});
 }
 
 document.addEventListener("mousedown",function(e){
@@ -615,18 +710,29 @@ document.addEventListener("mousedown",function(e){
   if(!payload.sectionId)return;
   e.preventDefault();
   e.stopPropagation();
-  dragState={payload:payload,startX:e.clientX,startY:e.clientY,started:false,el:el,target:e.target};
-  notifyPointerDown(payload,e.clientX,e.clientY);
+  clearDraggableHover();
+  var targetRect=e.target.getBoundingClientRect?e.target.getBoundingClientRect():{left:0,top:0};
+  var grabOffsetX=e.clientX-targetRect.left;
+  var grabOffsetY=e.clientY-targetRect.top;
+  dragState={payload:payload,startX:e.clientX,startY:e.clientY,started:false,el:el,target:e.target,grabOffsetX:grabOffsetX,grabOffsetY:grabOffsetY};
+  notifyPointerDown(payload,e.clientX,e.clientY,grabOffsetX,grabOffsetY);
+  var early=captureDragPreviewSync();
+  if(early)notifyPreviewThumb(dragState.payload,early);
 },true);
 
 document.addEventListener("mousemove",function(e){
-  if(!dragState||dragState.started)return;
+  if(!dragState){
+    applyDraggableHover(e.target);
+    return;
+  }
+  if(dragState.started)return;
   var dx=e.clientX-dragState.startX;
   var dy=e.clientY-dragState.startY;
   if(dx*dx+dy*dy>=DRAG_THRESHOLD*DRAG_THRESHOLD){
     dragState.started=true;
     document.documentElement.classList.add("site-editor-dragging");
-    notify(MSG.DRAG_START,Object.assign({},dragState.payload,{clientX:e.clientX,clientY:e.clientY,started:true}));
+    markDragSource(dragState.target);
+    notify(MSG.DRAG_START,Object.assign({},dragState.payload,{clientX:e.clientX,clientY:e.clientY,grabOffsetX:dragState.grabOffsetX,grabOffsetY:dragState.grabOffsetY,started:true}));
     captureAndNotifyDragPreview();
   }
 },true);
@@ -634,6 +740,7 @@ document.addEventListener("mousemove",function(e){
 document.addEventListener("mouseup",function(){
   if(dragState&&dragState.started){
     document.documentElement.classList.remove("site-editor-dragging");
+    clearDragSource();
   }
   dragState=null;
 },true);
@@ -668,8 +775,9 @@ window.addEventListener("message",function(event){
     if(dragState)dragState.started=true;
     captureAndNotifyDragPreview();
   }
-  else if(data.type==="SITE_SECTION_DRAG_CANCEL"){
+  else if(data.type===MSG.DRAG_CANCEL){
     document.documentElement.classList.remove("site-editor-dragging");
+    clearDragSource();
     dragState=null;
   }
 });

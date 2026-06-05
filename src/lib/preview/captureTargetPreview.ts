@@ -4,8 +4,11 @@
  */
 
 import {
+  TARGET_PREVIEW_THUMB_DPR,
   TARGET_PREVIEW_THUMB_HEIGHT,
   TARGET_PREVIEW_THUMB_PADDING,
+  TARGET_PREVIEW_THUMB_RENDER_HEIGHT,
+  TARGET_PREVIEW_THUMB_RENDER_WIDTH,
   TARGET_PREVIEW_THUMB_WIDTH,
 } from '@/lib/preview/targetPreviewThumbnail';
 
@@ -168,17 +171,23 @@ function captureLeafKind(payload){
 }
 
 var PREVIEW_THUMB_PAD=${TARGET_PREVIEW_THUMB_PADDING};
+var PREVIEW_THUMB_DPR=${TARGET_PREVIEW_THUMB_DPR};
+var PREVIEW_THUMB_RENDER_W=${TARGET_PREVIEW_THUMB_RENDER_WIDTH};
+var PREVIEW_THUMB_RENDER_H=${TARGET_PREVIEW_THUMB_RENDER_HEIGHT};
 
-function thumbResult(canvas){
-  return {dataUrl:canvas.toDataURL("image/jpeg",0.82),captureKind:"styled_fallback",width:PREVIEW_THUMB_W,height:PREVIEW_THUMB_H};
+function thumbResult(canvas,usePng){
+  var mime=usePng?"image/png":"image/jpeg";
+  var quality=usePng?undefined:0.82;
+  return {dataUrl:canvas.toDataURL(mime,quality),captureKind:"styled_fallback",width:PREVIEW_THUMB_W,height:PREVIEW_THUMB_H};
 }
 
 function createThumbCanvas(el){
   var canvas=document.createElement("canvas");
-  canvas.width=PREVIEW_THUMB_W;
-  canvas.height=PREVIEW_THUMB_H;
+  canvas.width=PREVIEW_THUMB_RENDER_W;
+  canvas.height=PREVIEW_THUMB_RENDER_H;
   var ctx=canvas.getContext("2d");
   if(!ctx)return null;
+  ctx.scale(PREVIEW_THUMB_DPR,PREVIEW_THUMB_DPR);
   ctx.fillStyle=resolvePreviewFrameBackground(el);
   ctx.fillRect(0,0,PREVIEW_THUMB_W,PREVIEW_THUMB_H);
   return {canvas:canvas,ctx:ctx,pad:PREVIEW_THUMB_PAD,innerW:PREVIEW_THUMB_W-PREVIEW_THUMB_PAD*2,innerH:PREVIEW_THUMB_H-PREVIEW_THUMB_PAD*2};
@@ -253,7 +262,7 @@ function captureButtonStyledFallback(el){
   }
   thumb.ctx.fillStyle=isOpaqueCssColor(style.color)?style.color:"#ffffff";
   drawFittedLine(thumb.ctx,el.textContent,bx+fit.w/2,by+fit.h/2,fit.w-8,fit.h-4,style,Math.min(parseFloat(style.fontSize)||13,13)*fit.scale+4,"center");
-  return thumbResult(thumb.canvas);
+  return thumbResult(thumb.canvas,true);
 }
 
 function captureChipStyledFallback(el){
@@ -270,7 +279,7 @@ function captureChipStyledFallback(el){
   thumb.ctx.fill();
   thumb.ctx.fillStyle=isOpaqueCssColor(style.color)?style.color:"#334155";
   drawFittedLine(thumb.ctx,el.textContent,cx+fit.w/2,cy+fit.h/2,fit.w-8,fit.h-4,style,11,"center");
-  return thumbResult(thumb.canvas);
+  return thumbResult(thumb.canvas,true);
 }
 
 function captureCardStyledFallback(el){
@@ -288,12 +297,24 @@ function captureCardStyledFallback(el){
     thumb.ctx.lineWidth=borderW;
     thumb.ctx.stroke();
   }
+  var imgEl=el.querySelector("img");
+  if(imgEl){
+    var imgH=Math.min(Math.round(ih*0.45),36);
+    thumb.ctx.fillStyle="rgba(15,23,42,0.08)";
+    roundRect(thumb.ctx,ix+6,iy+6,iw-12,imgH,6);
+    thumb.ctx.fill();
+    thumb.ctx.fillStyle="rgba(15,23,42,0.25)";
+    thumb.ctx.font="9px sans-serif";
+    thumb.ctx.textAlign="center";
+    thumb.ctx.fillText("img",ix+iw/2,iy+6+imgH/2+3);
+  }
   var titleEl=el.querySelector("h3,[data-site-element-kind='item_title'],h2,p");
   var titleText=titleEl?(titleEl.textContent||"").trim():(el.textContent||"").trim();
   var titleStyle=titleEl?window.getComputedStyle(titleEl):style;
+  var textY=imgEl?iy+Math.min(Math.round(ih*0.45),36)+10:iy+6;
   thumb.ctx.fillStyle=isOpaqueCssColor(titleStyle.color)?titleStyle.color:"#111827";
-  drawFittedWrapped(thumb.ctx,titleText,ix+6,iy+6,iw-12,ih-14,titleStyle,11);
-  return thumbResult(thumb.canvas);
+  drawFittedWrapped(thumb.ctx,titleText,ix+6,textY,iw-12,ih-textY-6,titleStyle,11);
+  return thumbResult(thumb.canvas,true);
 }
 
 function captureTextStyledFallback(el,leafKind){
@@ -313,8 +334,12 @@ function captureTextStyledFallback(el,leafKind){
   }
   thumb.ctx.fillStyle=isOpaqueCssColor(style.color)?style.color:(isHeading?"#111827":"#334155");
   var prefer=Math.min(parseFloat(style.fontSize)||(isHeading?16:12),isHeading?12:10);
-  drawFittedLine(thumb.ctx,text,ix+iw/2,iy+ih/2,iw-6,ih-6,style,prefer,"center");
-  return thumbResult(thumb.canvas);
+  if(text.length>28||leafKind==="body"){
+    drawFittedWrapped(thumb.ctx,text,ix+4,iy+4,iw-8,ih-8,style,prefer);
+  }else{
+    drawFittedLine(thumb.ctx,text,ix+iw/2,iy+ih/2,iw-6,ih-6,style,prefer,"center");
+  }
+  return thumbResult(thumb.canvas,true);
 }
 
 function captureBoxStyledFallback(el){
@@ -331,7 +356,7 @@ function captureBoxStyledFallback(el){
   thumb.ctx.fill();
   thumb.ctx.fillStyle=isOpaqueCssColor(style.color)?style.color:"#18181b";
   drawFittedLine(thumb.ctx,el.textContent,bx+fit.w/2,by+fit.h/2,fit.w-8,fit.h-4,style,10,"center");
-  return thumbResult(thumb.canvas);
+  return thumbResult(thumb.canvas,true);
 }
 
 function captureElementStyledPreview(el,leafKind){

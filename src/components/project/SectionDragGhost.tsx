@@ -1,6 +1,7 @@
 'use client';
 
 import type { SelectedSectionPayload } from '@/lib/preview/sectionSelectionProtocol';
+import { clampDragGhostPosition } from '@/lib/preview/clampDragGhostPosition';
 import { formatPreviewTargetDisplay } from '@/lib/preview/previewTargetChipLabels';
 import { PreviewTargetThumbnail } from '@/components/project/PreviewTargetThumbnail';
 import {
@@ -15,10 +16,21 @@ interface Props {
   x: number;
   y: number;
   previewDataUrl?: string;
+  grabOffsetX?: number;
+  grabOffsetY?: number;
 }
 
+const MAX_CHAIN_ROWS = 2;
+
 /** Floating ghost while dragging a preview section or element toward chat. */
-export function SectionDragGhost({ payload, x, y, previewDataUrl }: Props) {
+export function SectionDragGhost({
+  payload,
+  x,
+  y,
+  previewDataUrl,
+  grabOffsetX = 12,
+  grabOffsetY = 12,
+}: Props) {
   const kind = payload.sectionType === 'hero' || payload.sectionIndex < 0 ? 'hero' : 'section';
   const target = normalizeSelectedTarget({
     kind,
@@ -44,50 +56,62 @@ export function SectionDragGhost({ payload, x, y, previewDataUrl }: Props) {
     previewDataUrl || targetPreviewDisplayUrl(target) || targetPreviewFallbackLabel(target)
   );
 
+  const chainRows = display.chainRows?.slice(-MAX_CHAIN_ROWS);
+  const primaryLabel =
+    chainRows?.[chainRows.length - 1]?.label ??
+    display.element?.label ??
+    (showTitle ? display.title : display.scopeLabel);
+
+  const position = clampDragGhostPosition({
+    pointerX: x,
+    pointerY: y,
+    grabOffsetX,
+    grabOffsetY,
+    ghostWidth: 200,
+    ghostHeight: showTargetPreview ? 180 : 80,
+  });
+
   return (
     <div
-      className="fixed z-[100] pointer-events-none max-w-[360px] rounded-lg border border-zinc-200/80 border-l-[3px] border-l-blue-500 bg-white px-3 py-2 shadow-xl"
-      style={{ left: x + 12, top: y + 12 }}
+      className="fixed z-[100] pointer-events-none w-[200px] rounded-lg border border-zinc-200/80 border-l-[3px] border-l-blue-500 bg-white px-2.5 py-2 shadow-xl transition-transform duration-150 ease-out scale-100"
+      style={{
+        left: position.left,
+        top: position.top,
+        transform: 'translate3d(0,0,0)',
+      }}
       aria-hidden
     >
       <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5">
         Edit target
       </div>
-      <div className={showTargetPreview ? 'flex gap-2.5' : ''}>
-        {showTargetPreview && <PreviewTargetThumbnail target={target} size="sm" />}
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <Badge tone="info" className="shrink-0 text-[10px]">
-              {display.scopeLabel}
-            </Badge>
-            {showTitle ? (
-              <span className="text-sm font-semibold text-zinc-950 break-words">{display.title}</span>
-            ) : null}
-          </div>
-          {display.chainRows && display.chainRows.length > 0 ? (
-            <div className="mt-1.5 space-y-0.5">
-              {display.chainRows.map((row, index) => (
-                <div
-                  key={`${row.role}-${row.label}-${index}`}
-                  className="text-sm text-zinc-700 break-words"
-                  style={{ paddingLeft: `${row.depth * 12}px` }}
-                >
-                  <span className="text-zinc-300 mr-1" aria-hidden>
-                    ⌞
-                  </span>
-                  {row.label}
-                </div>
-              ))}
-            </div>
-          ) : display.element ? (
-            <div className="mt-1.5 pl-3 text-sm text-zinc-700 break-words">
-              <span className="text-zinc-300 mr-1" aria-hidden>
-                ⌞
-              </span>
-              {display.element.label}
-            </div>
-          ) : null}
+      {showTargetPreview ? (
+        <div className="flex justify-center mb-2">
+          <PreviewTargetThumbnail target={target} size="md" progressive />
         </div>
+      ) : null}
+      <div className="min-w-0 text-center">
+        <div className="flex flex-wrap items-center justify-center gap-1.5">
+          <Badge tone="info" className="shrink-0 text-[10px]">
+            {display.scopeLabel}
+          </Badge>
+        </div>
+        {primaryLabel ? (
+          <p className="mt-1 text-xs font-semibold text-zinc-950 break-words line-clamp-2">
+            {primaryLabel}
+          </p>
+        ) : null}
+        {chainRows && chainRows.length > 1 ? (
+          <div className="mt-1 space-y-0.5">
+            {chainRows.slice(0, -1).map((row, index) => (
+              <p
+                key={`${row.role}-${row.label}-${index}`}
+                className="text-[10px] text-zinc-500 break-words line-clamp-1"
+              >
+                {row.label}
+              </p>
+            ))}
+          </div>
+        ) : null}
       </div>
     </div>
   );

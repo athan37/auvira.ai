@@ -5,6 +5,7 @@ import {
   buildSiteSectionClearMessage,
   buildSiteSectionFocusMessage,
   buildSiteSectionHighlightMessage,
+  buildSiteSectionDragCancelMessage,
   buildSiteSectionParentDragStartMessage,
   parseSiteSectionDismissMessage,
   parseSiteSectionDragStartMessage,
@@ -60,6 +61,8 @@ interface Props {
   onSectionHighlightDismiss?: () => void;
   /** Bumped when parent drag threshold is crossed — triggers iframe capture. */
   sectionDragCaptureKey?: number;
+  /** Bumped when parent cancels drag (Escape) — clears iframe drag state. */
+  sectionDragCancelKey?: number;
   onSectionPreviewThumb?: (thumb: TargetPreviewThumbMessage) => void;
 }
 
@@ -100,6 +103,7 @@ export function ProjectPreviewFrame({
   onSectionPointerDown,
   onSectionHighlightDismiss,
   sectionDragCaptureKey = 0,
+  sectionDragCancelKey = 0,
   onSectionPreviewThumb,
 }: Props) {
   const onReadyChangeRef = useRef(onReadyChange);
@@ -134,6 +138,11 @@ export function ProjectPreviewFrame({
     if (!selectionAvailable || sectionDragCaptureKey <= 0) return;
     postToIframe(buildSiteSectionParentDragStartMessage());
   }, [sectionDragCaptureKey, selectionAvailable, postToIframe]);
+
+  useEffect(() => {
+    if (!selectionAvailable || sectionDragCancelKey <= 0) return;
+    postToIframe(buildSiteSectionDragCancelMessage());
+  }, [sectionDragCancelKey, selectionAvailable, postToIframe]);
 
   useEffect(() => {
     if (!selectionAvailable) return;

@@ -118,12 +118,22 @@ export default function ProjectPage() {
     previewCaptureKind?: TargetPreviewCaptureKind;
     previewWidth?: number;
     previewHeight?: number;
+    grabOffsetX?: number;
+    grabOffsetY?: number;
   } | null>(null);
   const [sectionDragCaptureKey, setSectionDragCaptureKey] = useState(0);
+  const [sectionDragCancelKey, setSectionDragCancelKey] = useState(0);
+  const sectionDragPendingPayloadRef = useRef<SiteSectionContextPayload | null>(null);
   const [sectionDragPending, setSectionDragPending] = useState<{
     payload: SiteSectionContextPayload;
     startX: number;
     startY: number;
+    previewDataUrl?: string;
+    previewCaptureKind?: TargetPreviewCaptureKind;
+    previewWidth?: number;
+    previewHeight?: number;
+    grabOffsetX?: number;
+    grabOffsetY?: number;
   } | null>(null);
   const [isChatDropActive, setIsChatDropActive] = useState(false);
 
@@ -236,11 +246,32 @@ export default function ProjectPage() {
     [handleSelectedSectionChange, isPointInChatDropZone, projectId, sectionDrag]
   );
 
+  const thumbMatchesPayload = useCallback(
+    (payload: SiteSectionContextPayload, thumb: TargetPreviewThumbMessage) => {
+      if (payload.sectionId !== thumb.sectionId) return false;
+      if (payload.fieldPath && thumb.fieldPath) {
+        return payload.fieldPath === thumb.fieldPath;
+      }
+      if (thumb.surfaceId && payload.surfaceId) {
+        return thumb.surfaceId === payload.surfaceId;
+      }
+      return true;
+    },
+    []
+  );
+
   const handleSectionPointerDown = useCallback(
     (payload: SiteSectionContextPayload, screenX: number, screenY: number) => {
       sectionDragPayloadRef.current = null;
       setSectionDrag(null);
-      setSectionDragPending({ payload, startX: screenX, startY: screenY });
+      sectionDragPendingPayloadRef.current = payload;
+      setSectionDragPending({
+        payload,
+        startX: screenX,
+        startY: screenY,
+        grabOffsetX: payload.grabOffsetX,
+        grabOffsetY: payload.grabOffsetY,
+      });
       setIsChatDropActive(isPointInChatDropZone(screenX, screenY));
     },
     [isPointInChatDropZone]
@@ -249,33 +280,58 @@ export default function ProjectPage() {
   const handleSectionDragStart = useCallback(
     (payload: SiteSectionContextPayload, screenX: number, screenY: number) => {
       sectionDragPayloadRef.current = payload;
-      setSectionDrag({ payload, x: screenX, y: screenY });
+      const pending = sectionDragPending;
+      setSectionDrag({
+        payload,
+        x: screenX,
+        y: screenY,
+        previewDataUrl: pending?.previewDataUrl,
+        previewCaptureKind: pending?.previewCaptureKind,
+        previewWidth: pending?.previewWidth,
+        previewHeight: pending?.previewHeight,
+        grabOffsetX: payload.grabOffsetX ?? pending?.grabOffsetX,
+        grabOffsetY: payload.grabOffsetY ?? pending?.grabOffsetY,
+      });
+      sectionDragPendingPayloadRef.current = null;
       setSectionDragPending(null);
       setSectionDragCaptureKey((key) => key + 1);
       setIsChatDropActive(isPointInChatDropZone(screenX, screenY));
     },
-    [isPointInChatDropZone]
+    [isPointInChatDropZone, sectionDragPending]
   );
 
-  const handleSectionPreviewThumb = useCallback((thumb: TargetPreviewThumbMessage) => {
-    const activePayload = sectionDragPayloadRef.current;
-    if (!activePayload) return;
-    if (activePayload.sectionId !== thumb.sectionId) return;
-    if (thumb.surfaceId && activePayload.surfaceId && thumb.surfaceId !== activePayload.surfaceId) {
-      return;
-    }
-    setSectionDrag((prev) =>
-      prev
-        ? {
-            ...prev,
-            previewDataUrl: thumb.dataUrl,
-            previewCaptureKind: thumb.captureKind,
-            previewWidth: thumb.width,
-            previewHeight: thumb.height,
-          }
-        : prev
-    );
-  }, []);
+  const handleSectionPreviewThumb = useCallback(
+    (thumb: TargetPreviewThumbMessage) => {
+      const activePayload = sectionDragPayloadRef.current;
+      const pendingPayload = sectionDragPendingPayloadRef.current;
+      const preview = {
+        previewDataUrl: thumb.dataUrl,
+        previewCaptureKind: thumb.captureKind,
+        previewWidth: thumb.width,
+        previewHeight: thumb.height,
+      };
+
+      if (activePayload && thumbMatchesPayload(activePayload, thumb)) {
+        setSectionDrag((prev) => (prev ? { ...prev, ...preview } : prev));
+        return;
+      }
+
+      if (pendingPayload && thumbMatchesPayload(pendingPayload, thumb)) {
+        setSectionDragPending((prev) => (prev ? { ...prev, ...preview } : prev));
+      }
+    },
+    [thumbMatchesPayload]
+  );
+
+  const cancelSectionDrag = useCallback(() => {
+    if (!sectionDrag && !sectionDragPending) return;
+    sectionDragPayloadRef.current = null;
+    sectionDragPendingPayloadRef.current = null;
+    setSectionDrag(null);
+    setSectionDragPending(null);
+    setIsChatDropActive(false);
+    setSectionDragCancelKey((key) => key + 1);
+  }, [sectionDrag, sectionDragPending]);
 
   const handleSectionDragMove = useCallback(
     (clientX: number, clientY: number) => {
@@ -300,9 +356,18 @@ export default function ProjectPage() {
     function onWindowMouseUp(event: MouseEvent) {
       finishSectionDrag(event.clientX, event.clientY);
     }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        cancelSectionDrag();
+      }
+    }
     window.addEventListener('mouseup', onWindowMouseUp);
-    return () => window.removeEventListener('mouseup', onWindowMouseUp);
-  }, [sectionDragPending, sectionDrag, finishSectionDrag]);
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('mouseup', onWindowMouseUp);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [sectionDragPending, sectionDrag, finishSectionDrag, cancelSectionDrag]);
 
   useEffect(() => {
     if (!sectionToast) return;
@@ -419,6 +484,8 @@ export default function ProjectPage() {
               x={sectionDrag.x}
               y={sectionDrag.y}
               previewDataUrl={sectionDrag.previewDataUrl}
+              grabOffsetX={sectionDrag.grabOffsetX}
+              grabOffsetY={sectionDrag.grabOffsetY}
             />
           ) : null}
           <div
@@ -446,6 +513,7 @@ export default function ProjectPage() {
             onSectionPointerDown={handleSectionPointerDown}
             onSectionHighlightDismiss={handleSectionHighlightDismiss}
             sectionDragCaptureKey={sectionDragCaptureKey}
+            sectionDragCancelKey={sectionDragCancelKey}
             onSectionPreviewThumb={handleSectionPreviewThumb}
           />
         </div>
@@ -454,7 +522,7 @@ export default function ProjectPage() {
           ref={chatDropZoneRef}
           className="w-full lg:w-[440px] xl:w-[520px] shrink-0 min-h-[400px] lg:min-h-0 flex flex-col relative"
         >
-          {sectionDrag && (
+          {(sectionDrag || sectionDragPending) && (
             <div
               className={`pointer-events-none absolute inset-0 z-10 rounded-xl border-2 border-dashed transition-colors ${
                 isChatDropActive ? 'border-blue-500 bg-blue-50/60' : 'border-blue-300/80 bg-blue-50/20'
@@ -463,7 +531,11 @@ export default function ProjectPage() {
             >
               <div className="absolute inset-0 flex items-center justify-center">
                 <span className="rounded-lg bg-white/90 px-3 py-1.5 text-sm font-medium text-blue-700 shadow-sm">
-                  {isChatDropActive ? 'Release to add to chat' : 'Drop here'}
+                  {isChatDropActive
+                    ? 'Release to add to chat'
+                    : sectionDragPending
+                      ? 'Drag here to target'
+                      : 'Drop here'}
                 </span>
               </div>
             </div>

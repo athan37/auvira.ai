@@ -10,7 +10,10 @@ import {
 } from '@/lib/preview/captureTargetPreview';
 import {
   fitScaleToBox,
+  TARGET_PREVIEW_THUMB_DPR,
   TARGET_PREVIEW_THUMB_HEIGHT,
+  TARGET_PREVIEW_THUMB_RENDER_HEIGHT,
+  TARGET_PREVIEW_THUMB_RENDER_WIDTH,
   TARGET_PREVIEW_THUMB_WIDTH,
 } from '@/lib/preview/targetPreviewThumbnail';
 
@@ -80,13 +83,23 @@ describe('fitScaleToBox', () => {
   });
 });
 
+describe('TARGET_PREVIEW_THUMB_DPR', () => {
+  it('renders at 2x resolution for sharper display', () => {
+    expect(TARGET_PREVIEW_THUMB_DPR).toBe(2);
+    expect(TARGET_PREVIEW_THUMB_RENDER_WIDTH).toBe(TARGET_PREVIEW_THUMB_WIDTH * 2);
+    expect(TARGET_PREVIEW_THUMB_RENDER_HEIGHT).toBe(TARGET_PREVIEW_THUMB_HEIGHT * 2);
+  });
+});
+
 describe('buildElementCaptureBridgeScript', () => {
-  it('includes fixed-size thumb canvas and fitted text rendering', () => {
+  it('includes retina thumb canvas and PNG element captures', () => {
     const script = buildElementCaptureBridgeScript();
     expect(script).toContain('function createThumbCanvas');
     expect(script).toContain('function fitFontSize');
     expect(script).toContain('function drawFittedLine');
-    expect(script).toContain(`width:PREVIEW_THUMB_W,height:PREVIEW_THUMB_H`);
+    expect(script).toContain('PREVIEW_THUMB_RENDER_W');
+    expect(script).toContain('image/png');
     expect(script).toContain('resolvePreviewFrameBackground');
+    expect(script).toContain('img');
   });
 });

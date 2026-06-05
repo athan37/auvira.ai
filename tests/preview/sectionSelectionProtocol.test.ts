@@ -110,6 +110,21 @@ describe('sectionSelectionProtocol element pin', () => {
     expect(msg?.payload.captureKind).toBe('raster');
   });
 
+  it('parses fieldPath on preview thumb messages', () => {
+    const msg = parseSiteSectionPreviewThumbMessage({
+      type: 'SITE_SECTION_PREVIEW_THUMB',
+      payload: {
+        sectionId: 'hero',
+        fieldPath: 'contact.email',
+        dataUrl: 'data:image/png;base64,abc',
+        captureKind: 'styled_fallback',
+        width: 112,
+        height: 80,
+      },
+    });
+    expect(msg?.payload.fieldPath).toBe('contact.email');
+  });
+
   it('parses nav CTA drag payload with hero.primaryCta field path', () => {
     const msg = parseSiteSectionDragStartMessage({
       type: 'SITE_SECTION_DRAG_START',

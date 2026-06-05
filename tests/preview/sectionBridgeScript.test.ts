@@ -5,9 +5,23 @@ import {
   buildSectionBridgeScriptBody,
 } from '@/lib/preview/sectionBridgeScript';
 
-describe('sectionBridgeScript v26 hero contact row drag', () => {
-  it('bumps bridge version for hero contact value rows', () => {
-    expect(PREVIEW_SECTION_BRIDGE_VERSION).toBeGreaterThanOrEqual(26);
+describe('sectionBridgeScript drag preview UX', () => {
+  it('bumps bridge version for drag preview UX improvements', () => {
+    expect(PREVIEW_SECTION_BRIDGE_VERSION).toBeGreaterThanOrEqual(28);
+  });
+
+  it('includes early capture, cache, and hover affordance', () => {
+    const body = buildSectionBridgeScriptBody();
+    expect(body).toContain('function captureDragPreviewSync');
+    expect(body).toContain('function readCaptureCache');
+    expect(body).toContain('function applyDraggableHover');
+    expect(body).toContain('grabOffsetX');
+    expect(body).toContain('fieldPath:payload.fieldPath');
+  });
+
+  it('styles draggable hover and drag lift', () => {
+    expect(PREVIEW_SECTION_SELECTION_STYLES).toContain('site-editor-draggable-hover');
+    expect(PREVIEW_SECTION_SELECTION_STYLES).toContain('site-editor-drag-source');
   });
 
   it('prefers styled element capture over SVG raster for element pins', () => {

@@ -13,6 +13,11 @@ const GENERIC_TARGET_LABELS = new Set([
 export const TARGET_PREVIEW_THUMB_WIDTH = 112;
 export const TARGET_PREVIEW_THUMB_HEIGHT = 80;
 export const TARGET_PREVIEW_THUMB_PADDING = 8;
+/** Device pixel ratio for sharper canvas captures (display size unchanged). */
+export const TARGET_PREVIEW_THUMB_DPR = 2;
+export const TARGET_PREVIEW_THUMB_RENDER_WIDTH = TARGET_PREVIEW_THUMB_WIDTH * TARGET_PREVIEW_THUMB_DPR;
+export const TARGET_PREVIEW_THUMB_RENDER_HEIGHT =
+  TARGET_PREVIEW_THUMB_HEIGHT * TARGET_PREVIEW_THUMB_DPR;
 
 export type TargetPreviewCaptureKind = 'raster' | 'styled_fallback';
 
@@ -45,6 +50,7 @@ export interface TargetPreviewThumbnail {
 export interface TargetPreviewThumbMessage {
   sectionId: string;
   surfaceId?: string;
+  fieldPath?: string;
   dataUrl: string;
   captureKind: TargetPreviewCaptureKind;
   width: number;

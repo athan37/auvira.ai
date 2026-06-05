@@ -22,6 +22,7 @@ export const PREVIEW_SECTION_MSG = {
   DISABLE_MODE: 'SITE_SECTION_DISABLE_SELECTION',
   PREVIEW_THUMB: 'SITE_SECTION_PREVIEW_THUMB',
   PARENT_DRAG_START: 'SITE_SECTION_PARENT_DRAG_START',
+  DRAG_CANCEL: 'SITE_SECTION_DRAG_CANCEL',
 } as const;
 
 export type PreviewSectionMessageType =
@@ -49,6 +50,9 @@ export interface SelectedSectionPayload {
 export interface SiteSectionContextPayload extends SelectedSectionPayload {
   clientX: number;
   clientY: number;
+  /** Pointer offset within the grabbed element (iframe coordinates). */
+  grabOffsetX?: number;
+  grabOffsetY?: number;
 }
 
 export interface SelectedSection {
@@ -115,6 +119,7 @@ export interface SiteSectionPreviewThumbMessage {
   payload: {
     sectionId: string;
     surfaceId?: string;
+    fieldPath?: string;
     dataUrl: string;
     captureKind: TargetPreviewCaptureKind;
     width: number;
@@ -127,13 +132,18 @@ export interface SiteSectionParentDragStartMessage {
   payload: { started: true };
 }
 
+export interface SiteSectionDragCancelMessage {
+  type: typeof PREVIEW_SECTION_MSG.DRAG_CANCEL;
+}
+
 export type ParentToIframeSectionMessage =
   | SiteSectionHighlightMessage
   | SiteSectionFocusMessage
   | SiteSectionClearMessage
   | SiteSectionEnableModeMessage
   | SiteSectionDisableModeMessage
-  | SiteSectionParentDragStartMessage;
+  | SiteSectionParentDragStartMessage
+  | SiteSectionDragCancelMessage;
 
 export type IframeToParentSectionMessage =
   | SiteSectionSelectedMessage
@@ -149,6 +159,7 @@ const ALLOWED_PARENT_TYPES = new Set<string>([
   PREVIEW_SECTION_MSG.ENABLE_MODE,
   PREVIEW_SECTION_MSG.DISABLE_MODE,
   PREVIEW_SECTION_MSG.PARENT_DRAG_START,
+  PREVIEW_SECTION_MSG.DRAG_CANCEL,
 ]);
 
 const ALLOWED_IFRAME_TYPES = new Set<string>([
@@ -261,6 +272,7 @@ export function parseSiteSectionPreviewThumbMessage(
     payload: {
       sectionId: payload.sectionId.trim(),
       surfaceId: isNonEmptyString(payload.surfaceId) ? payload.surfaceId.trim() : undefined,
+      fieldPath: isNonEmptyString(payload.fieldPath) ? payload.fieldPath.trim() : undefined,
       dataUrl: payload.dataUrl.trim(),
       captureKind: payload.captureKind,
       width: payload.width,
@@ -321,11 +333,19 @@ function parseContextPayload(payload: Record<string, unknown>): SiteSectionConte
   const parsed = parseSelectedSectionPayload(payload);
   if (!parsed) return null;
 
-  const { clientX, clientY } = payload;
+  const { clientX, clientY, grabOffsetX, grabOffsetY } = payload;
   if (typeof clientX !== 'number' || !Number.isFinite(clientX)) return null;
   if (typeof clientY !== 'number' || !Number.isFinite(clientY)) return null;
 
-  return { ...parsed, clientX, clientY };
+  return {
+    ...parsed,
+    clientX,
+    clientY,
+    grabOffsetX:
+      typeof grabOffsetX === 'number' && Number.isFinite(grabOffsetX) ? grabOffsetX : undefined,
+    grabOffsetY:
+      typeof grabOffsetY === 'number' && Number.isFinite(grabOffsetY) ? grabOffsetY : undefined,
+  };
 }
 
 /** Map validated selection payload to UI state. */
@@ -358,6 +378,11 @@ export function selectedSectionFromPayload(payload: SelectedSectionPayload): Sel
 /** Build parent → iframe signal to capture drag target preview thumbnail. */
 export function buildSiteSectionParentDragStartMessage(): SiteSectionParentDragStartMessage {
   return { type: PREVIEW_SECTION_MSG.PARENT_DRAG_START, payload: { started: true } };
+}
+
+/** Build parent → iframe signal to cancel an in-progress drag. */
+export function buildSiteSectionDragCancelMessage(): SiteSectionDragCancelMessage {
+  return { type: PREVIEW_SECTION_MSG.DRAG_CANCEL };
 }
 
 /** Build parent → iframe highlight message. */
@@ -412,7 +437,8 @@ export function isValidParentToIframeSectionMessage(data: unknown): data is Pare
     data.type === PREVIEW_SECTION_MSG.DISABLE_MODE ||
     (data.type === PREVIEW_SECTION_MSG.PARENT_DRAG_START &&
       isRecord(data.payload) &&
-      data.payload.started === true)
+      data.payload.started === true) ||
+    data.type === PREVIEW_SECTION_MSG.DRAG_CANCEL
   );
 }
 
