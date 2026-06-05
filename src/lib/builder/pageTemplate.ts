@@ -70,11 +70,32 @@ function HeroContactCard() {
       <h2 className="mt-4 font-serif text-3xl font-semibold">Ready to work with us?</h2>
       <p className="mt-4 leading-7 text-slate-600">Get clear next steps and a professional experience from the first conversation.</p>
       {siteConfig.contact.phone && (
-        <div className={"mt-6 rounded-2xl " + preset.mutedBg + " p-4 font-semibold"}>{siteConfig.contact.phone}</div>
+        <div
+          className={"mt-6 rounded-2xl " + preset.mutedBg + " p-4 font-semibold"}
+          {...SITE_ELEMENT_ATTRS({ kind: "contact_field", label: "Phone in card", fieldPath: "contact.phone", surfaceId: "contact-phone-hero-card" })}
+        >{siteConfig.contact.phone}</div>
       )}
       {siteConfig.contact.email && (
-        <div className={"mt-3 rounded-2xl " + preset.mutedBg + " p-4 font-semibold"}>{siteConfig.contact.email}</div>
+        <div
+          className={"mt-3 rounded-2xl " + preset.mutedBg + " p-4 font-semibold"}
+          {...SITE_ELEMENT_ATTRS({ kind: "contact_field", label: "Email in card", fieldPath: "contact.email", surfaceId: "contact-email-hero-card" })}
+        >{siteConfig.contact.email}</div>
       )}
+      {siteConfig.contact.address && (
+        <div
+          className={"mt-3 rounded-2xl " + preset.mutedBg + " p-4 font-semibold"}
+          {...SITE_ELEMENT_ATTRS({ kind: "contact_field", label: "Address in card", fieldPath: "contact.address", surfaceId: "contact-address-hero-card" })}
+        >{siteConfig.contact.address}</div>
+      )}
+      {(Array.isArray(siteConfig.contact.extraLines) ? siteConfig.contact.extraLines : []).map((line, extraIndex) => (
+        line ? (
+          <div
+            key={"contact-extra-hero-" + extraIndex}
+            className={"mt-3 rounded-2xl " + preset.mutedBg + " p-4 font-semibold"}
+            {...SITE_ELEMENT_ATTRS({ kind: "contact_field", label: "Contact line " + (extraIndex + 1), fieldPath: "contact.extraLines[" + extraIndex + "]", surfaceId: "contact-extra-hero-" + extraIndex })}
+          >{line}</div>
+        ) : null
+      ))}
     </div>
   );
 }
@@ -475,6 +496,15 @@ function ContactSection({ section, sectionIndex }: { section: SiteSection; secti
                   {...SITE_ELEMENT_ATTRS({ kind: "contact_field", label: "Address in card", fieldPath: "contact.address" })}
                 >{contact.address}</div>
               )}
+              {(Array.isArray(contact.extraLines) ? contact.extraLines : []).map((line, extraIndex) => (
+                line ? (
+                  <div
+                    key={"contact-extra-" + extraIndex}
+                    className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-200"
+                    {...SITE_ELEMENT_ATTRS({ kind: "contact_field", label: "Contact line " + (extraIndex + 1), fieldPath: "contact.extraLines[" + extraIndex + "]", surfaceId: "contact-extra-" + extraIndex })}
+                  >{line}</div>
+                ) : null
+              ))}
             </div>
           </div>
         </div>

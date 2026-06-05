@@ -152,6 +152,29 @@ export function updateContactFieldInSource(
 }
 
 /**
+ * Append a new row to contact.extraLines (hero/contact card list).
+ */
+export function appendContactExtraLineInSource(content: string, value: string): string | null {
+  const line = value.trim();
+  if (!line) return null;
+
+  return mutateSiteConfigSource(content, (config) => {
+    const contact = asMutableRecord(config.contact);
+    const extraLines = Array.isArray(contact.extraLines)
+      ? [...(contact.extraLines as string[])]
+      : [];
+    const exists = extraLines.some(
+      (entry) => String(entry ?? '').trim().toLowerCase() === line.toLowerCase()
+    );
+    if (exists) return false;
+    extraLines.push(line);
+    contact.extraLines = extraLines;
+    config.contact = contact;
+    return true;
+  });
+}
+
+/**
  * Add a service item to the services section, creating that section if needed.
  */
 export function addServiceToSource(
@@ -320,6 +343,18 @@ export function updateConfigFieldInSource(
     }
     if (parsed.scope === 'contact') {
       const contact = asMutableRecord(config.contact);
+      if (parsed.field === 'extraLines' && parsed.contactExtraLineIndex != null) {
+        const extraLines = Array.isArray(contact.extraLines)
+          ? [...(contact.extraLines as string[])]
+          : [];
+        const idx = parsed.contactExtraLineIndex;
+        if (extraLines[idx] === value) return false;
+        while (extraLines.length <= idx) extraLines.push('');
+        extraLines[idx] = value;
+        contact.extraLines = extraLines;
+        config.contact = contact;
+        return true;
+      }
       if (contact[parsed.field] === value) return false;
       contact[parsed.field] = value;
       config.contact = contact;

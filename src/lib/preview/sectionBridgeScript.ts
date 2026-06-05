@@ -9,7 +9,7 @@ import {
   TARGET_PREVIEW_THUMB_WIDTH,
 } from '@/lib/preview/targetPreviewThumbnail';
 
-export const PREVIEW_SECTION_BRIDGE_VERSION = 25;
+export const PREVIEW_SECTION_BRIDGE_VERSION = 27;
 
 const HIGHLIGHT_CLASS = 'site-editor-section-highlight';
 const HOVER_CLASS = 'site-editor-section-hover';
@@ -17,9 +17,9 @@ const HOVER_CLASS = 'site-editor-section-hover';
 /** CSS injected into proxied preview HTML alongside the external bridge script. */
 export const PREVIEW_SECTION_SELECTION_STYLES = `<style id="preview-section-selection-styles">
 .${HIGHLIGHT_CLASS},.${HOVER_CLASS}{outline:3px solid #2563eb!important;outline-offset:3px!important;box-shadow:0 0 0 1px #2563eb,inset 0 0 0 9999px rgba(59,130,246,0.28)!important}
-.site-editor-preview-bridge section,.site-editor-preview-bridge section[id],.site-editor-preview-bridge [data-site-section-id],.site-editor-preview-bridge [data-analytics-id],.site-editor-preview-bridge [data-site-config-field-path],.site-editor-preview-bridge main a,.site-editor-preview-bridge main button,.site-editor-preview-bridge main h1,.site-editor-preview-bridge main h2,.site-editor-preview-bridge main h3,.site-editor-preview-bridge main p,.site-editor-preview-bridge nav a{cursor:grab!important}
-.site-editor-preview-bridge.site-editor-dragging section,.site-editor-preview-bridge.site-editor-dragging section[id],.site-editor-preview-bridge.site-editor-dragging [data-site-section-id],.site-editor-preview-bridge.site-editor-dragging [data-analytics-id],.site-editor-preview-bridge.site-editor-dragging [data-site-config-field-path],.site-editor-preview-bridge.site-editor-dragging main a,.site-editor-preview-bridge.site-editor-dragging main button,.site-editor-preview-bridge.site-editor-dragging main h1,.site-editor-preview-bridge.site-editor-dragging main h2,.site-editor-preview-bridge.site-editor-dragging main h3,.site-editor-preview-bridge.site-editor-dragging main p,.site-editor-preview-bridge.site-editor-dragging nav a{cursor:grabbing!important}
-.site-editor-preview-bridge [data-site-config-field-path]:active,.site-editor-preview-bridge main a:active,.site-editor-preview-bridge main button:active,.site-editor-preview-bridge nav a:active{cursor:grabbing!important}
+.site-editor-preview-bridge section,.site-editor-preview-bridge section[id],.site-editor-preview-bridge [data-site-section-id],.site-editor-preview-bridge [data-analytics-id],.site-editor-preview-bridge [data-site-config-field-path],.site-editor-preview-bridge [data-site-element-kind='contact_field'],.site-editor-preview-bridge main a,.site-editor-preview-bridge main button,.site-editor-preview-bridge main h1,.site-editor-preview-bridge main h2,.site-editor-preview-bridge main h3,.site-editor-preview-bridge main p,.site-editor-preview-bridge nav a{cursor:grab!important}
+.site-editor-preview-bridge.site-editor-dragging section,.site-editor-preview-bridge.site-editor-dragging section[id],.site-editor-preview-bridge.site-editor-dragging [data-site-section-id],.site-editor-preview-bridge.site-editor-dragging [data-analytics-id],.site-editor-preview-bridge.site-editor-dragging [data-site-config-field-path],.site-editor-preview-bridge.site-editor-dragging [data-site-element-kind='contact_field'],.site-editor-preview-bridge.site-editor-dragging main a,.site-editor-preview-bridge.site-editor-dragging main button,.site-editor-preview-bridge.site-editor-dragging main h1,.site-editor-preview-bridge.site-editor-dragging main h2,.site-editor-preview-bridge.site-editor-dragging main h3,.site-editor-preview-bridge.site-editor-dragging main p,.site-editor-preview-bridge.site-editor-dragging nav a{cursor:grabbing!important}
+.site-editor-preview-bridge [data-site-config-field-path]:active,.site-editor-preview-bridge [data-site-element-kind='contact_field']:active,.site-editor-preview-bridge main a:active,.site-editor-preview-bridge main button:active,.site-editor-preview-bridge nav a:active{cursor:grabbing!important}
 </style>`;
 
 /** JavaScript body for the preview section selection bridge (no script tags). */

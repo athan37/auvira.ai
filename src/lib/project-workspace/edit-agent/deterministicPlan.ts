@@ -39,6 +39,28 @@ function parseContactField(message: string): { field: string; value: string } | 
   return null;
 }
 
+/** Extract value for a new contact card row (hero Get Started / contact section). */
+function parseAddContactExtraLine(message: string): string | null {
+  const quotedAdd = message.match(
+    /\badd\s+(?:another\s+)?(?:contact\s+)?(?:line|row|item)\s+(?:with\s+|(?:saying\s+)?)?["']([^"']+)["']/i
+  );
+  if (quotedAdd?.[1]) return quotedAdd[1].trim();
+
+  const toCard = message.match(
+    /\badd\s+(.+?)\s+to\s+(?:the\s+)?(?:contact\s+card|hero\s+card|get\s+started(?:\s+card)?)\b/i
+  );
+  if (toCard?.[1]) return toCard[1].trim().replace(/^["']|["']$/g, '');
+
+  if (/\badd\s+(?:another|a\s+new|one\s+more)\s+(?:contact\s+)?(?:line|row|item)\b/i.test(message)) {
+    const email = message.match(/\b[\w.+-]+@[\w.-]+\.\w+\b/);
+    if (email?.[0]) return email[0];
+    const quoted = message.match(/["']([^"']+)["']/);
+    if (quoted?.[1]) return quoted[1].trim();
+  }
+
+  return null;
+}
+
 function parseHeroValue(message: string): { field: string; value: string } | null {
   const quoted = message.match(/\bto\s+["']([^"']+)["']/i);
   if (quoted?.[1] && /\bheadline\b/i.test(message)) {
@@ -492,6 +514,21 @@ export function buildDeterministicPlan(editContext: EditContext): EditPlan | nul
         {
           skill: 'add_service',
           params: { title: addService[1].trim() },
+        },
+      ],
+    };
+  }
+
+  const extraLineValue = parseAddContactExtraLine(message);
+  if (extraLineValue) {
+    return {
+      planVersion: 'website-agent',
+      needsClarification: false,
+      intent: 'section',
+      steps: [
+        {
+          skill: 'add_contact_extra_line',
+          params: { value: extraLineValue },
         },
       ],
     };

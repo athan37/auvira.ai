@@ -16,4 +16,17 @@ describe('pageTemplate hero variants', () => {
     expect(PAGE_TSX_TEMPLATE).toContain('function HeroMenuFeature()');
     expect(PAGE_TSX_TEMPLATE).toContain('function HeroAppointment()');
   });
+
+  it('tags hero Get Started card phone and email rows for preview drag', () => {
+    expect(PAGE_TSX_TEMPLATE).toContain('contact-phone-hero-card');
+    expect(PAGE_TSX_TEMPLATE).toContain('contact-email-hero-card');
+    expect(PAGE_TSX_TEMPLATE).toContain('fieldPath: "contact.phone"');
+    expect(PAGE_TSX_TEMPLATE).toContain('fieldPath: "contact.email"');
+  });
+
+  it('renders contact.extraLines rows in hero and contact cards', () => {
+    expect(PAGE_TSX_TEMPLATE).toContain('siteConfig.contact.extraLines');
+    expect(PAGE_TSX_TEMPLATE).toContain('contact.extraLines[" + extraIndex + "]');
+    expect(PAGE_TSX_TEMPLATE).toContain('contact.address');
+  });
 });

@@ -49,6 +49,7 @@ export const SKILL_TO_DOMAIN_TOOL: Partial<Record<string, DomainToolName>> = {
   update_section_style: 'apply_section_background',
   add_section: 'add_section',
   add_service: 'update_section_list',
+  add_contact_extra_line: 'update_section_list',
   remove_section: 'remove_section',
   reorder_sections: 'reorder_sections',
   replace_image: 'replace_image',
@@ -131,6 +132,13 @@ export function paramsForSkill(
       ...(merged.presentation && typeof merged.presentation === 'object'
         ? (merged.presentation as Record<string, unknown>)
         : {}),
+    };
+  }
+
+  if (skill === 'add_contact_extra_line') {
+    return {
+      action: 'add_contact_extra_line',
+      value: merged.value ?? merged.line,
     };
   }
 

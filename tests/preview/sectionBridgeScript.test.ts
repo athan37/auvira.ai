@@ -5,9 +5,9 @@ import {
   buildSectionBridgeScriptBody,
 } from '@/lib/preview/sectionBridgeScript';
 
-describe('sectionBridgeScript v25 scaled thumb capture', () => {
-  it('bumps bridge version for fixed-size scaled thumbnails', () => {
-    expect(PREVIEW_SECTION_BRIDGE_VERSION).toBeGreaterThanOrEqual(25);
+describe('sectionBridgeScript v26 hero contact row drag', () => {
+  it('bumps bridge version for hero contact value rows', () => {
+    expect(PREVIEW_SECTION_BRIDGE_VERSION).toBeGreaterThanOrEqual(26);
   });
 
   it('prefers styled element capture over SVG raster for element pins', () => {

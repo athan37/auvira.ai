@@ -56,6 +56,15 @@ export function isMeaningfulLeafTag(tagName: string): boolean {
   );
 }
 
+/** Map visible contact row text to siteConfig field path (placeholder-safe). */
+export function inferContactFieldPathFromText(text: string): 'contact.phone' | 'contact.email' | undefined {
+  const trimmed = text.trim();
+  if (!trimmed) return undefined;
+  if (/@/.test(trimmed)) return 'contact.email';
+  if (/phone|tel|call/i.test(trimmed)) return 'contact.phone';
+  return 'contact.phone';
+}
+
 /** Infer element kind from DOM tag + attrs. */
 export function inferElementKindFromTag(
   tagName: string,
@@ -114,6 +123,21 @@ function inferLeafKindFromTag(tag,href){
   return "body";
 }
 
+function inferContactFieldPathFromTextJs(text){
+  var t=(text||"").trim();
+  if(!t)return null;
+  if(t.indexOf("@")>=0)return "contact.email";
+  if(/phone|tel|call/i.test(t))return "contact.phone";
+  return "contact.phone";
+}
+
+function isContactValueRow(el){
+  if(!el||!el.getAttribute)return false;
+  if(el.getAttribute("data-site-element-kind")==="contact_field")return true;
+  var cls=el.className||"";
+  return el.tagName==="DIV"&&cls.indexOf("rounded-2xl")>=0&&cls.indexOf("p-4")>=0;
+}
+
 function inferLeafTarget(rootEl,target,sectionIndex){
   if(!rootEl||!target)return null;
   var node=target;
@@ -121,6 +145,31 @@ function inferLeafTarget(rootEl,target,sectionIndex){
     if(!node.tagName){node=node.parentElement;continue;}
     var tag=node.tagName.toUpperCase();
     var href=node.getAttribute?node.getAttribute("href")||"": "";
+    var annotatedKind=node.getAttribute("data-site-element-kind");
+    if(annotatedKind==="contact_field"||annotatedKind==="button"){
+      var annLabel=(node.getAttribute("data-site-element-label")||node.textContent||"").trim();
+      var annFp=node.getAttribute("data-site-config-field-path")||"";
+      return {
+        role:"element",
+        kind:annotatedKind,
+        label:annLabel||annotatedKind,
+        fieldPath:annFp||undefined,
+        surfaceId:node.getAttribute("data-site-surface-id")||undefined
+      };
+    }
+    if(tag==="DIV"&&isContactValueRow(node)){
+      var rowText=(node.textContent||"").trim();
+      if(rowText){
+        var rowFp=node.getAttribute("data-site-config-field-path")||inferContactFieldPathFromTextJs(rowText);
+        return {
+          role:"element",
+          kind:"contact_field",
+          label:rowText.slice(0,80),
+          fieldPath:rowFp||undefined,
+          surfaceId:rowFp?surfaceIdFromFieldPath(rowFp):undefined
+        };
+      }
+    }
     var isLeaf=tag==="A"||tag==="BUTTON"||/^H[1-4]$/.test(tag)||tag==="P"||tag==="FIGCAPTION"||tag==="IMG";
     if(isLeaf){
       var label=(node.textContent||"").trim()||node.getAttribute("alt")||node.getAttribute("data-analytics-label")||"";
@@ -204,6 +253,44 @@ function bootstrapHeroSection(heroEl){
   }
 }
 
+function bootstrapContactValueRows(scopeEl){
+  if(!scopeEl)return;
+  var rows=scopeEl.querySelectorAll(".rounded-2xl, .space-y-4 > div, [data-site-element-kind='contact_field']");
+  var phoneTagged=false,emailTagged=false,extraIndex=0;
+  for(var j=0;j<rows.length;j++){
+    var row=rows[j];
+    if(row.getAttribute("data-site-element-kind"))continue;
+    if(!isContactValueRow(row))continue;
+    var text=(row.textContent||"").trim();
+    if(!text)continue;
+    var fp=row.getAttribute("data-site-config-field-path")||"";
+    var sid="";
+    if(!fp){
+      if(!emailTagged&&/@/.test(text)){
+        fp="contact.email";
+        emailTagged=true;
+      }else if(!phoneTagged){
+        fp="contact.phone";
+        phoneTagged=true;
+      }else if(!emailTagged&&/@/.test(text)){
+        fp="contact.email";
+        emailTagged=true;
+      }else{
+        fp="contact.extraLines["+extraIndex+"]";
+        sid="contact-extra-"+extraIndex;
+        extraIndex++;
+      }
+    }
+    sid=row.getAttribute("data-site-surface-id")||sid||(fp.indexOf("extraLines")>=0?"contact-extra-line":("contact-"+(fp.split(".")[1]||"line")+"-card"));
+    setElementAttr(row,"contact_field",text.slice(0,80),fp,undefined,sid);
+  }
+}
+
+function bootstrapHeroContactFields(heroEl){
+  var card=heroEl.querySelector(".rounded-\\[2rem\\]")||heroEl.querySelector("[class*='rounded-[2rem]']");
+  bootstrapContactValueRows(card||heroEl);
+}
+
 function bootstrapContactExtras(sectionEl,sectionIndex){
   var innerCard=sectionEl.querySelector("[data-site-container-kind='inner_card']");
   if(!innerCard){
@@ -218,17 +305,7 @@ function bootstrapContactExtras(sectionEl,sectionIndex){
   }
   var phoneLink=sectionEl.querySelector('a[href^="tel:"]');
   if(phoneLink)bootstrapCtaLink(phoneLink,"Phone button","contact.phone");
-  var cardRows=sectionEl.querySelectorAll(".rounded-2xl.border, .space-y-4 > div");
-  for(var j=0;j<cardRows.length;j++){
-    var row=cardRows[j];
-    var text=(row.textContent||"").trim();
-    if(!text)continue;
-    if(/\\+?\\d[\\d\\s().-]{6,}/.test(text)&&!row.getAttribute("data-site-element-kind")){
-      setElementAttr(row,"contact_field","Phone in card","contact.phone",undefined,"contact-phone-card");
-    }else if(/@/.test(text)&&!row.getAttribute("data-site-element-kind")){
-      setElementAttr(row,"contact_field","Email in card","contact.email");
-    }
-  }
+  bootstrapContactValueRows(innerCard||sectionEl);
 }
 
 function bootstrapNavElements(navEl){
@@ -249,12 +326,18 @@ function bootstrapElementAttrsUniversal(){
     var sectionEl=sections[s];
     var idx=sectionIndexFromEl(sectionEl);
     if(!Number.isFinite(idx)||idx<0){
-      if(sectionEl.id==="hero"||sectionEl.getAttribute("data-analytics-type")==="hero")bootstrapHeroSection(sectionEl);
+      if(sectionEl.id==="hero"||sectionEl.getAttribute("data-analytics-type")==="hero"){
+        bootstrapHeroSection(sectionEl);
+        bootstrapHeroContactFields(sectionEl);
+      }
       continue;
     }
     var type=(sectionEl.getAttribute("data-site-section-type")||sectionEl.id||"").toLowerCase();
     bootstrapUniversalElements(sectionEl,idx);
-    if(type==="hero"||sectionEl.id==="hero")bootstrapHeroSection(sectionEl);
+    if(type==="hero"||sectionEl.id==="hero"){
+      bootstrapHeroSection(sectionEl);
+      bootstrapHeroContactFields(sectionEl);
+    }
     if(type==="contact"||sectionEl.id==="contact")bootstrapContactExtras(sectionEl,idx);
     else if(/services|about|features|faq|testimonials|generic|gallery/.test(type))bootstrapItemCards(sectionEl,idx);
   }

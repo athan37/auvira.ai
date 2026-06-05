@@ -45,6 +45,7 @@ export const SITE_CONFIG_ONLY_TYPE_BLOCK = `export type SiteConfig = {
     phone?: string;
     email?: string;
     address?: string;
+    extraLines?: string[];
   };
   sections: SiteSection[];
 };`;

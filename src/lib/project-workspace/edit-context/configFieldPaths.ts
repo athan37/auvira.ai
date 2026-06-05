@@ -7,15 +7,29 @@ export interface ParsedConfigFieldPath {
   scope: 'hero' | 'businessName' | 'contact' | 'section' | 'sectionItem';
   sectionIndex?: number;
   itemIndex?: number;
+  /** Index into contact.extraLines when field is `extraLines`. */
+  contactExtraLineIndex?: number;
   field: string;
 }
 
 const FIELD_PATH_RE =
   /^(hero\.(headline|subheadline|tagline|primaryCta|secondaryCta)|businessName|contact\.(phone|email|address)|sections\[(\d+)\]\.(title|subtitle|body)|sections\[(\d+)\]\.items\[(\d+)\]\.(title|description|imageUrl|alt|label|href))$/;
 
+const CONTACT_EXTRA_LINE_RE = /^contact\.extraLines\[(\d+)\]$/;
+
 /** Parse and validate an allowlisted config field path. */
 export function parseConfigFieldPath(fieldPath: string): ParsedConfigFieldPath | null {
   const trimmed = fieldPath.trim();
+  const extraLineMatch = trimmed.match(CONTACT_EXTRA_LINE_RE);
+  if (extraLineMatch?.[1] != null) {
+    return {
+      fieldPath: trimmed,
+      scope: 'contact',
+      field: 'extraLines',
+      contactExtraLineIndex: Number(extraLineMatch[1]),
+    };
+  }
+
   const match = trimmed.match(FIELD_PATH_RE);
   if (!match) return null;
 
@@ -63,6 +77,12 @@ export function readConfigFieldValue(
   }
   if (parsed.scope === 'contact') {
     const contact = config.contact as Record<string, unknown> | undefined;
+    if (parsed.field === 'extraLines' && parsed.contactExtraLineIndex != null) {
+      const extraLines = Array.isArray(contact?.extraLines)
+        ? (contact!.extraLines as unknown[])
+        : [];
+      return extraLines[parsed.contactExtraLineIndex];
+    }
     return contact?.[parsed.field];
   }
   const sections = Array.isArray(config.sections)
@@ -97,4 +117,9 @@ export function sectionItemFieldPath(
 
 export function heroFieldPath(field: string): string {
   return `hero.${field}`;
+}
+
+/** Build canonical contact.extraLines[n] path. */
+export function contactExtraLineFieldPath(index: number): string {
+  return `contact.extraLines[${index}]`;
 }

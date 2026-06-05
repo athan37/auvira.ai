@@ -7,6 +7,7 @@ import { parseSiteConfigSource } from '@/lib/site-manager/siteConfigParser';
 import {
   addSectionToSource,
   addServiceToSource,
+  appendContactExtraLineInSource,
   removeSectionFromSource,
   reorderSectionsInSource,
 } from '@/lib/project-workspace/siteConfigMutations';
@@ -62,6 +63,35 @@ export async function updateSectionListTool(
       changedFiles: [SITE_CONFIG],
       summary: `Added ${title} to services.`,
       evidence: { title },
+    };
+  }
+
+  if (action === 'add_contact_extra_line') {
+    const value = String(params.value ?? params.line ?? '').trim();
+    if (!value) {
+      return {
+        ok: false,
+        changedFiles: [],
+        summary: '',
+        invariantErrors: ['add_contact_extra_line requires value'],
+      };
+    }
+    const updated = appendContactExtraLineInSource(content, value);
+    if (!updated || updated === content) {
+      return {
+        ok: false,
+        changedFiles: [],
+        summary: '',
+        invariantErrors: ['Contact line already exists or could not be added'],
+      };
+    }
+    await writeWorkspaceRel(ctx.agentOptions, SITE_CONFIG, updated);
+    ctx.afterFiles[SITE_CONFIG] = updated;
+    return {
+      ok: true,
+      changedFiles: [SITE_CONFIG],
+      summary: `Added contact line "${value}" to the contact card.`,
+      evidence: { value },
     };
   }
 

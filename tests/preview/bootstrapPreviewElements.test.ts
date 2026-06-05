@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildUniversalBootstrapBridgeScript,
+  inferContactFieldPathFromText,
   inferElementKindFromTag,
   isMeaningfulLeafTag,
   mapCtaFieldPath,
@@ -47,6 +48,18 @@ describe('inferElementKindFromTag', () => {
   });
 });
 
+describe('inferContactFieldPathFromText', () => {
+  it('maps placeholder phone copy without digits to contact.phone', () => {
+    expect(inferContactFieldPathFromText('Display phone number provided by user')).toBe(
+      'contact.phone'
+    );
+  });
+
+  it('maps email rows to contact.email', () => {
+    expect(inferContactFieldPathFromText('1234@asdfasd.edu')).toBe('contact.email');
+  });
+});
+
 describe('buildUniversalBootstrapBridgeScript', () => {
   it('includes universal bootstrap and draggable root helpers', () => {
     const script = buildUniversalBootstrapBridgeScript();
@@ -54,6 +67,9 @@ describe('buildUniversalBootstrapBridgeScript', () => {
     expect(script).toContain('function inferLeafTarget');
     expect(script).toContain('function bootstrapUniversalElements');
     expect(script).toContain('function bootstrapNavElements');
+    expect(script).toContain('function bootstrapHeroContactFields');
+    expect(script).toContain('function bootstrapContactValueRows');
+    expect(script).toContain('contact.extraLines[');
     expect(script).not.toContain('primaryButton');
   });
 });

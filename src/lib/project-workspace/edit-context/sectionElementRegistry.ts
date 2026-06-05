@@ -1,6 +1,6 @@
 import { parseSiteConfigSource } from '@/lib/site-manager/siteConfigParser';
 import type { SelectedTargetInput } from '@/lib/project-workspace/edit-shared/selectedTargetTypes';
-import { heroFieldPath, sectionFieldPath, sectionItemFieldPath } from './configFieldPaths';
+import { contactExtraLineFieldPath, heroFieldPath, sectionFieldPath, sectionItemFieldPath } from './configFieldPaths';
 import {
   enumerateAllowlistedFields,
   filterFieldsToSection,
@@ -212,6 +212,24 @@ function contactEmbeddedSurfaces(
       confidence: 'high',
     });
   }
+
+  const extraLines = Array.isArray(contact.extraLines) ? (contact.extraLines as string[]) : [];
+  extraLines.forEach((line, index) => {
+    const value = String(line ?? '').trim();
+    if (!value) return;
+    surfaces.push({
+      surfaceId: `contact_extra_line_${sectionIndex}_${index}`,
+      elementKind: 'contact_field',
+      humanLabel: `Contact line ${index + 1} in card`,
+      fieldPath: contactExtraLineFieldPath(index),
+      visibleText: value,
+      matchAliases: ['contact line', 'extra line', 'contact card line', `line ${index + 1}`],
+      placement: 'inner_card',
+      source: 'embedded_global',
+      editFamily: 'copy',
+      confidence: 'high',
+    });
+  });
 
   return surfaces;
 }

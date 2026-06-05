@@ -1,6 +1,7 @@
 import { parseSiteConfigSource } from '@/lib/site-manager/siteConfigParser';
 import type { ParsedConfigFieldPath } from './configFieldPaths';
 import {
+  contactExtraLineFieldPath,
   heroFieldPath,
   parseConfigFieldPath,
   sectionFieldPath,
@@ -92,6 +93,15 @@ export function enumerateAllowlistedFields(
       labels: [field, 'contact', `contact ${field}`],
     });
   }
+
+  const extraLines = Array.isArray(contact?.extraLines) ? (contact!.extraLines as unknown[]) : [];
+  extraLines.forEach((line, index) => {
+    pushEntry(entries, contactExtraLineFieldPath(index), line, {
+      scope: 'contact',
+      field: 'extraLines',
+      labels: ['contact line', `contact line ${index + 1}`, 'extra line', 'contact card line'],
+    });
+  });
 
   const sections = parsed.sections;
 

@@ -11,6 +11,7 @@ export interface ParsedSiteConfig {
     phone?: string;
     email?: string;
     address?: string;
+    extraLines?: string[];
   };
   businessName?: string;
   hero?: {
