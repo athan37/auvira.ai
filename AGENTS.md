@@ -96,6 +96,7 @@ Users pin a section target by **dragging a section from the editable preview ifr
 | Proxy HTML injection | `src/lib/preview/injectPreviewSectionSelection.ts`, `src/lib/project-workspace/previewProxyRewrite.ts` |
 | Parent drag overlay + drop zone | `src/app/projects/[projectId]/page.tsx` |
 | postMessage protocol | `src/lib/preview/sectionSelectionProtocol.ts` |
+| Drag target preview thumbnails | `src/lib/preview/capturePreviewRoot.ts`, `src/lib/preview/targetPreviewThumbnail.ts`, `src/components/project/PreviewTargetThumbnail.tsx` |
 | Section DOM attrs on generated sites | `src/lib/builder/siteSectionDomAttrs.ts`, `src/lib/analytics/generated-sites/injectAnalyticsRuntime.ts` |
 
 **Editable preview only** — `previewMode === 'live'` loads the published site directly with no proxy injection; drag is disabled by design.
@@ -107,7 +108,15 @@ Users pin a section target by **dragging a section from the editable preview ifr
 3. **Cross-iframe mouse events** — After mousedown inside the iframe, the parent window did not reliably receive `mousemove`/`mouseup`. Fix: on `SITE_SECTION_DRAG_START`, show a full-screen capture overlay in `page.tsx` that tracks pointer until drop.
 4. **Missing section attrs on legacy workspaces** — Older clones lacked `data-site-section-id`. Fix: bridge falls back to any `<section>` / known `id`, and workspace repair runs `instrumentGeneratedSite` to add attrs.
 
-After bridge changes, **hard-refresh the preview** (toolbar refresh) so proxied HTML picks up the new `section-bridge?v=` version.
+After bridge changes, **hard-refresh the preview** (toolbar refresh) so proxied HTML picks up the new `section-bridge?v=` version (currently v25 — drag thumbnails are fixed 112×80px with scale-to-fit content).
+
+**Universal drag (v22+):** Any visible link, button, heading, or paragraph inside a section (or nav CTA / business name) can be dragged to chat. Legacy clones without `SITE_ELEMENT_ATTRS` get runtime bootstrap in the bridge; unannotated clicks infer a leaf pin with visible text as the label.
+
+**Element preview (v25):** All styled captures render into a **112×80px** canvas (`TARGET_PREVIEW_THUMB_WIDTH/HEIGHT`); text and controls are **scaled down to fit** so the chip shows the full label (e.g. “Contact Information”), not a cropped slice. UI uses `object-contain`.
+
+### Drag target preview thumbnails
+
+On drag past threshold, the bridge rasterizes the pinned element/card and posts `SITE_SECTION_PREVIEW_THUMB` to the parent. The drag ghost and pinned chip show the thumbnail; on chat drop it uploads via `upload-assets` and persists `previewThumbnail.previewUrl` on `metadata.selectedTarget` in chat history. Live published preview has no bridge — text breadcrumb only.
 
 ### Chat history persistence
 

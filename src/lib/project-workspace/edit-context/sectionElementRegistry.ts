@@ -439,3 +439,21 @@ export function buildSectionElementCatalog(
 
   return surfaces;
 }
+
+/** Restrict element catalog to a single pinned surface (fieldPath + optional surfaceId). */
+export function filterCatalogToPin(
+  catalog: SectionElementSurface[],
+  pin: { fieldPath?: string; surfaceId?: string }
+): SectionElementSurface[] {
+  const fieldPath = pin.fieldPath?.trim();
+  if (!fieldPath) return catalog;
+
+  const surfaceId = pin.surfaceId?.trim();
+  if (surfaceId) {
+    const bySurface = catalog.filter((surface) => surface.surfaceId === surfaceId);
+    if (bySurface.length > 0) return bySurface;
+  }
+
+  const byPath = catalog.filter((surface) => surface.fieldPath === fieldPath);
+  return byPath.length > 0 ? byPath : catalog.slice(0, 1);
+}

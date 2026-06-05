@@ -5,13 +5,16 @@ import {
   buildSiteSectionClearMessage,
   buildSiteSectionFocusMessage,
   buildSiteSectionHighlightMessage,
+  buildSiteSectionParentDragStartMessage,
   parseSiteSectionDismissMessage,
   parseSiteSectionDragStartMessage,
   parseSiteSectionPointerDownMessage,
+  parseSiteSectionPreviewThumbMessage,
   type ParentToIframeSectionMessage,
   type SelectedSection,
   type SiteSectionContextPayload,
 } from '@/lib/preview/sectionSelectionProtocol';
+import type { TargetPreviewThumbMessage } from '@/lib/preview/targetPreviewThumbnail';
 import {
   cancelWorkspaceReleaseOnEnter,
   scheduleWorkspaceReleaseOnLeave,
@@ -55,6 +58,9 @@ interface Props {
   onSectionDragStart?: (payload: SiteSectionContextPayload, screenX: number, screenY: number) => void;
   onSectionPointerDown?: (payload: SiteSectionContextPayload, screenX: number, screenY: number) => void;
   onSectionHighlightDismiss?: () => void;
+  /** Bumped when parent drag threshold is crossed — triggers iframe capture. */
+  sectionDragCaptureKey?: number;
+  onSectionPreviewThumb?: (thumb: TargetPreviewThumbMessage) => void;
 }
 
 const STAGE_ORDER = ['idle', 'cloning', 'installing', 'starting_server', 'ready'] as const;
@@ -93,6 +99,8 @@ export function ProjectPreviewFrame({
   onSectionDragStart,
   onSectionPointerDown,
   onSectionHighlightDismiss,
+  sectionDragCaptureKey = 0,
+  onSectionPreviewThumb,
 }: Props) {
   const onReadyChangeRef = useRef(onReadyChange);
   onReadyChangeRef.current = onReadyChange;
@@ -121,6 +129,11 @@ export function ProjectPreviewFrame({
       /* cross-origin or detached */
     }
   }, []);
+
+  useEffect(() => {
+    if (!selectionAvailable || sectionDragCaptureKey <= 0) return;
+    postToIframe(buildSiteSectionParentDragStartMessage());
+  }, [sectionDragCaptureKey, selectionAvailable, postToIframe]);
 
   useEffect(() => {
     if (!selectionAvailable) return;
@@ -361,6 +374,12 @@ export function ProjectPreviewFrame({
         return;
       }
 
+      const previewThumb = parseSiteSectionPreviewThumbMessage(event.data);
+      if (previewThumb && selectionAvailable) {
+        onSectionPreviewThumb?.(previewThumb.payload);
+        return;
+      }
+
       const dismiss = parseSiteSectionDismissMessage(event.data);
       if (dismiss && selectionAvailable) {
         onSectionHighlightDismiss?.();
@@ -372,7 +391,7 @@ export function ProjectPreviewFrame({
       window.removeEventListener('message', onMessage);
       if (chunkRetryTimerRef.current) clearTimeout(chunkRetryTimerRef.current);
     };
-  }, [editInProgress, onSectionDragStart, onSectionPointerDown, onSectionHighlightDismiss, selectionAvailable]);
+  }, [editInProgress, onSectionDragStart, onSectionPointerDown, onSectionHighlightDismiss, onSectionPreviewThumb, selectionAvailable]);
 
   const handleRefresh = () => {
     setIframeLoading(true);

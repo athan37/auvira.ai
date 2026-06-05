@@ -8,6 +8,8 @@ import { normalizeMisroutedCopyPlan } from '@/lib/project-workspace/edit-agent/p
 import { buildEditContext } from '@/lib/project-workspace/edit-context/buildEditContext';
 
 const PROJECT_ID = '6a1f96b65872cf542bda0d08';
+const WORKSPACE_SITE_CONFIG = path.join(getGitWorkspacePath(PROJECT_ID), 'src/lib/siteConfig.ts');
+const HAS_WORKSPACE_FIXTURE = fs.existsSync(WORKSPACE_SITE_CONFIG);
 const OWNER_MESSAGE = 'change get in touch btn to hello click on this';
 const SECTION_PIN = {
   kind: 'section' as const,
@@ -18,13 +20,10 @@ const SECTION_PIN = {
   analyticsId: 'section_contact_get-started-today_5',
 };
 
-describe('normalizeMisroutedCopyPlan preserves hero.primaryCta', () => {
+describe.skipIf(!HAS_WORKSPACE_FIXTURE)('normalizeMisroutedCopyPlan preserves hero.primaryCta', () => {
   it('does not rewrite get in touch btn plan away from hero.primaryCta', async () => {
     const workspacePath = getGitWorkspacePath(PROJECT_ID);
-    const siteConfig = await fs.promises.readFile(
-      path.join(workspacePath, 'src/lib/siteConfig.ts'),
-      'utf-8'
-    );
+    const siteConfig = await fs.promises.readFile(WORKSPACE_SITE_CONFIG, 'utf-8');
 
     const resolved = resolveConfigTextEdit({
       message: OWNER_MESSAGE,

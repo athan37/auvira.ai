@@ -6,6 +6,7 @@ import {
   formatPreviewTargetLabel,
   formatPreviewTargetLayers,
 } from '@/lib/preview/previewTargetChipLabels';
+import { targetPreviewDisplayUrl } from '@/lib/preview/targetPreviewThumbnail';
 import { sectionTypeLabel } from '@/lib/preview/previewTargetVisuals';
 import {
   activatePreviewTargetChip,
@@ -76,6 +77,7 @@ describe('previewTargetChipLabels', () => {
       scopeLabel: 'Contact',
       title: 'Get Started Today',
       element: { kind: 'button', label: 'Phone button' },
+      chainRows: [],
     });
   });
 
@@ -91,6 +93,45 @@ describe('previewTargetChipLabels', () => {
     ).toBe('Contact · Get Started Today › Phone button');
   });
 
+  it('formatPreviewTargetChain renders hierarchical rows with item position', () => {
+    const target = {
+      kind: 'section' as const,
+      sectionType: 'services',
+      sectionTitle: 'Our Services',
+      sectionIndex: 1,
+      targetChain: [
+        { role: 'section' as const, label: 'Our Services', kind: 'services' },
+        { role: 'container' as const, label: 'Service cards', kind: 'item_grid' },
+        { role: 'item' as const, label: 'Item 3', itemIndex: 2, itemPosition: 3 },
+        {
+          role: 'element' as const,
+          label: 'Service card description',
+          kind: 'item_body',
+          fieldPath: 'sections[1].items[2].description',
+        },
+      ],
+      fieldPath: 'sections[1].items[2].description',
+      pinScope: 'element' as const,
+    };
+    expect(formatPreviewTargetBreadcrumb(target)).toBe(
+      'Services · Our Services › Service cards › Item 3 › Service card description'
+    );
+  });
+
+  it('targetPreviewDisplayUrl prefers uploaded preview URL over transient data URL', () => {
+    expect(
+      targetPreviewDisplayUrl({
+        previewThumbnail: { previewUrl: '/api/preview.jpg' },
+        previewThumbnailDataUrl: 'data:image/jpeg;base64,tmp',
+      })
+    ).toBe('/api/preview.jpg');
+    expect(
+      targetPreviewDisplayUrl({
+        previewThumbnailDataUrl: 'data:image/jpeg;base64,tmp',
+      })
+    ).toBe('data:image/jpeg;base64,tmp');
+  });
+
   it('sectionTypeLabel title-cases known section types', () => {
     expect(sectionTypeLabel('contact')).toBe('Contact');
     expect(sectionTypeLabel('faq')).toBe('FAQ');
@@ -100,6 +141,41 @@ describe('previewTargetChipLabels', () => {
   it('renders pinned and used chip labels with unified copy', () => {
     expect(formatPreviewTargetChipText(heroTarget, 'pinned')).toBe('Pinned: Hero');
     expect(formatPreviewTargetChipText(ctaTarget, 'used')).toBe('Used: CTA: Book Now');
+  });
+
+  it('formats delivery coverage item card pin without generic Item cards label', () => {
+    const target = {
+      kind: 'section' as const,
+      sectionId: 'section_generic_delivery-coverage_5',
+      sectionType: 'generic',
+      sectionTitle: 'Delivery Coverage',
+      sectionIndex: 4,
+      fieldPath: 'sections[4].items[2].title',
+      elementKind: 'item_card',
+      elementLabel: 'Include minimum order requirements if any',
+      itemIndex: 2,
+      pinScope: 'element' as const,
+      targetChain: [
+        { role: 'section' as const, label: 'Delivery Coverage', kind: 'generic' },
+        { role: 'item' as const, label: 'Item 3', itemIndex: 2, itemPosition: 3 },
+        {
+          role: 'element' as const,
+          kind: 'item_card',
+          label: 'Include minimum order requirements if any',
+          fieldPath: 'sections[4].items[2].title',
+          itemIndex: 2,
+        },
+      ],
+    };
+    const display = formatPreviewTargetDisplay(target);
+    expect(display.title).toBe('Delivery Coverage');
+    expect(display.chainRows?.map((row) => row.label)).toEqual([
+      'Item 3',
+      'Include minimum order requirements if any',
+    ]);
+    expect(formatPreviewTargetLabel(target)).toBe(
+      'generic: Delivery Coverage › Item 3 › Include minimum order requirements if any'
+    );
   });
 });
 

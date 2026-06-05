@@ -26,14 +26,23 @@ function SITE_SECTION_DATA_ATTRS(section: SiteSection, sectionIndex: number) {
   };
 }
 
-function SITE_ELEMENT_ATTRS(opts: { kind: string; label: string; fieldPath: string; itemIndex?: number }) {
+function SITE_ELEMENT_ATTRS(opts: { kind: string; label: string; fieldPath: string; itemIndex?: number; surfaceId?: string }) {
+  const surfaceId = opts.surfaceId ?? opts.fieldPath.replace(/[\\[\\].]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
   const attrs: Record<string, string> = {
     "data-site-element-kind": opts.kind,
     "data-site-element-label": opts.label,
     "data-site-config-field-path": opts.fieldPath,
+    "data-site-surface-id": surfaceId,
   };
   if (opts.itemIndex != null) attrs["data-site-item-index"] = String(opts.itemIndex);
   return attrs;
+}
+
+function SITE_CONTAINER_ATTRS(opts: { kind: string; label: string }) {
+  return {
+    "data-site-container-kind": opts.kind,
+    "data-site-container-label": opts.label,
+  };
 }
 
 ${SECTION_PRESENTATION_RUNTIME}
@@ -227,7 +236,7 @@ function ServicesSection({ section, sectionIndex }: { section: SiteSection; sect
             >{section.body}</p>
           )}
         </div>
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3" {...SITE_CONTAINER_ATTRS({ kind: "item_grid", label: "Service cards" })}>
           {section.items?.slice(0, 6).map((item, i) => (
             <div key={i} className={"rounded-3xl border p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-xl " + resolveSectionCardClass(section, preset)}>
               <div className={"mb-5 flex h-12 w-12 items-center justify-center rounded-2xl text-lg font-bold text-white " + preset.iconBadge}>{i + 1}</div>
@@ -267,7 +276,7 @@ function AboutSection({ section, sectionIndex }: { section: SiteSection; section
             >{section.body}</p>
           )}
         </div>
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3" {...SITE_CONTAINER_ATTRS({ kind: "item_grid", label: "About cards" })}>
           {section.items?.slice(0, 6).map((item, i) => (
             <div key={i} className={"rounded-3xl border p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-xl " + resolveSectionCardClass(section, preset)}>
               <h3
@@ -306,7 +315,7 @@ function FeaturesSection({ section, sectionIndex }: { section: SiteSection; sect
             >{section.body}</p>
           )}
         </div>
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3" {...SITE_CONTAINER_ATTRS({ kind: "item_grid", label: "Feature cards" })}>
           {section.items?.slice(0, 6).map((item, i) => (
             <div key={i} className={"rounded-3xl border p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-xl " + resolveSectionCardClass(section, preset)}>
               <h3
@@ -345,7 +354,7 @@ function FaqSection({ section, sectionIndex }: { section: SiteSection; sectionIn
             >{section.body}</p>
           )}
         </div>
-        <div className="space-y-4 max-w-3xl mx-auto">
+        <div className="space-y-4 max-w-3xl mx-auto" {...SITE_CONTAINER_ATTRS({ kind: "item_grid", label: "FAQ items" })}>
           {section.items?.slice(0, 8).map((item, i) => (
             <div key={i} className={"rounded-2xl border p-6 " + resolveSectionCardClass(section, preset)}>
               <h3
@@ -384,7 +393,7 @@ function TestimonialsSection({ section, sectionIndex }: { section: SiteSection; 
             >{section.body}</p>
           )}
         </div>
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3" {...SITE_CONTAINER_ATTRS({ kind: "item_grid", label: "Testimonial cards" })}>
           {section.items?.slice(0, 6).map((item, i) => (
             <div key={i} className={"rounded-3xl border p-7 shadow-sm " + resolveSectionCardClass(section, preset)}>
               <p
@@ -434,14 +443,14 @@ function ContactSection({ section, sectionIndex }: { section: SiteSection; secti
                 <a
                   href={"tel:" + contact.phone.replace(/[^0-9]/g, "")}
                   className={"inline-flex items-center justify-center rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-white hover:bg-white/10 " + preset.secondaryButton}
-                  {...SITE_ELEMENT_ATTRS({ kind: "button", label: "Phone button", fieldPath: "contact.phone" })}
+                  {...SITE_ELEMENT_ATTRS({ kind: "button", label: "Phone button", fieldPath: "contact.phone", surfaceId: "contact-phone-button" })}
                 >{contact.phone}</a>
               )}
             </div>
           </div>
           <div
             className={"rounded-[2rem] border p-8 shadow-2xl " + resolveSectionCardClass(section, preset)}
-            {...SITE_ELEMENT_ATTRS({ kind: "panel", label: "Inner contact card", fieldPath: "sections[" + sectionIndex + "].presentation.cardClass" })}
+            {...SITE_CONTAINER_ATTRS({ kind: "inner_card", label: "Contact card" })}
           >
             <h3
               className="text-xl font-bold"
@@ -451,7 +460,7 @@ function ContactSection({ section, sectionIndex }: { section: SiteSection; secti
               {contact.phone && (
                 <div
                   className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-200"
-                  {...SITE_ELEMENT_ATTRS({ kind: "contact_field", label: "Phone in card", fieldPath: "contact.phone" })}
+                  {...SITE_ELEMENT_ATTRS({ kind: "contact_field", label: "Phone in card", fieldPath: "contact.phone", surfaceId: "contact-phone-card" })}
                 >{contact.phone}</div>
               )}
               {contact.email && (
@@ -504,7 +513,7 @@ function GallerySection({ section, sectionIndex }: { section: SiteSection; secti
           )}
         </div>
         {count > 0 && (
-          <div className={gridClass}>
+          <div className={gridClass} {...SITE_CONTAINER_ATTRS({ kind: "item_grid", label: "Gallery images" })}>
             {(section.items || []).map((item, i) => {
               const imageUrl = (item as { imageUrl?: string }).imageUrl;
               if (!imageUrl) return null;
@@ -580,11 +589,19 @@ function GenericSection({ section, sectionIndex }: { section: SiteSection; secti
           </div>
         )}
         {section.items && section.items.length > 0 && (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3" {...SITE_CONTAINER_ATTRS({ kind: "item_grid", label: "Content cards" })}>
             {section.items.slice(0, 6).map((item, i) => (
               <div key={i} className={"rounded-3xl border p-7 shadow-sm " + resolveSectionCardClass(section, preset)}>
-                <h3 className="text-lg font-bold text-slate-950">{item.title}</h3>
-                {item.description && <p className="mt-3 text-sm leading-6 text-slate-600">{item.description}</p>}
+                <h3
+                  className="text-lg font-bold text-slate-950"
+                  {...SITE_ELEMENT_ATTRS({ kind: "item_title", label: "Card title", fieldPath: "sections[" + sectionIndex + "].items[" + i + "].title", itemIndex: i })}
+                >{item.title}</h3>
+                {item.description && (
+                  <p
+                    className="mt-3 text-sm leading-6 text-slate-600"
+                    {...SITE_ELEMENT_ATTRS({ kind: "item_body", label: "Card description", fieldPath: "sections[" + sectionIndex + "].items[" + i + "].description", itemIndex: i })}
+                  >{item.description}</p>
+                )}
               </div>
             ))}
           </div>

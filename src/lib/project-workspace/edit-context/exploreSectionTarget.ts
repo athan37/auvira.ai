@@ -7,7 +7,7 @@ import {
   type SectionSurface,
   type SectionSurfaceEditFamily,
 } from './sectionSurfaceCatalog';
-import { buildSectionElementCatalog } from './sectionElementRegistry';
+import { buildSectionElementCatalog, filterCatalogToPin } from './sectionElementRegistry';
 import {
   extractTargetPhrase,
   matchSectionElementPhrase,
@@ -163,9 +163,33 @@ export function exploreSectionTargetDeterministic(
   if (surfaces.length === 0) surfaces = catalog.filter((s) => s.editFamily === 'copy');
   if (surfaces.length === 0) return { kind: 'none' };
 
+  const pinCtx = editContext.selectedTargetContext;
+  if (pinCtx?.pinnedElementOnly && pinCtx.allowedFieldPaths?.[0]) {
+    surfaces = filterCatalogToPin(surfaces, {
+      fieldPath: pinCtx.allowedFieldPaths[0],
+      surfaceId: pinCtx.target.surfaceId,
+    });
+  }
+
   const pinPath =
     editContext.selectedTarget?.fieldPath ??
     editContext.selectedTargetContext?.element?.fieldPath;
+
+  if (editContext.selectedTargetContext?.pinnedElementOnly && pinPath && editFamily === 'copy') {
+    const value = extractReplacementValue(message);
+    if (value) {
+      const pinned = surfaces.find((s) => s.fieldPath === pinPath);
+      if (pinned) {
+        return {
+          kind: 'apply',
+          fieldPath: pinned.fieldPath,
+          value,
+          surface: pinned,
+          reason: 'UI-pinned element-only scope',
+        };
+      }
+    }
+  }
 
   if (pinPath && editFamily === 'copy') {
     const pinned = surfaces.find((s) => s.fieldPath === pinPath);

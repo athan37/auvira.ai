@@ -95,6 +95,49 @@ describe('project 6a1f96 primary CTA (deterministic)', () => {
       value: EXPECTED_CTA,
     });
   });
+
+  it('element pin with targetChain scopes bare copy to pinned phone button only', async () => {
+    const workspacePath = workspacePathForProject();
+    const phonePin = {
+      kind: 'section' as const,
+      sectionIndex: 4,
+      sectionType: 'contact',
+      sectionTitle: 'Get Started Today',
+      sectionId: 'section_contact_get-started-today_5',
+      analyticsId: 'section_contact_get-started-today_5',
+      fieldPath: 'contact.phone',
+      surfaceId: 'contact-phone-button',
+      elementKind: 'button',
+      elementLabel: 'Phone button',
+      pinScope: 'element' as const,
+      targetChain: [
+        { role: 'section' as const, label: 'Get Started Today', kind: 'contact' },
+        { role: 'container' as const, label: 'Contact card', kind: 'inner_card' },
+        {
+          role: 'element' as const,
+          label: 'Phone button',
+          kind: 'button',
+          fieldPath: 'contact.phone',
+          surfaceId: 'contact-phone-button',
+        },
+      ],
+    };
+
+    const built = await buildEditContext({
+      workspacePath,
+      mode: 'gitlab',
+      ownerMessage: 'change phone to 555-0111',
+      infraBaselineReady: true,
+      selectedTarget: phonePin,
+    });
+
+    expect(built.context.selectedTargetContext?.pinnedElementOnly).toBe(true);
+    const plan = buildDeterministicPlan(built.context);
+    expect(plan?.steps[0]?.params).toMatchObject({
+      fieldPath: 'contact.phone',
+      value: '555-0111',
+    });
+  });
 });
 
 describe('project 6a1f96 stream route simulation', () => {

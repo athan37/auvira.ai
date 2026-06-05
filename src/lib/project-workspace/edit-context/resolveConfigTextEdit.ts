@@ -17,7 +17,7 @@ import {
 } from './resolveContactUpdateField';
 import type { SelectedTargetContext } from './selectedTargetContext';
 import type { SelectedTargetInput } from '@/lib/project-workspace/edit-shared/selectedTargetTypes';
-import { buildSectionElementCatalog } from './sectionElementRegistry';
+import { buildSectionElementCatalog, filterCatalogToPin } from './sectionElementRegistry';
 import {
   extractTargetPhrase,
   matchSectionElementPhrase,
@@ -55,6 +55,28 @@ const SCORE_NON_EMPTY = 10;
 const SCORE_TOKEN_OVERLAP = 5;
 const SCORE_CONTACT_GLOBAL = 20;
 const MIN_SCORE_MARGIN = 5;
+
+function isExplicitTypedFieldMessage(message: string, fieldPath: string): boolean {
+  const normalized = normalizeMessage(message);
+  if (fieldPath === 'contact.phone') return /\bphone\b|\bnumber\b/i.test(normalized);
+  if (fieldPath === 'contact.email') return /\bemail\b/i.test(normalized);
+  if (fieldPath === 'contact.address') return /\baddress\b/i.test(normalized);
+  if (fieldPath === 'hero.headline') return /\bheadline\b/i.test(normalized);
+  if (fieldPath === 'hero.subheadline') return /\bsubheadline\b|\btagline\b/i.test(normalized);
+  if (fieldPath === 'hero.primaryCta') return /\b(?:cta|button|btn)\b/i.test(normalized);
+  if (fieldPath === 'businessName') return /\bbusiness\s+name\b|\bcompany\s+name\b/i.test(normalized);
+  return false;
+}
+
+function shouldAllowTypedFieldOverride(
+  message: string,
+  typed: ConfigTextEditApply,
+  ctx?: SelectedTargetContext | null
+): boolean {
+  if (!ctx?.pinnedElementOnly || !ctx.allowedFieldPaths?.length) return true;
+  if (ctx.allowedFieldPaths.includes(typed.fieldPath)) return true;
+  return isExplicitTypedFieldMessage(message, typed.fieldPath);
+}
 
 function normalizeMessage(message: string): string {
   return stripPinnedTargetSuffix(message);
@@ -303,6 +325,18 @@ function resolveSetFieldMode(
     };
   }
 
+  if (ctx?.pinnedElementOnly && ctx.allowedFieldPaths?.length) {
+    const pinnedPath = ctx.allowedFieldPaths[0]!;
+    return {
+      kind: 'apply',
+      fieldPath: pinnedPath,
+      value,
+      mode: 'set_field',
+      confidence: 'high',
+      reason: 'UI-pinned element-only scope',
+    };
+  }
+
   const normalized = normalizeMessage(message);
   const mentionsContactField = /\b(phone|number|email|address)\b/i.test(normalized);
   const mentionsContactPanel = /\bcontact\s+information\b|\bcontact\s+info\b/i.test(normalized);
@@ -385,7 +419,11 @@ export function resolveConfigTextEdit(input: ResolveConfigTextEditInput): Config
   if (findReplace.kind !== 'none') return findReplace;
 
   const typed = resolveTypedFieldMode(message);
-  if (typed.kind === 'apply') return typed;
+  if (typed.kind === 'apply') {
+    if (shouldAllowTypedFieldOverride(message, typed, input.selectedTargetContext)) {
+      return typed;
+    }
+  }
 
   return resolveSetFieldMode(message, entries, input);
 }

@@ -262,4 +262,57 @@ describe('resolveConfigTextEdit', () => {
       expect(result.value).toBe('hello click on this');
     }
   });
+
+  it('element pin applies only pinned fieldPath for bare replacement value', () => {
+    const config = `export const siteConfig = {
+      businessName: "Demo Co",
+      hero: { headline: "Hero", subheadline: "", primaryCta: "Get in Touch" },
+      contact: { phone: "555-0000", email: "a@b.c" },
+      sections: [
+        {
+          type: "contact",
+          title: "Get Started Today",
+          subtitle: "Contact Information",
+          body: "Reach out."
+        }
+      ]
+    };`;
+    const pinnedPhone = {
+      ...contactSelectedTarget,
+      fieldPath: 'contact.phone',
+      elementKind: 'button',
+      elementLabel: 'Phone button',
+      pinScope: 'element' as const,
+    };
+    const selectedTargetContext = buildSelectedTargetContext({
+      selectedTarget: pinnedPhone,
+      siteConfigContent: config,
+      pageContent: '',
+      catalog: buildSiteSectionCatalog(config, ''),
+      target: {
+        kind: 'section' as const,
+        sectionIndex: 0,
+        sectionType: 'contact',
+        title: 'Get Started Today',
+        confidence: 'high' as const,
+        candidates: [],
+        needsClarification: false,
+      },
+    });
+
+    expect(selectedTargetContext?.pinnedElementOnly).toBe(true);
+    expect(selectedTargetContext?.allowedFieldPaths).toEqual(['contact.phone']);
+
+    const result = resolveConfigTextEdit({
+      message: 'change phone to 555-9999',
+      siteConfigContent: config,
+      pinnedSectionIndex: 0,
+      selectedTargetContext: selectedTargetContext ?? undefined,
+    });
+    expect(result.kind).toBe('apply');
+    if (result.kind === 'apply') {
+      expect(result.fieldPath).toBe('contact.phone');
+      expect(result.value).toBe('555-9999');
+    }
+  });
 });

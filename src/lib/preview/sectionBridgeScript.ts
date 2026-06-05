@@ -2,7 +2,14 @@
  * Preview iframe bridge script (served externally to avoid inline-script CSP blocks).
  */
 
-export const PREVIEW_SECTION_BRIDGE_VERSION = 17;
+import { buildUniversalBootstrapBridgeScript } from '@/lib/preview/bootstrapPreviewElements';
+import { buildElementCaptureBridgeScript } from '@/lib/preview/captureTargetPreview';
+import {
+  TARGET_PREVIEW_THUMB_HEIGHT,
+  TARGET_PREVIEW_THUMB_WIDTH,
+} from '@/lib/preview/targetPreviewThumbnail';
+
+export const PREVIEW_SECTION_BRIDGE_VERSION = 25;
 
 const HIGHLIGHT_CLASS = 'site-editor-section-highlight';
 const HOVER_CLASS = 'site-editor-section-hover';
@@ -10,18 +17,20 @@ const HOVER_CLASS = 'site-editor-section-hover';
 /** CSS injected into proxied preview HTML alongside the external bridge script. */
 export const PREVIEW_SECTION_SELECTION_STYLES = `<style id="preview-section-selection-styles">
 .${HIGHLIGHT_CLASS},.${HOVER_CLASS}{outline:3px solid #2563eb!important;outline-offset:3px!important;box-shadow:0 0 0 1px #2563eb,inset 0 0 0 9999px rgba(59,130,246,0.28)!important}
-.site-editor-preview-bridge section,.site-editor-preview-bridge section[id],.site-editor-preview-bridge [data-site-section-id],.site-editor-preview-bridge [data-analytics-id],.site-editor-preview-bridge [data-site-config-field-path]{cursor:grab!important}
-.site-editor-preview-bridge.site-editor-dragging section,.site-editor-preview-bridge.site-editor-dragging section[id],.site-editor-preview-bridge.site-editor-dragging [data-site-section-id],.site-editor-preview-bridge.site-editor-dragging [data-analytics-id],.site-editor-preview-bridge.site-editor-dragging [data-site-config-field-path]{cursor:grabbing!important}
-.site-editor-preview-bridge [data-site-config-field-path]:active{cursor:grabbing!important}
+.site-editor-preview-bridge section,.site-editor-preview-bridge section[id],.site-editor-preview-bridge [data-site-section-id],.site-editor-preview-bridge [data-analytics-id],.site-editor-preview-bridge [data-site-config-field-path],.site-editor-preview-bridge main a,.site-editor-preview-bridge main button,.site-editor-preview-bridge main h1,.site-editor-preview-bridge main h2,.site-editor-preview-bridge main h3,.site-editor-preview-bridge main p,.site-editor-preview-bridge nav a{cursor:grab!important}
+.site-editor-preview-bridge.site-editor-dragging section,.site-editor-preview-bridge.site-editor-dragging section[id],.site-editor-preview-bridge.site-editor-dragging [data-site-section-id],.site-editor-preview-bridge.site-editor-dragging [data-analytics-id],.site-editor-preview-bridge.site-editor-dragging [data-site-config-field-path],.site-editor-preview-bridge.site-editor-dragging main a,.site-editor-preview-bridge.site-editor-dragging main button,.site-editor-preview-bridge.site-editor-dragging main h1,.site-editor-preview-bridge.site-editor-dragging main h2,.site-editor-preview-bridge.site-editor-dragging main h3,.site-editor-preview-bridge.site-editor-dragging main p,.site-editor-preview-bridge.site-editor-dragging nav a{cursor:grabbing!important}
+.site-editor-preview-bridge [data-site-config-field-path]:active,.site-editor-preview-bridge main a:active,.site-editor-preview-bridge main button:active,.site-editor-preview-bridge nav a:active{cursor:grabbing!important}
 </style>`;
 
 /** JavaScript body for the preview section selection bridge (no script tags). */
 export function buildSectionBridgeScriptBody(): string {
   return `(function(){
-var MSG={DRAG_START:"SITE_SECTION_DRAG_START",POINTER_DOWN:"SITE_SECTION_POINTER_DOWN",READY:"SITE_SECTION_BRIDGE_READY",HIGHLIGHT:"SITE_SECTION_HIGHLIGHT",FOCUS:"SITE_SECTION_FOCUS",DISMISS:"SITE_SECTION_DISMISS",CLEAR:"SITE_SECTION_CLEAR_SELECTION"};
+var MSG={DRAG_START:"SITE_SECTION_DRAG_START",POINTER_DOWN:"SITE_SECTION_POINTER_DOWN",READY:"SITE_SECTION_BRIDGE_READY",HIGHLIGHT:"SITE_SECTION_HIGHLIGHT",FOCUS:"SITE_SECTION_FOCUS",DISMISS:"SITE_SECTION_DISMISS",CLEAR:"SITE_SECTION_CLEAR_SELECTION",PREVIEW_THUMB:"SITE_SECTION_PREVIEW_THUMB",PARENT_DRAG_START:"SITE_SECTION_PARENT_DRAG_START"};
 var HIGHLIGHT="${HIGHLIGHT_CLASS}";
 var HOVER="${HOVER_CLASS}";
 var DRAG_THRESHOLD=6;
+var PREVIEW_THUMB_W=${TARGET_PREVIEW_THUMB_WIDTH};
+var PREVIEW_THUMB_H=${TARGET_PREVIEW_THUMB_HEIGHT};
 var selectedId=null;
 var selectedHover=false;
 var dragState=null;
@@ -56,86 +65,174 @@ function sectionIndexFromEl(sectionEl){
   return allSections().indexOf(sectionEl);
 }
 
-function setElementAttr(el,kind,label,fieldPath,itemIndex){
+function surfaceIdFromFieldPath(fieldPath){
+  return fieldPath.replace(/[\\[\\].]/g,"-").replace(/-+/g,"-").replace(/^-|-$/g,"");
+}
+
+function setElementAttr(el,kind,label,fieldPath,itemIndex,surfaceId){
   if(!el||el.getAttribute("data-site-element-kind"))return;
   el.setAttribute("data-site-element-kind",kind);
   el.setAttribute("data-site-element-label",label);
   el.setAttribute("data-site-config-field-path",fieldPath);
   if(itemIndex!=null)el.setAttribute("data-site-item-index",String(itemIndex));
+  if(fieldPath)el.setAttribute("data-site-surface-id",surfaceId||surfaceIdFromFieldPath(fieldPath));
+}
+
+function pushItemNode(chain,itemIndex){
+  if(!Number.isFinite(itemIndex))return;
+  var last=chain[chain.length-1];
+  if(last&&last.role==="item"&&last.itemIndex===itemIndex)return;
+  chain.push({role:"item",kind:"item",label:"Item "+(itemIndex+1),itemIndex:itemIndex,itemPosition:itemIndex+1});
+}
+
+function readElementChain(sectionEl,target){
+  var chain=[];
+  var nodes=[];
+  var node=target;
+  while(node&&node!==sectionEl){
+    if(!node.getAttribute){node=node.parentElement;continue;}
+    var elKind=node.getAttribute("data-site-element-kind");
+    var containerKind=node.getAttribute("data-site-container-kind");
+    if(elKind||containerKind)nodes.push(node);
+    node=node.parentElement;
+  }
+  nodes.reverse();
+  for(var i=0;i<nodes.length;i++){
+    var n=nodes[i];
+    var ck=n.getAttribute("data-site-container-kind");
+    if(ck){
+      chain.push({role:"container",kind:ck,label:n.getAttribute("data-site-container-label")||ck});
+      continue;
+    }
+    var kind=n.getAttribute("data-site-element-kind");
+    var itemIdx=n.getAttribute("data-site-item-index");
+    var parsedIdx=itemIdx!=null?parseInt(itemIdx,10):undefined;
+    var fp=n.getAttribute("data-site-config-field-path")||"";
+    var sid=n.getAttribute("data-site-surface-id")||"";
+    if(Number.isFinite(parsedIdx))pushItemNode(chain,parsedIdx);
+    chain.push({
+      role:"element",
+      kind:kind,
+      label:n.getAttribute("data-site-element-label")||"",
+      fieldPath:fp||undefined,
+      itemIndex:Number.isFinite(parsedIdx)?parsedIdx:undefined,
+      itemPosition:Number.isFinite(parsedIdx)?parsedIdx+1:undefined,
+      surfaceId:sid||undefined
+    });
+  }
+  return chain;
+}
+
+function annotateItemCard(card,sectionIndex,itemIndex){
+  if(!card)return;
+  var titleEl=card.querySelector("h3")||card.querySelector("p.font-bold")||card.querySelector("h3,p");
+  var titleText=titleEl?(titleEl.textContent||"").trim():"";
+  var label=titleText||("Item "+(itemIndex+1));
+  var titlePath="sections["+sectionIndex+"].items["+itemIndex+"].title";
+  if(titleEl)setElementAttr(titleEl,"item_title",label,titlePath,itemIndex);
+  if(!card.getAttribute("data-site-element-kind")){
+    card.setAttribute("data-site-element-kind","item_card");
+    card.setAttribute("data-site-element-label",label);
+    card.setAttribute("data-site-config-field-path",titlePath);
+    card.setAttribute("data-site-item-index",String(itemIndex));
+    card.setAttribute("data-site-surface-id",surfaceIdFromFieldPath(titlePath));
+  }
+  var bodyEl=card.querySelector("p:not([data-site-element-kind])");
+  if(bodyEl&&titleEl&&bodyEl!==titleEl){
+    var bodyText=(bodyEl.textContent||"").trim();
+    if(bodyText)setElementAttr(bodyEl,"item_body",bodyText,"sections["+sectionIndex+"].items["+itemIndex+"].description",itemIndex);
+  }
 }
 
 function bootstrapItemCards(sectionEl,sectionIndex){
+  var grid=sectionEl.querySelector("[data-site-container-kind='item_grid']");
+  if(!grid){
+    var grids=sectionEl.querySelectorAll(".grid");
+    if(grids.length)grid=grids[grids.length-1];
+  }
+  if(grid&&!grid.getAttribute("data-site-container-kind")){
+    grid.setAttribute("data-site-container-kind","item_grid");
+    grid.setAttribute("data-site-container-label","Item cards");
+  }
+  if(grid){
+    var gridCards=grid.children;
+    for(var gi=0;gi<gridCards.length;gi++)annotateItemCard(gridCards[gi],sectionIndex,gi);
+    return;
+  }
   var cards=sectionEl.querySelectorAll("h3");
   for(var i=0;i<cards.length;i++){
     var titleEl=cards[i];
     if(titleEl.closest("h2"))continue;
-    setElementAttr(titleEl,"item_title","Item title","sections["+sectionIndex+"].items["+i+"].title",i);
-    var bodyEl=titleEl.parentElement&&titleEl.parentElement.querySelector("p");
-    if(bodyEl)setElementAttr(bodyEl,"item_body","Item description","sections["+sectionIndex+"].items["+i+"].description",i);
+    var card=titleEl.closest(".rounded-3xl,.rounded-2xl,.rounded-\\[2rem\\]")||titleEl.parentElement;
+    if(card)annotateItemCard(card,sectionIndex,i);
+    else setElementAttr(titleEl,"item_title",(titleEl.textContent||"").trim()||"Item title","sections["+sectionIndex+"].items["+i+"].title",i);
   }
 }
 
-function bootstrapContactSection(sectionEl,sectionIndex){
-  var h2=sectionEl.querySelector("h2");
-  if(h2)setElementAttr(h2,"heading","Section title","sections["+sectionIndex+"].title");
-  var intro=sectionEl.querySelector("h2 + p, p.mt-6");
-  if(intro)setElementAttr(intro,"body","Section intro","sections["+sectionIndex+"].body");
-  var h3=sectionEl.querySelector("h3");
-  if(h3)setElementAttr(h3,"heading","Contact Information","sections["+sectionIndex+"].subtitle");
-  var ctas=sectionEl.querySelectorAll('a[href="#contact"]');
-  for(var i=0;i<ctas.length;i++){
-    var cta=ctas[i];
-    var cls=cta.className||"";
-    if(/primaryButton/.test(cls))setElementAttr(cta,"button","Primary button","hero.primaryCta");
+function expandItemGridTarget(sectionEl,target,chain,sectionIndex){
+  if(!chain.length||!target||!Number.isFinite(sectionIndex))return chain;
+  var hasItemElement=chain.some(function(n){
+    return n.role==="element"&&(n.kind==="item_card"||n.kind==="item_title"||n.kind==="item_body");
+  });
+  if(hasItemElement)return chain;
+  var last=chain[chain.length-1];
+  var onlyGrid=chain.length===1&&last.role==="container"&&last.kind==="item_grid";
+  if(!onlyGrid&&!(last.role==="container"&&last.kind==="item_grid"))return chain;
+  var card=findItemCardWrapper(target,sectionEl);
+  if(!card)return chain;
+  var grid=card.parentElement;
+  if(!grid||grid.getAttribute("data-site-container-kind")!=="item_grid")return chain;
+  var itemIndex=-1;
+  for(var ci=0;ci<grid.children.length;ci++){
+    if(grid.children[ci]===card){itemIndex=ci;break;}
   }
-  var phoneLink=sectionEl.querySelector('a[href^="tel:"]');
-  if(phoneLink)setElementAttr(phoneLink,"button","Phone button","contact.phone");
-  var cardRows=sectionEl.querySelectorAll(".rounded-2xl.border, .space-y-4 > div");
-  for(var j=0;j<cardRows.length;j++){
-    var row=cardRows[j];
-    var text=(row.textContent||"").trim();
-    if(!text)continue;
-    if(/\\+?\\d[\\d\\s().-]{6,}/.test(text)&&!row.getAttribute("data-site-element-kind")){
-      setElementAttr(row,"contact_field","Phone in card","contact.phone");
-    }else if(/@/.test(text)&&!row.getAttribute("data-site-element-kind")){
-      setElementAttr(row,"contact_field","Email in card","contact.email");
+  if(itemIndex<0)return chain;
+  annotateItemCard(card,sectionIndex,itemIndex);
+  var titleEl=card.querySelector("[data-site-element-kind='item_title'],[data-site-element-kind='item_card'],h3,p");
+  var label=(titleEl&&(titleEl.getAttribute("data-site-element-label")||titleEl.textContent||"").trim())||("Item "+(itemIndex+1));
+  var fp="sections["+sectionIndex+"].items["+itemIndex+"].title";
+  var expanded=[
+    {role:"item",kind:"item",label:"Item "+(itemIndex+1),itemIndex:itemIndex,itemPosition:itemIndex+1},
+    {role:"element",kind:"item_card",label:label,fieldPath:fp,itemIndex:itemIndex,itemPosition:itemIndex+1,surfaceId:surfaceIdFromFieldPath(fp)}
+  ];
+  if(onlyGrid)return expanded;
+  return chain.slice(0,-1).concat(expanded);
+}
+
+${buildUniversalBootstrapBridgeScript()}
+
+function readPayload(el,target,rootType){
+  rootType=rootType||"section";
+  if(rootType==="nav"){
+    var navChain=[{role:"section",kind:"nav",label:"Navigation"}];
+    var navElements=target?readElementChain(el,target):[];
+    if(!navElements.some(function(n){return n.role==="element"&&n.fieldPath;})){
+      var navInferred=inferLeafTarget(el,target,-1);
+      if(navInferred)navElements=[navInferred];
     }
-  }
-}
-
-function bootstrapElementAttrs(){
-  var sections=allSections();
-  for(var s=0;s<sections.length;s++){
-    var sectionEl=sections[s];
-    var idx=sectionIndexFromEl(sectionEl);
-    if(!Number.isFinite(idx)||idx<0)continue;
-    var type=(sectionEl.getAttribute("data-site-section-type")||sectionEl.id||"").toLowerCase();
-    if(type==="contact"||sectionEl.id==="contact")bootstrapContactSection(sectionEl,idx);
-    else if(/services|about|features|faq|testimonials|generic|gallery/.test(type))bootstrapItemCards(sectionEl,idx);
-  }
-}
-
-function readElementPayload(sectionEl,target){
-  var node=target;
-  while(node&&node!==sectionEl){
-    if(!node.getAttribute)break;
-    var kind=node.getAttribute("data-site-element-kind");
-    if(kind){
-      var itemIdx=node.getAttribute("data-site-item-index");
-      var parsedIdx=itemIdx!=null?parseInt(itemIdx,10):undefined;
-      return{
-        elementKind:kind,
-        elementLabel:node.getAttribute("data-site-element-label")||"",
-        fieldPath:node.getAttribute("data-site-config-field-path")||"",
-        itemIndex:Number.isFinite(parsedIdx)?parsedIdx:undefined
-      };
+    for(var nc=0;nc<navElements.length;nc++)navChain.push(navElements[nc]);
+    var navLeaf=navChain.length>1?navChain[navChain.length-1]:null;
+    var navBase={
+      sectionId:"nav",
+      analyticsId:"nav",
+      sectionIndex:-1,
+      sectionType:"nav",
+      sectionTitle:"Navigation",
+      kind:"section",
+      targetChain:navChain,
+      pinScope:navLeaf&&navLeaf.fieldPath?"element":"section"
+    };
+    if(navLeaf&&navLeaf.fieldPath){
+      return Object.assign({},navBase,{
+        elementKind:navLeaf.kind,
+        elementLabel:navLeaf.label,
+        fieldPath:navLeaf.fieldPath,
+        itemIndex:navLeaf.itemIndex,
+        surfaceId:navLeaf.surfaceId
+      });
     }
-    node=node.parentElement;
+    return navBase;
   }
-  return null;
-}
-
-function readPayload(el,target){
   var id=el.getAttribute("data-site-section-id")||el.getAttribute("data-analytics-id")||el.id||"";
   var idx=sectionIndexFromEl(el);
   if(!Number.isFinite(idx))idx=-1;
@@ -143,10 +240,334 @@ function readPayload(el,target){
   var title=el.getAttribute("data-site-section-title")||el.getAttribute("data-analytics-label")||el.id||type;
   if(id==="hero"||type==="hero"){idx=-1;type="hero";title=title||"Hero";}
   if(!id){id="section_"+idx+"_"+type;}
-  var base={sectionId:id,analyticsId:id,sectionIndex:idx,sectionType:type,sectionTitle:title,kind:type==="hero"?"hero":"section"};
-  var element=target?readElementPayload(el,target):null;
-  if(!element)return base;
-  return Object.assign({},base,element);
+  var sectionLabel=title;
+  var chain=[{role:"section",kind:type,label:sectionLabel}];
+  var elementNodes=target?readElementChain(el,target):[];
+  elementNodes=expandItemGridTarget(el,target,elementNodes,idx);
+  if(!elementNodes.some(function(n){return n.role==="element"&&n.fieldPath;})){
+    var inferred=inferLeafTarget(el,target,idx);
+    if(inferred)elementNodes=elementNodes.concat([inferred]);
+  }
+  for(var c=0;c<elementNodes.length;c++)chain.push(elementNodes[c]);
+  var leaf=chain.length>1?chain[chain.length-1]:null;
+  var base={
+    sectionId:id,
+    analyticsId:id,
+    sectionIndex:idx,
+    sectionType:type,
+    sectionTitle:title,
+    kind:type==="hero"?"hero":"section",
+    targetChain:chain,
+    pinScope:leaf&&leaf.fieldPath?"element":"section"
+  };
+  if(leaf&&leaf.fieldPath){
+    return Object.assign({},base,{
+      elementKind:leaf.kind,
+      elementLabel:leaf.label,
+      fieldPath:leaf.fieldPath,
+      itemIndex:leaf.itemIndex,
+      surfaceId:leaf.surfaceId
+    });
+  }
+  return base;
+}
+
+function hasCardClassHint(el){
+  var cls=el.className||"";
+  return (cls.indexOf("rounded-3xl")>=0||cls.indexOf("rounded-2xl")>=0||cls.indexOf("rounded-[2rem]")>=0)&&cls.indexOf("border")>=0;
+}
+
+function findItemCardWrapper(el,sectionEl){
+  var node=el;
+  while(node&&node!==sectionEl){
+    if(hasCardClassHint(node))return node;
+    node=node.parentElement;
+  }
+  return null;
+}
+
+function findAnnotatedLeaf(el,sectionEl){
+  var node=el;
+  while(node&&node!==sectionEl){
+    if(node.getAttribute&&node.getAttribute("data-site-element-kind"))return node;
+    node=node.parentElement;
+  }
+  return null;
+}
+
+function isTinyElement(el){
+  var rect=el.getBoundingClientRect();
+  return rect.width<24||rect.height<16;
+}
+
+function resolveCaptureRoot(sectionEl,clickTarget,payload){
+  var chain=payload&&payload.targetChain?payload.targetChain:[];
+  var leaf=chain.length?chain[chain.length-1]:null;
+  var leafKind=leaf&&leaf.role==="element"?leaf.kind:null;
+  if((!payload||payload.pinScope!=="element")&&!(leaf&&leaf.fieldPath))return sectionEl;
+  if(leafKind==="item_title"||leafKind==="item_body"||leafKind==="image_caption"||leafKind==="item_card"){
+    var itemCard=findItemCardWrapper(clickTarget,sectionEl);
+    if(itemCard)return itemCard;
+    var cardLeaf=findAnnotatedLeaf(clickTarget,sectionEl);
+    if(cardLeaf&&cardLeaf.getAttribute("data-site-element-kind")==="item_card")return cardLeaf;
+  }
+  var annotated=findAnnotatedLeaf(clickTarget,sectionEl)||clickTarget;
+  if(isTinyElement(annotated)&&annotated.parentElement&&annotated.parentElement!==sectionEl)return annotated.parentElement;
+  if(leafKind==="contact_field"||leafKind==="button"||leafKind==="heading")return annotated;
+  var card=findItemCardWrapper(clickTarget,sectionEl);
+  if(card)return card;
+  return annotated;
+}
+
+function wrapText(ctx,text,maxWidth,x,y){
+  var words=(text||"").split(/\\s+/);
+  var line="";
+  var lineY=y;
+  for(var i=0;i<words.length;i++){
+    var test=line?line+" "+words[i]:words[i];
+    if(ctx.measureText(test).width>maxWidth&&line){
+      ctx.fillText(line,x,lineY);
+      line=words[i];
+      lineY+=18;
+    }else line=test;
+  }
+  if(line)ctx.fillText(line,x,lineY);
+}
+
+function captureStyledFallback(el,leafKind){
+  if(typeof captureElementStyledPreview==="function"){
+    var replica=captureElementStyledPreview(el,leafKind||null);
+    if(replica)return replica;
+  }
+  var style=window.getComputedStyle(el);
+  var rect=el.getBoundingClientRect();
+  var w=Math.min(Math.max(Math.round(rect.width)||120,80),280);
+  var h=Math.min(Math.max(Math.round(rect.height)||48,32),160);
+  var canvas=document.createElement("canvas");
+  canvas.width=w;canvas.height=h;
+  var ctx=canvas.getContext("2d");
+  if(!ctx)return null;
+  ctx.fillStyle=style.backgroundColor&&style.backgroundColor!=="rgba(0, 0, 0, 0)"?style.backgroundColor:"#ffffff";
+  ctx.fillRect(0,0,w,h);
+  ctx.strokeStyle=style.borderColor||"#e4e4e7";
+  ctx.lineWidth=1;
+  ctx.strokeRect(0.5,0.5,w-1,h-1);
+  ctx.fillStyle=style.color||"#18181b";
+  ctx.font=(style.fontWeight||"400")+" "+(style.fontSize||"14px")+" "+(style.fontFamily||"sans-serif");
+  wrapText(ctx,(el.textContent||"").trim().slice(0,160),w-16,8,Math.min(h/2,24));
+  return {dataUrl:canvas.toDataURL("image/jpeg",0.75),captureKind:"styled_fallback",width:w,height:h};
+}
+
+function isSectionElement(el){
+  return el&&(el.tagName==="SECTION"||el.getAttribute("data-site-section-id")||el.getAttribute("data-site-section-type"));
+}
+
+function isSectionOverviewField(fieldPath){
+  return /sections\\[\\d+\\]\\.(title|body)$/.test(fieldPath||"");
+}
+
+function shouldCaptureFullSectionPreview(payload){
+  if(!payload||payload.pinScope!=="element")return true;
+  var leaf=payload.targetChain&&payload.targetChain.length?payload.targetChain[payload.targetChain.length-1]:null;
+  if(!leaf||leaf.role==="section")return true;
+  if(leaf.role==="element"&&isSectionOverviewField(leaf.fieldPath))return true;
+  return false;
+}
+
+function resolvePreviewCaptureRoot(sectionEl,clickTarget,payload){
+  if(shouldCaptureFullSectionPreview(payload))return sectionEl;
+  return resolveCaptureRoot(sectionEl,clickTarget,payload);
+}
+
+function roundRect(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
+}
+
+${buildElementCaptureBridgeScript()}
+
+function captureSectionStyledFallback(sectionEl){
+  var w=280,h=160;
+  var canvas=document.createElement("canvas");
+  canvas.width=w;canvas.height=h;
+  var ctx=canvas.getContext("2d");
+  if(!ctx)return null;
+  var sectionStyle=window.getComputedStyle(sectionEl);
+  var bg=sectionStyle.backgroundColor;
+  ctx.fillStyle=bg&&bg!=="rgba(0, 0, 0, 0)"?bg:"#7C2D12";
+  ctx.fillRect(0,0,w,h);
+  var h2=sectionEl.querySelector("h2");
+  if(h2){
+    ctx.fillStyle="#ffffff";
+    ctx.font="bold 13px sans-serif";
+    wrapText(ctx,(h2.textContent||"").trim().slice(0,80),Math.round(w*0.52)-12,14,18);
+  }
+  var innerCard=sectionEl.querySelector("[data-site-container-kind='inner_card']")||sectionEl.querySelector(".rounded-\\[2rem\\]");
+  if(innerCard){
+    var cardX=Math.round(w*0.52);
+    ctx.fillStyle="rgba(255,255,255,0.96)";
+    roundRect(ctx,cardX,10,w-cardX-8,h-18,14);
+    ctx.fill();
+    ctx.strokeStyle="rgba(0,0,0,0.08)";
+    ctx.stroke();
+    var cardTitle=innerCard.querySelector("h3");
+    if(cardTitle){
+      ctx.fillStyle="#111827";
+      ctx.font="bold 10px sans-serif";
+      wrapText(ctx,(cardTitle.textContent||"").trim().slice(0,40),cardX+8,24,12);
+    }
+    var rows=innerCard.querySelectorAll(".rounded-2xl,.space-y-4 > div,[data-site-element-kind='contact_field']");
+    var rowY=42;
+    for(var ri=0;ri<Math.min(rows.length,2);ri++){
+      ctx.fillStyle="rgba(15,23,42,0.06)";
+      roundRect(ctx,cardX+8,rowY,w-cardX-24,16,6);
+      ctx.fill();
+      ctx.fillStyle="#334155";
+      ctx.font="8px sans-serif";
+      ctx.fillText((rows[ri].textContent||"").trim().slice(0,28),cardX+12,rowY+11);
+      rowY+=20;
+    }
+  }
+  var btns=sectionEl.querySelectorAll('a[href="#contact"],a[href^="tel:"]');
+  var btnY=h-42;
+  for(var bi=0;bi<Math.min(btns.length,2);bi++){
+    var btnText=(btns[bi].textContent||"").trim().slice(0,16);
+    if(bi===0){
+      ctx.fillStyle="#EA580C";
+      roundRect(ctx,10,btnY+bi*22,96,16,8);
+      ctx.fill();
+      ctx.fillStyle="#ffffff";
+    }else{
+      ctx.strokeStyle="rgba(255,255,255,0.55)";
+      ctx.lineWidth=1;
+      roundRect(ctx,10,btnY+bi*22,96,16,8);
+      ctx.stroke();
+      ctx.fillStyle="#ffffff";
+    }
+    ctx.font="8px sans-serif";
+    ctx.fillText(btnText,16,btnY+bi*22+11);
+  }
+  var out=document.createElement("canvas");
+  out.width=PREVIEW_THUMB_W;
+  out.height=PREVIEW_THUMB_H;
+  var octx=out.getContext("2d");
+  if(octx){
+    octx.drawImage(canvas,0,0,PREVIEW_THUMB_W,PREVIEW_THUMB_H);
+    return {dataUrl:out.toDataURL("image/jpeg",0.82),captureKind:"styled_fallback",width:PREVIEW_THUMB_W,height:PREVIEW_THUMB_H};
+  }
+  return {dataUrl:canvas.toDataURL("image/jpeg",0.75),captureKind:"styled_fallback",width:w,height:h};
+}
+
+function inlineComputedStyles(source,target){
+  if(!source||!target||source.nodeType!==1||target.nodeType!==1)return;
+  var computed=window.getComputedStyle(source);
+  var css="";
+  for(var i=0;i<computed.length;i++){
+    var prop=computed[i];
+    css+=prop+":"+computed.getPropertyValue(prop)+";";
+  }
+  target.setAttribute("style",css);
+  var srcChildren=source.children;
+  var tgtChildren=target.children;
+  for(var c=0;c<srcChildren.length;c++){
+    if(tgtChildren[c])inlineComputedStyles(srcChildren[c],tgtChildren[c]);
+  }
+}
+
+function captureRaster(el,clickTarget){
+  var rect=el.getBoundingClientRect();
+  var isSection=isSectionElement(el);
+  var clipH=isSection?Math.min(220,Math.max(Math.round(rect.height),1)):Math.min(Math.max(Math.round(rect.height),1),400);
+  var width=Math.min(Math.max(Math.round(rect.width),1),560);
+  var height=clipH;
+  var offsetY=0;
+  if(isSection&&clickTarget){
+    var clickRect=clickTarget.getBoundingClientRect();
+    offsetY=Math.max(0,Math.min(clickRect.top-rect.top-clipH/2,Math.max(rect.height-clipH,0)));
+    offsetY=Math.round(offsetY);
+  }
+  var thumbScale=Math.min(1,PREVIEW_THUMB_W/width,PREVIEW_THUMB_H/height);
+  var drawW=Math.max(1,Math.round(width*thumbScale));
+  var drawH=Math.max(1,Math.round(height*thumbScale));
+  var clone=el.cloneNode(true);
+  inlineComputedStyles(el,clone);
+  if(isSection&&offsetY>0){
+    clone.style.marginTop="-"+offsetY+"px";
+    clone.style.height=Math.round(rect.height)+"px";
+  }
+  var host=document.createElement("div");
+  host.style.cssText="position:fixed;left:-10000px;top:0;width:"+width+"px;height:"+height+"px;overflow:hidden;background:#fff;";
+  host.appendChild(clone);
+  document.body.appendChild(host);
+  try{
+    var serialized=new XMLSerializer().serializeToString(clone);
+    var svg='<?xml version="1.0" encoding="UTF-8"?><svg xmlns="http://www.w3.org/2000/svg" width="'+width+'" height="'+height+'"><foreignObject width="100%" height="100%"><div xmlns="http://www.w3.org/1999/xhtml" style="width:'+width+'px;height:'+height+'px;overflow:hidden;">'+serialized+'</div></foreignObject></svg>';
+    var url="data:image/svg+xml;charset=utf-8,"+encodeURIComponent(svg);
+    return new Promise(function(resolve){
+      var img=new Image();
+      img.onload=function(){
+        try{
+          var canvas=document.createElement("canvas");
+          canvas.width=PREVIEW_THUMB_W;canvas.height=PREVIEW_THUMB_H;
+          var ctx=canvas.getContext("2d");
+          if(!ctx){resolve(null);return;}
+          ctx.fillStyle="#f4f4f5";
+          ctx.fillRect(0,0,PREVIEW_THUMB_W,PREVIEW_THUMB_H);
+          var offsetX=Math.round((PREVIEW_THUMB_W-drawW)/2);
+          var offsetY=Math.round((PREVIEW_THUMB_H-drawH)/2);
+          ctx.drawImage(img,offsetX,offsetY,drawW,drawH);
+          resolve({dataUrl:canvas.toDataURL("image/jpeg",0.82),captureKind:"raster",width:PREVIEW_THUMB_W,height:PREVIEW_THUMB_H});
+        }catch(e){resolve(null);}
+        finally{document.body.removeChild(host);}
+      };
+      img.onerror=function(){document.body.removeChild(host);resolve(null);};
+      img.src=url;
+    });
+  }catch(e2){
+    document.body.removeChild(host);
+    return Promise.resolve(null);
+  }
+}
+
+function notifyPreviewThumb(payload,capture){
+  if(!capture||!payload)return;
+  notify(MSG.PREVIEW_THUMB,{
+    sectionId:payload.sectionId,
+    surfaceId:payload.surfaceId,
+    dataUrl:capture.dataUrl,
+    captureKind:capture.captureKind,
+    width:capture.width,
+    height:capture.height
+  });
+}
+
+function captureAndNotifyDragPreview(){
+  if(!dragState||!dragState.el||!dragState.target||!dragState.payload)return;
+  var root=resolvePreviewCaptureRoot(dragState.el,dragState.target,dragState.payload);
+  var leafKind=captureLeafKind(dragState.payload);
+  var fullSection=shouldCaptureFullSectionPreview(dragState.payload);
+  if(!fullSection&&typeof captureElementStyledPreview==="function"){
+    var styled=captureElementStyledPreview(root,leafKind);
+    if(styled){
+      notifyPreviewThumb(dragState.payload,styled);
+      return;
+    }
+  }
+  captureRaster(root,dragState.target).then(function(raster){
+    var capture=raster;
+    if(!capture&&isSectionElement(root))capture=captureSectionStyledFallback(root);
+    if(!capture)capture=captureStyledFallback(root,leafKind);
+    if(capture&&capture.dataUrl.length>40000&&fullSection){
+      var smaller=captureSectionStyledFallback(root);
+      if(smaller)capture=smaller;
+    }
+    notifyPreviewThumb(dragState.payload,capture);
+  });
 }
 
 function clearHighlight(){
@@ -187,14 +608,27 @@ function notifyPointerDown(payload,clientX,clientY){
 
 document.addEventListener("mousedown",function(e){
   if(e.button!==0||dragState)return;
-  var el=findSectionEl(e.target);
-  if(!el)return;
-  var payload=readPayload(el,e.target);
+  var root=findDraggableRoot(e.target);
+  if(!root)return;
+  var el=root.el;
+  var payload=readPayload(el,e.target,root.type);
   if(!payload.sectionId)return;
   e.preventDefault();
   e.stopPropagation();
-  dragState={payload:payload,startX:e.clientX,startY:e.clientY,started:false,el:el};
+  dragState={payload:payload,startX:e.clientX,startY:e.clientY,started:false,el:el,target:e.target};
   notifyPointerDown(payload,e.clientX,e.clientY);
+},true);
+
+document.addEventListener("mousemove",function(e){
+  if(!dragState||dragState.started)return;
+  var dx=e.clientX-dragState.startX;
+  var dy=e.clientY-dragState.startY;
+  if(dx*dx+dy*dy>=DRAG_THRESHOLD*DRAG_THRESHOLD){
+    dragState.started=true;
+    document.documentElement.classList.add("site-editor-dragging");
+    notify(MSG.DRAG_START,Object.assign({},dragState.payload,{clientX:e.clientX,clientY:e.clientY,started:true}));
+    captureAndNotifyDragPreview();
+  }
 },true);
 
 document.addEventListener("mouseup",function(){
@@ -206,7 +640,7 @@ document.addEventListener("mouseup",function(){
 
 document.addEventListener("mousedown",function(e){
   if(e.button!==0||dragState)return;
-  if(findSectionEl(e.target))return;
+  if(findDraggableRoot(e.target))return;
   notify(MSG.DISMISS,{});
 },true);
 
@@ -223,10 +657,16 @@ window.addEventListener("message",function(event){
     if(sid===selectedId&&hover===selectedHover)return;
     applyHighlight(sid,hover);
   }
+  else if(data.type===MSG.PARENT_DRAG_START&&data.payload&&data.payload.started){
+    document.documentElement.classList.add("site-editor-dragging");
+    if(dragState)dragState.started=true;
+    captureAndNotifyDragPreview();
+  }
   else if(data.type===MSG.DRAG_START&&data.payload&&data.payload.started){
     document.documentElement.classList.add("site-editor-dragging");
     dragState=dragState||{started:true};
     if(dragState)dragState.started=true;
+    captureAndNotifyDragPreview();
   }
   else if(data.type==="SITE_SECTION_DRAG_CANCEL"){
     document.documentElement.classList.remove("site-editor-dragging");
@@ -234,7 +674,7 @@ window.addEventListener("message",function(event){
   }
 });
 
-bootstrapElementAttrs();
+bootstrapElementAttrsUniversal();
 notify(MSG.READY,{version:${PREVIEW_SECTION_BRIDGE_VERSION},sections:allSections().length});
 })();`;
 }

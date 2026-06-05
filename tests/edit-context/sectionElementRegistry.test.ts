@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { buildSectionElementCatalog } from '@/lib/project-workspace/edit-context/sectionElementRegistry';
+import {
+  buildSectionElementCatalog,
+  filterCatalogToPin,
+} from '@/lib/project-workspace/edit-context/sectionElementRegistry';
 
 const CONTACT_CONFIG = `export const siteConfig = {
   businessName: 'Demo',
@@ -65,5 +68,18 @@ describe('buildSectionElementCatalog', () => {
     });
     expect(catalog.some((s) => s.fieldPath === 'hero.headline')).toBe(true);
     expect(catalog.some((s) => s.fieldPath === 'hero.primaryCta')).toBe(true);
+  });
+
+  it('filterCatalogToPin prefers surfaceId when fieldPath is duplicated', () => {
+    const catalog = buildSectionElementCatalog(CONTACT_CONFIG, 0);
+    const phoneSurfaces = catalog.filter((s) => s.fieldPath === 'contact.phone');
+    expect(phoneSurfaces.length).toBeGreaterThan(1);
+
+    const buttonOnly = filterCatalogToPin(catalog, {
+      fieldPath: 'contact.phone',
+      surfaceId: phoneSurfaces.find((s) => s.placement === 'left_column')?.surfaceId,
+    });
+    expect(buttonOnly).toHaveLength(1);
+    expect(buttonOnly[0]?.placement).toBe('left_column');
   });
 });

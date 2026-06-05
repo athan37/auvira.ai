@@ -15,10 +15,17 @@ import {
   handlePreviewTargetChipKeyDown,
 } from '@/lib/preview/previewTargetChipInteractions';
 import {
+  chainNodeIconName,
   elementKindIconName,
   type ElementKindIconName,
 } from '@/lib/preview/previewTargetVisuals';
+import type { PreviewTargetChainRow } from '@/lib/preview/previewTargetChipLabels';
 import type { SelectedTargetInput } from '@/lib/project-workspace/edit-shared/selectedTargetTypes';
+import { PreviewTargetThumbnail } from '@/components/project/PreviewTargetThumbnail';
+import {
+  targetPreviewDisplayUrl,
+  targetPreviewFallbackLabel,
+} from '@/lib/preview/targetPreviewThumbnail';
 
 interface Props {
   target: SelectedTargetInput;
@@ -76,6 +83,18 @@ function ElementKindIcon({
       return (
         <svg className={cls} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
           <path strokeLinecap="round" strokeWidth={2} d="M6 8h12M6 12h12M6 16h8" />
+        </svg>
+      );
+    case 'container':
+      return (
+        <svg className={cls} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+          <rect x="4" y="5" width="16" height="14" rx="2" strokeWidth={2} />
+        </svg>
+      );
+    case 'item':
+      return (
+        <svg className={cls} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+          <path strokeLinecap="round" strokeWidth={2} d="M8 7h8M8 11h8M8 15h5" />
         </svg>
       );
     default:
@@ -138,6 +157,31 @@ function TargetSectionRow({
       {showTitle ? (
         <span className="text-sm font-semibold text-zinc-950 break-words">{title}</span>
       ) : null}
+    </div>
+  );
+}
+
+function TargetChainRows({ rows }: { rows: PreviewTargetChainRow[] }) {
+  return (
+    <div className="space-y-1">
+      {rows.map((row, index) => {
+        const iconKind = chainNodeIconName(row.role, row.kind);
+        return (
+          <div
+            key={`${row.role}-${row.label}-${index}`}
+            className="flex items-start gap-2"
+            style={{ paddingLeft: `${row.depth * 12}px` }}
+          >
+            <span className="mt-2 text-zinc-300 select-none" aria-hidden>
+              ⌞
+            </span>
+            <div className="flex min-w-0 flex-1 items-center gap-1.5 pt-0.5">
+              <ElementKindIcon kind={iconKind} />
+              <span className="text-sm text-zinc-700 break-words">{row.label}</span>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -212,12 +256,22 @@ function PinnedTargetCard({
     activatePreviewTargetChip({ onActivate, refocusInput });
   };
 
+  const thumbSrc = target.previewThumbnail?.previewUrl ?? target.previewThumbnailDataUrl;
+  const showTargetPreview = Boolean(thumbSrc || targetPreviewFallbackLabel(target));
+
   const body = (
     <div className="space-y-2 pt-2">
-      <TargetSectionRow scopeLabel={display.scopeLabel} title={display.title} />
-      {display.element ? (
-        <TargetElementRow kind={display.element.kind} label={display.element.label} />
-      ) : null}
+      <div className={showTargetPreview ? 'flex gap-3' : ''}>
+        {showTargetPreview ? <PreviewTargetThumbnail target={target} /> : null}
+        <div className="min-w-0 flex-1 space-y-2">
+          <TargetSectionRow scopeLabel={display.scopeLabel} title={display.title} />
+          {display.chainRows && display.chainRows.length > 0 ? (
+            <TargetChainRows rows={display.chainRows} />
+          ) : display.element ? (
+            <TargetElementRow kind={display.element.kind} label={display.element.label} />
+          ) : null}
+        </div>
+      </div>
       <p className="text-[11px] text-zinc-500 pt-0.5">
         Describe what to change in the box below
       </p>
@@ -281,6 +335,11 @@ function UsedTargetPill({
   const breadcrumb = formatPreviewTargetBreadcrumb(target);
   const chipText = formatPreviewTargetChipText(target, 'used');
   const canActivate = interactive && Boolean(onActivate);
+  const showTargetPreview = Boolean(
+    target.previewThumbnail?.previewUrl ||
+      target.previewThumbnailDataUrl ||
+      targetPreviewFallbackLabel(target)
+  );
 
   const activate = () => {
     activatePreviewTargetChip({ onActivate, refocusInput });
@@ -290,7 +349,7 @@ function UsedTargetPill({
     <div
       data-section-chat-label
       className={cn(
-        'inline-flex max-w-full items-center rounded-md border border-zinc-200/80 bg-zinc-100 px-2 py-1 text-xs text-zinc-800 transition-colors',
+        'inline-flex max-w-full items-center gap-2 rounded-md border border-zinc-200/80 bg-zinc-100 px-2 py-1 text-xs text-zinc-800 transition-colors',
         interactive &&
           (active
             ? 'cursor-pointer ring-2 ring-zinc-400/50 ring-offset-1'
@@ -311,6 +370,9 @@ function UsedTargetPill({
           : undefined
       }
     >
+      {showTargetPreview ? (
+        <PreviewTargetThumbnail target={target} size="sm" className="h-8 w-11" />
+      ) : null}
       <span className="min-w-0 break-words whitespace-normal font-medium">{breadcrumb}</span>
     </div>
   );

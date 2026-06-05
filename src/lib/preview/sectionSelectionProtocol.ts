@@ -2,6 +2,14 @@
  * postMessage protocol for preview section selection (editor-only, proxy-injected).
  */
 
+import type { PinScope, TargetChainNode } from '@/lib/preview/targetChain';
+import type {
+  TargetPreviewCaptureKind,
+  TargetPreviewThumbnail,
+} from '@/lib/preview/targetPreviewThumbnail';
+
+export type { PinScope, TargetChainNode, TargetPreviewCaptureKind, TargetPreviewThumbnail };
+
 export const PREVIEW_SECTION_MSG = {
   SELECTED: 'SITE_SECTION_SELECTED',
   DRAG_START: 'SITE_SECTION_DRAG_START',
@@ -12,6 +20,8 @@ export const PREVIEW_SECTION_MSG = {
   CLEAR: 'SITE_SECTION_CLEAR_SELECTION',
   ENABLE_MODE: 'SITE_SECTION_ENABLE_SELECTION',
   DISABLE_MODE: 'SITE_SECTION_DISABLE_SELECTION',
+  PREVIEW_THUMB: 'SITE_SECTION_PREVIEW_THUMB',
+  PARENT_DRAG_START: 'SITE_SECTION_PARENT_DRAG_START',
 } as const;
 
 export type PreviewSectionMessageType =
@@ -28,6 +38,11 @@ export interface SelectedSectionPayload {
   elementLabel?: string;
   fieldPath?: string;
   itemIndex?: number;
+  surfaceId?: string;
+  targetChain?: TargetChainNode[];
+  pinScope?: PinScope;
+  previewThumbnail?: TargetPreviewThumbnail;
+  previewThumbnailDataUrl?: string;
 }
 
 /** Context-menu payload includes iframe viewport coordinates for parent menu placement. */
@@ -47,6 +62,11 @@ export interface SelectedSection {
   elementLabel?: string;
   fieldPath?: string;
   itemIndex?: number;
+  surfaceId?: string;
+  targetChain?: TargetChainNode[];
+  pinScope?: PinScope;
+  previewThumbnail?: TargetPreviewThumbnail;
+  previewThumbnailDataUrl?: string;
 }
 
 export interface SiteSectionSelectedMessage {
@@ -90,18 +110,37 @@ export interface SiteSectionDisableModeMessage {
   type: typeof PREVIEW_SECTION_MSG.DISABLE_MODE;
 }
 
+export interface SiteSectionPreviewThumbMessage {
+  type: typeof PREVIEW_SECTION_MSG.PREVIEW_THUMB;
+  payload: {
+    sectionId: string;
+    surfaceId?: string;
+    dataUrl: string;
+    captureKind: TargetPreviewCaptureKind;
+    width: number;
+    height: number;
+  };
+}
+
+export interface SiteSectionParentDragStartMessage {
+  type: typeof PREVIEW_SECTION_MSG.PARENT_DRAG_START;
+  payload: { started: true };
+}
+
 export type ParentToIframeSectionMessage =
   | SiteSectionHighlightMessage
   | SiteSectionFocusMessage
   | SiteSectionClearMessage
   | SiteSectionEnableModeMessage
-  | SiteSectionDisableModeMessage;
+  | SiteSectionDisableModeMessage
+  | SiteSectionParentDragStartMessage;
 
 export type IframeToParentSectionMessage =
   | SiteSectionSelectedMessage
   | SiteSectionDragStartMessage
   | SiteSectionPointerDownMessage
-  | SiteSectionDismissMessage;
+  | SiteSectionDismissMessage
+  | SiteSectionPreviewThumbMessage;
 
 const ALLOWED_PARENT_TYPES = new Set<string>([
   PREVIEW_SECTION_MSG.HIGHLIGHT,
@@ -109,6 +148,7 @@ const ALLOWED_PARENT_TYPES = new Set<string>([
   PREVIEW_SECTION_MSG.CLEAR,
   PREVIEW_SECTION_MSG.ENABLE_MODE,
   PREVIEW_SECTION_MSG.DISABLE_MODE,
+  PREVIEW_SECTION_MSG.PARENT_DRAG_START,
 ]);
 
 const ALLOWED_IFRAME_TYPES = new Set<string>([
@@ -116,6 +156,7 @@ const ALLOWED_IFRAME_TYPES = new Set<string>([
   PREVIEW_SECTION_MSG.DRAG_START,
   PREVIEW_SECTION_MSG.POINTER_DOWN,
   PREVIEW_SECTION_MSG.DISMISS,
+  PREVIEW_SECTION_MSG.PREVIEW_THUMB,
 ]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -124,6 +165,37 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
+}
+
+function parseTargetChainNode(raw: unknown): TargetChainNode | null {
+  if (!isRecord(raw) || !isNonEmptyString(raw.label)) return null;
+  const role = raw.role;
+  if (role !== 'section' && role !== 'container' && role !== 'item' && role !== 'element') {
+    return null;
+  }
+  const itemIndex =
+    typeof raw.itemIndex === 'number' && Number.isFinite(raw.itemIndex) ? raw.itemIndex : undefined;
+  const itemPosition =
+    typeof raw.itemPosition === 'number' && Number.isFinite(raw.itemPosition)
+      ? raw.itemPosition
+      : itemIndex != null
+        ? itemIndex + 1
+        : undefined;
+  return {
+    role,
+    kind: isNonEmptyString(raw.kind) ? raw.kind.trim() : undefined,
+    label: raw.label.trim(),
+    fieldPath: isNonEmptyString(raw.fieldPath) ? raw.fieldPath.trim() : undefined,
+    itemIndex,
+    itemPosition,
+    surfaceId: isNonEmptyString(raw.surfaceId) ? raw.surfaceId.trim() : undefined,
+  };
+}
+
+function parseTargetChain(raw: unknown): TargetChainNode[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const nodes = raw.map(parseTargetChainNode).filter((n): n is TargetChainNode => n != null);
+  return nodes.length > 0 ? nodes : undefined;
 }
 
 function parseSelectedSectionPayload(payload: Record<string, unknown>): SelectedSectionPayload | null {
@@ -140,6 +212,18 @@ function parseSelectedSectionPayload(payload: Record<string, unknown>): Selected
     typeof payload.itemIndex === 'number' && Number.isFinite(payload.itemIndex)
       ? payload.itemIndex
       : undefined;
+  const surfaceId = isNonEmptyString(payload.surfaceId) ? payload.surfaceId.trim() : undefined;
+  const targetChain = parseTargetChain(payload.targetChain);
+  const pinScope =
+    payload.pinScope === 'element' || payload.pinScope === 'section'
+      ? payload.pinScope
+      : fieldPath
+        ? 'element'
+        : undefined;
+  const previewThumbnail = parsePreviewThumbnail(payload.previewThumbnail);
+  const previewThumbnailDataUrl = isNonEmptyString(payload.previewThumbnailDataUrl)
+    ? payload.previewThumbnailDataUrl.trim()
+    : undefined;
 
   return {
     sectionId: payload.sectionId.trim(),
@@ -151,10 +235,54 @@ function parseSelectedSectionPayload(payload: Record<string, unknown>): Selected
     elementLabel,
     fieldPath,
     itemIndex,
+    surfaceId,
+    targetChain,
+    pinScope,
+    previewThumbnail,
+    previewThumbnailDataUrl,
   };
 }
 
-/** Parse iframe → parent SITE_SECTION_SELECTED message. */
+/** Parse iframe → parent SITE_SECTION_PREVIEW_THUMB message. */
+export function parseSiteSectionPreviewThumbMessage(
+  data: unknown
+): SiteSectionPreviewThumbMessage | null {
+  if (!isRecord(data) || data.type !== PREVIEW_SECTION_MSG.PREVIEW_THUMB) return null;
+  if (!isRecord(data.payload)) return null;
+  const payload = data.payload;
+  if (!isNonEmptyString(payload.sectionId)) return null;
+  if (!isNonEmptyString(payload.dataUrl)) return null;
+  if (payload.captureKind !== 'raster' && payload.captureKind !== 'styled_fallback') return null;
+  if (typeof payload.width !== 'number' || !Number.isFinite(payload.width)) return null;
+  if (typeof payload.height !== 'number' || !Number.isFinite(payload.height)) return null;
+
+  return {
+    type: PREVIEW_SECTION_MSG.PREVIEW_THUMB,
+    payload: {
+      sectionId: payload.sectionId.trim(),
+      surfaceId: isNonEmptyString(payload.surfaceId) ? payload.surfaceId.trim() : undefined,
+      dataUrl: payload.dataUrl.trim(),
+      captureKind: payload.captureKind,
+      width: payload.width,
+      height: payload.height,
+    },
+  };
+}
+
+function parsePreviewThumbnail(raw: unknown): TargetPreviewThumbnail | undefined {
+  if (!isRecord(raw) || !isNonEmptyString(raw.previewUrl)) return undefined;
+  return {
+    previewUrl: raw.previewUrl.trim(),
+    publicUrl: isNonEmptyString(raw.publicUrl) ? raw.publicUrl.trim() : undefined,
+    path: isNonEmptyString(raw.path) ? raw.path.trim() : undefined,
+    width: typeof raw.width === 'number' && Number.isFinite(raw.width) ? raw.width : undefined,
+    height: typeof raw.height === 'number' && Number.isFinite(raw.height) ? raw.height : undefined,
+    captureKind:
+      raw.captureKind === 'raster' || raw.captureKind === 'styled_fallback'
+        ? raw.captureKind
+        : undefined,
+  };
+}
 export function parseSiteSectionSelectedMessage(data: unknown): SiteSectionSelectedMessage | null {
   if (!isRecord(data) || data.type !== PREVIEW_SECTION_MSG.SELECTED) return null;
   if (!isRecord(data.payload)) return null;
@@ -202,7 +330,12 @@ function parseContextPayload(payload: Record<string, unknown>): SiteSectionConte
 
 /** Map validated selection payload to UI state. */
 export function selectedSectionFromPayload(payload: SelectedSectionPayload): SelectedSection {
-  const kind = payload.sectionType === 'hero' || payload.sectionIndex < 0 ? 'hero' : 'section';
+  const kind =
+    payload.sectionType === 'nav'
+      ? 'section'
+      : payload.sectionType === 'hero' || payload.sectionIndex < 0
+        ? 'hero'
+        : 'section';
   return {
     kind,
     sectionId: payload.sectionId,
@@ -214,7 +347,17 @@ export function selectedSectionFromPayload(payload: SelectedSectionPayload): Sel
     elementLabel: payload.elementLabel,
     fieldPath: payload.fieldPath,
     itemIndex: payload.itemIndex,
+    surfaceId: payload.surfaceId,
+    targetChain: payload.targetChain,
+    pinScope: payload.pinScope ?? (payload.fieldPath ? 'element' : 'section'),
+    previewThumbnail: payload.previewThumbnail,
+    previewThumbnailDataUrl: payload.previewThumbnailDataUrl,
   };
+}
+
+/** Build parent → iframe signal to capture drag target preview thumbnail. */
+export function buildSiteSectionParentDragStartMessage(): SiteSectionParentDragStartMessage {
+  return { type: PREVIEW_SECTION_MSG.PARENT_DRAG_START, payload: { started: true } };
 }
 
 /** Build parent → iframe highlight message. */
@@ -266,7 +409,10 @@ export function isValidParentToIframeSectionMessage(data: unknown): data is Pare
   return (
     data.type === PREVIEW_SECTION_MSG.CLEAR ||
     data.type === PREVIEW_SECTION_MSG.ENABLE_MODE ||
-    data.type === PREVIEW_SECTION_MSG.DISABLE_MODE
+    data.type === PREVIEW_SECTION_MSG.DISABLE_MODE ||
+    (data.type === PREVIEW_SECTION_MSG.PARENT_DRAG_START &&
+      isRecord(data.payload) &&
+      data.payload.started === true)
   );
 }
 

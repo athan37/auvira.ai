@@ -14,6 +14,8 @@ export type ElementKindIconName =
   | 'contact_field'
   | 'item_title'
   | 'item_body'
+  | 'container'
+  | 'item'
   | 'default';
 
 /** Map bridge elementKind to icon variant for target card UI. */
@@ -27,12 +29,29 @@ export function elementKindIconName(elementKind: string | undefined): ElementKin
     case 'contact_field':
       return 'contact_field';
     case 'item_title':
+    case 'item_card':
     case 'image_caption':
       return 'item_title';
     case 'item_body':
     case 'body':
       return 'item_body';
+    case 'item_grid':
+    case 'inner_card':
+    case 'panel':
+      return 'container';
+    case 'item':
+      return 'item';
     default:
       return 'default';
   }
+}
+
+/** Icon for hierarchical chain row (role + kind). */
+export function chainNodeIconName(
+  role: 'section' | 'container' | 'item' | 'element',
+  kind?: string
+): ElementKindIconName {
+  if (role === 'container') return 'container';
+  if (role === 'item') return 'item';
+  return elementKindIconName(kind);
 }

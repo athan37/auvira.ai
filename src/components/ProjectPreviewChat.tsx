@@ -17,6 +17,7 @@ import {
   shouldShowPreviewTargetHint,
 } from '@/lib/preview/previewTargetHintStorage';
 import {
+  normalizeSelectedTarget,
   selectedTargetSectionId,
   type SelectedTargetInput,
 } from '@/lib/project-workspace/edit-shared/selectedTargetTypes';
@@ -269,7 +270,7 @@ function ChevronButton({
 }
 
 function selectedTargetFromSection(section: SelectedSection): SelectedTargetInput {
-  return {
+  return normalizeSelectedTarget({
     kind: section.kind,
     sectionId: section.sectionId,
     analyticsId: section.analyticsId,
@@ -280,7 +281,12 @@ function selectedTargetFromSection(section: SelectedSection): SelectedTargetInpu
     itemIndex: section.itemIndex,
     elementKind: section.elementKind,
     elementLabel: section.elementLabel,
-  };
+    surfaceId: section.surfaceId,
+    targetChain: section.targetChain,
+    pinScope: section.pinScope,
+    previewThumbnail: section.previewThumbnail,
+    previewThumbnailDataUrl: section.previewThumbnailDataUrl,
+  })!;
 }
 
 function ChatMessageBubble({

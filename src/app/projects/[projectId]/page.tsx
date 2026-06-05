@@ -24,6 +24,11 @@ import {
   type SelectedSection,
   type SiteSectionContextPayload,
 } from '@/lib/preview/sectionSelectionProtocol';
+import type {
+  TargetPreviewCaptureKind,
+  TargetPreviewThumbMessage,
+} from '@/lib/preview/targetPreviewThumbnail';
+import { uploadTargetPreviewThumbnail } from '@/lib/preview/uploadTargetPreviewThumbnail';
 
 const SECTION_DRAG_THRESHOLD = 6;
 
@@ -109,7 +114,12 @@ export default function ProjectPage() {
     payload: SiteSectionContextPayload;
     x: number;
     y: number;
+    previewDataUrl?: string;
+    previewCaptureKind?: TargetPreviewCaptureKind;
+    previewWidth?: number;
+    previewHeight?: number;
   } | null>(null);
+  const [sectionDragCaptureKey, setSectionDragCaptureKey] = useState(0);
   const [sectionDragPending, setSectionDragPending] = useState<{
     payload: SiteSectionContextPayload;
     startX: number;
@@ -190,17 +200,40 @@ export default function ProjectPage() {
   }, []);
 
   const finishSectionDrag = useCallback(
-    (clientX: number, clientY: number) => {
+    async (clientX: number, clientY: number) => {
       const payloadToDrop = sectionDragPayloadRef.current;
+      const dragPreview = sectionDrag;
       if (payloadToDrop && isPointInChatDropZone(clientX, clientY)) {
-        handleSelectedSectionChange(selectedSectionFromPayload(payloadToDrop));
+        let section = selectedSectionFromPayload(payloadToDrop);
+        const dataUrl = dragPreview?.previewDataUrl;
+        if (dataUrl) {
+          section = { ...section, previewThumbnailDataUrl: dataUrl };
+          handleSelectedSectionChange(section);
+          try {
+            const uploaded = await uploadTargetPreviewThumbnail(
+              projectId,
+              dataUrl,
+              dragPreview?.previewCaptureKind,
+              { width: dragPreview?.previewWidth, height: dragPreview?.previewHeight }
+            );
+            setSelectedSection((prev) =>
+              prev && prev.sectionId === section.sectionId
+                ? { ...prev, previewThumbnail: uploaded, previewThumbnailDataUrl: undefined }
+                : prev
+            );
+          } catch {
+            /* keep transient data URL if upload fails */
+          }
+        } else {
+          handleSelectedSectionChange(section);
+        }
       }
       sectionDragPayloadRef.current = null;
       setSectionDrag(null);
       setSectionDragPending(null);
       setIsChatDropActive(false);
     },
-    [handleSelectedSectionChange, isPointInChatDropZone]
+    [handleSelectedSectionChange, isPointInChatDropZone, projectId, sectionDrag]
   );
 
   const handleSectionPointerDown = useCallback(
@@ -218,10 +251,31 @@ export default function ProjectPage() {
       sectionDragPayloadRef.current = payload;
       setSectionDrag({ payload, x: screenX, y: screenY });
       setSectionDragPending(null);
+      setSectionDragCaptureKey((key) => key + 1);
       setIsChatDropActive(isPointInChatDropZone(screenX, screenY));
     },
     [isPointInChatDropZone]
   );
+
+  const handleSectionPreviewThumb = useCallback((thumb: TargetPreviewThumbMessage) => {
+    const activePayload = sectionDragPayloadRef.current;
+    if (!activePayload) return;
+    if (activePayload.sectionId !== thumb.sectionId) return;
+    if (thumb.surfaceId && activePayload.surfaceId && thumb.surfaceId !== activePayload.surfaceId) {
+      return;
+    }
+    setSectionDrag((prev) =>
+      prev
+        ? {
+            ...prev,
+            previewDataUrl: thumb.dataUrl,
+            previewCaptureKind: thumb.captureKind,
+            previewWidth: thumb.width,
+            previewHeight: thumb.height,
+          }
+        : prev
+    );
+  }, []);
 
   const handleSectionDragMove = useCallback(
     (clientX: number, clientY: number) => {
@@ -360,7 +414,12 @@ export default function ProjectPage() {
       {(sectionDrag || sectionDragPending) && (
         <>
           {sectionDrag ? (
-            <SectionDragGhost payload={sectionDrag.payload} x={sectionDrag.x} y={sectionDrag.y} />
+            <SectionDragGhost
+              payload={sectionDrag.payload}
+              x={sectionDrag.x}
+              y={sectionDrag.y}
+              previewDataUrl={sectionDrag.previewDataUrl}
+            />
           ) : null}
           <div
             className="fixed inset-0 z-[99] cursor-grabbing select-none"
@@ -386,6 +445,8 @@ export default function ProjectPage() {
             onSectionDragStart={handleSectionDragStart}
             onSectionPointerDown={handleSectionPointerDown}
             onSectionHighlightDismiss={handleSectionHighlightDismiss}
+            sectionDragCaptureKey={sectionDragCaptureKey}
+            onSectionPreviewThumb={handleSectionPreviewThumb}
           />
         </div>
 

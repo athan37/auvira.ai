@@ -4,6 +4,7 @@ import { instrumentGeneratedSite } from '@/lib/analytics/generated-sites/instrum
 import { repairPageTsxStructure } from '@/lib/project-workspace/repairPageTsxStructure';
 import { repairContactSectionSubtitleInPage } from '@/lib/preview/repairContactSectionSubtitle';
 import { repairContactSectionPrimaryCtaInPage } from '@/lib/preview/repairContactSectionPrimaryCta';
+import { repairPreviewContainerAttrsInPage } from '@/lib/preview/repairPreviewContainerAttrs';
 import { repairSiteConfigTypesInWorkspace } from '@/lib/preview/repairSiteConfigTypes';
 import { repairSectionPresentationWiringInWorkspace } from '@/lib/project-workspace/edit-shared/legacySectionPresentation';
 
@@ -31,6 +32,12 @@ export async function repairPreviewWorkspace(workspacePath: string): Promise<voi
     const primaryCtaRepair = repairContactSectionPrimaryCtaInPage(page);
     if (primaryCtaRepair.repaired) {
       page = primaryCtaRepair.content;
+      pageChanged = true;
+    }
+
+    const containerRepair = repairPreviewContainerAttrsInPage(page);
+    if (containerRepair.repaired) {
+      page = containerRepair.content;
       pageChanged = true;
     }
 

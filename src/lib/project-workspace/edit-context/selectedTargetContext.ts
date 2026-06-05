@@ -2,6 +2,10 @@ import type { SiteSectionPresentation } from '@/lib/builder/sectionPresentation'
 import { parseSiteConfigSource } from '@/lib/site-manager/siteConfigParser';
 import { extractSiteConfigSectionBlock } from '@/lib/project-workspace/edit-shared/extractEditCodeContext';
 import type { SelectedTargetInput } from '@/lib/project-workspace/edit-shared/selectedTargetTypes';
+import {
+  allowedFieldPathsForTarget,
+  resolvePinScope,
+} from '@/lib/project-workspace/edit-shared/selectedTargetTypes';
 import type { SiteSectionCatalog } from '@/lib/project-workspace/edit-shared/siteSectionCatalog';
 import {
   heroFieldPath,
@@ -79,6 +83,9 @@ export interface SelectedTargetContext {
     configPath: string;
     currentValue?: string;
   }>;
+  /** When true, copy edits default to allowedFieldPaths only. */
+  pinnedElementOnly?: boolean;
+  allowedFieldPaths?: string[];
 }
 
 export interface BuildSelectedTargetContextInput {
@@ -176,12 +183,37 @@ export function buildSelectedTargetContext(
     confidence: target.confidence,
   };
 
-  const editableFields =
+  const editableFieldsAll =
     selectedTarget.kind === 'hero'
       ? buildHeroFields(siteConfigContent)
       : target.sectionIndex != null
         ? buildSectionFields(siteConfigContent, target.sectionIndex)
         : [];
+
+  const pinScope = resolvePinScope(selectedTarget);
+  const allowedFieldPaths = allowedFieldPathsForTarget(selectedTarget);
+  const pinnedElementOnly = pinScope === 'element' && allowedFieldPaths.length > 0;
+
+  let editableFields = editableFieldsAll;
+  if (pinnedElementOnly) {
+    editableFields = editableFieldsAll.filter((field) =>
+      allowedFieldPaths.includes(field.fieldPath)
+    );
+    if (editableFields.length === 0 && allowedFieldPaths[0]) {
+      const parsedPath = parseConfigFieldPath(allowedFieldPaths[0]);
+      editableFields = [
+        {
+          fieldPath: allowedFieldPaths[0],
+          label: selectedTarget.elementLabel ?? allowedFieldPaths[0],
+          currentValue: parsedPath
+            ? readConfigFieldValue(configObject, parsedPath)
+            : undefined,
+          confidence: 'high' as const,
+          reason: 'UI-pinned element field',
+        },
+      ];
+    }
+  }
 
   let sectionSlice: SelectedTargetContext['section'];
   if (target.sectionIndex != null && parsedConfig?.sections?.[target.sectionIndex]) {
@@ -258,6 +290,8 @@ export function buildSelectedTargetContext(
     },
     recommendedDefaultField,
     styleTargets,
+    pinnedElementOnly: pinnedElementOnly || undefined,
+    allowedFieldPaths: pinnedElementOnly ? allowedFieldPaths : undefined,
   };
 }
 
@@ -301,6 +335,9 @@ export function formatSelectedTargetContextBlock(ctx: SelectedTargetContext): st
   if (ctx.resolved.sectionTitle) lines.push(`- title: ${ctx.resolved.sectionTitle}`);
   if (ctx.element?.kind) lines.push(`- element: ${ctx.element.kind}`);
   if (ctx.element?.fieldPath) lines.push(`- elementFieldPath: ${ctx.element.fieldPath}`);
+  if (ctx.pinnedElementOnly && ctx.allowedFieldPaths?.length) {
+    lines.push(`- pinScope: element (only ${ctx.allowedFieldPaths.join(', ')})`);
+  }
 
   lines.push('', 'SELECTED TARGET CONTEXT:');
   if (ctx.section?.title) lines.push(`- Current title: "${ctx.section.title}"`);
@@ -324,7 +361,8 @@ export function formatSelectedTargetContextBlock(ctx: SelectedTargetContext): st
 
   if (ctx.editableFields.length) {
     lines.push('', 'EDITABLE FIELDS:');
-    ctx.editableFields.slice(0, 12).forEach((field, i) => {
+    const fieldLimit = ctx.pinnedElementOnly ? ctx.editableFields.length : 12;
+    ctx.editableFields.slice(0, fieldLimit).forEach((field, i) => {
       const value =
         field.currentValue == null
           ? '(empty)'
@@ -358,6 +396,11 @@ export function formatSelectedTargetContextBlock(ctx: SelectedTargetContext): st
     '',
     'RULES:',
     '- Treat UI-selected target as pinned; do not pick a different section unless the user explicitly names another.',
+    ...(ctx.pinnedElementOnly && ctx.allowedFieldPaths?.[0]
+      ? [
+          `- Owner pinned element \`${ctx.allowedFieldPaths[0]}\`. Only edit that field unless the message explicitly names another target.`,
+        ]
+      : []),
     '- If the user says "title", use the most likely title field from EDITABLE FIELDS.',
     '- Prefer config field paths and domain skills over custom_code_edit.',
     '- Style/color requests → update_section_style on the pinned sectionIndex.',

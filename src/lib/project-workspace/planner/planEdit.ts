@@ -12,6 +12,7 @@ import { normalizeEditPlanPayload } from './normalizeEditPlan';
 import { buildDeterministicPlan } from '@/lib/project-workspace/edit-agent/deterministicPlan';
 import { guardUnsupportedPlanSkills } from './validatePlanSkills';
 import { guardEditPlanSemantics } from './validateEditPlanSemantics';
+import { applyPinnedElementScopeGuard } from './guardPinnedElementScope';
 import { normalizeMisroutedCopyPlan } from '@/lib/project-workspace/edit-agent/planFromConfigTextEdit';
 import { tryExplorerPlan } from '@/lib/project-workspace/edit-agent/tryExplorerPlan';
 import { isUnifiedCopyEditEnabled } from '@/lib/project-workspace/edit-context/unifiedCopyEditFlag';
@@ -75,7 +76,7 @@ export async function planEdit(input: PlanEditInputUnion): Promise<PlanEditResul
         : guarded;
       return {
         ok: true,
-        plan: guardEditPlanSemantics(normalized, editContext),
+        plan: guardEditPlanSemantics(applyPinnedElementScopeGuard(normalized, editContext), editContext),
       };
     }
   }
@@ -90,7 +91,7 @@ export async function planEdit(input: PlanEditInputUnion): Promise<PlanEditResul
         : guarded;
       return {
         ok: true,
-        plan: guardEditPlanSemantics(normalized, editContext),
+        plan: guardEditPlanSemantics(applyPinnedElementScopeGuard(normalized, editContext), editContext),
       };
     }
   }
@@ -101,7 +102,7 @@ export async function planEdit(input: PlanEditInputUnion): Promise<PlanEditResul
       const guarded = guardUnsupportedPlanSkills(parsed.data, skillGuardOptions);
       return {
         ok: true,
-        plan: guardEditPlanSemantics(guarded, editContext),
+        plan: guardEditPlanSemantics(applyPinnedElementScopeGuard(guarded, editContext), editContext),
       };
     }
   }
@@ -143,7 +144,7 @@ export async function planEdit(input: PlanEditInputUnion): Promise<PlanEditResul
         : guarded;
       return {
         ok: true,
-        plan: guardEditPlanSemantics(normalized, editContext),
+        plan: guardEditPlanSemantics(applyPinnedElementScopeGuard(normalized, editContext), editContext),
       };
     }
 
