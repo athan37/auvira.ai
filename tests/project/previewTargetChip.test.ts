@@ -2,9 +2,12 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   formatPreviewTargetBreadcrumb,
   formatPreviewTargetChipText,
+  formatPreviewTargetCompactBreadcrumb,
   formatPreviewTargetDisplay,
   formatPreviewTargetLabel,
   formatPreviewTargetLayers,
+  formatPreviewTargetPrimaryLabel,
+  shouldShowTargetBreadcrumb,
 } from '@/lib/preview/previewTargetChipLabels';
 import { targetPreviewDisplayUrl } from '@/lib/preview/targetPreviewThumbnail';
 import { sectionTypeLabel } from '@/lib/preview/previewTargetVisuals';
@@ -176,6 +179,73 @@ describe('previewTargetChipLabels', () => {
     expect(formatPreviewTargetLabel(target)).toBe(
       'generic: Delivery Coverage › Item 3 › Include minimum order requirements if any'
     );
+  });
+
+  it('formatPreviewTargetPrimaryLabel prefers leaf chain label over section title', () => {
+    expect(
+      formatPreviewTargetPrimaryLabel({
+        kind: 'hero',
+        sectionTitle: 'Hero',
+        elementKind: 'heading',
+        elementLabel: 'Beverage & Food Delivery for Your Business',
+        pinScope: 'element',
+        targetChain: [
+          { role: 'section', label: 'Hero', kind: 'hero' },
+          {
+            role: 'element',
+            kind: 'heading',
+            label: 'Beverage & Food Delivery for Your Business',
+          },
+        ],
+      })
+    ).toBe('Beverage & Food Delivery for Your Business');
+  });
+
+  it('shouldShowTargetBreadcrumb shows element path for single-level element pins', () => {
+    expect(
+      shouldShowTargetBreadcrumb({
+        kind: 'hero',
+        elementKind: 'heading',
+        elementLabel: 'Beverage & Food Delivery for Your Business',
+        pinScope: 'element',
+        targetChain: [
+          { role: 'section', label: 'Hero', kind: 'hero' },
+          {
+            role: 'element',
+            kind: 'heading',
+            label: 'Beverage & Food Delivery for Your Business',
+          },
+        ],
+      })
+    ).toBe(true);
+    expect(
+      formatPreviewTargetCompactBreadcrumb({
+        kind: 'hero',
+        elementKind: 'button',
+        elementLabel: 'Learn About Our Services',
+        pinScope: 'element',
+        targetChain: [
+          { role: 'section', label: 'Hero', kind: 'hero' },
+          { role: 'element', kind: 'button', label: 'Learn About Our Services' },
+        ],
+      })
+    ).toBe('Hero › Button');
+  });
+
+  it('formatPreviewTargetCompactBreadcrumb keeps intermediate chain labels', () => {
+    expect(
+      formatPreviewTargetCompactBreadcrumb({
+        kind: 'section',
+        sectionType: 'services',
+        sectionTitle: 'Our Services',
+        targetChain: [
+          { role: 'section', label: 'Our Services' },
+          { role: 'container', label: 'Service cards', kind: 'item_grid' },
+          { role: 'item', label: 'Item 3', itemIndex: 2 },
+          { role: 'element', kind: 'item_body', label: 'Fast response times' },
+        ],
+      })
+    ).toBe('Our Services › Service cards › Item 3');
   });
 });
 

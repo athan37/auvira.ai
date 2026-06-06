@@ -3,6 +3,8 @@ import {
   injectPreviewChunkErrorRecovery,
   isPreviewRewriteableContentType,
   rewriteHtmlAssetPaths,
+  rewritePreviewLoopbackAssetUrls,
+  rewritePreviewLoopbackLocation,
   rewritePreviewResponseBody,
 } from '../src/lib/project-workspace/previewProxyRewrite';
 
@@ -69,5 +71,21 @@ describe('rewriteHtmlAssetPaths', () => {
     expect(out.rewritten).toBe(true);
     expect(String(out.body)).toContain('preview/section-bridge');
     expect(String(out.body)).toContain('cursor:grab');
+  });
+
+  it('rewrites loopback redirect locations through the preview proxy', () => {
+    const out = rewritePreviewLoopbackLocation(
+      'http://localhost:3427/about?x=1',
+      projectId,
+      3427
+    );
+    expect(out).toBe(`${base}/about?x=1`);
+  });
+
+  it('rewrites absolute loopback asset URLs in proxied bundles', () => {
+    const js = 'fetch("http://127.0.0.1:3427/_next/static/chunks/main.js")';
+    const out = rewritePreviewLoopbackAssetUrls(js, projectId, 3427);
+    expect(out).toContain(`${base}/_next/static/chunks/main.js`);
+    expect(out).not.toContain('127.0.0.1:3427');
   });
 });

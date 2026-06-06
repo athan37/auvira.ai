@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildElementCaptureBridgeScript,
+  gradientLineForAngle,
   isOpaqueCssColor,
+  isOutlineControlStyle,
   parseBorderRadiusPx,
+  parseLinearGradientAngle,
+  parseLinearGradientStops,
+  pickCssBackgroundColor,
   pickElementFillColor,
   pickPreviewFrameBackground,
   shouldPreferStyledElementCapture,
@@ -67,6 +72,32 @@ describe('pickElementFillColor', () => {
   });
 });
 
+describe('pickCssBackgroundColor', () => {
+  it('reads gradient colors when backgroundColor is transparent', () => {
+    expect(
+      pickCssBackgroundColor('transparent', 'linear-gradient(rgb(127, 45, 18), rgb(0, 0, 0))')
+    ).toBe('rgb(127, 45, 18)');
+  });
+});
+
+describe('isOutlineControlStyle', () => {
+  it('detects border-only buttons', () => {
+    expect(
+      isOutlineControlStyle({
+        backgroundColor: 'transparent',
+        borderWidth: '1px',
+        borderColor: 'rgb(255, 255, 255)',
+      })
+    ).toBe(true);
+    expect(
+      isOutlineControlStyle({
+        backgroundColor: 'rgb(234, 88, 12)',
+        borderWidth: '0px',
+      })
+    ).toBe(false);
+  });
+});
+
 describe('isOpaqueCssColor', () => {
   it('rejects transparent values', () => {
     expect(isOpaqueCssColor('transparent')).toBe(false);
@@ -91,15 +122,51 @@ describe('TARGET_PREVIEW_THUMB_DPR', () => {
   });
 });
 
+describe('parseLinearGradientStops', () => {
+  it('extracts rgb and hex stops from linear-gradient', () => {
+    expect(parseLinearGradientStops('none')).toEqual([]);
+    expect(
+      parseLinearGradientStops('linear-gradient(135deg, rgb(127, 45, 18) 0%, rgb(59, 130, 246) 100%)')
+    ).toEqual(['rgb(127, 45, 18)', 'rgb(59, 130, 246)']);
+    expect(parseLinearGradientStops('linear-gradient(#fff, #000)')).toEqual(['#fff', '#000']);
+  });
+});
+
+describe('parseLinearGradientAngle', () => {
+  it('reads deg from linear-gradient and defaults to 90', () => {
+    expect(parseLinearGradientAngle('none')).toBe(90);
+    expect(parseLinearGradientAngle('linear-gradient(135deg, #fff, #000)')).toBe(135);
+    expect(parseLinearGradientAngle('linear-gradient(rgb(1,2,3), rgb(4,5,6))')).toBe(90);
+  });
+});
+
+describe('gradientLineForAngle', () => {
+  it('returns distinct endpoints for diagonal gradients', () => {
+    const line = gradientLineForAngle(360, 200, 135);
+    expect(line.x0).not.toBe(line.x1);
+    expect(line.y0).not.toBe(line.y1);
+  });
+});
+
 describe('buildElementCaptureBridgeScript', () => {
-  it('includes retina thumb canvas and PNG element captures', () => {
+  it('includes styled section and element capture helpers', () => {
     const script = buildElementCaptureBridgeScript();
-    expect(script).toContain('function createThumbCanvas');
+    expect(script).toContain('function captureSectionStyledPreview');
+    expect(script).toContain('function resolveSectionPreviewCanvasSize');
+    expect(script).toContain('function parseLinearGradientAngle');
+    expect(script).toContain('function previewCardRadiusPx');
+    expect(script).toContain('function paintCanvasBackground');
+    expect(script).toContain('function createScaledCanvas');
+    expect(script).not.toContain('var w=280,h=140');
     expect(script).toContain('function fitFontSize');
     expect(script).toContain('function drawFittedLine');
     expect(script).toContain('PREVIEW_THUMB_RENDER_W');
     expect(script).toContain('image/png');
+    expect(script).not.toContain('function createThumbCanvas');
     expect(script).toContain('resolvePreviewFrameBackground');
-    expect(script).toContain('img');
+    expect(script).toContain('measureButtonPaintSize');
+    expect(script).toContain('ctx.fillText(label,cx,cy);');
+    expect(script).toContain('paintElementBackdrop(ctx,el,outW,outH)');
+    expect(script).not.toMatch(/paintElementBackdrop\(ctx,outW,outH,el\)/);
   });
 });

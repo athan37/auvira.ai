@@ -72,6 +72,50 @@ export function rewritePreviewAssetPaths(content: string, projectId: string): st
   return content;
 }
 
+/** Rewrite workspace dev-server redirect targets so the iframe stays on the preview proxy. */
+export function rewritePreviewLoopbackLocation(
+  location: string,
+  projectId: string,
+  previewPort: number
+): string {
+  try {
+    const parsed = location.startsWith('http')
+      ? new URL(location)
+      : new URL(location, `http://127.0.0.1:${previewPort}`);
+    const host = parsed.hostname.toLowerCase();
+    if (host !== 'localhost' && host !== '127.0.0.1') {
+      return location;
+    }
+    const port = parsed.port ? Number(parsed.port) : previewPort;
+    if (port !== previewPort) {
+      return location;
+    }
+    const proxyBase = `/api/projects/${projectId}/preview/proxy`;
+    return `${proxyBase}${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return location;
+  }
+}
+
+/** Rewrite absolute loopback asset URLs in proxied HTML/CSS/JS. */
+export function rewritePreviewLoopbackAssetUrls(
+  content: string,
+  projectId: string,
+  previewPort: number
+): string {
+  const proxyBase = `/api/projects/${projectId}/preview/proxy`;
+  const portPattern = String(previewPort);
+  const hosts = ['localhost', '127\\.0\\.0\\.1'];
+  for (const host of hosts) {
+    const absolute = new RegExp(
+      `(https?:\\/\\/${host}:${portPattern})(\\/[^"'\\s)]+)`,
+      'g'
+    );
+    content = content.replace(absolute, `${proxyBase}$2`);
+  }
+  return content;
+}
+
 const CHUNK_ERROR_RECOVERY_SCRIPT = `<script>(function(){var retried=false;function notify(){try{window.parent.postMessage({type:"preview-chunk-error"},"*");}catch(e){}}function isChunkErr(m){return typeof m==="string"&&(m.indexOf("ChunkLoadError")>=0||m.indexOf("Loading chunk")>=0);}window.addEventListener("error",function(e){if(isChunkErr(e.message)||isChunkErr(String(e.error||"")))notify();});window.addEventListener("unhandledrejection",function(e){var r=e.reason;var m=r&&r.message?r.message:String(r||"");if(isChunkErr(m))notify();});})();</script>`;
 
 /** Inject parent-frame chunk error recovery hook into proxied HTML. */
@@ -87,7 +131,8 @@ export function injectPreviewChunkErrorRecovery(html: string): string {
 export function rewritePreviewResponseBody(
   body: Buffer,
   contentType: string,
-  projectId: string
+  projectId: string,
+  previewPort?: number
 ): { body: Buffer | string; rewritten: boolean; contentType: string } {
   if (!isPreviewRewriteableContentType(contentType) || body.length === 0) {
     return { body, rewritten: false, contentType };
@@ -95,6 +140,9 @@ export function rewritePreviewResponseBody(
 
   const text = body.toString('utf8');
   let rewritten = rewritePreviewAssetPaths(text, projectId);
+  if (previewPort) {
+    rewritten = rewritePreviewLoopbackAssetUrls(rewritten, projectId, previewPort);
+  }
   let didRewrite = rewritten !== text;
 
   if (contentType.includes('text/html')) {

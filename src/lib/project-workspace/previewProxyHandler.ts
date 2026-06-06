@@ -6,7 +6,10 @@ import {
   isReservedWorkspacePreviewPort,
 } from '@/lib/preview/workspacePreviewHealth';
 import { buildPreviewLoadingHtml } from '@/lib/project-workspace/codePreviewServe';
-import { rewritePreviewResponseBody } from '@/lib/project-workspace/previewProxyRewrite';
+import {
+  rewritePreviewLoopbackLocation,
+  rewritePreviewResponseBody,
+} from '@/lib/project-workspace/previewProxyRewrite';
 
 export { rewriteHtmlAssetPaths } from '@/lib/project-workspace/previewProxyRewrite';
 
@@ -54,7 +57,7 @@ function filterHeaders(headers: Record<string, string | string[] | undefined>): 
   return filtered;
 }
 
-function makeProxyRequest(
+function makeProxyRequestOnce(
   targetUrl: string
 ): Promise<{ status: number; headers: Record<string, string | string[] | undefined>; body: Buffer }> {
   return new Promise((resolve, reject) => {
@@ -81,6 +84,49 @@ function makeProxyRequest(
     });
     req.setTimeout(15000);
   });
+}
+
+async function makeProxyRequest(
+  targetUrl: string,
+  options: { maxRedirects?: number } = {}
+): Promise<{ status: number; headers: Record<string, string | string[] | undefined>; body: Buffer }> {
+  const maxRedirects = options.maxRedirects ?? 5;
+  let current = targetUrl;
+
+  for (let hop = 0; hop <= maxRedirects; hop++) {
+    const result = await makeProxyRequestOnce(current);
+    if (result.status < 300 || result.status >= 400 || hop >= maxRedirects) {
+      return result;
+    }
+
+    const rawLocation = result.headers.location;
+    const location = Array.isArray(rawLocation) ? rawLocation[0] : rawLocation;
+    if (!location) {
+      return result;
+    }
+
+    const next = new URL(location, current);
+    const host = next.hostname.toLowerCase();
+    if (host !== '127.0.0.1' && host !== 'localhost') {
+      return result;
+    }
+    current = next.toString();
+  }
+
+  throw new Error('Too many preview redirects');
+}
+
+function applyLoopbackLocationRewrite(
+  headers: Headers,
+  projectId: string,
+  previewPort: number
+): void {
+  const location = headers.get('location');
+  if (!location) return;
+  const rewritten = rewritePreviewLoopbackLocation(location, projectId, previewPort);
+  if (rewritten !== location) {
+    headers.set('location', rewritten);
+  }
 }
 
 function friendlyHtml(message: string): NextResponse {
@@ -242,10 +288,11 @@ export async function handlePreviewProxyGet(
   try {
     const result = await makeProxyRequest(target);
     let filteredHeaders = filterHeaders(result.headers);
+    applyLoopbackLocationRewrite(filteredHeaders, projectId, port);
 
     const contentType = result.headers['content-type'];
     const ctStr = Array.isArray(contentType) ? contentType[0] : contentType || '';
-    const rewrite = rewritePreviewResponseBody(result.body, ctStr, projectId);
+    const rewrite = rewritePreviewResponseBody(result.body, ctStr, projectId, port);
 
     if (rewrite.rewritten) {
       filteredHeaders.delete('content-length');

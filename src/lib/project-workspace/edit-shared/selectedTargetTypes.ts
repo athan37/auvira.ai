@@ -34,6 +34,10 @@ export interface SelectedTargetInput {
   previewThumbnail?: TargetPreviewThumbnail;
   /** Transient data URL before upload completes. */
   previewThumbnailDataUrl?: string;
+  /** Source element rect width from drag capture (aspect-ratio layout). */
+  previewCaptureWidth?: number;
+  /** Source element rect height from drag capture (aspect-ratio layout). */
+  previewCaptureHeight?: number;
 }
 
 function parseTargetChain(raw: unknown): TargetChainNode[] | undefined {
@@ -154,6 +158,18 @@ export function normalizeSelectedTarget(
     typeof input.previewThumbnailDataUrl === 'string' && input.previewThumbnailDataUrl.trim()
       ? input.previewThumbnailDataUrl.trim()
       : undefined;
+  const previewCaptureWidth =
+    typeof input.previewCaptureWidth === 'number' && Number.isFinite(input.previewCaptureWidth)
+      ? input.previewCaptureWidth
+      : typeof input.previewWidth === 'number' && Number.isFinite(input.previewWidth)
+        ? input.previewWidth
+        : previewThumbnail?.width;
+  const previewCaptureHeight =
+    typeof input.previewCaptureHeight === 'number' && Number.isFinite(input.previewCaptureHeight)
+      ? input.previewCaptureHeight
+      : typeof input.previewHeight === 'number' && Number.isFinite(input.previewHeight)
+        ? input.previewHeight
+        : previewThumbnail?.height;
 
   const base: SelectedTargetInput =
     kind === 'hero'
@@ -172,6 +188,8 @@ export function normalizeSelectedTarget(
           pinScope,
           previewThumbnail,
           previewThumbnailDataUrl,
+          previewCaptureWidth,
+          previewCaptureHeight,
         }
       : sectionId || sectionIndex != null
         ? {
@@ -193,6 +211,8 @@ export function normalizeSelectedTarget(
             pinScope,
             previewThumbnail,
             previewThumbnailDataUrl,
+            previewCaptureWidth,
+            previewCaptureHeight,
           }
         : (undefined as unknown as SelectedTargetInput);
 

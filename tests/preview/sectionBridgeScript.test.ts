@@ -33,7 +33,7 @@ describe('sectionBridgeScript drag preview UX', () => {
   it('prefers styled element capture over SVG raster for element pins', () => {
     const body = buildSectionBridgeScriptBody();
     expect(body).toContain('function captureElementStyledPreview');
-    expect(body).toContain('captureElementStyledPreview(root,leafKind)');
+    expect(body).toContain('captureElementStyledPreview(captureEl,leafKind)');
     expect(body).toContain('function inlineComputedStyles');
   });
 
@@ -67,7 +67,14 @@ describe('sectionBridgeScript drag preview UX', () => {
   it('includes full-section preview capture for nested contact layouts', () => {
     const body = buildSectionBridgeScriptBody();
     expect(body).toContain('function resolvePreviewCaptureRoot');
-    expect(body).toContain('function captureSectionStyledFallback');
+    expect(body).toContain('function captureSectionStyledPreview');
     expect(body).toContain('shouldCaptureFullSectionPreview');
+  });
+
+  it('uses layout-aware section styled preview instead of hero-only sketch', () => {
+    const body = buildSectionBridgeScriptBody();
+    expect(body).toContain('function captureFeaturesGridSection');
+    expect(body).toContain('function detectSectionLayout');
+    expect(body).not.toContain('function captureSectionStyledFallback');
   });
 });

@@ -2,11 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/cn';
-import { Badge } from '@/components/ui/Badge';
+import { PreviewTargetCardLayout } from '@/components/project/PreviewTargetCardLayout';
 import {
   formatPreviewTargetBreadcrumb,
   formatPreviewTargetChipText,
-  formatPreviewTargetDisplay,
   formatPreviewTargetLabel,
   type PreviewTargetChipVariant,
 } from '@/lib/preview/previewTargetChipLabels';
@@ -14,15 +13,11 @@ import {
   activatePreviewTargetChip,
   handlePreviewTargetChipKeyDown,
 } from '@/lib/preview/previewTargetChipInteractions';
-import {
-  chainNodeIconName,
-  elementKindIconName,
-  type ElementKindIconName,
-} from '@/lib/preview/previewTargetVisuals';
-import type { PreviewTargetChainRow } from '@/lib/preview/previewTargetChipLabels';
 import type { SelectedTargetInput } from '@/lib/project-workspace/edit-shared/selectedTargetTypes';
 import { PreviewTargetThumbnail } from '@/components/project/PreviewTargetThumbnail';
 import {
+  inferPreviewScaleProfile,
+  resolvePreviewThumbSourceDimensions,
   targetPreviewDisplayUrl,
   targetPreviewFallbackLabel,
 } from '@/lib/preview/targetPreviewThumbnail';
@@ -39,76 +34,6 @@ interface Props {
   onActivate?: () => void;
   refocusInput?: () => void;
   className?: string;
-}
-
-function ElementKindIcon({
-  kind,
-  className = 'h-3.5 w-3.5',
-}: {
-  kind: ElementKindIconName;
-  className?: string;
-}) {
-  const cls = cn('shrink-0 text-zinc-500', className);
-  switch (kind) {
-    case 'button':
-      return (
-        <svg className={cls} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-          <rect x="4" y="8" width="16" height="8" rx="4" strokeWidth={2} />
-        </svg>
-      );
-    case 'heading':
-      return (
-        <svg className={cls} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-          <path strokeLinecap="round" strokeWidth={2} d="M6 6h12M6 12h8M6 18h10" />
-        </svg>
-      );
-    case 'contact_field':
-      return (
-        <svg className={cls} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
-          />
-        </svg>
-      );
-    case 'item_title':
-      return (
-        <svg className={cls} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-          <rect x="5" y="5" width="14" height="14" rx="2" strokeWidth={2} />
-        </svg>
-      );
-    case 'item_body':
-      return (
-        <svg className={cls} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-          <path strokeLinecap="round" strokeWidth={2} d="M6 8h12M6 12h12M6 16h8" />
-        </svg>
-      );
-    case 'container':
-      return (
-        <svg className={cls} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-          <rect x="4" y="5" width="16" height="14" rx="2" strokeWidth={2} />
-        </svg>
-      );
-    case 'item':
-      return (
-        <svg className={cls} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-          <path strokeLinecap="round" strokeWidth={2} d="M8 7h8M8 11h8M8 15h5" />
-        </svg>
-      );
-    default:
-      return (
-        <svg className={cls} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M4 6h16M4 12h16M4 18h10"
-          />
-        </svg>
-      );
-  }
 }
 
 function ClearPinButton({ label, onClear }: { label: string; onClear: () => void }) {
@@ -141,72 +66,6 @@ function TargetCardHeader({ onClear, label }: { onClear: () => void; label: stri
   );
 }
 
-function TargetSectionRow({
-  scopeLabel,
-  title,
-}: {
-  scopeLabel: string;
-  title: string;
-}) {
-  const showTitle = title.toLowerCase() !== scopeLabel.toLowerCase();
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      <Badge tone="info" className="shrink-0">
-        {scopeLabel}
-      </Badge>
-      {showTitle ? (
-        <span className="text-sm font-semibold text-zinc-950 break-words">{title}</span>
-      ) : null}
-    </div>
-  );
-}
-
-function TargetChainRows({ rows }: { rows: PreviewTargetChainRow[] }) {
-  return (
-    <div className="space-y-1">
-      {rows.map((row, index) => {
-        const iconKind = chainNodeIconName(row.role, row.kind);
-        return (
-          <div
-            key={`${row.role}-${row.label}-${index}`}
-            className="flex items-start gap-2"
-            style={{ paddingLeft: `${row.depth * 12}px` }}
-          >
-            <span className="mt-2 text-zinc-300 select-none" aria-hidden>
-              ⌞
-            </span>
-            <div className="flex min-w-0 flex-1 items-center gap-1.5 pt-0.5">
-              <ElementKindIcon kind={iconKind} />
-              <span className="text-sm text-zinc-700 break-words">{row.label}</span>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function TargetElementRow({
-  kind,
-  label,
-}: {
-  kind?: string;
-  label: string;
-}) {
-  const iconKind = elementKindIconName(kind);
-  return (
-    <div className="flex items-start gap-2 pl-3">
-      <span className="mt-2 text-zinc-300 select-none" aria-hidden>
-        ⌞
-      </span>
-      <div className="flex min-w-0 flex-1 items-center gap-1.5 pt-0.5">
-        <ElementKindIcon kind={iconKind} />
-        <span className="text-sm text-zinc-700 break-words">{label}</span>
-      </div>
-    </div>
-  );
-}
-
 function pinnedCardSurfaceClass(options: {
   interactive: boolean;
   active: boolean;
@@ -214,7 +73,7 @@ function pinnedCardSurfaceClass(options: {
   className?: string;
 }): string {
   return cn(
-    'w-full rounded-lg border border-zinc-200/80 border-l-[3px] border-l-blue-500 bg-white shadow-sm transition-colors',
+    'w-full overflow-hidden rounded-xl border border-zinc-200/80 border-l-[3px] border-l-blue-500 bg-white shadow-sm transition-colors',
     options.interactive &&
       (options.active
         ? 'cursor-pointer ring-2 ring-blue-400/40 ring-offset-1'
@@ -247,36 +106,35 @@ function PinnedTargetCard({
   refocusInput?: () => void;
   className?: string;
 }) {
-  const display = formatPreviewTargetDisplay(target);
   const label = formatPreviewTargetLabel(target);
   const chipText = formatPreviewTargetChipText(target, 'pinned');
   const canActivate = interactive && Boolean(onActivate);
+  const source = resolvePreviewThumbSourceDimensions(target);
+  const isSectionPreview =
+    target.kind === 'hero' ||
+    inferPreviewScaleProfile(
+      source.width,
+      source.height,
+      target.pinScope,
+      target.elementKind,
+      target.kind
+    ) === 'section';
 
   const activate = () => {
     activatePreviewTargetChip({ onActivate, refocusInput });
   };
 
-  const thumbSrc = target.previewThumbnail?.previewUrl ?? target.previewThumbnailDataUrl;
-  const showTargetPreview = Boolean(thumbSrc || targetPreviewFallbackLabel(target));
-
   const body = (
-    <div className="space-y-2 pt-2">
-      <div className={showTargetPreview ? 'flex gap-3' : ''}>
-        {showTargetPreview ? <PreviewTargetThumbnail target={target} /> : null}
-        <div className="min-w-0 flex-1 space-y-2">
-          <TargetSectionRow scopeLabel={display.scopeLabel} title={display.title} />
-          {display.chainRows && display.chainRows.length > 0 ? (
-            <TargetChainRows rows={display.chainRows} />
-          ) : display.element ? (
-            <TargetElementRow kind={display.element.kind} label={display.element.label} />
-          ) : null}
-        </div>
-      </div>
-      <p className="text-[11px] text-zinc-500 pt-0.5">
-        Describe what to change in the box below
-      </p>
-    </div>
+    <PreviewTargetCardLayout
+      target={target}
+      variant="pinned"
+      showHint
+      edgeToEdgePreview={isSectionPreview}
+      className={isSectionPreview ? 'pt-0' : 'pt-2'}
+    />
   );
+
+  const bodyPaddingClass = cn('pb-3', isSectionPreview ? '' : 'px-3');
 
   return (
     <div
@@ -289,7 +147,7 @@ function PinnedTargetCard({
       {canActivate ? (
         <button
           type="button"
-          className="block w-full px-3 pb-3 text-left"
+          className={cn('block w-full text-left', bodyPaddingClass)}
           title={`Show ${label} in preview`}
           aria-label={`${chipText}. Show in preview.`}
           onMouseEnter={onHoverStart}
@@ -302,7 +160,7 @@ function PinnedTargetCard({
           {body}
         </button>
       ) : (
-        <div className="px-3 pb-3" aria-live="polite">
+        <div className={bodyPaddingClass} aria-live="polite">
           {body}
         </div>
       )}
@@ -371,7 +229,7 @@ function UsedTargetPill({
       }
     >
       {showTargetPreview ? (
-        <PreviewTargetThumbnail target={target} size="sm" className="h-8 w-11" />
+        <PreviewTargetThumbnail target={target} variant="pill" />
       ) : null}
       <span className="min-w-0 break-words whitespace-normal font-medium">{breadcrumb}</span>
     </div>

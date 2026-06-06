@@ -16,14 +16,14 @@ describe('clampDragGhostPosition', () => {
     expect(pos.top).toBe(212);
   });
 
-  it('clamps ghost inside viewport right and bottom edges', () => {
+  it('clamps ghost with dynamic dimensions', () => {
     const pos = clampDragGhostPosition({
       pointerX: 2000,
       pointerY: 2000,
       grabOffsetX: 12,
       grabOffsetY: 12,
       ghostWidth: 200,
-      ghostHeight: 160,
+      ghostHeight: 220,
       margin: 8,
     });
     expect(pos.left).toBeLessThan(2000);

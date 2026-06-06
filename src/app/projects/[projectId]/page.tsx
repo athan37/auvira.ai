@@ -135,6 +135,13 @@ export default function ProjectPage() {
     grabOffsetX?: number;
     grabOffsetY?: number;
   } | null>(null);
+  const sectionDragRef = useRef(sectionDrag);
+  sectionDragRef.current = sectionDrag;
+  const sectionDragPendingRef = useRef(sectionDragPending);
+  sectionDragPendingRef.current = sectionDragPending;
+  const finishSectionDragRef = useRef<(clientX: number, clientY: number) => void>(() => {});
+  const handleSectionDragMoveRef = useRef<(clientX: number, clientY: number) => void>(() => {});
+  const sectionDragFinishingRef = useRef(false);
   const [isChatDropActive, setIsChatDropActive] = useState(false);
 
   useEffect(() => {
@@ -209,11 +216,29 @@ export default function ProjectPage() {
     );
   }, []);
 
+  const clearSectionDragUi = useCallback(() => {
+    sectionDragPayloadRef.current = null;
+    sectionDragPendingPayloadRef.current = null;
+    setSectionDrag(null);
+    setSectionDragPending(null);
+    setIsChatDropActive(false);
+    setSectionDragCancelKey((key) => key + 1);
+  }, []);
+
   const finishSectionDrag = useCallback(
     async (clientX: number, clientY: number) => {
+      if (sectionDragFinishingRef.current) return;
+      sectionDragFinishingRef.current = true;
+
       const payloadToDrop = sectionDragPayloadRef.current;
-      const dragPreview = sectionDrag;
-      if (payloadToDrop && isPointInChatDropZone(clientX, clientY)) {
+      const dragPreview = sectionDragRef.current;
+      const shouldDrop = Boolean(payloadToDrop && isPointInChatDropZone(clientX, clientY));
+
+      clearSectionDragUi();
+
+      try {
+        if (!shouldDrop || !payloadToDrop) return;
+
         let section = selectedSectionFromPayload(payloadToDrop);
         const dataUrl = dragPreview?.previewDataUrl;
         if (dataUrl) {
@@ -237,14 +262,13 @@ export default function ProjectPage() {
         } else {
           handleSelectedSectionChange(section);
         }
+      } finally {
+        sectionDragFinishingRef.current = false;
       }
-      sectionDragPayloadRef.current = null;
-      setSectionDrag(null);
-      setSectionDragPending(null);
-      setIsChatDropActive(false);
     },
-    [handleSelectedSectionChange, isPointInChatDropZone, projectId, sectionDrag]
+    [clearSectionDragUi, handleSelectedSectionChange, isPointInChatDropZone, projectId]
   );
+  finishSectionDragRef.current = finishSectionDrag;
 
   const thumbMatchesPayload = useCallback(
     (payload: SiteSectionContextPayload, thumb: TargetPreviewThumbMessage) => {
@@ -280,7 +304,7 @@ export default function ProjectPage() {
   const handleSectionDragStart = useCallback(
     (payload: SiteSectionContextPayload, screenX: number, screenY: number) => {
       sectionDragPayloadRef.current = payload;
-      const pending = sectionDragPending;
+      const pending = sectionDragPendingRef.current;
       setSectionDrag({
         payload,
         x: screenX,
@@ -297,7 +321,7 @@ export default function ProjectPage() {
       setSectionDragCaptureKey((key) => key + 1);
       setIsChatDropActive(isPointInChatDropZone(screenX, screenY));
     },
-    [isPointInChatDropZone, sectionDragPending]
+    [isPointInChatDropZone]
   );
 
   const handleSectionPreviewThumb = useCallback(
@@ -325,21 +349,18 @@ export default function ProjectPage() {
 
   const cancelSectionDrag = useCallback(() => {
     if (!sectionDrag && !sectionDragPending) return;
-    sectionDragPayloadRef.current = null;
-    sectionDragPendingPayloadRef.current = null;
-    setSectionDrag(null);
-    setSectionDragPending(null);
-    setIsChatDropActive(false);
-    setSectionDragCancelKey((key) => key + 1);
-  }, [sectionDrag, sectionDragPending]);
+    clearSectionDragUi();
+  }, [clearSectionDragUi, sectionDrag, sectionDragPending]);
 
   const handleSectionDragMove = useCallback(
     (clientX: number, clientY: number) => {
-      if (sectionDragPending && !sectionDrag) {
-        const dx = clientX - sectionDragPending.startX;
-        const dy = clientY - sectionDragPending.startY;
+      const pending = sectionDragPendingRef.current;
+      const activeDrag = sectionDragRef.current;
+      if (pending && !activeDrag) {
+        const dx = clientX - pending.startX;
+        const dy = clientY - pending.startY;
         if (dx * dx + dy * dy >= SECTION_DRAG_THRESHOLD * SECTION_DRAG_THRESHOLD) {
-          handleSectionDragStart(sectionDragPending.payload, clientX, clientY);
+          handleSectionDragStart(pending.payload, clientX, clientY);
           return;
         }
         setIsChatDropActive(isPointInChatDropZone(clientX, clientY));
@@ -348,26 +369,41 @@ export default function ProjectPage() {
       setSectionDrag((prev) => (prev ? { ...prev, x: clientX, y: clientY } : null));
       setIsChatDropActive(isPointInChatDropZone(clientX, clientY));
     },
-    [sectionDragPending, sectionDrag, handleSectionDragStart, isPointInChatDropZone]
+    [handleSectionDragStart, isPointInChatDropZone]
   );
+  handleSectionDragMoveRef.current = handleSectionDragMove;
 
   useEffect(() => {
     if (!sectionDragPending && !sectionDrag) return;
+    const previousCursor = document.body.style.cursor;
+    document.body.style.cursor = sectionDrag ? 'grabbing' : 'grab';
+    return () => {
+      document.body.style.cursor = previousCursor;
+    };
+  }, [sectionDragPending, sectionDrag]);
+
+  useEffect(() => {
+    if (!sectionDragPending && !sectionDrag) return;
+    function onWindowMouseMove(event: MouseEvent) {
+      handleSectionDragMoveRef.current(event.clientX, event.clientY);
+    }
     function onWindowMouseUp(event: MouseEvent) {
-      finishSectionDrag(event.clientX, event.clientY);
+      finishSectionDragRef.current(event.clientX, event.clientY);
     }
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
         cancelSectionDrag();
       }
     }
+    window.addEventListener('mousemove', onWindowMouseMove);
     window.addEventListener('mouseup', onWindowMouseUp);
     window.addEventListener('keydown', onKeyDown);
     return () => {
+      window.removeEventListener('mousemove', onWindowMouseMove);
       window.removeEventListener('mouseup', onWindowMouseUp);
       window.removeEventListener('keydown', onKeyDown);
     };
-  }, [sectionDragPending, sectionDrag, finishSectionDrag, cancelSectionDrag]);
+  }, [sectionDragPending, sectionDrag, cancelSectionDrag]);
 
   useEffect(() => {
     if (!sectionToast) return;
@@ -476,26 +512,18 @@ export default function ProjectPage() {
           {sectionToast}
         </div>
       )}
-      {(sectionDrag || sectionDragPending) && (
-        <>
-          {sectionDrag ? (
-            <SectionDragGhost
-              payload={sectionDrag.payload}
-              x={sectionDrag.x}
-              y={sectionDrag.y}
-              previewDataUrl={sectionDrag.previewDataUrl}
-              grabOffsetX={sectionDrag.grabOffsetX}
-              grabOffsetY={sectionDrag.grabOffsetY}
-            />
-          ) : null}
-          <div
-            className="fixed inset-0 z-[99] cursor-grabbing select-none"
-            aria-hidden
-            onMouseMove={(event) => handleSectionDragMove(event.clientX, event.clientY)}
-            onMouseUp={(event) => finishSectionDrag(event.clientX, event.clientY)}
-          />
-        </>
-      )}
+      {sectionDrag ? (
+        <SectionDragGhost
+          payload={sectionDrag.payload}
+          x={sectionDrag.x}
+          y={sectionDrag.y}
+          previewDataUrl={sectionDrag.previewDataUrl}
+          previewWidth={sectionDrag.previewWidth}
+          previewHeight={sectionDrag.previewHeight}
+          grabOffsetX={sectionDrag.grabOffsetX}
+          grabOffsetY={sectionDrag.grabOffsetY}
+        />
+      ) : null}
       <div className="flex flex-col lg:flex-row flex-1 min-h-0 h-[calc(100vh-3.5rem)] p-3 lg:p-4 gap-3 lg:gap-4">
         <div className="flex-1 min-h-[320px] lg:min-h-0 min-w-0 flex flex-col">
           <ProjectPreviewFrame

@@ -1,7 +1,7 @@
 import type { SelectedTargetInput } from '@/lib/project-workspace/edit-shared/selectedTargetTypes';
 import { parseConfigFieldPath } from '@/lib/project-workspace/edit-context/configFieldPaths';
 import { sectionTypeLabel } from '@/lib/preview/previewTargetVisuals';
-import { resolveTargetChain, type TargetChainNode } from '@/lib/preview/targetChain';
+import { resolvePinScope, resolveTargetChain, type TargetChainNode } from '@/lib/preview/targetChain';
 
 export type PreviewTargetChipVariant = 'pinned' | 'used';
 
@@ -30,6 +30,34 @@ export interface PreviewTargetDisplay {
   title: string;
   element?: PreviewTargetDisplayElement;
   chainRows?: PreviewTargetChainRow[];
+}
+
+/** Human-readable element kind for breadcrumb segments (e.g. button → Button). */
+export function humanElementKindLabel(kind: string | undefined): string {
+  const normalized = kind?.trim().toLowerCase();
+  if (!normalized) return 'Element';
+  switch (normalized) {
+    case 'button':
+      return 'Button';
+    case 'heading':
+      return 'Heading';
+    case 'body':
+      return 'Body text';
+    case 'contact_field':
+      return 'Contact field';
+    case 'item_title':
+      return 'Item title';
+    case 'item_body':
+      return 'Item body';
+    case 'item_card':
+      return 'Item card';
+    case 'image_caption':
+      return 'Caption';
+    case 'panel':
+      return 'Panel';
+    default:
+      return normalized.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  }
 }
 
 function chainRowsFromTarget(target: SelectedTargetInput): PreviewTargetChainRow[] {
@@ -126,6 +154,69 @@ export function formatPreviewTargetDisplay(target: SelectedTargetInput): Preview
     element: resolveElementDisplay(target),
     chainRows: chainRowsFromTarget(target),
   };
+}
+
+/** The single line users care about (leaf element label, else section title). */
+export function formatPreviewTargetPrimaryLabel(target: SelectedTargetInput): string {
+  const display = formatPreviewTargetDisplay(target);
+  const chainRows = display.chainRows ?? [];
+  if (chainRows.length > 0) {
+    const leaf = chainRows[chainRows.length - 1]?.label?.trim();
+    if (leaf && leaf.toLowerCase() !== display.scopeLabel.toLowerCase()) {
+      return leaf;
+    }
+  }
+  if (
+    display.element?.label &&
+    display.element.label.toLowerCase() !== display.scopeLabel.toLowerCase()
+  ) {
+    return display.element.label;
+  }
+  if (display.title && display.title.toLowerCase() !== display.scopeLabel.toLowerCase()) {
+    return display.title;
+  }
+  return display.scopeLabel;
+}
+
+/** True when breadcrumb path adds context beyond scope badge + primary label. */
+export function shouldShowTargetBreadcrumb(target: SelectedTargetInput): boolean {
+  return formatPreviewTargetCompactBreadcrumb(target).length > 0;
+}
+
+/** Compact path for nested targets (section › containers › element kind). */
+export function formatPreviewTargetCompactBreadcrumb(target: SelectedTargetInput): string {
+  const display = formatPreviewTargetDisplay(target);
+  const chain = resolveTargetChain(target);
+  const primary = formatPreviewTargetPrimaryLabel(target).toLowerCase();
+  const parts: string[] = [];
+
+  if (resolvePinScope(target) === 'element' && chain.length >= 2) {
+    const sectionNode = chain[0];
+    if (sectionNode?.label?.trim()) {
+      parts.push(sectionNode.label.trim());
+    }
+    for (let i = 1; i < chain.length - 1; i++) {
+      const label = chain[i]?.label?.trim();
+      if (label) parts.push(label);
+    }
+    const leaf = chain[chain.length - 1];
+    if (leaf?.role === 'element') {
+      const kindLabel = humanElementKindLabel(leaf.kind);
+      if (kindLabel.toLowerCase() !== primary) {
+        parts.push(kindLabel);
+      }
+    }
+    return parts.filter(Boolean).join(' › ');
+  }
+
+  if (display.title && display.title.toLowerCase() !== display.scopeLabel.toLowerCase()) {
+    parts.push(display.title);
+  }
+  const chainRows = display.chainRows ?? [];
+  if (chainRows.length > 1) {
+    parts.push(...chainRows.slice(0, -1).map((row) => row.label));
+  }
+  return parts.filter(Boolean).join(' › ');
 }
 
 /** Compact breadcrumb for used-variant pill (Contact · Title › Container › Item 3 › Element). */

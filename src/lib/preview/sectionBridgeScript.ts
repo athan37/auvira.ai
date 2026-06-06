@@ -12,7 +12,7 @@ import {
   TARGET_PREVIEW_THUMB_WIDTH,
 } from '@/lib/preview/targetPreviewThumbnail';
 
-export const PREVIEW_SECTION_BRIDGE_VERSION = 29;
+export const PREVIEW_SECTION_BRIDGE_VERSION = 42;
 
 const HIGHLIGHT_CLASS = 'site-editor-section-highlight';
 const HOVER_CLASS = 'site-editor-section-hover';
@@ -426,76 +426,20 @@ function roundRect(ctx,x,y,w,h,r){
 
 ${buildElementCaptureBridgeScript()}
 
-function captureSectionStyledFallback(sectionEl){
-  var w=280,h=160;
-  var canvas=document.createElement("canvas");
-  canvas.width=w;canvas.height=h;
-  var ctx=canvas.getContext("2d");
-  if(!ctx)return null;
-  var sectionStyle=window.getComputedStyle(sectionEl);
-  var bg=sectionStyle.backgroundColor;
-  ctx.fillStyle=bg&&bg!=="rgba(0, 0, 0, 0)"?bg:"#7C2D12";
-  ctx.fillRect(0,0,w,h);
-  var h2=sectionEl.querySelector("h2");
-  if(h2){
-    ctx.fillStyle="#ffffff";
-    ctx.font="bold 13px sans-serif";
-    wrapText(ctx,(h2.textContent||"").trim().slice(0,80),Math.round(w*0.52)-12,14,18);
-  }
-  var innerCard=findRoundedCardIn(sectionEl);
-  if(innerCard){
-    var cardX=Math.round(w*0.52);
-    ctx.fillStyle="rgba(255,255,255,0.96)";
-    roundRect(ctx,cardX,10,w-cardX-8,h-18,14);
-    ctx.fill();
-    ctx.strokeStyle="rgba(0,0,0,0.08)";
-    ctx.stroke();
-    var cardTitle=innerCard.querySelector("h3");
-    if(cardTitle){
-      ctx.fillStyle="#111827";
-      ctx.font="bold 10px sans-serif";
-      wrapText(ctx,(cardTitle.textContent||"").trim().slice(0,40),cardX+8,24,12);
-    }
-    var rows=innerCard.querySelectorAll(".rounded-2xl,.space-y-4 > div,[data-site-element-kind='contact_field']");
-    var rowY=42;
-    for(var ri=0;ri<Math.min(rows.length,2);ri++){
-      ctx.fillStyle="rgba(15,23,42,0.06)";
-      roundRect(ctx,cardX+8,rowY,w-cardX-24,16,6);
-      ctx.fill();
-      ctx.fillStyle="#334155";
-      ctx.font="8px sans-serif";
-      ctx.fillText((rows[ri].textContent||"").trim().slice(0,28),cardX+12,rowY+11);
-      rowY+=20;
+function sectionHostBackground(el){
+  if(!el)return "#ffffff";
+  var style=window.getComputedStyle(el);
+  if(typeof paintCanvasBackground==="function"){
+    var probe=document.createElement("canvas");
+    probe.width=1;probe.height=1;
+    var pctx=probe.getContext("2d");
+    if(pctx){
+      paintCanvasBackground(pctx,1,1,style);
+      return pctx.fillStyle||"#ffffff";
     }
   }
-  var btns=sectionEl.querySelectorAll('a[href="#contact"],a[href^="tel:"]');
-  var btnY=h-42;
-  for(var bi=0;bi<Math.min(btns.length,2);bi++){
-    var btnText=(btns[bi].textContent||"").trim().slice(0,16);
-    if(bi===0){
-      ctx.fillStyle="#EA580C";
-      roundRect(ctx,10,btnY+bi*22,96,16,8);
-      ctx.fill();
-      ctx.fillStyle="#ffffff";
-    }else{
-      ctx.strokeStyle="rgba(255,255,255,0.55)";
-      ctx.lineWidth=1;
-      roundRect(ctx,10,btnY+bi*22,96,16,8);
-      ctx.stroke();
-      ctx.fillStyle="#ffffff";
-    }
-    ctx.font="8px sans-serif";
-    ctx.fillText(btnText,16,btnY+bi*22+11);
-  }
-  var out=document.createElement("canvas");
-  out.width=PREVIEW_THUMB_W;
-  out.height=PREVIEW_THUMB_H;
-  var octx=out.getContext("2d");
-  if(octx){
-    octx.drawImage(canvas,0,0,PREVIEW_THUMB_W,PREVIEW_THUMB_H);
-    return {dataUrl:out.toDataURL("image/jpeg",0.82),captureKind:"styled_fallback",width:PREVIEW_THUMB_W,height:PREVIEW_THUMB_H};
-  }
-  return {dataUrl:canvas.toDataURL("image/jpeg",0.75),captureKind:"styled_fallback",width:w,height:h};
+  var solid=pickElementFillColor(style);
+  return solid||"#ffffff";
 }
 
 function inlineComputedStyles(source,target){
@@ -526,9 +470,6 @@ function captureRaster(el,clickTarget){
     offsetY=Math.max(0,Math.min(clickRect.top-rect.top-clipH/2,Math.max(rect.height-clipH,0)));
     offsetY=Math.round(offsetY);
   }
-  var thumbScale=Math.min(1,PREVIEW_THUMB_W/width,PREVIEW_THUMB_H/height);
-  var drawW=Math.max(1,Math.round(width*thumbScale));
-  var drawH=Math.max(1,Math.round(height*thumbScale));
   var clone=el.cloneNode(true);
   inlineComputedStyles(el,clone);
   if(isSection&&offsetY>0){
@@ -536,7 +477,7 @@ function captureRaster(el,clickTarget){
     clone.style.height=Math.round(rect.height)+"px";
   }
   var host=document.createElement("div");
-  host.style.cssText="position:fixed;left:-10000px;top:0;width:"+width+"px;height:"+height+"px;overflow:hidden;background:#fff;";
+  host.style.cssText="position:fixed;left:-10000px;top:0;width:"+width+"px;height:"+height+"px;overflow:hidden;background:"+sectionHostBackground(el)+";";
   host.appendChild(clone);
   document.body.appendChild(host);
   try{
@@ -548,16 +489,14 @@ function captureRaster(el,clickTarget){
       img.onload=function(){
         try{
           var canvas=document.createElement("canvas");
-          canvas.width=PREVIEW_THUMB_RENDER_W;canvas.height=PREVIEW_THUMB_RENDER_H;
+          canvas.width=width*PREVIEW_THUMB_DPR;
+          canvas.height=height*PREVIEW_THUMB_DPR;
           var ctx=canvas.getContext("2d");
           if(!ctx){resolve(null);return;}
           ctx.scale(PREVIEW_THUMB_DPR,PREVIEW_THUMB_DPR);
-          ctx.fillStyle="#f4f4f5";
-          ctx.fillRect(0,0,PREVIEW_THUMB_W,PREVIEW_THUMB_H);
-          var offsetX=Math.round((PREVIEW_THUMB_W-drawW)/2);
-          var offsetY=Math.round((PREVIEW_THUMB_H-drawH)/2);
-          ctx.drawImage(img,offsetX,offsetY,drawW,drawH);
-          resolve({dataUrl:canvas.toDataURL("image/jpeg",0.82),captureKind:"raster",width:PREVIEW_THUMB_W,height:PREVIEW_THUMB_H});
+          paintCanvasBackground(ctx,width,height,window.getComputedStyle(el));
+          ctx.drawImage(img,0,0,width,height);
+          resolve({dataUrl:canvas.toDataURL("image/jpeg",0.82),captureKind:"raster",width:width,height:height});
         }catch(e){resolve(null);}
         finally{document.body.removeChild(host);}
       };
@@ -614,21 +553,22 @@ function captureDragPreviewSync(){
   if(!dragState||!dragState.el||!dragState.target||!dragState.payload)return null;
   var cached=readCaptureCache(dragState.payload);
   if(cached)return cached;
-  var root=resolvePreviewCaptureRoot(dragState.el,dragState.target,dragState.payload);
   var leafKind=captureLeafKind(dragState.payload);
   var fullSection=shouldCaptureFullSectionPreview(dragState.payload);
+  var root=resolvePreviewCaptureRoot(dragState.el,dragState.target,dragState.payload);
+  var captureEl=(!fullSection&&shouldUseElementCapture(dragState.payload))?dragState.target:root;
   if(!fullSection&&shouldUseElementCapture(dragState.payload)&&typeof captureElementStyledPreview==="function"){
-    var styled=captureElementStyledPreview(root,leafKind);
+    var styled=captureElementStyledPreview(captureEl,leafKind);
     if(styled){
       writeCaptureCache(dragState.payload,styled);
       return styled;
     }
   }
   if(fullSection){
-    var sketch=captureSectionStyledFallback(root);
-    if(sketch){
-      writeCaptureCache(dragState.payload,sketch);
-      return sketch;
+    var sectionPreview=typeof captureSectionStyledPreview==="function"?captureSectionStyledPreview(root):null;
+    if(sectionPreview){
+      writeCaptureCache(dragState.payload,sectionPreview);
+      return sectionPreview;
     }
   }
   return null;
@@ -639,7 +579,7 @@ function captureAndNotifyDragPreview(){
   var sync=captureDragPreviewSync();
   if(sync){
     notifyPreviewThumb(dragState.payload,sync);
-    if(!shouldCaptureFullSectionPreview(dragState.payload))return;
+    return;
   }
   var root=resolvePreviewCaptureRoot(dragState.el,dragState.target,dragState.payload);
   var leafKind=captureLeafKind(dragState.payload);
@@ -647,12 +587,8 @@ function captureAndNotifyDragPreview(){
   if(!fullSection)return;
   captureRaster(root,dragState.target).then(function(raster){
     var capture=raster;
-    if(!capture&&isSectionElement(root))capture=captureSectionStyledFallback(root);
+    if(!capture&&isSectionElement(root)&&typeof captureSectionStyledPreview==="function")capture=captureSectionStyledPreview(root);
     if(!capture)capture=captureStyledFallback(root,leafKind);
-    if(capture&&capture.dataUrl.length>40000&&fullSection){
-      var smaller=captureSectionStyledFallback(root);
-      if(smaller)capture=smaller;
-    }
     if(capture)writeCaptureCache(dragState.payload,capture);
     notifyPreviewThumb(dragState.payload,capture);
   });
@@ -722,9 +658,14 @@ function clearDragSource(){
 }
 
 document.addEventListener("mousedown",function(e){
-  if(e.button!==0||dragState)return;
+  if(e.button!==0)return;
   var root=findDraggableRoot(e.target);
   if(!root)return;
+  if(dragState){
+    document.documentElement.classList.remove("site-editor-dragging");
+    clearDragSource();
+    dragState=null;
+  }
   var el=root.el;
   var payload=readPayload(el,e.target,root.type);
   if(!payload.sectionId)return;
@@ -736,8 +677,10 @@ document.addEventListener("mousedown",function(e){
   var grabOffsetY=e.clientY-targetRect.top;
   dragState={payload:payload,startX:e.clientX,startY:e.clientY,started:false,el:el,target:e.target,grabOffsetX:grabOffsetX,grabOffsetY:grabOffsetY};
   notifyPointerDown(payload,e.clientX,e.clientY,grabOffsetX,grabOffsetY);
-  var early=captureDragPreviewSync();
-  if(early)notifyPreviewThumb(dragState.payload,early);
+  try{
+    var early=captureDragPreviewSync();
+    if(early)notifyPreviewThumb(dragState.payload,early);
+  }catch(captureErr){}
 },true);
 
 document.addEventListener("mousemove",function(e){

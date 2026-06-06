@@ -80,6 +80,21 @@ function isPreviewLoadingStub(doc: Document | null | undefined): boolean {
   );
 }
 
+function isPreviewConnectionFailed(doc: Document | null | undefined): boolean {
+  if (!doc) return true;
+  const title = doc.title?.trim().toLowerCase() ?? '';
+  const bodyText = doc.body?.textContent?.trim() ?? '';
+  if (
+    title.includes("can't be reached") ||
+    title.includes('refused to connect') ||
+    bodyText.includes('refused to connect') ||
+    bodyText.includes("This site can't be reached")
+  ) {
+    return true;
+  }
+  return doc.body?.childElementCount === 0 && bodyText.length === 0;
+}
+
 function stageProgress(stage: string): number {
   const idx = STAGE_ORDER.indexOf(stage as (typeof STAGE_ORDER)[number]);
   if (idx < 0) return 10;
@@ -205,6 +220,7 @@ export function ProjectPreviewFrame({
   const bootstrapStarted = useRef(false);
   const previewRestartInFlight = useRef(false);
   const pollCountRef = useRef(0);
+  const unhealthyPollsRef = useRef(0);
   const pageVisible = usePageVisible();
 
   const startBootstrap = useCallback(async (): Promise<boolean> => {
@@ -260,6 +276,26 @@ export function ProjectPreviewFrame({
     let cancelled = false;
     let pollTimer: ReturnType<typeof setInterval> | null = null;
 
+    async function maybeRestartPreview(status: WorkspaceStatus): Promise<void> {
+      const needsPreviewRestart =
+        !status.ready &&
+        status.codeWorkspaceStatus === 'ready' &&
+        (status.stage === 'starting_server' ||
+          status.previewHealthy === false ||
+          status.label?.includes('restart required') ||
+          status.label?.includes('stopped responding'));
+      if (!needsPreviewRestart || bootstrapStarted.current) return;
+      bootstrapStarted.current = true;
+      setPreviewReady(false);
+      setSetupLabel('Restarting preview server…');
+      setSetupStage('starting_server');
+      try {
+        await startBootstrap();
+      } finally {
+        bootstrapStarted.current = false;
+      }
+    }
+
     async function runBootstrap() {
       setSetupError(null);
       setSetupStage('idle');
@@ -269,14 +305,19 @@ export function ProjectPreviewFrame({
 
       const initial = await pollStatus();
       if (cancelled) return;
+
       if (initial?.ready && initial.previewHealthy !== false) {
         applyStatus(initial);
-        return;
-      }
-
-      if (initial) {
-        setSetupStage(initial.stage);
-        setSetupLabel(initial.label);
+      } else {
+        if (initial) {
+          setSetupStage(initial.stage);
+          setSetupLabel(initial.label);
+        }
+        if (!bootstrapStarted.current) {
+          bootstrapStarted.current = true;
+          await startBootstrap();
+          bootstrapStarted.current = false;
+        }
       }
 
       pollTimer = setInterval(async () => {
@@ -285,40 +326,20 @@ export function ProjectPreviewFrame({
         if (cancelled || !status) return;
         pollCountRef.current += 1;
         applyStatus(status);
-        if (status.ready && pollTimer) clearInterval(pollTimer);
         if (status.stage === 'failed' && status.error) {
           setSetupError(status.error);
-          if (pollTimer) clearInterval(pollTimer);
         }
-        // Stale preview (files on disk but hung dev server) — retry bootstrap after ~6s when
-        // status already says restart is required; otherwise wait ~2 min for slow first boot.
-        const needsPreviewRestart =
-          !status.ready &&
-          status.codeWorkspaceStatus === 'ready' &&
-          (status.stage === 'starting_server' ||
-            status.label?.includes('restart required') ||
-            status.label?.includes('stopped responding'));
-        const retryAfterPolls = needsPreviewRestart ? 4 : 80;
-        if (
-          !status.ready &&
-          pollCountRef.current >= retryAfterPolls &&
-          status.codeWorkspaceStatus === 'ready' &&
-          !bootstrapStarted.current
-        ) {
-          bootstrapStarted.current = true;
-          setSetupLabel('Restarting preview server…');
-          await startBootstrap();
-          bootstrapStarted.current = false;
-        }
-      }, 1500);
 
-      if (!bootstrapStarted.current) {
-        bootstrapStarted.current = true;
-        if (!cancelled) {
-          await startBootstrap();
+        if (status.ready && status.previewHealthy !== false) {
+          unhealthyPollsRef.current = 0;
+        } else {
+          unhealthyPollsRef.current += 1;
+          if (unhealthyPollsRef.current >= 2) {
+            unhealthyPollsRef.current = 0;
+            await maybeRestartPreview(status);
+          }
         }
-        bootstrapStarted.current = false;
-      }
+      }, 3000);
     }
 
     bootstrapStarted.current = false;
@@ -528,7 +549,7 @@ export function ProjectPreviewFrame({
               lastHighlightRef.current = { id: null, hover: false };
               if (selectionAvailable) {
                 const doc = iframeRef.current?.contentDocument;
-                if (isPreviewLoadingStub(doc)) {
+                if (isPreviewConnectionFailed(doc) || isPreviewLoadingStub(doc)) {
                   void restartPreviewIfStub();
                   return;
                 }
