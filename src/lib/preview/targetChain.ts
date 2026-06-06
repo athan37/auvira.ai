@@ -45,6 +45,16 @@ export function leafChainNode(chain: TargetChainNode[] | undefined): TargetChain
   return chain[chain.length - 1];
 }
 
+/** Inner card container when the UI pin ends on (or inside) a contact/hero card shell. */
+export function findPinnedInnerCardContainer(
+  chain: TargetChainNode[] | undefined
+): TargetChainNode | undefined {
+  if (!chain?.length) return undefined;
+  const leaf = chain[chain.length - 1];
+  if (leaf?.role === 'container' && leaf.kind === 'inner_card') return leaf;
+  return chain.find((node) => node.role === 'container' && node.kind === 'inner_card');
+}
+
 export function allowedFieldPathsForTarget(target: SelectedTargetInput): string[] {
   if (resolvePinScope(target) !== 'element') return [];
   const leaf = leafChainNode(target.targetChain);

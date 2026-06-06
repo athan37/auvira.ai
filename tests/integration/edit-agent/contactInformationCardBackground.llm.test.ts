@@ -76,4 +76,47 @@ describeRunLlmIntegration('contact information card background (LLM integration)
     },
     LLM_TEST_TIMEOUT_MS
   );
+
+  it(
+    'pinned contact card container: generic gradient updates cardClass only',
+    async () => {
+      workspacePath = await createContactInfoPanelWorkspace();
+      const siteConfigBefore = await readSyntheticFile(workspacePath, 'src/lib/siteConfig.ts');
+      const sectionsBefore = parseSections(siteConfigBefore);
+      expect(sectionBackgroundClass(sectionsBefore[0] ?? {})).toBe(EXISTING_SECTION_GRADIENT);
+
+      const result = await runWebsiteEditAgent({
+        workspacePath,
+        ownerMessage: 'change the background to a color gradient',
+        projectId: 'llm-contact-card-container-pin',
+        mode: 'gitlab',
+        infraBaselineReady: true,
+        selectedTarget: {
+          kind: 'section',
+          sectionIndex: 0,
+          sectionType: 'contact',
+          sectionTitle: 'hi, this hema',
+          sectionId: CONTACT_SECTION_ANALYTICS_ID,
+          analyticsId: CONTACT_SECTION_ANALYTICS_ID,
+          pinScope: 'section',
+          targetChain: [
+            { role: 'section', label: 'hi, this hema', kind: 'contact' },
+            { role: 'container', label: 'Contact card', kind: 'inner_card' },
+          ],
+        },
+      });
+
+      expect(result.needsClarification, result.ownerMessage).toBeFalsy();
+      expect(result.ok, result.error ?? result.ownerMessage).toBe(true);
+
+      const siteConfigAfter = await readSyntheticFile(workspacePath, 'src/lib/siteConfig.ts');
+      expect(sectionBackgroundClass(parseSections(siteConfigAfter)[0] ?? {})).toBe(
+        EXISTING_SECTION_GRADIENT
+      );
+      const cardClass = sectionPresentationCardClass(siteConfigAfter, 0);
+      expect(cardClass).toBeTruthy();
+      expect(cardClass!.toLowerCase()).toMatch(/gradient/);
+    },
+    LLM_TEST_TIMEOUT_MS
+  );
 });

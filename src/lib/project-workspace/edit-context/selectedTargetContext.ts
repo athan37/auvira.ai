@@ -6,6 +6,7 @@ import {
   allowedFieldPathsForTarget,
   resolvePinScope,
 } from '@/lib/project-workspace/edit-shared/selectedTargetTypes';
+import { findPinnedInnerCardContainer } from '@/lib/preview/targetChain';
 import type { SiteSectionCatalog } from '@/lib/project-workspace/edit-shared/siteSectionCatalog';
 import {
   heroFieldPath,
@@ -86,6 +87,8 @@ export interface SelectedTargetContext {
   /** When true, copy edits default to allowedFieldPaths only. */
   pinnedElementOnly?: boolean;
   allowedFieldPaths?: string[];
+  /** When UI pin targets an inner card shell, style edits must use this presentation field. */
+  pinnedPresentationField?: 'backgroundClass' | 'cardClass';
 }
 
 export interface BuildSelectedTargetContextInput {
@@ -273,6 +276,9 @@ export function buildSelectedTargetContext(
         )
       : undefined;
 
+  const pinnedInnerCard = findPinnedInnerCardContainer(selectedTarget.targetChain);
+  const pinnedPresentationField = pinnedInnerCard ? ('cardClass' as const) : undefined;
+
   return {
     target: selectedTarget,
     resolved,
@@ -292,6 +298,7 @@ export function buildSelectedTargetContext(
     styleTargets,
     pinnedElementOnly: pinnedElementOnly || undefined,
     allowedFieldPaths: pinnedElementOnly ? allowedFieldPaths : undefined,
+    pinnedPresentationField,
   };
 }
 
@@ -335,6 +342,15 @@ export function formatSelectedTargetContextBlock(ctx: SelectedTargetContext): st
   if (ctx.resolved.sectionTitle) lines.push(`- title: ${ctx.resolved.sectionTitle}`);
   if (ctx.element?.kind) lines.push(`- element: ${ctx.element.kind}`);
   if (ctx.element?.fieldPath) lines.push(`- elementFieldPath: ${ctx.element.fieldPath}`);
+  const pinnedInnerCard = findPinnedInnerCardContainer(ctx.target.targetChain);
+  if (pinnedInnerCard) {
+    lines.push(
+      `- pinnedContainer: ${pinnedInnerCard.label} (inner_card) — background/style edits MUST use presentation.cardClass, NOT presentation.backgroundClass`
+    );
+  }
+  if (ctx.pinnedPresentationField) {
+    lines.push(`- pinnedPresentationField: ${ctx.pinnedPresentationField}`);
+  }
   if (ctx.pinnedElementOnly && ctx.allowedFieldPaths?.length) {
     lines.push(`- pinScope: element (only ${ctx.allowedFieldPaths.join(', ')})`);
   }
@@ -388,7 +404,8 @@ export function formatSelectedTargetContextBlock(ctx: SelectedTargetContext): st
     });
     lines.push(
       '- When the owner names an inner element ("contact information", "card", "info panel"), use presentation.cardClass — not backgroundClass.',
-      '- Use presentation.backgroundClass only for the outer section wrapper.'
+      '- When the UI pin ends on an inner card container (targetChain container inner_card), background/style edits apply to presentation.cardClass only — not the outer section wrapper.',
+      '- Use presentation.backgroundClass only for the outer section wrapper (or when the owner says "whole section").'
     );
   }
 

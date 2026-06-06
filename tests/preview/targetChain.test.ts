@@ -3,6 +3,7 @@ import {
   allowedFieldPathsForTarget,
   buildTargetChainFromFlat,
   enrichSelectedTarget,
+  findPinnedInnerCardContainer,
   leafChainNode,
   resolvePinScope,
   resolveTargetChain,
@@ -77,5 +78,13 @@ describe('targetChain', () => {
 
     expect(enriched.pinScope).toBe('element');
     expect(resolveTargetChain(enriched).length).toBeGreaterThan(1);
+  });
+
+  it('finds pinned inner card container from target chain', () => {
+    const chain = [
+      { role: 'section' as const, label: 'Get Started Today', kind: 'contact' },
+      { role: 'container' as const, label: 'Contact card', kind: 'inner_card' },
+    ];
+    expect(findPinnedInnerCardContainer(chain)?.label).toBe('Contact card');
   });
 });

@@ -129,6 +129,27 @@ describe('buildSelectedTargetContext', () => {
     expect(paths).toContain('sections[0].body');
     expect(ctx?.recommendedDefaultField?.fieldPath).toBe('sections[0].body');
   });
+
+  it('sets pinnedPresentationField when target chain ends on inner card', () => {
+    const catalog = buildSiteSectionCatalog(servicesSiteConfig, '');
+    const ctx = buildSelectedTargetContext({
+      selectedTarget: {
+        kind: 'section',
+        sectionIndex: 0,
+        sectionType: 'contact',
+        sectionTitle: 'Get Started Today',
+        targetChain: [
+          { role: 'section', label: 'Get Started Today', kind: 'contact' },
+          { role: 'container', label: 'Contact card', kind: 'inner_card' },
+        ],
+      },
+      siteConfigContent: servicesSiteConfig,
+      pageContent: '',
+      catalog,
+      target: mockTarget(0),
+    });
+    expect(ctx?.pinnedPresentationField).toBe('cardClass');
+  });
 });
 
 describe('formatSelectedTargetContextBlock', () => {

@@ -1,5 +1,6 @@
 import { classifyEditWhat } from '@/lib/project-workspace/edit-context/classifyEditWhat';
 import { inferPresentationStyleTarget } from '@/lib/project-workspace/edit-context/inferPresentationStyleTarget';
+import { findPinnedInnerCardContainer } from '@/lib/preview/targetChain';
 import { inferSelectedTargetField } from '@/lib/project-workspace/edit-context/inferSelectedTargetField';
 import { isUnifiedCopyEditEnabled } from '@/lib/project-workspace/edit-context/unifiedCopyEditFlag';
 import { planFromConfigTextEdit } from '@/lib/project-workspace/edit-agent/planFromConfigTextEdit';
@@ -410,11 +411,30 @@ export function buildDeterministicPlan(editContext: EditContext): EditPlan | nul
     const bgClass = extractSectionBackgroundClassFromMessage(message);
     const color = extractBackgroundColorFromMessage(message);
     if (bgClass || color) {
-      const styleTarget = inferPresentationStyleTarget(
-        message,
-        editContext.selectedTargetContext,
-        editContext.target.title
-      );
+      const styleTarget = (() => {
+        const inferred = inferPresentationStyleTarget(
+          message,
+          editContext.selectedTargetContext,
+          editContext.target.title
+        );
+        const pinnedField = editContext.selectedTargetContext?.pinnedPresentationField;
+        if (
+          pinnedField === 'cardClass' &&
+          inferred.presentationField === 'backgroundClass' &&
+          !/\b(?:whole|entire|full)\s+section\b/i.test(message)
+        ) {
+          const innerCard = findPinnedInnerCardContainer(
+            editContext.selectedTargetContext?.target?.targetChain
+          );
+          return {
+            presentationField: 'cardClass' as const,
+            label: innerCard?.label ?? 'Contact card',
+            confidence: 'high' as const,
+            reason: 'UI-pinned inner card container',
+          };
+        }
+        return inferred;
+      })();
       const isInnerElementStyle =
         styleTarget.presentationField === 'cardClass' && styleTarget.confidence === 'high';
       const hasPinnedSectionTarget =

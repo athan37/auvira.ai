@@ -91,14 +91,30 @@ export function parseBorderRadiusPx(borderRadius: string, height: number): numbe
   return Math.min(first, height / 2);
 }
 
-/** True when a computed color is visible (not fully transparent). */
-export function isOpaqueCssColor(color: string | undefined | null): boolean {
-  if (!color) return false;
+/** Parse alpha channel from rgba()/rgb() colors (1 for opaque hex/named colors). */
+export function backgroundColorAlpha(color: string | undefined | null): number {
+  if (!color) return 0;
   const c = color.trim().toLowerCase();
   if (!c || c === 'transparent' || c === 'rgba(0, 0, 0, 0)' || c === 'rgba(0,0,0,0)') {
-    return false;
+    return 0;
   }
-  return true;
+  const rgba = c.match(
+    /rgba?\(\s*[\d.]+\s*,\s*[\d.]+\s*,\s*[\d.]+\s*(?:,\s*([\d.]+)\s*)?\)/
+  );
+  if (rgba) {
+    return rgba[1] !== undefined ? parseFloat(rgba[1]) : 1;
+  }
+  return 1;
+}
+
+/** True when a computed color is visible (not fully transparent). */
+export function isOpaqueCssColor(color: string | undefined | null): boolean {
+  return backgroundColorAlpha(color) > 0;
+}
+
+/** True when a solid background is visible enough to paint (ignores glass/5% fills). */
+export function isMeaningfulBackgroundColor(color: string | undefined | null): boolean {
+  return backgroundColorAlpha(color) >= 0.2;
 }
 
 /** Resolve fill color from computed style (background or gradient snippet). */
@@ -106,7 +122,7 @@ export function pickElementFillColor(
   backgroundColor: string | undefined,
   backgroundImage?: string
 ): string | undefined {
-  if (isOpaqueCssColor(backgroundColor)) return backgroundColor!;
+  if (isMeaningfulBackgroundColor(backgroundColor)) return backgroundColor!;
   const img = backgroundImage ?? '';
   if (!img || img === 'none') return undefined;
   const rgb = img.match(/rgb\([^)]+\)/);
@@ -114,6 +130,30 @@ export function pickElementFillColor(
   const hex = img.match(/#([0-9a-fA-F]{3,8})/);
   if (hex?.[0]) return hex[0];
   return undefined;
+}
+
+/** True when computed style has a solid or gradient background worth painting. */
+export function hasVisibleBackground(style: {
+  backgroundColor?: string;
+  backgroundImage?: string;
+}): boolean {
+  return Boolean(
+    pickElementFillColor(style.backgroundColor, style.backgroundImage) ||
+      (style.backgroundImage && style.backgroundImage !== 'none')
+  );
+}
+
+/**
+ * Return the first style in the chain (element, parent, …) with a visible background.
+ * Used by unit tests via style arrays; the bridge walks live DOM parents.
+ */
+export function resolveBackgroundFromChain(
+  styles: Array<{ backgroundColor?: string; backgroundImage?: string }>
+): { backgroundColor?: string; backgroundImage?: string } | null {
+  for (const style of styles) {
+    if (hasVisibleBackground(style)) return style;
+  }
+  return null;
 }
 
 export type SectionPreviewLayout = 'features_grid' | 'hero_split' | 'contact' | 'generic';
@@ -173,7 +213,22 @@ function isOpaqueCssColor(color){
   if(!color)return false;
   var c=color.trim().toLowerCase();
   if(!c||c==="transparent"||c==="rgba(0, 0, 0, 0)"||c==="rgba(0,0,0,0)")return false;
+  var rgba=c.match(/rgba?\\(\\s*[\\d.]+\\s*,\\s*[\\d.]+\\s*,\\s*[\\d.]+\\s*(?:,\\s*([\\d.]+)\\s*)?\\)/);
+  if(rgba)return rgba[1]!==undefined?parseFloat(rgba[1]):1;
   return true;
+}
+
+function backgroundColorAlpha(color){
+  if(!color)return 0;
+  var c=color.trim().toLowerCase();
+  if(!c||c==="transparent"||c==="rgba(0, 0, 0, 0)"||c==="rgba(0,0,0,0)")return 0;
+  var rgba=c.match(/rgba?\\(\\s*[\\d.]+\\s*,\\s*[\\d.]+\\s*,\\s*[\\d.]+\\s*(?:,\\s*([\\d.]+)\\s*)?\\)/);
+  if(rgba)return rgba[1]!==undefined?parseFloat(rgba[1]):1;
+  return 1;
+}
+
+function isMeaningfulBackgroundColor(color){
+  return backgroundColorAlpha(color)>=0.2;
 }
 
 function parseBorderRadiusPx(borderRadius,height){
@@ -195,7 +250,7 @@ function parseBorderRadiusPx(borderRadius,height){
 }
 
 function pickElementFillColor(style){
-  if(isOpaqueCssColor(style.backgroundColor))return style.backgroundColor;
+  if(isMeaningfulBackgroundColor(style.backgroundColor))return style.backgroundColor;
   var img=style.backgroundImage||"";
   if(img&&img!=="none"){
     var rgb=img.match(/rgb\\([^)]+\\)/);
@@ -208,6 +263,51 @@ function pickElementFillColor(style){
 
 function pickBackgroundFromStyle(style){
   return pickElementFillColor(style);
+}
+
+function styleHasVisibleBackground(style){
+  if(style.backgroundImage&&style.backgroundImage!=="none")return true;
+  return !!pickElementFillColor(style);
+}
+
+function resolveImmediateBackgroundStyle(el,elementStyle){
+  if(elementStyle&&styleHasVisibleBackground(elementStyle))return elementStyle;
+  var node=el.parentElement;
+  var depth=0;
+  while(node&&depth<8){
+    var ps=window.getComputedStyle(node);
+    if(styleHasVisibleBackground(ps))return ps;
+    node=node.parentElement;
+    depth++;
+  }
+  var section=el.closest&&el.closest("section,nav");
+  if(section){
+    var sectionStyle=window.getComputedStyle(section);
+    if(styleHasVisibleBackground(sectionStyle))return sectionStyle;
+  }
+  return null;
+}
+
+function resolveChipBackgroundStyle(el){
+  var style=window.getComputedStyle(el);
+  if(isMeaningfulBackgroundColor(style.backgroundColor))return style;
+  return resolveImmediateBackgroundStyle(el,null);
+}
+
+function fillRoundedRectWithStyle(ctx,x,y,w,h,radius,bgStyle,fallbackSolid){
+  ctx.save();
+  roundRect(ctx,x,y,w,h,radius);
+  ctx.clip();
+  if(bgStyle&&bgStyle.backgroundImage&&bgStyle.backgroundImage!=="none"){
+    ctx.save();
+    ctx.translate(x,y);
+    paintCanvasBackground(ctx,w,h,bgStyle);
+    ctx.restore();
+  }else{
+    ctx.fillStyle=(bgStyle&&pickElementFillColor(bgStyle))||fallbackSolid;
+    ctx.fillRect(x,y,w,h);
+  }
+  ctx.restore();
 }
 
 function parseLinearGradientStops(backgroundImage){
@@ -276,9 +376,9 @@ function paintElementBackdrop(ctx,el,outW,outH){
     ctx.fillRect(0,0,outW,outH);
     return;
   }
-  var sectionStyle=resolveSectionComputedStyle(el);
-  if(sectionStyle){
-    paintCanvasBackground(ctx,outW,outH,sectionStyle);
+  var bgStyle=resolveImmediateBackgroundStyle(el,null);
+  if(bgStyle){
+    paintCanvasBackground(ctx,outW,outH,bgStyle);
     return;
   }
   ctx.fillStyle=resolvePreviewFrameBackground(el);
@@ -356,7 +456,7 @@ function captureCardStyledFallback(el){
   var style=window.getComputedStyle(el);
   var rect=el.getBoundingClientRect();
   var cardW=Math.min(Math.max(Math.round(rect.width)||80,72),220);
-  var cardH=Math.min(Math.max(Math.round(rect.height)||60,48),120);
+  var cardH=Math.min(Math.max(Math.round(rect.height)||60,48),200);
   var edgePad=8;
   var outW=cardW+edgePad*2;
   var outH=cardH+edgePad*2;
@@ -841,13 +941,14 @@ function captureChipStyledFallback(el){
   var ctx=canvas.getContext("2d");
   if(!ctx)return null;
   ctx.scale(PREVIEW_THUMB_DPR,PREVIEW_THUMB_DPR);
-  roundRect(ctx,edgePad,edgePad,chipW,chipH,parseBorderRadiusPx(style.borderRadius,chipH));
-  ctx.fillStyle=pickElementFillColor(style)||"rgba(254,243,199,0.95)";
-  ctx.fill();
+  var radius=parseBorderRadiusPx(style.borderRadius,chipH);
+  var bgStyle=resolveChipBackgroundStyle(el);
+  fillRoundedRectWithStyle(ctx,edgePad,edgePad,chipW,chipH,radius,bgStyle,"rgb(37, 99, 235)");
   var borderW=parseFloat(style.borderWidth)||0;
   if(borderW>0&&isOpaqueCssColor(style.borderColor)){
     ctx.strokeStyle=style.borderColor;
     ctx.lineWidth=Math.max(1,borderW);
+    roundRect(ctx,edgePad,edgePad,chipW,chipH,radius);
     ctx.stroke();
   }
   ctx.fillStyle=isOpaqueCssColor(style.color)?style.color:"#334155";

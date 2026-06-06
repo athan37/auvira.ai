@@ -16,7 +16,7 @@ import {
   TARGET_PREVIEW_THUMB_WIDTH,
 } from '@/lib/preview/targetPreviewThumbnail';
 
-export const PREVIEW_SECTION_BRIDGE_VERSION = 46;
+export const PREVIEW_SECTION_BRIDGE_VERSION = 52;
 
 const HIGHLIGHT_CLASS = 'site-editor-section-highlight';
 const HOVER_CLASS = 'site-editor-section-hover';
@@ -354,7 +354,7 @@ function resolveCaptureRoot(sectionEl,clickTarget,payload){
   }
   var annotated=findAnnotatedLeaf(clickTarget,sectionEl)||clickTarget;
   if(isTinyElement(annotated)&&annotated.parentElement&&annotated.parentElement!==sectionEl)return annotated.parentElement;
-  if(leafKind==="contact_field"||leafKind==="button"||leafKind==="heading")return annotated;
+  if(leafKind==="contact_field"||leafKind==="button"||leafKind==="heading"||leafKind==="body")return annotated;
   var card=findItemCardWrapper(clickTarget,sectionEl);
   if(card)return card;
   return annotated;
@@ -428,12 +428,25 @@ function shouldUseInnerCardPreviewCapture(payload,sectionEl,clickTarget){
   return true;
 }
 
+function resolveDragCaptureElement(sectionEl,clickTarget,root,innerCard,fullSection,leafKind,pinScope){
+  if(innerCard)return innerCard;
+  if(fullSection)return root;
+  if(pinScope==="element"){
+    if(leafKind==="item_card"||leafKind==="item_title"||leafKind==="item_body"||leafKind==="image_caption"){
+      var card=findItemCardWrapper(clickTarget,sectionEl);
+      if(card)return card;
+    }
+    if(leafKind==="panel"&&root!==sectionEl)return root;
+    return clickTarget;
+  }
+  return root;
+}
+
 function shouldCaptureFullSectionPreview(payload,sectionEl,clickTarget){
   if(sectionEl&&clickTarget&&findInnerCardWrapper(sectionEl,clickTarget))return false;
   if(!payload||payload.pinScope!=="element")return true;
   var leaf=payload.targetChain&&payload.targetChain.length?payload.targetChain[payload.targetChain.length-1]:null;
   if(!leaf||leaf.role==="section")return true;
-  if(leaf.role==="element"&&isSectionOverviewField(leaf.fieldPath))return true;
   return false;
 }
 
@@ -595,7 +608,7 @@ function captureDragPreviewSync(){
   var innerCard=useInnerCard?findInnerCardWrapper(sectionEl,clickTarget):null;
   var fullSection=shouldCaptureFullSectionPreview(payload,sectionEl,clickTarget);
   var root=resolvePreviewCaptureRoot(sectionEl,clickTarget,payload);
-  var captureEl=innerCard||((!fullSection&&shouldUseElementCapture(payload))?clickTarget:root);
+  var captureEl=resolveDragCaptureElement(sectionEl,clickTarget,root,innerCard,fullSection,leafKind,payload.pinScope);
   if(!fullSection&&shouldUseElementCapture(payload)&&typeof captureElementStyledPreview==="function"){
     var styled=captureElementStyledPreview(captureEl,leafKind);
     if(styled){
@@ -622,6 +635,8 @@ function captureDragPreviewSync(){
 
 function shouldSkipDomBitmapForElementCapture(payload,leafKind){
   if(leafKind==="button"||leafKind==="contact_field")return true;
+  if(leafKind==="heading"||leafKind==="body")return true;
+  if(leafKind==="item_card"||leafKind==="item_title"||leafKind==="item_body"||leafKind==="image_caption")return false;
   if(payload&&payload.pinScope==="element"&&shouldUseElementCapture(payload))return true;
   return false;
 }
@@ -645,7 +660,7 @@ function captureAndNotifyDragPreview(){
   var fullSection=shouldCaptureFullSectionPreview(payload,sectionEl,clickTarget);
   var root=resolvePreviewCaptureRoot(sectionEl,clickTarget,payload);
   var leafKind=captureLeafKind(payload);
-  var captureEl=innerCard||((!fullSection&&shouldUseElementCapture(payload))?clickTarget:root);
+  var captureEl=resolveDragCaptureElement(sectionEl,clickTarget,root,innerCard,fullSection,leafKind,payload.pinScope);
   function finish(capture){
     if(capture)writeCaptureCache(payload,capture);
     notifyPreviewThumb(payload,capture);

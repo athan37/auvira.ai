@@ -70,4 +70,58 @@ describe('inferPresentationStyleTarget', () => {
     const result = inferPresentationStyleTarget('make it red', undefined, 'Contact Us');
     expect(result.presentationField).toBe('backgroundClass');
   });
+
+  it('routes pinned inner card container to cardClass without naming the card', () => {
+    const result = inferPresentationStyleTarget(
+      'change the background to a blue to green gradient',
+      {
+        target: {
+          kind: 'section',
+          sectionIndex: 4,
+          sectionType: 'contact',
+          sectionTitle: 'Get Started Today',
+          targetChain: [
+            { role: 'section', label: 'Get Started Today', kind: 'contact' },
+            { role: 'container', label: 'Contact card', kind: 'inner_card' },
+          ],
+        },
+        resolved: {
+          kind: 'section',
+          sectionIndex: 4,
+          sectionType: 'contact',
+          sectionTitle: 'Get Started Today',
+          confidence: 'high',
+        },
+        editableFields: [],
+        sourceHints: { siteConfigPath: 'src/lib/siteConfig.ts' },
+      },
+      'Get Started Today'
+    );
+    expect(result.presentationField).toBe('cardClass');
+    expect(result.confidence).toBe('high');
+  });
+
+  it('honors explicit whole section phrasing even when inner card is pinned', () => {
+    const result = inferPresentationStyleTarget(
+      'change the whole section background to blue',
+      {
+        target: {
+          kind: 'section',
+          sectionIndex: 4,
+          targetChain: [
+            { role: 'section', label: 'Get Started Today', kind: 'contact' },
+            { role: 'container', label: 'Contact card', kind: 'inner_card' },
+          ],
+        },
+        resolved: {
+          kind: 'section',
+          sectionIndex: 4,
+          confidence: 'high',
+        },
+        editableFields: [],
+        sourceHints: { siteConfigPath: 'src/lib/siteConfig.ts' },
+      }
+    );
+    expect(result.presentationField).toBe('backgroundClass');
+  });
 });

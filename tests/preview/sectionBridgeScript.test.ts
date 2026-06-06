@@ -86,7 +86,7 @@ describe('sectionBridgeScript drag preview UX', () => {
     expect(body).toContain('captureDomBitmap(captureEl,clickTarget)');
     expect(body).toContain('PreviewDomCapture');
     expect(body).toContain('function findInnerCardWrapper');
-    expect(body).toContain('function shouldUseInnerCardPreviewCapture');
+    expect(body).toContain('function resolveDragCaptureElement');
     expect(body).toContain('function shouldSkipDomBitmapForElementCapture');
     expect(body).toContain('captureStyledElementPreview(payload,root,captureEl,leafKind,fullSection)');
     expect(body).toContain('captureStyledPreviewFallback(payload,root,captureEl,leafKind,fullSection)');
@@ -97,6 +97,14 @@ describe('sectionBridgeScript drag preview UX', () => {
     expect(body).not.toMatch(
       /PreviewDomCapture\.domToPngDataUrl\s*=/
     );
+  });
+
+  it('embeds parent background fallback for contact field chips', () => {
+    const body = buildSectionBridgeScriptBody();
+    expect(body).toContain('function resolveImmediateBackgroundStyle');
+    expect(body).toContain('function resolveChipBackgroundStyle');
+    expect(body).toContain('function fillRoundedRectWithStyle');
+    expect(body).toContain('isMeaningfulBackgroundColor');
   });
 
   it('loads dom capture bundle without mutating read-only exports', () => {

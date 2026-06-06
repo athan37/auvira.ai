@@ -4,12 +4,15 @@ import {
   gradientLineForAngle,
   isOpaqueCssColor,
   isOutlineControlStyle,
+  backgroundColorAlpha,
+  isMeaningfulBackgroundColor,
   parseBorderRadiusPx,
   parseLinearGradientAngle,
   parseLinearGradientStops,
   pickCssBackgroundColor,
   pickElementFillColor,
   pickPreviewFrameBackground,
+  resolveBackgroundFromChain,
   shouldPreferStyledElementCapture,
   shouldUseButtonStyledCapture,
 } from '@/lib/preview/captureTargetPreview';
@@ -36,6 +39,70 @@ describe('shouldPreferStyledElementCapture', () => {
     expect(shouldPreferStyledElementCapture('item_card', 'element')).toBe(true);
     expect(shouldPreferStyledElementCapture('heading', 'element')).toBe(true);
     expect(shouldPreferStyledElementCapture(undefined, 'section')).toBe(false);
+  });
+});
+
+describe('backgroundColorAlpha', () => {
+  it('treats low-alpha glass fills as transparent for parent fallback', () => {
+    expect(backgroundColorAlpha('rgba(255, 255, 255, 0.05)')).toBe(0.05);
+    expect(isMeaningfulBackgroundColor('rgba(255, 255, 255, 0.05)')).toBe(false);
+    expect(pickElementFillColor('rgba(255, 255, 255, 0.05)', 'none')).toBeUndefined();
+  });
+
+  it('keeps opaque fills', () => {
+    expect(isMeaningfulBackgroundColor('rgb(37, 99, 235)')).toBe(true);
+    expect(pickElementFillColor('rgb(37, 99, 235)', 'none')).toBe('rgb(37, 99, 235)');
+  });
+});
+
+describe('resolveBackgroundFromChain', () => {
+  it('uses immediate parent background when element fill is transparent', () => {
+    expect(
+      resolveBackgroundFromChain([
+        { backgroundColor: 'transparent', backgroundImage: 'none' },
+        { backgroundColor: 'rgb(37, 99, 235)', backgroundImage: 'none' },
+      ])
+    ).toEqual({ backgroundColor: 'rgb(37, 99, 235)', backgroundImage: 'none' });
+  });
+
+  it('skips glass fills and inherits parent background', () => {
+    expect(
+      resolveBackgroundFromChain([
+        { backgroundColor: 'rgba(255, 255, 255, 0.05)', backgroundImage: 'none' },
+        { backgroundColor: 'rgb(37, 99, 235)', backgroundImage: 'none' },
+      ])
+    ).toEqual({ backgroundColor: 'rgb(37, 99, 235)', backgroundImage: 'none' });
+  });
+
+  it('prefers inner card background over section background for headings', () => {
+    expect(
+      resolveBackgroundFromChain([
+        { backgroundColor: 'transparent', backgroundImage: 'none' },
+        { backgroundColor: 'transparent', backgroundImage: 'none' },
+        { backgroundColor: 'rgb(37, 99, 235)', backgroundImage: 'none' },
+        { backgroundColor: 'rgb(220, 38, 38)', backgroundImage: 'none' },
+      ])
+    ).toEqual({ backgroundColor: 'rgb(37, 99, 235)', backgroundImage: 'none' });
+  });
+
+  it('prefers element background when present', () => {
+    expect(
+      resolveBackgroundFromChain([
+        { backgroundColor: 'rgb(254, 243, 199)', backgroundImage: 'none' },
+        { backgroundColor: 'rgb(37, 99, 235)', backgroundImage: 'none' },
+      ])
+    ).toEqual({ backgroundColor: 'rgb(254, 243, 199)', backgroundImage: 'none' });
+  });
+
+  it('inherits gradient backgrounds from parent', () => {
+    const style = resolveBackgroundFromChain([
+      { backgroundColor: 'transparent', backgroundImage: 'none' },
+      {
+        backgroundColor: 'transparent',
+        backgroundImage: 'linear-gradient(rgb(127, 45, 18), rgb(0, 0, 0))',
+      },
+    ]);
+    expect(style?.backgroundImage).toContain('linear-gradient');
   });
 });
 
@@ -167,6 +234,8 @@ describe('buildElementCaptureBridgeScript', () => {
     expect(script).toContain('measureButtonPaintSize');
     expect(script).toContain('ctx.fillText(label,cx,cy);');
     expect(script).toContain('paintElementBackdrop(ctx,el,outW,outH)');
+    expect(script).toContain('resolveImmediateBackgroundStyle(el,null)');
+    expect(script).not.toMatch(/paintElementBackdrop[\s\S]*resolveSectionComputedStyle/);
     expect(script).not.toMatch(/paintElementBackdrop\(ctx,outW,outH,el\)/);
   });
 });

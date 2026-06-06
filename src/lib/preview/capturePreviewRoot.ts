@@ -79,6 +79,7 @@ export function shouldUseInnerCardPreviewCapture(input: CaptureRootInput): boole
 
 /**
  * True when the drag preview should rasterize the whole section (nested layout included).
+ * Element pins (including section title/body fields) use compact styled text capture instead.
  */
 export function shouldCaptureFullSectionPreview(input: CaptureRootInput): boolean {
   const { sectionEl, clickTarget, targetChain, pinScope } = input;
@@ -86,7 +87,6 @@ export function shouldCaptureFullSectionPreview(input: CaptureRootInput): boolea
   if (pinScope !== 'element') return true;
   const leaf = targetChain?.length ? targetChain[targetChain.length - 1] : undefined;
   if (!leaf || leaf.role === 'section') return true;
-  if (leaf.role === 'element' && isSectionOverviewField(leaf.fieldPath)) return true;
   return false;
 }
 
@@ -118,7 +118,7 @@ export function resolveCaptureRoot(input: CaptureRootInput): Element {
     return annotated.parentElement;
   }
 
-  if (leafKind === 'contact_field' || leafKind === 'button' || leafKind === 'heading') {
+  if (leafKind === 'contact_field' || leafKind === 'button' || leafKind === 'heading' || leafKind === 'body') {
     return annotated;
   }
 
@@ -126,6 +126,37 @@ export function resolveCaptureRoot(input: CaptureRootInput): Element {
   if (card) return card;
 
   return annotated;
+}
+
+const ITEM_CARD_CAPTURE_KINDS = new Set([
+  'item_card',
+  'item_title',
+  'item_body',
+  'image_caption',
+]);
+
+/** Pick the DOM node to rasterize for drag preview (may differ from click target). */
+export function resolveDragCaptureElement(input: {
+  sectionEl: Element;
+  clickTarget: Element;
+  root: Element;
+  innerCard?: Element | null;
+  fullSection: boolean;
+  leafKind?: string;
+  pinScope?: string;
+}): Element {
+  const { sectionEl, clickTarget, root, innerCard, fullSection, leafKind, pinScope } = input;
+  if (innerCard) return innerCard;
+  if (fullSection) return root;
+  if (pinScope === 'element') {
+    if (leafKind && ITEM_CARD_CAPTURE_KINDS.has(leafKind)) {
+      const card = findItemCardWrapper(clickTarget, sectionEl);
+      if (card) return card;
+    }
+    if (leafKind === 'panel' && root !== sectionEl) return root;
+    return clickTarget;
+  }
+  return root;
 }
 
 /**

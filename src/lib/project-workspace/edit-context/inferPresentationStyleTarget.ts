@@ -1,4 +1,5 @@
 import type { SiteSectionPresentation } from '@/lib/builder/sectionPresentation';
+import { findPinnedInnerCardContainer } from '@/lib/preview/targetChain';
 import type { SelectedTargetContext } from './selectedTargetContext';
 
 export type PresentationStyleField = keyof Pick<
@@ -82,21 +83,31 @@ export function inferPresentationStyleTarget(
 ): InferredPresentationStyleTarget {
   const resolvedTitle = sectionTitle ?? ctx?.resolved.sectionTitle ?? ctx?.section?.title;
 
-  if (ctx?.element?.fieldPath?.includes('cardClass')) {
-    return {
-      presentationField: 'cardClass',
-      label: ctx.element.label ?? 'Pinned element',
-      confidence: 'high',
-      reason: 'UI-pinned element maps to cardClass',
-    };
-  }
-
   if (/\b(?:whole|entire|full)\s+section\b/i.test(message)) {
     return {
       presentationField: 'backgroundClass',
       label: 'Section background',
       confidence: 'high',
       reason: 'Owner explicitly named whole section',
+    };
+  }
+
+  const pinnedInnerCard = findPinnedInnerCardContainer(ctx?.target?.targetChain);
+  if (pinnedInnerCard) {
+    return {
+      presentationField: 'cardClass',
+      label: pinnedInnerCard.label || 'Contact card',
+      confidence: 'high',
+      reason: 'UI-pinned inner card container — use presentation.cardClass',
+    };
+  }
+
+  if (ctx?.element?.fieldPath?.includes('cardClass')) {
+    return {
+      presentationField: 'cardClass',
+      label: ctx.element.label ?? 'Pinned element',
+      confidence: 'high',
+      reason: 'UI-pinned element maps to cardClass',
     };
   }
 

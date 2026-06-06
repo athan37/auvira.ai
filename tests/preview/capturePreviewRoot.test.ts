@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   findInnerCardWrapper,
   resolveCaptureRoot,
+  resolveDragCaptureElement,
   resolvePreviewCaptureRoot,
   resolveSectionCaptureClip,
   shouldCaptureFullSectionPreview,
@@ -142,7 +143,7 @@ describe('resolveCaptureRoot', () => {
 });
 
 describe('resolvePreviewCaptureRoot', () => {
-  it('promotes section title element pin to full section preview', () => {
+  it('uses compact text capture for section title and body element pins', () => {
     const section = mockEl(
       { 'data-site-section-id': 'contact', 'data-site-section-type': 'contact' },
       null,
@@ -156,20 +157,35 @@ describe('resolvePreviewCaptureRoot', () => {
       },
       section,
     );
+    const body = mockEl(
+      {
+        'data-site-element-kind': 'body',
+        'data-site-config-field-path': 'sections[4].body',
+      },
+      section,
+    );
 
-    expect(
-      shouldCaptureFullSectionPreview({
-        sectionEl: section as unknown as Element,
-        clickTarget: heading as unknown as Element,
-        pinScope: 'element',
-        targetChain: [
-          { role: 'section', label: 'Get Started Today' },
-          { role: 'element', kind: 'heading', label: 'Get Started Today', fieldPath: 'sections[4].title' },
-        ],
-      })
-    ).toBe(true);
+    for (const clickTarget of [heading, body]) {
+      expect(
+        shouldCaptureFullSectionPreview({
+          sectionEl: section as unknown as Element,
+          clickTarget: clickTarget as unknown as Element,
+          pinScope: 'element',
+          targetChain: [
+            { role: 'section', label: 'Get Started Today' },
+            {
+              role: 'element',
+              kind: clickTarget === heading ? 'heading' : 'body',
+              label: 'Section copy',
+              fieldPath:
+                clickTarget === heading ? 'sections[4].title' : 'sections[4].body',
+            },
+          ],
+        })
+      ).toBe(false);
+    }
 
-    const root = resolvePreviewCaptureRoot({
+    const titleRoot = resolvePreviewCaptureRoot({
       sectionEl: section as unknown as Element,
       clickTarget: heading as unknown as Element,
       pinScope: 'element',
@@ -178,7 +194,23 @@ describe('resolvePreviewCaptureRoot', () => {
         { role: 'element', kind: 'heading', label: 'Get Started Today', fieldPath: 'sections[4].title' },
       ],
     });
-    expect(root).toBe(section);
+    expect(titleRoot).toBe(heading);
+
+    const bodyRoot = resolvePreviewCaptureRoot({
+      sectionEl: section as unknown as Element,
+      clickTarget: body as unknown as Element,
+      pinScope: 'element',
+      targetChain: [
+        { role: 'section', label: 'Get Started Today' },
+        {
+          role: 'element',
+          kind: 'body',
+          label: 'Section intro',
+          fieldPath: 'sections[4].body',
+        },
+      ],
+    });
+    expect(bodyRoot).toBe(body);
   });
 
   it('keeps button pins on the leaf element', () => {
@@ -278,6 +310,33 @@ describe('resolvePreviewCaptureRoot', () => {
       ],
     });
     expect(root).toBe(field);
+  });
+});
+
+describe('resolveDragCaptureElement', () => {
+  it('uses item card wrapper for item_card pin even when click target is inner text', () => {
+    const section = mockEl({ 'data-site-section-id': 'features' }, null, { width: 960, height: 420 }, 'SECTION');
+    const card = mockEl({ class: 'rounded-3xl border p-7 bg-white' }, section, { width: 280, height: 160 });
+    const title = mockEl(
+      {
+        'data-site-element-kind': 'item_title',
+        'data-site-config-field-path': 'sections[2].items[1].title',
+      },
+      card,
+      { width: 240, height: 80 },
+      'H3',
+    );
+
+    const captureEl = resolveDragCaptureElement({
+      sectionEl: section as unknown as Element,
+      clickTarget: title as unknown as Element,
+      root: card as unknown as Element,
+      fullSection: false,
+      leafKind: 'item_card',
+      pinScope: 'element',
+    });
+
+    expect(captureEl).toBe(card);
   });
 });
 
