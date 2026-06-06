@@ -32,6 +32,7 @@ import {
   MISSING_IMAGE_ATTACHMENT_MESSAGE,
 } from '@/lib/project-workspace/edit-shared/imagePlacementIntent';
 import { LEGACY_PROJECT_UNSUPPORTED_MESSAGE } from '@/lib/project-workspace/requireGitLabProject';
+import { useBrowserSpeechRecognition } from '@/lib/hooks/useBrowserSpeechRecognition';
 
 export interface EditCompleteResult {
   ok: boolean;
@@ -171,6 +172,27 @@ function ImageAttachIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+
+function MicIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v5a3 3 0 0 0 3 3z" />
+      <path d="M19 11a7 7 0 0 1-14 0" />
+      <path d="M12 18v3" />
+    </svg>
+  );
+}
+
+const VOICE_EMPTY_TRANSCRIPT_MESSAGE = "Didn't catch that — try again.";
 
 function StepIcon({ status }: { status: AgentStepStatus }) {
   if (status === 'pending') {
@@ -481,6 +503,11 @@ export function ProjectPreviewChat({
   const chipAnchorRef = useRef<HTMLDivElement>(null);
   const chatFormRef = useRef<HTMLFormElement>(null);
   const chatInputId = `project-chat-input-${projectId}`;
+  const voiceBaseInputRef = useRef('');
+  const pendingVoiceSubmitRef = useRef(false);
+
+  const speech = useBrowserSpeechRecognition();
+  const [voiceError, setVoiceError] = useState<string | null>(null);
 
   const refocusChatInput = useCallback(() => {
     document.getElementById(chatInputId)?.focus();
@@ -497,6 +524,18 @@ export function ProjectPreviewChat({
   });
 
   const inputDisabled = disabled || !previewReady || sending;
+
+  useEffect(() => {
+    if (sending && speech.listening) {
+      speech.stop();
+    }
+  }, [sending, speech.listening, speech.stop]);
+
+  useEffect(() => {
+    if (speech.error) {
+      setVoiceError(speech.error);
+    }
+  }, [speech.error]);
 
   useEffect(() => {
     if (!showTargetHint) return;
@@ -631,9 +670,9 @@ export function ProjectPreviewChat({
     return data.attachments as WorkspaceAssetAttachment[];
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = input.trim();
+  const submitMessage = useCallback(
+    async (messageText: string) => {
+    const trimmed = messageText.trim();
     if ((!trimmed && pendingImages.length === 0) || inputDisabled) return;
 
     const userMsg =
@@ -650,6 +689,7 @@ export function ProjectPreviewChat({
     setInput('');
     setSending(true);
     setUploadError(null);
+    setVoiceError(null);
     onEditStart?.();
     const pinnedTarget = selectedSection ? selectedTargetFromSection(selectedSection) : undefined;
     setMessages((prev) => [
@@ -864,7 +904,62 @@ export function ProjectPreviewChat({
     } finally {
       setSending(false);
     }
+  },
+    [
+      inputDisabled,
+      onEditComplete,
+      onEditStart,
+      onEditSuccess,
+      pendingImages,
+      projectId,
+      selectedSection,
+    ]
+  );
+
+  useEffect(() => {
+    if (speech.listening || !pendingVoiceSubmitRef.current) return;
+    pendingVoiceSubmitRef.current = false;
+
+    const spoken = speech.finalTranscript.trim();
+    const finalMessage = [voiceBaseInputRef.current, spoken].filter(Boolean).join(' ').trim();
+    voiceBaseInputRef.current = '';
+
+    if (finalMessage) {
+      void submitMessage(finalMessage);
+      return;
+    }
+    setVoiceError(VOICE_EMPTY_TRANSCRIPT_MESSAGE);
+  }, [speech.listening, speech.finalTranscript, submitMessage]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    void submitMessage(input.trim());
   };
+
+  const handleMicToggle = () => {
+    if (!speech.supported || inputDisabled) return;
+    speech.resetError();
+    setVoiceError(null);
+
+    if (speech.listening) {
+      pendingVoiceSubmitRef.current = true;
+      speech.stop();
+      return;
+    }
+
+    voiceBaseInputRef.current = input.trim();
+    if (input.trim()) {
+      setInput('');
+    }
+    speech.start();
+  };
+
+  const voicePreviewText = [voiceBaseInputRef.current, speech.interimTranscript || speech.finalTranscript]
+    .filter(Boolean)
+    .join(' ')
+    .trim();
+  const textareaValue = speech.listening ? voicePreviewText : input;
+  const inlineError = voiceError || uploadError;
 
   const applyPrompt = useCallback((text: string) => {
     setInput(text);
@@ -1048,16 +1143,20 @@ export function ProjectPreviewChat({
               ))}
             </div>
           )}
-          {uploadError && <p className="text-xs text-red-600">{uploadError}</p>}
+          {inlineError && <p className="text-xs text-red-600">{inlineError}</p>}
           <Textarea
             id={chatInputId}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
+            value={textareaValue}
+            onChange={(e) => {
+              if (speech.listening) return;
+              setInput(e.target.value);
+            }}
             onKeyDown={(event) => {
               if (event.key === 'Enter' && !event.shiftKey) {
                 event.preventDefault();
                 if (
                   !inputDisabled &&
+                  !speech.listening &&
                   (input.trim().length > 0 || pendingImages.length > 0)
                 ) {
                   chatFormRef.current?.requestSubmit();
@@ -1065,13 +1164,18 @@ export function ProjectPreviewChat({
               }
             }}
             placeholder={
-              previewReady
-                ? 'e.g. Add this photo to the hero… (Shift+Enter for a new line)'
-                : 'Waiting for preview…'
+              speech.listening
+                ? 'Listening… tap the mic when you are done.'
+                : previewReady
+                  ? 'e.g. Add this photo to the hero… (Shift+Enter for a new line)'
+                  : 'Waiting for preview…'
             }
-            disabled={inputDisabled}
+            disabled={inputDisabled || speech.listening}
             rows={4}
-            className="min-h-[6.5rem] max-h-52 resize-y text-sm leading-relaxed"
+            className={cn(
+              'min-h-[6.5rem] max-h-52 resize-y text-sm leading-relaxed',
+              speech.listening && 'border-red-300 bg-red-50/40'
+            )}
           />
           <div className="flex gap-2">
             <input
@@ -1081,13 +1185,15 @@ export function ProjectPreviewChat({
               multiple
               className="hidden"
               onChange={handleImagePick}
-              disabled={inputDisabled}
+              disabled={inputDisabled || speech.listening}
             />
             <Button
               type="button"
               variant="secondary"
               size="sm"
-              disabled={inputDisabled || pendingImages.length >= MAX_IMAGES_PER_UPLOAD}
+              disabled={
+                inputDisabled || speech.listening || pendingImages.length >= MAX_IMAGES_PER_UPLOAD
+              }
               onClick={() => fileInputRef.current?.click()}
               aria-label="Attach images"
               title="Attach images"
@@ -1095,10 +1201,34 @@ export function ProjectPreviewChat({
             >
               <ImageAttachIcon className="h-5 w-5" />
             </Button>
+            {speech.supported ? (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={inputDisabled}
+                onClick={handleMicToggle}
+                aria-label={speech.listening ? 'Stop and send' : 'Speak edit request'}
+                aria-pressed={speech.listening}
+                title={
+                  speech.listening
+                    ? 'Stop listening and send'
+                    : 'Speak your edit request (Chrome, Edge, or Safari)'
+                }
+                className={cn(
+                  'shrink-0 px-2.5',
+                  speech.listening && 'border-red-300 bg-red-50 text-red-700 animate-pulse'
+                )}
+              >
+                <MicIcon className="h-5 w-5" />
+              </Button>
+            ) : null}
             <Button
               type="submit"
               className="flex-1 sm:flex-none"
-              disabled={(!input.trim() && pendingImages.length === 0) || inputDisabled}
+              disabled={
+                speech.listening || (!input.trim() && pendingImages.length === 0) || inputDisabled
+              }
             >
               {sending ? '…' : 'Send'}
             </Button>
