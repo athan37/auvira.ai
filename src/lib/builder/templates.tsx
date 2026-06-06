@@ -4,6 +4,13 @@ import { pickBackgroundColor, extractCssColor } from './cssColor';
 import { SITE_CONFIG_TYPE_BLOCK } from './siteConfigTypes';
 import { instrumentGeneratedFiles } from '@/lib/analytics/generated-sites/instrumentGeneratedSite';
 import { tailwindContentPathsForGeneratedSite } from './tailwindPresentationSupport';
+import {
+  applyCategoryPresetToSiteSpec,
+  buildActionsSectionsFromPreset,
+  categoryPresetMetadataComment,
+  getCategoryPreset,
+  type WebsiteCategoryId,
+} from './categoryPresets';
 
 // Hardcoded premium theme presets by industry
 // These are SAFE, PREDEFINED themes - no LLM arbitrary classes
@@ -435,9 +442,12 @@ pages:
  * Generates siteConfig.ts with typed business data.
  * All business content lives here - page.tsx only renders it.
  */
-export function generateSiteConfig(siteSpec: SiteSpec): string {
+export function generateSiteConfig(siteSpec: SiteSpec, categoryPresetId?: WebsiteCategoryId | string): string {
+  const preset = getCategoryPreset(categoryPresetId);
+  const mergedSpec = applyCategoryPresetToSiteSpec(siteSpec, preset.id);
+
   // Extract contact info from sections
-  const contactItems = siteSpec.sections.find((s) => s.type === 'contact')?.items ?? [];
+  const contactItems = mergedSpec.sections.find((s) => s.type === 'contact')?.items ?? [];
   const phoneItem =
     contactItems.find(
       (i) =>
@@ -447,15 +457,15 @@ export function generateSiteConfig(siteSpec: SiteSpec): string {
   const emailItem = contactItems.find((i) => i.includes('@')) || '';
 
   // Build hero from siteSpec (hero section title wins over siteTitle for headline)
-  const heroSection = siteSpec.sections.find(s => s.type === 'hero');
+  const heroSection = mergedSpec.sections.find(s => s.type === 'hero');
   const headline =
-    heroSection?.title?.trim() || siteSpec.siteTitle?.trim() || 'Business Website';
+    heroSection?.title?.trim() || mergedSpec.siteTitle?.trim() || 'Business Website';
   const hero = {
     headline,
-    subheadline: siteSpec.tagline,
+    subheadline: mergedSpec.tagline,
     eyebrow: heroSection?.body?.split(' ').slice(0, 8).join(' ') || undefined,
-    primaryCta: siteSpec.primaryCTA,
-    secondaryCta: siteSpec.secondaryCTA,
+    primaryCta: mergedSpec.primaryCTA,
+    secondaryCta: mergedSpec.secondaryCTA,
   };
 
   // Build sections array (excluding hero, using proper types)
@@ -468,7 +478,7 @@ export function generateSiteConfig(siteSpec: SiteSpec): string {
     contact: 'contact',
   };
 
-  const sections = siteSpec.sections
+  const sections = mergedSpec.sections
     .filter(s => s.type !== 'hero')
     .map(s => ({
       type: (sectionTypeMap[s.type] || 'generic') as 'services' | 'about' | 'features' | 'faq' | 'testimonials' | 'contact' | 'generic',
@@ -485,22 +495,27 @@ export function generateSiteConfig(siteSpec: SiteSpec): string {
       }),
     }));
 
+  const actionSections = buildActionsSectionsFromPreset(preset);
+  const insertAt = Math.min(1, sections.length);
+  const allSections = [...sections.slice(0, insertAt), ...actionSections, ...sections.slice(insertAt)];
+
   const siteConfig = {
-    businessName: siteSpec.siteTitle,
-    tagline: siteSpec.tagline,
-    description: siteSpec.tagline,
+    businessName: mergedSpec.siteTitle,
+    tagline: mergedSpec.tagline,
+    description: mergedSpec.tagline,
     hero,
     contact: {
       phone: phoneItem || undefined,
       email: emailItem || undefined,
     },
-    sections,
+    sections: allSections,
   };
 
   const siteConfigJson = JSON.stringify(siteConfig, null, 2);
 
   return `// Site configuration - business content only
 // This file is auto-generated. Edits will be overwritten.
+${categoryPresetMetadataComment(preset.id)}
 
 ${SITE_CONFIG_TYPE_BLOCK}
 

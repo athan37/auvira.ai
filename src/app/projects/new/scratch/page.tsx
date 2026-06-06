@@ -10,6 +10,7 @@ import { TemplateGalleryPicker } from '@/components/clone/TemplateGalleryPicker'
 import { ScratchDesignPreviewPanel } from '@/components/scratch/ScratchDesignPreviewPanel';
 import { ScratchFormSection } from '@/components/scratch/ScratchFormSection';
 import { StarterGalleryPicker } from '@/components/scratch/StarterGalleryPicker';
+import { CategoryPresetPicker } from '@/components/scratch/CategoryPresetPicker';
 import { Alert } from '@/components/ui/Alert';
 import { Button } from '@/components/ui/Button';
 import { Input, Textarea } from '@/components/ui/Input';
@@ -18,14 +19,20 @@ import { Spinner } from '@/components/ui/Spinner';
 import { cn } from '@/lib/cn';
 import type { WebsitePlan } from '@/lib/agent/schemas';
 import {
+  getCategoryPreset,
+  recommendCategoryFromIndustry,
+  type WebsiteCategoryId,
+} from '@/lib/builder/categoryPresets';
+import {
   recommendLayoutStarterForIndustry,
+  getLayoutStarter,
   type LayoutStarter,
   type LayoutStarterId,
 } from '@/lib/builder/layoutStarters';
 import { getTemplateGallery, type TemplateGalleryEntry } from '@/lib/builder/templateGallery';
 import { websitePlanToProposedPlan } from '@/lib/scratch/websitePlanToProposedPlan';
 
-type ScratchStep = 'intake' | 'review';
+type ScratchStep = 'category' | 'intake' | 'review';
 type ScratchProgressStage = 'idle' | 'planning' | 'revising' | 'building' | 'saving';
 
 const MAIN_GOAL_OPTIONS = [
@@ -146,7 +153,8 @@ export default function NewScratchPage() {
     () => getTemplateGallery().find((t) => t.variant === 'modern-clean') ?? getTemplateGallery()[0],
     []
   );
-  const [step, setStep] = useState<ScratchStep>('intake');
+  const [step, setStep] = useState<ScratchStep>('category');
+  const [categoryPresetId, setCategoryPresetId] = useState<WebsiteCategoryId>('service_business');
   const [businessName, setBusinessName] = useState('');
   const [industry, setIndustry] = useState('');
   const [location, setLocation] = useState('');
@@ -228,9 +236,28 @@ export default function NewScratchPage() {
   const handleIndustryChange = (value: string) => {
     setIndustry(value);
     if (!layoutManuallySelected && value.trim()) {
-      const recommended = recommendLayoutStarterForIndustry(value);
-      setSelectedStarter(recommended);
-      setLayoutStarterId(recommended.id);
+      const recommendedCategory = recommendCategoryFromIndustry(value);
+      setCategoryPresetId(recommendedCategory);
+      const presetStarter = getLayoutStarter(getCategoryPreset(recommendedCategory).layoutStarterId);
+      if (presetStarter) {
+        setSelectedStarter(presetStarter);
+        setLayoutStarterId(presetStarter.id);
+      } else {
+        const recommended = recommendLayoutStarterForIndustry(value);
+        setSelectedStarter(recommended);
+        setLayoutStarterId(recommended.id);
+      }
+    }
+  };
+
+  const handleCategorySelect = (id: WebsiteCategoryId) => {
+    setCategoryPresetId(id);
+    if (!layoutManuallySelected) {
+      const starter = getLayoutStarter(getCategoryPreset(id).layoutStarterId);
+      if (starter) {
+        setSelectedStarter(starter);
+        setLayoutStarterId(starter.id);
+      }
     }
   };
 
@@ -343,6 +370,7 @@ export default function NewScratchPage() {
           websitePlan,
           projectName: businessName.trim(),
           layoutStarterId: resolvedLayoutStarterId,
+          categoryPresetId,
           intake: intakePayload,
         }),
       });
@@ -364,6 +392,12 @@ export default function NewScratchPage() {
       setLoading(false);
     }
   };
+
+  const categoryPrimaryButton = (
+    <Button type="button" className="w-full" onClick={() => setStep('intake')}>
+      Continue to business details
+    </Button>
+  );
 
   const intakePrimaryButton = (
     <Button
@@ -411,7 +445,9 @@ export default function NewScratchPage() {
             <div>
               <h1 className="text-2xl font-bold text-zinc-900 mb-2">Start from a template</h1>
               <p className="text-zinc-600 max-w-2xl">
-                {step === 'intake'
+                {step === 'category'
+                  ? 'Choose a website category — we’ll tailor sections, packages, and CTAs for your business type.'
+                  : step === 'intake'
                   ? 'Tell us about your business, then pick a layout template and color theme. We will propose a plan before building.'
                   : 'Review your proposed website plan, revise if needed, then confirm to build.'}
               </p>
@@ -459,7 +495,21 @@ export default function NewScratchPage() {
 
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 lg:gap-6">
             <div className="lg:col-span-3 space-y-4 min-w-0">
-              {step === 'intake' ? (
+              {step === 'category' ? (
+                <div className="space-y-4">
+                  <ScratchFormSection
+                    title="Website category"
+                    description="Service packages, menus, donation tiers, portfolio work, or startup landing — one template fits all."
+                  >
+                    <CategoryPresetPicker
+                      selectedId={categoryPresetId}
+                      onSelect={handleCategorySelect}
+                      disabled={loading}
+                    />
+                  </ScratchFormSection>
+                  <HowItWorks />
+                </div>
+              ) : step === 'intake' ? (
                 <form onSubmit={handlePropose} className="space-y-4">
                   <ScratchFormSection
                     title="About your business"
@@ -724,7 +774,11 @@ export default function NewScratchPage() {
                   showReadiness={step === 'intake'}
                   readinessItems={readinessItems}
                 >
-                  {step === 'intake' ? intakePrimaryButton : reviewPrimaryButton}
+                  {step === 'category'
+                    ? categoryPrimaryButton
+                    : step === 'intake'
+                      ? intakePrimaryButton
+                      : reviewPrimaryButton}
                 </ScratchDesignPreviewPanel>
               </div>
             </div>
@@ -734,7 +788,11 @@ export default function NewScratchPage() {
 
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-zinc-200 bg-white/95 p-4 backdrop-blur supports-[backdrop-filter]:bg-white/80 lg:hidden">
         <div className="mx-auto max-w-6xl">
-          {step === 'intake' ? intakePrimaryButton : reviewPrimaryButton}
+          {step === 'category'
+            ? categoryPrimaryButton
+            : step === 'intake'
+              ? intakePrimaryButton
+              : reviewPrimaryButton}
         </div>
       </div>
     </AppShell>

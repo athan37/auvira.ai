@@ -1,9 +1,27 @@
 /** Section type union emitted in generated customer siteConfig.ts files. */
 export const SITE_SECTION_TYPE_UNION =
-  "'services' | 'about' | 'features' | 'faq' | 'testimonials' | 'contact' | 'generic' | 'gallery' | 'documentation'";
+  "'services' | 'about' | 'features' | 'faq' | 'testimonials' | 'contact' | 'generic' | 'gallery' | 'documentation' | 'actions'";
 
 export const SITE_SECTION_ITEMS_TYPE =
   'Array<{ title: string; description?: string; imageUrl?: string }>';
+
+export const ACTION_MODULE_KIND_UNION =
+  "'service_packages' | 'menu_items' | 'donation_tiers' | 'event_rsvp' | 'portfolio_ctas'";
+
+export const ACTION_TYPE_UNION =
+  "'quote' | 'book' | 'buy' | 'donate' | 'rsvp' | 'contact'";
+
+export const ACTION_ITEM_TYPE = `{
+  id: string;
+  name: string;
+  description?: string;
+  valueLabel?: string;
+  imageUrl?: string;
+  ctaLabel?: string;
+  actionType: ${ACTION_TYPE_UNION};
+}`;
+
+export const ACTION_ITEMS_ARRAY_TYPE = `Array<${ACTION_ITEM_TYPE}>`;
 
 export const SITE_SECTION_PRESENTATION_TYPE = `export type SiteSectionPresentation = {
   backgroundClass?: string;
@@ -21,6 +39,8 @@ export const SITE_SECTION_TYPE_BLOCK = `export type SiteSection = {
   subtitle?: string;
   body?: string;
   items?: ${SITE_SECTION_ITEMS_TYPE};
+  moduleKind?: ${ACTION_MODULE_KIND_UNION};
+  actionItems?: ${ACTION_ITEMS_ARRAY_TYPE};
   presentation?: SiteSectionPresentation;
 };`;
 
@@ -66,6 +86,9 @@ const LEGACY_ITEMS_TYPE_PATTERN =
 
 const GALLERY_IN_SECTION_DATA =
   /["']type["']\s*:\s*["']gallery["']|type\s*:\s*['"]gallery['"]/;
+
+const ACTIONS_IN_SECTION_DATA =
+  /["']type["']\s*:\s*["']actions["']|type\s*:\s*['"]actions['"]|["']actionItems["']\s*:/;
 
 const SITE_SECTION_BLOCK_PATTERN = /export type SiteSection\s*=\s*\{[\s\S]*?\n\};/;
 const SITE_CONFIG_BLOCK_PATTERN = /export type SiteConfig\s*=\s*\{[\s\S]*?\n\};/;
@@ -124,7 +147,30 @@ export function ensureSiteConfigTypesSupportGallery(content: string): string {
     );
   }
 
-  return ensureSiteConfigTypesSupportPresentation(out);
+  return ensureSiteConfigTypesSupportActions(ensureSiteConfigTypesSupportPresentation(out));
+}
+
+/** True when siteConfig data references actions sections but type union omits actions. */
+export function siteConfigNeedsActionsTypeUpgrade(content: string): boolean {
+  if (!ACTIONS_IN_SECTION_DATA.test(content)) return false;
+  const block = content.match(SITE_SECTION_BLOCK_PATTERN)?.[0];
+  if (!block) return true;
+  return !/\bactions\b/.test(block) || !/actionItems\?/.test(block);
+}
+
+/**
+ * Upgrade legacy siteConfig.ts type exports so actions sections and ActionItem type-check.
+ */
+export function ensureSiteConfigTypesSupportActions(content: string): string {
+  if (!siteConfigNeedsActionsTypeUpgrade(content)) {
+    return content;
+  }
+
+  let out = content;
+  if (SITE_SECTION_BLOCK_PATTERN.test(out)) {
+    out = out.replace(SITE_SECTION_BLOCK_PATTERN, SITE_SECTION_TYPE_BLOCK);
+  }
+  return out;
 }
 
 /** True when siteConfig references presentation styling but omits the type definition. */

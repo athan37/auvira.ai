@@ -29,6 +29,8 @@ export type SyntheticSectionSpec = {
   type: SyntheticSectionType | string;
   /** Defaults to generic label derived from type + index. */
   title?: string;
+  moduleKind?: string;
+  actionItems?: Array<Record<string, unknown>>;
 };
 
 export type SyntheticSiteSpec = {
@@ -77,7 +79,13 @@ export function buildSyntheticSiteConfigSource(spec: SyntheticSiteSpec): string 
   const sectionLines = spec.sections.map((section, index) => {
     const title = section.title ?? defaultTitle(String(section.type), index);
     const type = String(section.type);
-    return `    { type: '${type}', title: '${escapeJsString(title)}', body: 'Synthetic body', items: [] }`;
+    const extras: string[] = [];
+    if (section.moduleKind) extras.push(`moduleKind: '${escapeJsString(section.moduleKind)}'`);
+    if (section.actionItems?.length) {
+      extras.push(`actionItems: ${JSON.stringify(section.actionItems, null, 2).split('\n').join('\n      ')}`);
+    }
+    const extraBlock = extras.length ? `, ${extras.join(', ')}` : '';
+    return `    { type: '${type}', title: '${escapeJsString(title)}', body: 'Synthetic body', items: []${extraBlock} }`;
   });
 
   const heroHeadline = spec.hero?.headline ?? 'Synthetic hero';

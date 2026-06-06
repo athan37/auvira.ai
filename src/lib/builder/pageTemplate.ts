@@ -6,6 +6,7 @@ import { SECTION_PRESENTATION_RUNTIME } from './sectionPresentationRuntime';
 export const PAGE_TSX_TEMPLATE = `// @ts-nocheck
 import { siteConfig } from "@/lib/siteConfig";
 import type { SiteSection } from "@/lib/siteConfig";
+import { ActionConfirmButton } from "@/components/ActionConfirm";
 
 // Theme preset - injected at build time
 const preset = __PRESET_JSON__;
@@ -642,6 +643,113 @@ function GenericSection({ section, sectionIndex }: { section: SiteSection; secti
 }
 
 // Section router
+function actionEyebrow(section: SiteSection): string {
+  const kind = section.moduleKind || "service_packages";
+  const map: Record<string, string> = {
+    service_packages: "Our Services",
+    menu_items: "Menu",
+    donation_tiers: "Support Us",
+    event_rsvp: "Events",
+    portfolio_ctas: "Featured Work",
+  };
+  return map[kind] || "Actions";
+}
+
+function actionEmptyHint(section: SiteSection): string {
+  const kind = section.moduleKind || "service_packages";
+  const map: Record<string, string> = {
+    service_packages: 'Try: "Add a service package"',
+    menu_items: 'Try: "Add menu items"',
+    donation_tiers: 'Try: "Add a donation tier"',
+    event_rsvp: 'Try: "Add an RSVP section"',
+    portfolio_ctas: 'Try: "Add a portfolio item"',
+  };
+  return map[kind] || 'Ask AI to add items';
+}
+
+function actionCtaClass(actionType: string): string {
+  if (actionType === "donate") return "bg-rose-600 text-white hover:bg-rose-700 shadow-lg shadow-rose-900/20";
+  if (actionType === "buy") return preset.primaryButton;
+  if (actionType === "quote") return "bg-slate-900 text-white hover:bg-slate-800 shadow-lg";
+  if (actionType === "book") return "bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg shadow-emerald-900/20";
+  if (actionType === "rsvp") return "bg-violet-600 text-white hover:bg-violet-700 shadow-lg shadow-violet-900/20";
+  return preset.primaryButton;
+}
+
+function actionInitials(name: string): string {
+  return name.split(/\\s+/).slice(0, 2).map((w) => w[0] || "").join("").toUpperCase() || "?";
+}
+
+function ActionSection({ section, sectionIndex }: { section: SiteSection; sectionIndex: number }) {
+  const items = section.actionItems || [];
+  const eyebrow = actionEyebrow(section);
+  return (
+    <section id={"actions-" + sectionIndex} {...SITE_SECTION_DATA_ATTRS(section, sectionIndex)} className={"px-4 py-20 sm:px-6 lg:px-8 " + resolveSectionBackground(section, preset)}>
+      <div className="mx-auto max-w-7xl">
+        <div className="mx-auto max-w-3xl text-center mb-14">
+          <p className={"mb-3 text-xs font-bold uppercase tracking-[0.28em] " + resolveSectionEyebrowClass(section, preset)}>{eyebrow}</p>
+          <h2
+            className={"text-3xl font-semibold tracking-tight md:text-5xl " + resolveSectionTitleClass(section, preset)}
+            {...SITE_ELEMENT_ATTRS({ kind: "heading", label: "Section title", fieldPath: "sections[" + sectionIndex + "].title" })}
+          >{section.title}</h2>
+          {(section.subtitle || section.body) && (
+            <p
+              className={"mt-5 text-lg leading-8 " + resolveSectionBodyClass(section, preset)}
+              {...SITE_ELEMENT_ATTRS({ kind: "body", label: "Section intro", fieldPath: "sections[" + sectionIndex + "].body" })}
+            >{section.subtitle || section.body}</p>
+          )}
+        </div>
+        {items.length === 0 ? (
+          <div className={"mx-auto max-w-lg rounded-3xl border border-dashed p-10 text-center " + resolveSectionCardClass(section, preset)}>
+            <p className="text-sm font-semibold text-slate-700">No items yet</p>
+            <p className="mt-2 text-sm text-slate-500">{actionEmptyHint(section)}</p>
+          </div>
+        ) : (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3" {...SITE_CONTAINER_ATTRS({ kind: "item_grid", label: "Action cards" })}>
+            {items.map((item, i) => (
+              <div
+                key={item.id || i}
+                className={"flex flex-col rounded-3xl border p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-xl " + resolveSectionCardClass(section, preset)}
+                {...SITE_ELEMENT_ATTRS({ kind: "action_item", label: "Action card", fieldPath: "sections[" + sectionIndex + "].actionItems[" + i + "]", itemIndex: i })}
+              >
+                {item.imageUrl ? (
+                  <img src={item.imageUrl} alt={item.name} className="mb-5 h-40 w-full rounded-2xl object-cover" />
+                ) : (
+                  <div className={"mb-5 flex h-40 w-full items-center justify-center rounded-2xl bg-gradient-to-br text-3xl font-bold text-white " + preset.iconBadge}>
+                    {actionInitials(item.name)}
+                  </div>
+                )}
+                {item.valueLabel ? (
+                  <span
+                    className={"mb-3 inline-flex w-fit rounded-full px-3 py-1 text-xs font-bold text-white " + preset.iconBadge}
+                    {...SITE_ELEMENT_ATTRS({ kind: "action_value", label: "Value label", fieldPath: "sections[" + sectionIndex + "].actionItems[" + i + "].valueLabel", itemIndex: i })}
+                  >{item.valueLabel}</span>
+                ) : null}
+                <h3
+                  className="text-lg font-bold text-slate-950"
+                  {...SITE_ELEMENT_ATTRS({ kind: "action_title", label: "Action title", fieldPath: "sections[" + sectionIndex + "].actionItems[" + i + "].name", itemIndex: i })}
+                >{item.name}</h3>
+                {item.description ? (
+                  <p className="mt-3 flex-1 text-sm leading-6 text-slate-600">{item.description}</p>
+                ) : null}
+                <div className="mt-6">
+                  <ActionConfirmButton
+                    actionType={item.actionType}
+                    itemName={item.name}
+                    ctaLabel={item.ctaLabel || "Learn More"}
+                    className={"inline-flex w-full items-center justify-center rounded-2xl px-4 py-3 text-sm font-semibold transition " + actionCtaClass(item.actionType)}
+                    fieldPath={"sections[" + sectionIndex + "].actionItems[" + i + "].ctaLabel"}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function SectionRenderer({ section, sectionIndex }: { section: SiteSection; sectionIndex: number }) {
   switch (section.type) {
     case "services": return <ServicesSection section={section} sectionIndex={sectionIndex} />;
@@ -651,6 +759,7 @@ function SectionRenderer({ section, sectionIndex }: { section: SiteSection; sect
     case "testimonials": return <TestimonialsSection section={section} sectionIndex={sectionIndex} />;
     case "contact": return <ContactSection section={section} sectionIndex={sectionIndex} />;
     case "gallery": return <GallerySection section={section} sectionIndex={sectionIndex} />;
+    case "actions": return <ActionSection section={section} sectionIndex={sectionIndex} />;
     default: return <GenericSection section={section} sectionIndex={sectionIndex} />;
   }
 }

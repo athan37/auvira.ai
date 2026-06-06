@@ -27,12 +27,13 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { websitePlan, projectName, validateBuild = true, intake: intakeBody, layoutStarterId } = body as {
+    const { websitePlan, projectName, validateBuild = true, intake: intakeBody, layoutStarterId, categoryPresetId } = body as {
       websitePlan: WebsitePlan;
       projectName: string;
       validateBuild?: boolean;
       intake?: Partial<ScratchIntake>;
       layoutStarterId?: string;
+      categoryPresetId?: string;
     };
 
     if (!websitePlan) {
@@ -46,6 +47,7 @@ export async function POST(request: NextRequest) {
       intake,
       projectName,
       layoutStarterId: layoutStarterId ?? websitePlan.suggestedTemplate?.layoutStarterId,
+      categoryPresetId,
       validateBuild,
       logPrefix: 'PROJECTS/SCRATCH/BUILD',
     });
@@ -139,6 +141,7 @@ export async function POST(request: NextRequest) {
             variant: buildResult.template.variant,
             reason: buildResult.template.reason,
             layoutStarterId: buildResult.layoutStarterId,
+            categoryPresetId: categoryPresetId ?? undefined,
           }
         : undefined,
       scratchValidation: buildResult.scratchValidation

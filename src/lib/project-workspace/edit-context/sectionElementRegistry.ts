@@ -20,6 +20,10 @@ export type SectionElementKind =
   | 'contact_field'
   | 'item_title'
   | 'item_body'
+  | 'action_item'
+  | 'action_title'
+  | 'action_value'
+  | 'action_cta'
   | 'panel'
   | 'image_caption';
 
@@ -391,6 +395,32 @@ export function buildSectionElementCatalog(
           entry.field === 'title'
             ? `${sectionType} item ${(entry.itemIndex ?? 0) + 1} title`
             : `${sectionType} item ${(entry.itemIndex ?? 0) + 1} description`,
+        matchAliases: entry.labels,
+      })
+    );
+  }
+
+  for (const entry of sectionEntries.filter((e) => e.scope === 'actionItem')) {
+    const kind =
+      entry.field === 'name'
+        ? 'action_title'
+        : entry.field === 'valueLabel'
+          ? 'action_value'
+          : entry.field === 'ctaLabel'
+            ? 'action_cta'
+            : 'action_item';
+    byPath.set(
+      entry.fieldPath,
+      entryToSurface(entry, {
+        elementKind: kind,
+        humanLabel:
+          entry.field === 'name'
+            ? `Action card ${(entry.itemIndex ?? 0) + 1} title`
+            : entry.field === 'valueLabel'
+              ? `Action card ${(entry.itemIndex ?? 0) + 1} price`
+              : entry.field === 'ctaLabel'
+                ? `Action card ${(entry.itemIndex ?? 0) + 1} button`
+                : `Action card ${(entry.itemIndex ?? 0) + 1}`,
         matchAliases: entry.labels,
       })
     );

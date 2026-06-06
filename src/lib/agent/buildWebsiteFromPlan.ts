@@ -18,6 +18,7 @@ import {
   type LayoutStarter,
 } from '@/lib/builder/layoutStarters';
 import { normalizeTemplateSelection } from '@/lib/builder/normalizeTemplateVariant';
+import { getCategoryPreset } from '@/lib/builder/categoryPresets';
 
 export interface StageLog {
   stage: string;
@@ -30,6 +31,7 @@ export interface BuildWebsiteFromPlanInput {
   intake: ScratchIntake;
   projectName: string;
   layoutStarterId?: string;
+  categoryPresetId?: string;
   validateBuild?: boolean;
   logPrefix?: string;
 }
@@ -144,9 +146,11 @@ export async function buildWebsiteFromPlan(
   }
   logStage(stageLogs, 'plan_to_sitespec_done', logPrefix, Date.now() - startTime);
 
+  const categoryPreset = getCategoryPreset(input.categoryPresetId);
   const layoutStarter =
     getLayoutStarter(input.layoutStarterId) ??
     getLayoutStarter(websitePlan.suggestedTemplate?.layoutStarterId) ??
+    getLayoutStarter(categoryPreset.layoutStarterId) ??
     getDefaultLayoutStarter();
 
   logStage(stageLogs, 'design_brief_start', logPrefix);
@@ -206,7 +210,14 @@ export async function buildWebsiteFromPlan(
   logStage(stageLogs, 'build_files_start', logPrefix);
   let generated: GenerateWebsiteFilesResult;
   try {
-    generated = generateWebsiteFiles(siteSpec, uniqueName, designBrief, template, layoutStarter);
+    generated = generateWebsiteFiles(
+      siteSpec,
+      uniqueName,
+      designBrief,
+      template,
+      layoutStarter,
+      categoryPreset.id
+    );
   } catch (error) {
     logStage(stageLogs, 'build_files_failed', logPrefix);
     return {

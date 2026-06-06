@@ -3,6 +3,7 @@ import type { ParsedConfigFieldPath } from './configFieldPaths';
 import {
   contactExtraLineFieldPath,
   heroFieldPath,
+  actionItemFieldPath,
   parseConfigFieldPath,
   sectionFieldPath,
   sectionItemFieldPath,
@@ -145,6 +146,28 @@ export function enumerateAllowlistedFields(
             sectionTitle,
             itemIndex,
             labels: [field, `item ${field}`, sectionTitle],
+          }
+        );
+      }
+    });
+
+    const actionItems = Array.isArray(section.actionItems)
+      ? (section.actionItems as Array<Record<string, unknown>>)
+      : [];
+    actionItems.forEach((item, itemIndex) => {
+      for (const field of ['name', 'description', 'valueLabel', 'ctaLabel'] as const) {
+        pushEntry(
+          entries,
+          actionItemFieldPath(sectionIndex, itemIndex, field),
+          item[field],
+          {
+            scope: 'actionItem',
+            field,
+            sectionIndex,
+            sectionType,
+            sectionTitle,
+            itemIndex,
+            labels: [field, `action ${field}`, sectionTitle, 'price', 'cta', 'button'],
           }
         );
       }

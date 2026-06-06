@@ -9,6 +9,7 @@ export const DOMAIN_TOOL_NAMES = [
   'update_config_field',
   'update_contact_info',
   'update_section_list',
+  'update_action_items',
   'apply_section_background',
   'update_theme',
   'add_section',

@@ -21,13 +21,16 @@ import type { TemplateSelection } from '../agent/selectTemplateAgent';
 import { instrumentGeneratedFiles } from '@/lib/analytics/generated-sites/instrumentGeneratedSite';
 import type { LayoutStarter } from './layoutStarters';
 import { applyLayoutStrategyToPreset } from './layoutStarters';
+import type { WebsiteCategoryId } from './categoryPresets';
+import { generateActionConfirmTsx, siteConfigUsesActions } from './actionConfirmTemplate';
 
 export function generateWebsiteFiles(
   siteSpec: SiteSpec,
   projectName: string,
   designBrief?: DesignBrief,
   template?: TemplateSelection,
-  layoutStarter?: LayoutStarter
+  layoutStarter?: LayoutStarter,
+  categoryPresetId?: WebsiteCategoryId | string
 ): GenerateWebsiteFilesResult {
   // Clean siteSpec to remove any markdown artifacts before generating files
   const cleanedSiteSpec = normalizeSiteSpec(cleanGeneratedCopy(siteSpec) as SiteSpec);
@@ -73,7 +76,7 @@ export function generateWebsiteFiles(
     },
     {
       filePath: 'src/lib/siteConfig.ts',
-      content: generateSiteConfig(cleanedSiteSpec),
+      content: generateSiteConfig(cleanedSiteSpec, categoryPresetId),
     },
     {
       filePath: 'src/app/layout.tsx',
@@ -92,6 +95,14 @@ export function generateWebsiteFiles(
       content: generateReadme(projectName, cleanedSiteSpec),
     },
   ];
+
+  const siteConfigContent = files.find((f) => f.filePath === 'src/lib/siteConfig.ts')?.content ?? '';
+  if (siteConfigUsesActions(siteConfigContent)) {
+    files.push({
+      filePath: 'src/components/ActionConfirm.tsx',
+      content: generateActionConfirmTsx(),
+    });
+  }
 
   const instrumented = instrumentGeneratedFiles(files);
 

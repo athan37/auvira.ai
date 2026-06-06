@@ -554,5 +554,140 @@ export function buildDeterministicPlan(editContext: EditContext): EditPlan | nul
     };
   }
 
+  const categoryActionPlan = tryCategoryActionPlan(message, editContext);
+  if (categoryActionPlan) return categoryActionPlan;
+
+  return null;
+}
+
+function extractQuotedToValue(message: string): string | null {
+  const quoted = message.match(/\bto\s+["']([^"']+)["']/i);
+  if (quoted?.[1]) return quoted[1].trim();
+  const plain = message.match(/\bto\s+(.+?)(?:\.|$)/i);
+  return plain?.[1]?.trim() ?? null;
+}
+
+function parseActionItemIndex(editContext: EditContext): number | undefined {
+  const fieldPath = editContext.target.fieldPath;
+  if (!fieldPath) return undefined;
+  const match = fieldPath.match(/actionItems\[(\d+)\]/);
+  return match?.[1] != null ? Number(match[1]) : undefined;
+}
+
+/** Deterministic fast-paths for category action module demo commands. */
+function tryCategoryActionPlan(message: string, editContext: EditContext): EditPlan | null {
+  const normalized = message.trim();
+  const sectionIndex = editContext.target.sectionIndex;
+  const itemIndex = parseActionItemIndex(editContext);
+  const replacement = extractQuotedToValue(normalized);
+
+  if (/\badd\s+a?\s*service\s+package\b/i.test(normalized)) {
+    return {
+      planVersion: 'website-agent',
+      needsClarification: false,
+      intent: 'section',
+      steps: [
+        {
+          skill: 'add_action_item',
+          params: {
+            name: 'New Service Package',
+            actionType: 'quote',
+            moduleKind: 'service_packages',
+          },
+        },
+      ],
+    };
+  }
+
+  if (/\badd\s+a?\s*donation\s+tier\b/i.test(normalized)) {
+    return {
+      planVersion: 'website-agent',
+      needsClarification: false,
+      intent: 'section',
+      steps: [
+        {
+          skill: 'add_action_item',
+          params: {
+            name: 'New Donation Tier',
+            actionType: 'donate',
+            moduleKind: 'donation_tiers',
+          },
+        },
+      ],
+    };
+  }
+
+  if (/\badd\s+an?\s*rsvp\s+section\b/i.test(normalized)) {
+    return {
+      planVersion: 'website-agent',
+      needsClarification: false,
+      intent: 'section',
+      steps: [
+        {
+          skill: 'add_actions_section',
+          params: {
+            moduleKind: 'event_rsvp',
+            title: 'Reserve Your Spot',
+            seedItem: { name: 'General Admission', valueLabel: 'Free', actionType: 'rsvp' },
+          },
+        },
+      ],
+    };
+  }
+
+  if (/\badd\s+menu\s+items?\b/i.test(normalized) || /\badd\s+these\s+items?\b/i.test(normalized)) {
+    const listMatch = normalized.match(/:\s*(.+)$/);
+    const names = listMatch?.[1]
+      ? listMatch[1].split(/,|\band\b/i).map((s) => s.trim()).filter(Boolean)
+      : ['New Menu Item'];
+    return {
+      planVersion: 'website-agent',
+      needsClarification: false,
+      intent: 'section',
+      steps: names.map((name) => ({
+        skill: 'add_action_item' as const,
+        params: { name, actionType: 'buy', moduleKind: 'menu_items' },
+      })),
+    };
+  }
+
+  if (
+    replacement &&
+    sectionIndex != null &&
+    itemIndex != null &&
+    (/\b(price|value|cost)\b/i.test(normalized) || editContext.target.kind === 'action_value')
+  ) {
+    return {
+      planVersion: 'website-agent',
+      needsClarification: false,
+      intent: 'copy',
+      steps: [
+        {
+          skill: 'update_action_item',
+          params: { sectionIndex, itemIndex, valueLabel: replacement },
+        },
+      ],
+    };
+  }
+
+  if (
+    replacement &&
+    sectionIndex != null &&
+    itemIndex != null &&
+    (/\b(button|cta|label)\b/i.test(normalized) || editContext.target.kind === 'action_cta')
+  ) {
+    return {
+      planVersion: 'website-agent',
+      needsClarification: false,
+      intent: 'copy',
+      steps: [
+        {
+          skill: 'update_action_item',
+          params: { sectionIndex, itemIndex, ctaLabel: replacement },
+        },
+      ],
+    };
+  }
+
   return null;
 }

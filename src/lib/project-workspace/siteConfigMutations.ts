@@ -3,6 +3,12 @@ import {
   colorNameToBackgroundClass,
   type SiteSectionPresentation,
 } from '@/lib/builder/sectionPresentation';
+import {
+  createActionItem,
+  defaultCtaForActionType,
+  type ActionModuleKind,
+  type ActionType,
+} from '@/lib/builder/actionItemTypes';
 
 const SITE_CONFIG_EXPORT = /export const siteConfig(?::\s*SiteConfig)?\s*=\s*/;
 
@@ -373,6 +379,17 @@ export function updateConfigFieldInSource(
       return true;
     }
 
+    if (parsed.scope === 'actionItem') {
+      const actionItems = Array.isArray(section.actionItems)
+        ? (section.actionItems as Array<Record<string, unknown>>)
+        : [];
+      const actionItem = actionItems[parsed.itemIndex ?? -1];
+      if (!actionItem) return false;
+      if (actionItem[parsed.field] === value) return false;
+      actionItem[parsed.field] = value;
+      return true;
+    }
+
     const items = Array.isArray(section.items)
       ? (section.items as Array<Record<string, unknown>>)
       : [];
@@ -473,5 +490,173 @@ export function migrateSubtitleStyleMarkersInSource(content: string): string | n
 
     return changed;
   });
+}
+
+function findActionsSection(
+  sections: Array<Record<string, unknown>>,
+  moduleKind?: ActionModuleKind
+): Record<string, unknown> | undefined {
+  return sections.find((section) => {
+    const type = normalizeString(section.type)?.toLowerCase();
+    if (type !== 'actions') return false;
+    if (!moduleKind) return true;
+    return normalizeString(section.moduleKind) === moduleKind;
+  });
+}
+
+/** Ensure an actions section exists; create when missing. */
+export function ensureActionsSectionInSource(
+  content: string,
+  options: {
+    moduleKind: ActionModuleKind;
+    title: string;
+    subtitle?: string;
+  }
+): string | null {
+  const title = normalizeString(options.title);
+  if (!title) return null;
+
+  return mutateSiteConfigSource(content, (config) => {
+    const sections = Array.isArray(config.sections)
+      ? (config.sections as Array<Record<string, unknown>>)
+      : [];
+    const existing = findActionsSection(sections, options.moduleKind);
+    if (existing) return false;
+
+    sections.push({
+      type: 'actions',
+      title,
+      subtitle: normalizeString(options.subtitle) ?? undefined,
+      body: normalizeString(options.subtitle) ?? undefined,
+      moduleKind: options.moduleKind,
+      actionItems: [],
+    });
+    config.sections = sections;
+    return true;
+  });
+}
+
+/** Add an action item to the first matching actions section (or create one). */
+export function addActionItemToSource(
+  content: string,
+  item: {
+    name: string;
+    description?: string;
+    valueLabel?: string;
+    actionType: ActionType;
+    moduleKind?: ActionModuleKind;
+    ctaLabel?: string;
+    sectionTitle?: string;
+  }
+): string | null {
+  const name = normalizeString(item.name);
+  if (!name) return null;
+
+  return mutateSiteConfigSource(content, (config) => {
+    const sections = Array.isArray(config.sections)
+      ? (config.sections as Array<Record<string, unknown>>)
+      : [];
+    let actions = findActionsSection(sections, item.moduleKind);
+    if (!actions) {
+      actions = {
+        type: 'actions',
+        title: item.sectionTitle ?? 'Actions',
+        moduleKind: item.moduleKind ?? 'service_packages',
+        actionItems: [],
+      };
+      sections.unshift(actions);
+      config.sections = sections;
+    }
+
+    const actionItems = Array.isArray(actions.actionItems)
+      ? (actions.actionItems as Array<Record<string, unknown>>)
+      : [];
+    const exists = actionItems.some(
+      (existing) => normalizeString(existing.name)?.toLowerCase() === name.toLowerCase()
+    );
+    if (exists) return false;
+
+    const nextItem = createActionItem({
+      name,
+      description: normalizeString(item.description) ?? undefined,
+      valueLabel: normalizeString(item.valueLabel) ?? undefined,
+      actionType: item.actionType,
+      ctaLabel: normalizeString(item.ctaLabel) ?? defaultCtaForActionType(item.actionType),
+    });
+    actionItems.push(nextItem);
+    actions.actionItems = actionItems;
+    return true;
+  });
+}
+
+/** Update fields on an action item by section and item index. */
+export function updateActionItemInSource(
+  content: string,
+  sectionIndex: number,
+  itemIndex: number,
+  patch: Partial<{ name: string; description: string; valueLabel: string; ctaLabel: string }>
+): string | null {
+  if (sectionIndex < 0 || itemIndex < 0) return null;
+
+  return mutateSiteConfigSource(content, (config) => {
+    const sections = Array.isArray(config.sections)
+      ? (config.sections as Array<Record<string, unknown>>)
+      : [];
+    const section = sections[sectionIndex];
+    if (!section || normalizeString(section.type) !== 'actions') return false;
+
+    const actionItems = Array.isArray(section.actionItems)
+      ? (section.actionItems as Array<Record<string, unknown>>)
+      : [];
+    const item = actionItems[itemIndex];
+    if (!item) return false;
+
+    let changed = false;
+    for (const [key, raw] of Object.entries(patch)) {
+      const value = normalizeString(raw);
+      if (!value || item[key] === value) continue;
+      item[key] = value;
+      changed = true;
+    }
+    return changed;
+  });
+}
+
+/** Remove an action item by section and item index. */
+export function removeActionItemFromSource(
+  content: string,
+  sectionIndex: number,
+  itemIndex: number
+): string | null {
+  if (sectionIndex < 0 || itemIndex < 0) return null;
+
+  return mutateSiteConfigSource(content, (config) => {
+    const sections = Array.isArray(config.sections)
+      ? (config.sections as Array<Record<string, unknown>>)
+      : [];
+    const section = sections[sectionIndex];
+    if (!section || normalizeString(section.type) !== 'actions') return false;
+
+    const actionItems = Array.isArray(section.actionItems)
+      ? (section.actionItems as Array<Record<string, unknown>>)
+      : [];
+    if (itemIndex >= actionItems.length) return false;
+    actionItems.splice(itemIndex, 1);
+    section.actionItems = actionItems;
+    return true;
+  });
+}
+
+/** Update action item field via parsed config field path. */
+export function updateActionItemFieldInSource(
+  content: string,
+  sectionIndex: number,
+  itemIndex: number,
+  field: string,
+  value: string
+): string | null {
+  const allowed = new Set(['name', 'description', 'valueLabel', 'ctaLabel']);
+  if (!allowed.has(field) || !value.trim()) return null;
+  return updateActionItemInSource(content, sectionIndex, itemIndex, { [field]: value });
 }
 

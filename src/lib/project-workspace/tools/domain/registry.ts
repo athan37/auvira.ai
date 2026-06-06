@@ -1,3 +1,4 @@
+import { updateActionItemsTool } from './actionItems';
 import { applySectionBackgroundTool } from './applySectionBackground';
 import { findSectionTool } from './findSection';
 import {
@@ -26,6 +27,7 @@ const HANDLERS: Record<DomainToolName, DomainToolHandler> = {
   update_config_field: updateConfigFieldTool,
   update_contact_info: updateContactInfoTool,
   update_section_list: updateSectionListTool,
+  update_action_items: updateActionItemsTool,
   apply_section_background: applySectionBackgroundTool,
   update_theme: updateThemeTool,
   add_section: addSectionTool,
@@ -49,6 +51,10 @@ export const SKILL_TO_DOMAIN_TOOL: Partial<Record<string, DomainToolName>> = {
   update_section_style: 'apply_section_background',
   add_section: 'add_section',
   add_service: 'update_section_list',
+  add_action_item: 'update_action_items',
+  add_actions_section: 'update_action_items',
+  update_action_item: 'update_action_items',
+  remove_action_item: 'update_action_items',
   add_contact_extra_line: 'update_section_list',
   remove_section: 'remove_section',
   reorder_sections: 'reorder_sections',
@@ -147,6 +153,53 @@ export function paramsForSkill(
       action: 'add_service',
       title: merged.title,
       description: merged.description,
+    };
+  }
+
+  if (skill === 'add_action_item') {
+    return {
+      action: 'add_action_item',
+      name: merged.name ?? merged.title,
+      description: merged.description,
+      valueLabel: merged.valueLabel,
+      actionType: merged.actionType,
+      moduleKind: merged.moduleKind,
+      ctaLabel: merged.ctaLabel,
+      sectionTitle: merged.sectionTitle,
+    };
+  }
+
+  if (skill === 'add_actions_section') {
+    return {
+      action: 'add_actions_section',
+      moduleKind: merged.moduleKind,
+      title: merged.title,
+      subtitle: merged.subtitle ?? merged.body,
+      defaultActionType: merged.defaultActionType,
+      seedItem: merged.seedItem,
+    };
+  }
+
+  if (skill === 'update_action_item') {
+    return {
+      action: 'update_action_item',
+      sectionIndex: merged.sectionIndex ?? editContext.target.sectionIndex,
+      itemIndex: merged.itemIndex,
+      name: merged.name,
+      description: merged.description,
+      valueLabel: merged.valueLabel,
+      ctaLabel: merged.ctaLabel,
+      field: merged.field,
+      value: merged.value,
+      fieldPath: merged.fieldPath ?? editContext.target.fieldPath,
+    };
+  }
+
+  if (skill === 'remove_action_item') {
+    return {
+      action: 'remove_action_item',
+      sectionIndex: merged.sectionIndex ?? editContext.target.sectionIndex,
+      itemIndex: merged.itemIndex,
     };
   }
 

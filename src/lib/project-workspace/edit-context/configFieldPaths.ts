@@ -4,7 +4,7 @@
 
 export interface ParsedConfigFieldPath {
   fieldPath: string;
-  scope: 'hero' | 'businessName' | 'contact' | 'section' | 'sectionItem';
+  scope: 'hero' | 'businessName' | 'contact' | 'section' | 'sectionItem' | 'actionItem';
   sectionIndex?: number;
   itemIndex?: number;
   /** Index into contact.extraLines when field is `extraLines`. */
@@ -13,7 +13,7 @@ export interface ParsedConfigFieldPath {
 }
 
 const FIELD_PATH_RE =
-  /^(hero\.(headline|subheadline|tagline|primaryCta|secondaryCta)|businessName|contact\.(phone|email|address)|sections\[(\d+)\]\.(title|subtitle|body)|sections\[(\d+)\]\.items\[(\d+)\]\.(title|description|imageUrl|alt|label|href))$/;
+  /^(hero\.(headline|subheadline|tagline|primaryCta|secondaryCta)|businessName|contact\.(phone|email|address)|sections\[(\d+)\]\.(title|subtitle|body)|sections\[(\d+)\]\.items\[(\d+)\]\.(title|description|imageUrl|alt|label|href)|sections\[(\d+)\]\.actionItems\[(\d+)\]\.(name|description|valueLabel|ctaLabel))$/;
 
 const CONTACT_EXTRA_LINE_RE = /^contact\.extraLines\[(\d+)\]$/;
 
@@ -51,13 +51,22 @@ export function parseConfigFieldPath(fieldPath: string): ParsedConfigFieldPath |
       field: match[5]!,
     };
   }
-  if (match[6] != null && match[7] != null) {
+  if (match[6] != null && match[7] != null && match[9] == null) {
     return {
       fieldPath: trimmed,
       scope: 'sectionItem',
       sectionIndex: Number(match[6]),
       itemIndex: Number(match[7]),
       field: match[8]!,
+    };
+  }
+  if (match[9] != null && match[10] != null) {
+    return {
+      fieldPath: trimmed,
+      scope: 'actionItem',
+      sectionIndex: Number(match[9]),
+      itemIndex: Number(match[10]),
+      field: match[11]!,
     };
   }
   return null;
@@ -99,7 +108,15 @@ export function readConfigFieldValue(
     ? (section.items as Array<Record<string, unknown>>)
     : [];
   const item = items[parsed.itemIndex ?? -1];
-  return item?.[parsed.field];
+  if (parsed.scope === 'sectionItem') {
+    return item?.[parsed.field];
+  }
+
+  const actionItems = Array.isArray(section.actionItems)
+    ? (section.actionItems as Array<Record<string, unknown>>)
+    : [];
+  const actionItem = actionItems[parsed.itemIndex ?? -1];
+  return actionItem?.[parsed.field];
 }
 
 /** Build canonical field path strings. */
@@ -113,6 +130,14 @@ export function sectionItemFieldPath(
   field: string
 ): string {
   return `sections[${sectionIndex}].items[${itemIndex}].${field}`;
+}
+
+export function actionItemFieldPath(
+  sectionIndex: number,
+  itemIndex: number,
+  field: string
+): string {
+  return `sections[${sectionIndex}].actionItems[${itemIndex}].${field}`;
 }
 
 export function heroFieldPath(field: string): string {
