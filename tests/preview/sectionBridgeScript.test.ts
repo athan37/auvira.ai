@@ -77,4 +77,12 @@ describe('sectionBridgeScript drag preview UX', () => {
     expect(body).toContain('function detectSectionLayout');
     expect(body).not.toContain('function captureSectionStyledFallback');
   });
+
+  it('prefers DOM bitmap capture with styled and SVG fallbacks', () => {
+    const body = buildSectionBridgeScriptBody();
+    expect(body).toContain('function captureDomBitmap');
+    expect(body).toContain('function captureStyledPreviewFallback');
+    expect(body).toContain('captureDomBitmap(captureEl,dragState.target)');
+    expect(body).toContain('PreviewDomCapture');
+  });
 });

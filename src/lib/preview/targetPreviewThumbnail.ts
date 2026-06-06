@@ -259,8 +259,16 @@ export function resolvePreviewThumbDisplaySize(
     elementKind?: string;
     pinScope?: string;
     kind?: string;
+    captureKind?: TargetPreviewCaptureKind;
   }
-): { width: number; height: number; aspectRatio: string; fillWidth?: boolean; maxHeight?: number } {
+): {
+  width: number;
+  height: number;
+  aspectRatio: string;
+  fillWidth?: boolean;
+  maxHeight?: number;
+  objectFit?: 'contain' | 'cover';
+} {
   const max = PREVIEW_THUMB_MAX[variant];
   const aspectRatio = `${Math.max(1, Math.round(sourceWidth))} / ${Math.max(1, Math.round(sourceHeight))}`;
   const profile = inferPreviewScaleProfile(
@@ -278,12 +286,14 @@ export function resolvePreviewThumbDisplaySize(
         ? Math.max(sectionMax.width, Math.round(options.containerWidth))
         : sectionMax.width;
     const fit = fitScaleToBox(sourceWidth, sourceHeight, boxWidth, sectionMax.height);
+    const raster = options?.captureKind === 'raster';
     return {
       width: fit.width,
       height: fit.height,
       maxHeight: sectionMax.height,
       aspectRatio,
       fillWidth: Boolean(options?.fullWidth),
+      objectFit: raster ? 'contain' : 'cover',
     };
   }
 

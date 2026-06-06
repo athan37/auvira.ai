@@ -135,6 +135,17 @@ describe('resolvePreviewThumbDisplaySize section pin', () => {
     expect(display.maxHeight).toBe(SECTION_PREVIEW_THUMB_MAX.pinned.height);
     expect(display.height).toBe(SECTION_PREVIEW_THUMB_MAX.pinned.height);
     expect(display.width).toBeGreaterThan(PREVIEW_THUMB_MAX.pinned.width);
+    expect(display.objectFit).toBe('cover');
+  });
+
+  it('uses object-contain for raster section captures', () => {
+    const display = resolvePreviewThumbDisplaySize('pinned', 400, 240, {
+      pinScope: 'section',
+      fullWidth: true,
+      captureKind: 'raster',
+    });
+    expect(display.objectFit).toBe('contain');
+    expect(display.fillWidth).toBe(true);
   });
 });
 

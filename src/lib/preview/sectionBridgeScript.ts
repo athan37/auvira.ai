@@ -5,6 +5,10 @@
 import { buildUniversalBootstrapBridgeScript } from '@/lib/preview/bootstrapPreviewElements';
 import { buildElementCaptureBridgeScript } from '@/lib/preview/captureTargetPreview';
 import {
+  buildDomBitmapCaptureBridgeScript,
+  loadDomBitmapCaptureBundle,
+} from '@/lib/preview/domBitmapCaptureBridge';
+import {
   TARGET_PREVIEW_THUMB_DPR,
   TARGET_PREVIEW_THUMB_HEIGHT,
   TARGET_PREVIEW_THUMB_RENDER_HEIGHT,
@@ -12,7 +16,7 @@ import {
   TARGET_PREVIEW_THUMB_WIDTH,
 } from '@/lib/preview/targetPreviewThumbnail';
 
-export const PREVIEW_SECTION_BRIDGE_VERSION = 42;
+export const PREVIEW_SECTION_BRIDGE_VERSION = 43;
 
 const HIGHLIGHT_CLASS = 'site-editor-section-highlight';
 const HOVER_CLASS = 'site-editor-section-hover';
@@ -32,7 +36,9 @@ export const PREVIEW_SECTION_SELECTION_STYLES = `<style id="preview-section-sele
 
 /** JavaScript body for the preview section selection bridge (no script tags). */
 export function buildSectionBridgeScriptBody(): string {
-  return `(function(){
+  const domCaptureBundle = loadDomBitmapCaptureBundle();
+  return `${domCaptureBundle}
+(function(){
 var MSG={DRAG_START:"SITE_SECTION_DRAG_START",POINTER_DOWN:"SITE_SECTION_POINTER_DOWN",READY:"SITE_SECTION_BRIDGE_READY",HIGHLIGHT:"SITE_SECTION_HIGHLIGHT",FOCUS:"SITE_SECTION_FOCUS",DISMISS:"SITE_SECTION_DISMISS",CLEAR:"SITE_SECTION_CLEAR_SELECTION",PREVIEW_THUMB:"SITE_SECTION_PREVIEW_THUMB",PARENT_DRAG_START:"SITE_SECTION_PARENT_DRAG_START",DRAG_CANCEL:"SITE_SECTION_DRAG_CANCEL"};
 var HIGHLIGHT="${HIGHLIGHT_CLASS}";
 var HOVER="${HOVER_CLASS}";
@@ -426,6 +432,8 @@ function roundRect(ctx,x,y,w,h,r){
 
 ${buildElementCaptureBridgeScript()}
 
+${buildDomBitmapCaptureBridgeScript()}
+
 function sectionHostBackground(el){
   if(!el)return "#ffffff";
   var style=window.getComputedStyle(el);
@@ -576,21 +584,22 @@ function captureDragPreviewSync(){
 
 function captureAndNotifyDragPreview(){
   if(!dragState||!dragState.el||!dragState.target||!dragState.payload)return;
-  var sync=captureDragPreviewSync();
-  if(sync){
-    notifyPreviewThumb(dragState.payload,sync);
-    return;
-  }
   var root=resolvePreviewCaptureRoot(dragState.el,dragState.target,dragState.payload);
   var leafKind=captureLeafKind(dragState.payload);
   var fullSection=shouldCaptureFullSectionPreview(dragState.payload);
-  if(!fullSection)return;
-  captureRaster(root,dragState.target).then(function(raster){
-    var capture=raster;
-    if(!capture&&isSectionElement(root)&&typeof captureSectionStyledPreview==="function")capture=captureSectionStyledPreview(root);
-    if(!capture)capture=captureStyledFallback(root,leafKind);
+  var captureEl=(!fullSection&&shouldUseElementCapture(dragState.payload))?dragState.target:root;
+  function finish(capture){
     if(capture)writeCaptureCache(dragState.payload,capture);
     notifyPreviewThumb(dragState.payload,capture);
+  }
+  captureDomBitmap(captureEl,dragState.target).then(function(dom){
+    if(dom){finish(dom);return;}
+    var styled=captureStyledPreviewFallback(root,captureEl,leafKind,fullSection);
+    if(styled){finish(styled);return;}
+    if(!fullSection){finish(null);return;}
+    captureRaster(root,dragState.target).then(function(raster){
+      finish(raster||captureStyledFallback(root,leafKind));
+    });
   });
 }
 

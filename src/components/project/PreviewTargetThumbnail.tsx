@@ -75,24 +75,31 @@ export function PreviewTargetThumbnail({
     width: captureWidth ?? target.previewCaptureWidth,
     height: captureHeight ?? target.previewCaptureHeight,
   });
+  const captureKind = target.previewThumbnail?.captureKind;
   const display = resolvePreviewThumbDisplaySize(resolvedVariant, source.width, source.height, {
     fullWidth,
     elementKind: target.elementKind,
     pinScope: target.pinScope,
     kind: target.kind,
+    captureKind,
   });
   const sectionPreview = Boolean(display.fillWidth);
+  const sectionObjectFit = display.objectFit ?? 'cover';
 
   if (src && sectionPreview) {
-    const height = display.maxHeight ?? SECTION_PREVIEW_THUMB_MAX[resolvedVariant].height;
+    const maxHeight = display.maxHeight ?? SECTION_PREVIEW_THUMB_MAX[resolvedVariant].height;
     const widthClass = fullBleed ? 'w-full' : 'w-full max-w-full';
+    const rasterContain = sectionObjectFit === 'contain';
+    const sectionStyle = rasterContain
+      ? { aspectRatio: display.aspectRatio, maxHeight, width: '100%' as const }
+      : { height: maxHeight };
 
     return (
       <>
         {progressive && !imageLoaded ? (
           <div
             className={cn('animate-pulse rounded-xl bg-zinc-200/80', widthClass)}
-            style={{ height }}
+            style={sectionStyle}
             aria-hidden
           />
         ) : null}
@@ -101,12 +108,13 @@ export function PreviewTargetThumbnail({
           alt=""
           onLoad={() => setImageLoaded(true)}
           className={cn(
-            'block rounded-xl object-cover',
+            'block rounded-xl',
+            sectionObjectFit === 'contain' ? 'object-contain' : 'object-cover',
             widthClass,
             progressive && !imageLoaded ? 'absolute opacity-0' : 'opacity-100',
             className
           )}
-          style={{ height }}
+          style={sectionStyle}
           aria-hidden
         />
       </>
