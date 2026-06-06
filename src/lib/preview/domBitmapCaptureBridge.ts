@@ -84,8 +84,8 @@ function captureDomBitmap(el,clickTarget){
   });
 }
 
-function captureStyledPreviewFallback(root,captureEl,leafKind,fullSection){
-  if(!fullSection&&shouldUseElementCapture(dragState.payload)&&typeof captureElementStyledPreview==="function"){
+function captureStyledPreviewFallback(payload,root,captureEl,leafKind,fullSection){
+  if(!fullSection&&shouldUseElementCapture(payload)&&typeof captureElementStyledPreview==="function"){
     var styledEl=captureElementStyledPreview(captureEl,leafKind);
     if(styledEl)return styledEl;
   }

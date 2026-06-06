@@ -86,9 +86,21 @@ export function inferPreviewScaleProfile(
   sourceWidth: number,
   sourceHeight: number,
   pinScope?: string,
-  _elementKind?: string,
+  elementKind?: string,
   kind?: string
 ): PreviewScaleProfile {
+  if (pinScope === 'element') {
+    if (elementKind && BARE_PREVIEW_TARGET_HEIGHT[elementKind]) {
+      return 'element';
+    }
+    if (
+      sourceWidth >= SECTION_COMPOSITE_CAPTURE_MIN.width &&
+      sourceHeight >= SECTION_COMPOSITE_CAPTURE_MIN.height
+    ) {
+      return 'section';
+    }
+    return 'element';
+  }
   if (kind === 'hero') return 'section';
   if (pinScope && pinScope !== 'element') return 'section';
   if (

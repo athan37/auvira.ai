@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { loadDomBitmapCaptureBundle } from '@/lib/preview/domBitmapCaptureBridge';
 import {
   PREVIEW_SECTION_BRIDGE_VERSION,
   PREVIEW_SECTION_SELECTION_STYLES,
@@ -82,7 +83,29 @@ describe('sectionBridgeScript drag preview UX', () => {
     const body = buildSectionBridgeScriptBody();
     expect(body).toContain('function captureDomBitmap');
     expect(body).toContain('function captureStyledPreviewFallback');
-    expect(body).toContain('captureDomBitmap(captureEl,dragState.target)');
+    expect(body).toContain('captureDomBitmap(captureEl,clickTarget)');
     expect(body).toContain('PreviewDomCapture');
+    expect(body).toContain('function findInnerCardWrapper');
+    expect(body).toContain('function shouldUseInnerCardPreviewCapture');
+    expect(body).toContain('function shouldSkipDomBitmapForElementCapture');
+    expect(body).toContain('captureStyledElementPreview(payload,root,captureEl,leafKind,fullSection)');
+    expect(body).toContain('captureStyledPreviewFallback(payload,root,captureEl,leafKind,fullSection)');
+  });
+
+  it('does not assign read-only PreviewDomCapture exports (breaks bridge IIFE)', () => {
+    const body = buildSectionBridgeScriptBody();
+    expect(body).not.toMatch(
+      /PreviewDomCapture\.domToPngDataUrl\s*=/
+    );
+  });
+
+  it('loads dom capture bundle without mutating read-only exports', () => {
+    const bundle = loadDomBitmapCaptureBundle();
+    expect(bundle).not.toMatch(/PreviewDomCapture\.domToPngDataUrl\s*=/);
+    const previewDomCapture = new Function(
+      'window',
+      `${bundle}; return PreviewDomCapture;`
+    )({ navigator: { userAgent: 'Chrome' } }) as { domToPngDataUrl?: unknown };
+    expect(typeof previewDomCapture?.domToPngDataUrl).toBe('function');
   });
 });

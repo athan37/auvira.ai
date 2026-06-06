@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  findInnerCardWrapper,
   resolveCaptureRoot,
   resolvePreviewCaptureRoot,
   resolveSectionCaptureClip,
   shouldCaptureFullSectionPreview,
+  shouldUseInnerCardPreviewCapture,
 } from '@/lib/preview/capturePreviewRoot';
 
 interface MockElement {
@@ -199,6 +201,83 @@ describe('resolvePreviewCaptureRoot', () => {
       ],
     });
     expect(root).toBe(button);
+  });
+
+  it('captures hero inner card instead of full hero section', () => {
+    const section = mockEl(
+      { id: 'hero', 'data-site-section-type': 'hero' },
+      null,
+      { width: 960, height: 420 },
+      'SECTION',
+    );
+    const card = mockEl(
+      { class: 'rounded-3xl border bg-white p-8', 'data-site-container-kind': 'inner_card' },
+      section,
+    );
+    const heading = mockEl({}, card, { width: 220, height: 32 }, 'H2');
+
+    expect(
+      findInnerCardWrapper(section as unknown as Element, heading as unknown as Element)
+    ).toBe(card);
+
+    expect(
+      shouldCaptureFullSectionPreview({
+        sectionEl: section as unknown as Element,
+        clickTarget: heading as unknown as Element,
+        pinScope: 'section',
+      })
+    ).toBe(false);
+
+    const root = resolvePreviewCaptureRoot({
+      sectionEl: section as unknown as Element,
+      clickTarget: heading as unknown as Element,
+      pinScope: 'section',
+    });
+    expect(root).toBe(card);
+  });
+
+  it('captures contact field row inside inner card, not the card shell', () => {
+    const section = mockEl(
+      { id: 'hero', 'data-site-section-type': 'hero' },
+      null,
+      { width: 960, height: 420 },
+      'SECTION',
+    );
+    const card = mockEl(
+      { class: 'rounded-3xl border bg-white p-8', 'data-site-container-kind': 'inner_card' },
+      section,
+    );
+    const field = mockEl(
+      {
+        class: 'rounded-2xl p-4',
+        'data-site-element-kind': 'contact_field',
+        'data-site-config-field-path': 'contact.phone',
+      },
+      card,
+    );
+
+    expect(
+      shouldUseInnerCardPreviewCapture({
+        sectionEl: section as unknown as Element,
+        clickTarget: field as unknown as Element,
+        pinScope: 'element',
+        targetChain: [
+          { role: 'section', label: 'Hero' },
+          { role: 'element', kind: 'contact_field', label: 'Phone', fieldPath: 'contact.phone' },
+        ],
+      })
+    ).toBe(false);
+
+    const root = resolvePreviewCaptureRoot({
+      sectionEl: section as unknown as Element,
+      clickTarget: field as unknown as Element,
+      pinScope: 'element',
+      targetChain: [
+        { role: 'section', label: 'Hero' },
+        { role: 'element', kind: 'contact_field', label: 'Phone', fieldPath: 'contact.phone' },
+      ],
+    });
+    expect(root).toBe(field);
   });
 });
 

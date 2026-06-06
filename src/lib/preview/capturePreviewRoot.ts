@@ -53,11 +53,36 @@ function isSectionOverviewField(fieldPath?: string): boolean {
   return SECTION_TITLE_FIELD.test(fieldPath) || SECTION_BODY_FIELD.test(fieldPath);
 }
 
+/** Hero/contact rounded card wrapper when the click target is inside it. */
+export function findInnerCardWrapper(sectionEl: Element, clickTarget: Element): Element | null {
+  let node: Element | null = clickTarget;
+  while (node && node !== sectionEl) {
+    if (node.getAttribute?.('data-site-container-kind') === 'inner_card') return node;
+    if (hasCardClassHint(node)) return node;
+    node = node.parentElement;
+  }
+  return null;
+}
+
+/**
+ * True when preview should rasterize the inner card shell (not a leaf row/chip inside it).
+ */
+export function shouldUseInnerCardPreviewCapture(input: CaptureRootInput): boolean {
+  if (!findInnerCardWrapper(input.sectionEl, input.clickTarget)) return false;
+  if (input.pinScope !== 'element') return true;
+  const leaf = input.targetChain?.length ? input.targetChain[input.targetChain.length - 1] : undefined;
+  if (!leaf || leaf.role !== 'element') return true;
+  if (isSectionOverviewField(leaf.fieldPath)) return false;
+  if (leaf.fieldPath) return false;
+  return true;
+}
+
 /**
  * True when the drag preview should rasterize the whole section (nested layout included).
  */
 export function shouldCaptureFullSectionPreview(input: CaptureRootInput): boolean {
-  const { targetChain, pinScope } = input;
+  const { sectionEl, clickTarget, targetChain, pinScope } = input;
+  if (findInnerCardWrapper(sectionEl, clickTarget)) return false;
   if (pinScope !== 'element') return true;
   const leaf = targetChain?.length ? targetChain[targetChain.length - 1] : undefined;
   if (!leaf || leaf.role === 'section') return true;
@@ -107,6 +132,10 @@ export function resolveCaptureRoot(input: CaptureRootInput): Element {
  * Preview capture may promote element pins (section title/intro) to the full section subtree.
  */
 export function resolvePreviewCaptureRoot(input: CaptureRootInput): Element {
+  if (shouldUseInnerCardPreviewCapture(input)) {
+    const innerCard = findInnerCardWrapper(input.sectionEl, input.clickTarget);
+    if (innerCard) return innerCard;
+  }
   if (shouldCaptureFullSectionPreview(input)) {
     return input.sectionEl;
   }

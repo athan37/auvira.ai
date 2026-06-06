@@ -117,9 +117,10 @@ describe('resolvePreviewThumbDisplaySize button', () => {
 });
 
 describe('inferPreviewScaleProfile', () => {
-  it('treats wide composite captures as section scale even for heading pins', () => {
-    expect(inferPreviewScaleProfile(400, 220, 'element', 'heading')).toBe('section');
+  it('uses compact scale for bare element pins even when wide or inside hero', () => {
+    expect(inferPreviewScaleProfile(400, 220, 'element', 'heading')).toBe('element');
     expect(inferPreviewScaleProfile(320, 48, 'element', 'heading')).toBe('element');
+    expect(inferPreviewScaleProfile(280, 44, 'element', 'button', 'hero')).toBe('element');
     expect(inferPreviewScaleProfile(280, 140, 'section')).toBe('section');
     expect(inferPreviewScaleProfile(112, 80, 'section', undefined, 'hero')).toBe('section');
   });
@@ -150,15 +151,15 @@ describe('resolvePreviewThumbDisplaySize section pin', () => {
 });
 
 describe('resolvePreviewThumbDisplaySize heading with section capture', () => {
-  it('uses section scale when capture is a wide composite', () => {
+  it('keeps heading element pins compact even when capture is wide', () => {
     const display = resolvePreviewThumbDisplaySize('pinned', 400, 220, {
       elementKind: 'heading',
       pinScope: 'element',
       fullWidth: true,
     });
-    expect(display.height).toBe(SECTION_PREVIEW_THUMB_MAX.pinned.height);
+    expect(display.height).toBe(48);
     expect(display.width).toBeGreaterThan(48);
-    expect(display.fillWidth).toBe(true);
+    expect(display.fillWidth).toBeUndefined();
   });
 });
 

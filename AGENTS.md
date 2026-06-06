@@ -108,7 +108,7 @@ Users pin a section target by **dragging a section from the editable preview ifr
 3. **Cross-iframe mouse events** — After mousedown inside the iframe, the parent window did not reliably receive `mousemove`/`mouseup`. Fix: on `SITE_SECTION_DRAG_START`, show a full-screen capture overlay in `page.tsx` that tracks pointer until drop.
 4. **Missing section attrs on legacy workspaces** — Older clones lacked `data-site-section-id`. Fix: bridge falls back to any `<section>` / known `id`, and workspace repair runs `instrumentGeneratedSite` to add attrs.
 
-After bridge changes, **hard-refresh the preview** (toolbar refresh) so proxied HTML picks up the new `section-bridge?v=` version (currently v43 — DOM bitmap capture via modern-screenshot with styled-canvas fallback).
+After bridge changes, **hard-refresh the preview** (toolbar refresh) so proxied HTML picks up the new `section-bridge?v=` version (currently v46 — styled element capture for buttons/fields, inner-card routing).
 
 **Universal drag (v22+):** Any visible link, button, heading, or paragraph inside a section (or nav CTA / business name) can be dragged to chat. Legacy clones without `SITE_ELEMENT_ATTRS` get runtime bootstrap in the bridge; unannotated clicks infer a leaf pin with visible text as the label.
 

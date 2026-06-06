@@ -16,7 +16,7 @@ import {
   TARGET_PREVIEW_THUMB_WIDTH,
 } from '@/lib/preview/targetPreviewThumbnail';
 
-export const PREVIEW_SECTION_BRIDGE_VERSION = 43;
+export const PREVIEW_SECTION_BRIDGE_VERSION = 46;
 
 const HIGHLIGHT_CLASS = 'site-editor-section-highlight';
 const HOVER_CLASS = 'site-editor-section-hover';
@@ -407,7 +407,29 @@ function isSectionOverviewField(fieldPath){
   return /sections\\[\\d+\\]\\.(title|body)$/.test(fieldPath||"");
 }
 
-function shouldCaptureFullSectionPreview(payload){
+function findInnerCardWrapper(sectionEl,clickTarget){
+  if(!sectionEl||!clickTarget)return null;
+  var node=clickTarget;
+  while(node&&node!==sectionEl){
+    if(node.getAttribute&&node.getAttribute("data-site-container-kind")==="inner_card")return node;
+    if(hasCardClassHint(node))return node;
+    node=node.parentElement;
+  }
+  return null;
+}
+
+function shouldUseInnerCardPreviewCapture(payload,sectionEl,clickTarget){
+  if(!findInnerCardWrapper(sectionEl,clickTarget))return false;
+  if(!payload||payload.pinScope!=="element")return true;
+  var leaf=payload.targetChain&&payload.targetChain.length?payload.targetChain[payload.targetChain.length-1]:null;
+  if(!leaf||leaf.role!=="element")return true;
+  if(isSectionOverviewField(leaf.fieldPath))return false;
+  if(leaf.fieldPath)return false;
+  return true;
+}
+
+function shouldCaptureFullSectionPreview(payload,sectionEl,clickTarget){
+  if(sectionEl&&clickTarget&&findInnerCardWrapper(sectionEl,clickTarget))return false;
   if(!payload||payload.pinScope!=="element")return true;
   var leaf=payload.targetChain&&payload.targetChain.length?payload.targetChain[payload.targetChain.length-1]:null;
   if(!leaf||leaf.role==="section")return true;
@@ -416,7 +438,11 @@ function shouldCaptureFullSectionPreview(payload){
 }
 
 function resolvePreviewCaptureRoot(sectionEl,clickTarget,payload){
-  if(shouldCaptureFullSectionPreview(payload))return sectionEl;
+  if(shouldUseInnerCardPreviewCapture(payload,sectionEl,clickTarget)){
+    var innerCard=findInnerCardWrapper(sectionEl,clickTarget);
+    if(innerCard)return innerCard;
+  }
+  if(shouldCaptureFullSectionPreview(payload,sectionEl,clickTarget))return sectionEl;
   return resolveCaptureRoot(sectionEl,clickTarget,payload);
 }
 
@@ -559,45 +585,87 @@ function shouldUseElementCapture(payload){
 
 function captureDragPreviewSync(){
   if(!dragState||!dragState.el||!dragState.target||!dragState.payload)return null;
-  var cached=readCaptureCache(dragState.payload);
+  var payload=dragState.payload;
+  var sectionEl=dragState.el;
+  var clickTarget=dragState.target;
+  var cached=readCaptureCache(payload);
   if(cached)return cached;
-  var leafKind=captureLeafKind(dragState.payload);
-  var fullSection=shouldCaptureFullSectionPreview(dragState.payload);
-  var root=resolvePreviewCaptureRoot(dragState.el,dragState.target,dragState.payload);
-  var captureEl=(!fullSection&&shouldUseElementCapture(dragState.payload))?dragState.target:root;
-  if(!fullSection&&shouldUseElementCapture(dragState.payload)&&typeof captureElementStyledPreview==="function"){
+  var leafKind=captureLeafKind(payload);
+  var useInnerCard=shouldUseInnerCardPreviewCapture(payload,sectionEl,clickTarget);
+  var innerCard=useInnerCard?findInnerCardWrapper(sectionEl,clickTarget):null;
+  var fullSection=shouldCaptureFullSectionPreview(payload,sectionEl,clickTarget);
+  var root=resolvePreviewCaptureRoot(sectionEl,clickTarget,payload);
+  var captureEl=innerCard||((!fullSection&&shouldUseElementCapture(payload))?clickTarget:root);
+  if(!fullSection&&shouldUseElementCapture(payload)&&typeof captureElementStyledPreview==="function"){
     var styled=captureElementStyledPreview(captureEl,leafKind);
     if(styled){
-      writeCaptureCache(dragState.payload,styled);
+      writeCaptureCache(payload,styled);
       return styled;
     }
   }
   if(fullSection){
     var sectionPreview=typeof captureSectionStyledPreview==="function"?captureSectionStyledPreview(root):null;
     if(sectionPreview){
-      writeCaptureCache(dragState.payload,sectionPreview);
+      writeCaptureCache(payload,sectionPreview);
       return sectionPreview;
+    }
+  }
+  if(innerCard&&!shouldUseElementCapture(payload)&&typeof captureCardStyledFallback==="function"){
+    var cardPreview=captureCardStyledFallback(innerCard);
+    if(cardPreview){
+      writeCaptureCache(payload,cardPreview);
+      return cardPreview;
     }
   }
   return null;
 }
 
+function shouldSkipDomBitmapForElementCapture(payload,leafKind){
+  if(leafKind==="button"||leafKind==="contact_field")return true;
+  if(payload&&payload.pinScope==="element"&&shouldUseElementCapture(payload))return true;
+  return false;
+}
+
+function captureStyledElementPreview(payload,root,captureEl,leafKind,fullSection){
+  if(fullSection||!shouldUseElementCapture(payload))return null;
+  if(typeof captureElementStyledPreview==="function"){
+    var styled=captureElementStyledPreview(captureEl,leafKind);
+    if(styled)return styled;
+  }
+  return captureStyledPreviewFallback(payload,root,captureEl,leafKind,fullSection);
+}
+
 function captureAndNotifyDragPreview(){
   if(!dragState||!dragState.el||!dragState.target||!dragState.payload)return;
-  var root=resolvePreviewCaptureRoot(dragState.el,dragState.target,dragState.payload);
-  var leafKind=captureLeafKind(dragState.payload);
-  var fullSection=shouldCaptureFullSectionPreview(dragState.payload);
-  var captureEl=(!fullSection&&shouldUseElementCapture(dragState.payload))?dragState.target:root;
+  var payload=dragState.payload;
+  var sectionEl=dragState.el;
+  var clickTarget=dragState.target;
+  var useInnerCard=shouldUseInnerCardPreviewCapture(payload,sectionEl,clickTarget);
+  var innerCard=useInnerCard?findInnerCardWrapper(sectionEl,clickTarget):null;
+  var fullSection=shouldCaptureFullSectionPreview(payload,sectionEl,clickTarget);
+  var root=resolvePreviewCaptureRoot(sectionEl,clickTarget,payload);
+  var leafKind=captureLeafKind(payload);
+  var captureEl=innerCard||((!fullSection&&shouldUseElementCapture(payload))?clickTarget:root);
   function finish(capture){
-    if(capture)writeCaptureCache(dragState.payload,capture);
-    notifyPreviewThumb(dragState.payload,capture);
+    if(capture)writeCaptureCache(payload,capture);
+    notifyPreviewThumb(payload,capture);
   }
-  captureDomBitmap(captureEl,dragState.target).then(function(dom){
+  var styledElement=captureStyledElementPreview(payload,root,captureEl,leafKind,fullSection);
+  if(styledElement){finish(styledElement);return;}
+  if(shouldSkipDomBitmapForElementCapture(payload,leafKind)){
+    finish(null);
+    return;
+  }
+  captureDomBitmap(captureEl,clickTarget).then(function(dom){
     if(dom){finish(dom);return;}
-    var styled=captureStyledPreviewFallback(root,captureEl,leafKind,fullSection);
+    var styled=captureStyledPreviewFallback(payload,root,captureEl,leafKind,fullSection);
     if(styled){finish(styled);return;}
+    if(innerCard&&!shouldUseElementCapture(payload)&&typeof captureCardStyledFallback==="function"){
+      var cardFallback=captureCardStyledFallback(innerCard);
+      if(cardFallback){finish(cardFallback);return;}
+    }
     if(!fullSection){finish(null);return;}
-    captureRaster(root,dragState.target).then(function(raster){
+    captureRaster(root,clickTarget).then(function(raster){
       finish(raster||captureStyledFallback(root,leafKind));
     });
   });

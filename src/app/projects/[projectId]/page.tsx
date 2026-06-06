@@ -335,13 +335,36 @@ export default function ProjectPage() {
         previewHeight: thumb.height,
       };
 
+      const shouldAcceptPreviewUpdate = (
+        existing:
+          | {
+              previewDataUrl?: string;
+              previewCaptureKind?: TargetPreviewThumbMessage['captureKind'];
+            }
+          | null
+          | undefined
+      ) => {
+        if (!existing?.previewDataUrl) return true;
+        if (
+          existing.previewCaptureKind === 'styled_fallback' &&
+          thumb.captureKind === 'raster'
+        ) {
+          return false;
+        }
+        return true;
+      };
+
       if (activePayload && thumbMatchesPayload(activePayload, thumb)) {
-        setSectionDrag((prev) => (prev ? { ...prev, ...preview } : prev));
+        setSectionDrag((prev) =>
+          prev && shouldAcceptPreviewUpdate(prev) ? { ...prev, ...preview } : prev
+        );
         return;
       }
 
       if (pendingPayload && thumbMatchesPayload(pendingPayload, thumb)) {
-        setSectionDragPending((prev) => (prev ? { ...prev, ...preview } : prev));
+        setSectionDragPending((prev) =>
+          prev && shouldAcceptPreviewUpdate(prev) ? { ...prev, ...preview } : prev
+        );
       }
     },
     [thumbMatchesPayload]

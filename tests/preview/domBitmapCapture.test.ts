@@ -47,8 +47,13 @@ describe('dom bitmap bridge bundle', () => {
   it('embeds dom bitmap capture as primary path in bridge body', () => {
     const body = buildSectionBridgeScriptBody();
     expect(body).toContain('function captureDomBitmap');
-    expect(body).toContain('captureDomBitmap(captureEl,dragState.target)');
-    expect(body).toContain('captureStyledPreviewFallback');
+    expect(body).toContain('captureDomBitmap(captureEl,clickTarget)');
+    expect(body).toContain('captureStyledPreviewFallback(payload,root,captureEl,leafKind,fullSection)');
     expect(body).toContain('PreviewDomCapture.domToPngDataUrl');
+  });
+
+  it('produces valid executable JavaScript', () => {
+    const body = buildSectionBridgeScriptBody();
+    expect(() => new Function(body)).not.toThrow();
   });
 });
