@@ -58,4 +58,12 @@ describe('section heading color routing', () => {
     expect(plan?.steps[0]?.params?.textClass).toBe('text-green-600');
     expect(plan?.steps[0]?.params?.backgroundClass).toBeUndefined();
   });
+
+  it('ignores UI pin suffix title metadata for card color prompts', () => {
+    const suffix =
+      ' (UI-selected section: index 0, id "section_testimonials", title "What Clients Say", field sections[0].title)';
+    expect(
+      isTextColorEditRequest(`make the testimonial cards purple${suffix}`)
+    ).toBe(false);
+  });
 });

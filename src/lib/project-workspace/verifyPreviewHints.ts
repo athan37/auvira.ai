@@ -1,5 +1,6 @@
 /** Shared hint extraction for preview-first edit verification. */
 
+import { stripPinnedTargetSuffix } from '@/lib/project-workspace/edit-context/configTextEditUtils';
 import { isGradientBackgroundRequest } from '@/lib/project-workspace/edit-shared/preset/presetUtils';
 
 const COLOR_NAMES = [
@@ -51,7 +52,8 @@ export function htmlShowsTailwindColor(html: string, color: string): boolean {
 
 /** True when the prompt targets headline/title/text color, not page background. */
 export function isTextColorEditRequest(ownerMessage: string): boolean {
-  const lower = ownerMessage.toLowerCase();
+  const normalized = stripPinnedTargetSuffix(ownerMessage);
+  const lower = normalized.toLowerCase();
   const hasColor = COLOR_NAMES.some((c) => messageHasKeyword(lower, c));
   if (!hasColor || messageHasKeyword(lower, 'background')) {
     return false;
@@ -66,10 +68,11 @@ export function isTextColorEditRequest(ownerMessage: string): boolean {
 
 /** True when the prompt targets visible background / generic color styling. */
 export function isBackgroundColorEditRequest(ownerMessage: string): boolean {
-  if (isGradientBackgroundRequest(ownerMessage)) {
+  const normalized = stripPinnedTargetSuffix(ownerMessage);
+  if (isGradientBackgroundRequest(normalized)) {
     return true;
   }
-  const lower = ownerMessage.toLowerCase();
+  const lower = normalized.toLowerCase();
   const hasColor = COLOR_NAMES.some((c) => messageHasKeyword(lower, c));
   if (!hasColor || isTextColorEditRequest(ownerMessage)) {
     return false;

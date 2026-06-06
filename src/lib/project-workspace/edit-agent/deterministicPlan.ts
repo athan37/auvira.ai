@@ -1,4 +1,5 @@
 import { classifyEditWhat } from '@/lib/project-workspace/edit-context/classifyEditWhat';
+import { stripPinnedTargetSuffix } from '@/lib/project-workspace/edit-context/configTextEditUtils';
 import { inferPresentationStyleTarget } from '@/lib/project-workspace/edit-context/inferPresentationStyleTarget';
 import { findPinnedInnerCardContainer } from '@/lib/preview/targetChain';
 import { inferSelectedTargetField } from '@/lib/project-workspace/edit-context/inferSelectedTargetField';
@@ -232,7 +233,7 @@ function planHeroBackgroundStyle(editContext: EditContext): EditPlan | null {
  * Rule-based plan for high-confidence requests (no LLM).
  */
 export function buildDeterministicPlan(editContext: EditContext): EditPlan | null {
-  const message = editContext.effectiveMessage;
+  const message = stripPinnedTargetSuffix(editContext.effectiveMessage);
   const what = classifyEditWhat(message);
   const siteConfigContent = editContext.siteModel.siteConfigContent ?? '';
 

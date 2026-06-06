@@ -1,5 +1,6 @@
 import type { SiteSectionPresentation } from '@/lib/builder/sectionPresentation';
 import { findPinnedInnerCardContainer } from '@/lib/preview/targetChain';
+import { stripPinnedTargetSuffix } from '@/lib/project-workspace/edit-context/configTextEditUtils';
 import { isTextColorEditRequest } from '@/lib/project-workspace/verifyPreviewHints';
 import type { SelectedTargetContext } from './selectedTargetContext';
 
@@ -82,9 +83,10 @@ export function inferPresentationStyleTarget(
   ctx?: SelectedTargetContext,
   sectionTitle?: string
 ): InferredPresentationStyleTarget {
+  const ownerMessage = stripPinnedTargetSuffix(message);
   const resolvedTitle = sectionTitle ?? ctx?.resolved.sectionTitle ?? ctx?.section?.title;
 
-  if (/\b(?:whole|entire|full)\s+section\b/i.test(message)) {
+  if (/\b(?:whole|entire|full)\s+section\b/i.test(ownerMessage)) {
     return {
       presentationField: 'backgroundClass',
       label: 'Section background',
@@ -93,8 +95,8 @@ export function inferPresentationStyleTarget(
     };
   }
 
-  if (isTextColorEditRequest(message)) {
-    if (/\b(?:body|subtitle|description|subheading|sub-heading)\b/i.test(message)) {
+  if (isTextColorEditRequest(ownerMessage)) {
+    if (/\b(?:body|subtitle|description|subheading|sub-heading)\b/i.test(ownerMessage)) {
       return {
         presentationField: 'bodyClass',
         label: 'Section body text',
@@ -102,7 +104,7 @@ export function inferPresentationStyleTarget(
         reason: 'Owner requested body/subtitle text color',
       };
     }
-    if (/\beyebrow\b/i.test(message)) {
+    if (/\beyebrow\b/i.test(ownerMessage)) {
       return {
         presentationField: 'eyebrowClass',
         label: 'Section eyebrow',
@@ -137,7 +139,7 @@ export function inferPresentationStyleTarget(
     };
   }
 
-  const innerName = messageNamesInnerElement(message, resolvedTitle);
+  const innerName = messageNamesInnerElement(ownerMessage, resolvedTitle);
   if (innerName) {
     return {
       presentationField: 'cardClass',
@@ -147,7 +149,7 @@ export function inferPresentationStyleTarget(
     };
   }
 
-  if (/\b(?:section|hero)\s+background\b/i.test(message) && !/\bcard\b/i.test(message)) {
+  if (/\b(?:section|hero)\s+background\b/i.test(ownerMessage) && !/\bcard\b/i.test(ownerMessage)) {
     return {
       presentationField: 'backgroundClass',
       label: 'Section background',

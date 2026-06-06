@@ -1,5 +1,6 @@
 import { hasExplicitEditTarget } from '@/lib/project-workspace/edit-shared/editTargetUtils';
 import type { EditWhatKind } from '@/lib/project-workspace/edit-shared/types';
+import { stripPinnedTargetSuffix } from '@/lib/project-workspace/edit-context/configTextEditUtils';
 import {
   isBackgroundColorEditRequest,
   isTextColorEditRequest,
@@ -12,7 +13,7 @@ function messageHasKeyword(message: string, keyword: string): boolean {
 
 /** Classify WHAT the owner wants to change from the message. */
 export function classifyEditWhat(message: string): EditWhatKind {
-  const lower = message.toLowerCase();
+  const lower = stripPinnedTargetSuffix(message).toLowerCase();
   const hasColorSignal =
     /\b(backgrounds?|colours?|colors?)\b/.test(lower) ||
     isBackgroundColorEditRequest(message) ||
