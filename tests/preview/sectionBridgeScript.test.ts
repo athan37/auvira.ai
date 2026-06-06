@@ -7,7 +7,7 @@ import {
 
 describe('sectionBridgeScript drag preview UX', () => {
   it('bumps bridge version for drag preview UX improvements', () => {
-    expect(PREVIEW_SECTION_BRIDGE_VERSION).toBeGreaterThanOrEqual(28);
+    expect(PREVIEW_SECTION_BRIDGE_VERSION).toBeGreaterThanOrEqual(29);
   });
 
   it('includes early capture, cache, and hover affordance', () => {
@@ -17,6 +17,12 @@ describe('sectionBridgeScript drag preview UX', () => {
     expect(body).toContain('function applyDraggableHover');
     expect(body).toContain('grabOffsetX');
     expect(body).toContain('fieldPath:payload.fieldPath');
+  });
+
+  it('finds rounded cards via className instead of invalid querySelector', () => {
+    const body = buildSectionBridgeScriptBody();
+    expect(body).toContain('function findRoundedCardIn');
+    expect(body).not.toMatch(/querySelector\("\.rounded-\[2rem\]"\)/);
   });
 
   it('styles draggable hover and drag lift', () => {

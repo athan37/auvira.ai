@@ -253,6 +253,23 @@ function bootstrapHeroSection(heroEl){
   }
 }
 
+function hasRoundedCardClass(el){
+  if(!el||!el.getAttribute)return false;
+  var cls=el.className||"";
+  return (cls.indexOf("rounded-3xl")>=0||cls.indexOf("rounded-2xl")>=0||cls.indexOf("rounded-[2rem]")>=0)&&cls.indexOf("border")>=0;
+}
+
+function findRoundedCardIn(scope){
+  if(!scope)return null;
+  var marked=scope.querySelector("[data-site-container-kind='inner_card']");
+  if(marked)return marked;
+  var nodes=scope.querySelectorAll("div");
+  for(var i=0;i<nodes.length;i++){
+    if(hasRoundedCardClass(nodes[i]))return nodes[i];
+  }
+  return null;
+}
+
 function bootstrapContactValueRows(scopeEl){
   if(!scopeEl)return;
   var rows=scopeEl.querySelectorAll(".rounded-2xl, .space-y-4 > div, [data-site-element-kind='contact_field']");
@@ -287,16 +304,16 @@ function bootstrapContactValueRows(scopeEl){
 }
 
 function bootstrapHeroContactFields(heroEl){
-  var card=heroEl.querySelector(".rounded-\\[2rem\\]")||heroEl.querySelector("[class*='rounded-[2rem]']");
+  var card=findRoundedCardIn(heroEl);
   bootstrapContactValueRows(card||heroEl);
 }
 
 function bootstrapContactExtras(sectionEl,sectionIndex){
   var innerCard=sectionEl.querySelector("[data-site-container-kind='inner_card']");
   if(!innerCard){
-    var cards=sectionEl.querySelectorAll(".rounded-\\[2rem\\], .rounded-2xl.border");
+    var cards=sectionEl.querySelectorAll("div");
     for(var c=0;c<cards.length;c++){
-      if(cards[c].querySelector("h3")){innerCard=cards[c];break;}
+      if(hasRoundedCardClass(cards[c])&&cards[c].querySelector("h3")){innerCard=cards[c];break;}
     }
   }
   if(innerCard&&!innerCard.getAttribute("data-site-container-kind")){

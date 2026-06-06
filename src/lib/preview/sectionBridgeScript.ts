@@ -12,7 +12,7 @@ import {
   TARGET_PREVIEW_THUMB_WIDTH,
 } from '@/lib/preview/targetPreviewThumbnail';
 
-export const PREVIEW_SECTION_BRIDGE_VERSION = 28;
+export const PREVIEW_SECTION_BRIDGE_VERSION = 29;
 
 const HIGHLIGHT_CLASS = 'site-editor-section-highlight';
 const HOVER_CLASS = 'site-editor-section-hover';
@@ -178,7 +178,7 @@ function bootstrapItemCards(sectionEl,sectionIndex){
   for(var i=0;i<cards.length;i++){
     var titleEl=cards[i];
     if(titleEl.closest("h2"))continue;
-    var card=titleEl.closest(".rounded-3xl,.rounded-2xl,.rounded-\\[2rem\\]")||titleEl.parentElement;
+    var card=closestRoundedCard(titleEl)||titleEl.parentElement;
     if(card)annotateItemCard(card,sectionIndex,i);
     else setElementAttr(titleEl,"item_title",(titleEl.textContent||"").trim()||"Item title","sections["+sectionIndex+"].items["+i+"].title",i);
   }
@@ -290,6 +290,26 @@ function readPayload(el,target,rootType){
 function hasCardClassHint(el){
   var cls=el.className||"";
   return (cls.indexOf("rounded-3xl")>=0||cls.indexOf("rounded-2xl")>=0||cls.indexOf("rounded-[2rem]")>=0)&&cls.indexOf("border")>=0;
+}
+
+function findRoundedCardIn(scope){
+  if(!scope)return null;
+  var marked=scope.querySelector("[data-site-container-kind='inner_card']");
+  if(marked)return marked;
+  var nodes=scope.querySelectorAll("div");
+  for(var i=0;i<nodes.length;i++){
+    if(hasCardClassHint(nodes[i]))return nodes[i];
+  }
+  return null;
+}
+
+function closestRoundedCard(el){
+  var node=el;
+  while(node){
+    if(hasCardClassHint(node))return node;
+    node=node.parentElement;
+  }
+  return null;
 }
 
 function findItemCardWrapper(el,sectionEl){
@@ -422,7 +442,7 @@ function captureSectionStyledFallback(sectionEl){
     ctx.font="bold 13px sans-serif";
     wrapText(ctx,(h2.textContent||"").trim().slice(0,80),Math.round(w*0.52)-12,14,18);
   }
-  var innerCard=sectionEl.querySelector("[data-site-container-kind='inner_card']")||sectionEl.querySelector(".rounded-\\[2rem\\]");
+  var innerCard=findRoundedCardIn(sectionEl);
   if(innerCard){
     var cardX=Math.round(w*0.52);
     ctx.fillStyle="rgba(255,255,255,0.96)";
