@@ -421,6 +421,7 @@ export function formatSelectedTargetContextBlock(ctx: SelectedTargetContext): st
     '- If the user says "title", use the most likely title field from EDITABLE FIELDS.',
     '- Prefer config field paths and domain skills over custom_code_edit.',
     '- Style/color requests → update_section_style on the pinned sectionIndex.',
+    '- Structural card/list edits (add, duplicate, delete) → add_section_item, duplicate_section_item, or remove_section_item on the pinned sectionIndex/itemIndex.',
     '- If the requested field is missing, choose the closest editable field or ask which field to update (not which section).'
   );
 

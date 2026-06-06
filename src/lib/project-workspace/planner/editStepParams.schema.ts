@@ -121,6 +121,105 @@ export const ReorderSectionsParamsSchema = z
     { message: 'reorder_sections requires order or fromIndex and toIndex' }
   );
 
+function coerceItemIndex(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return undefined;
+}
+
+export const AddSectionItemParamsSchema = z
+  .object({
+    sectionIndex: z.union([z.number(), z.string()]).optional(),
+    itemIndex: z.union([z.number(), z.string()]).optional(),
+    cloneFromItemIndex: z.union([z.number(), z.string()]).optional(),
+    cloneFromPinned: z.boolean().optional(),
+    title: z.string().optional(),
+    description: z.string().optional(),
+  })
+  .superRefine((p, ctx) => {
+    if (coerceSectionIndex(p.sectionIndex) == null) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'add_section_item requires sectionIndex' });
+    }
+    const hasTitle = Boolean(p.title?.trim());
+    const hasClone =
+      coerceItemIndex(p.cloneFromItemIndex) != null || coerceItemIndex(p.itemIndex) != null;
+    if (!hasTitle && !hasClone && !p.cloneFromPinned) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'add_section_item requires title or cloneFromItemIndex',
+      });
+    }
+  });
+
+export const RemoveSectionItemParamsSchema = z
+  .object({
+    sectionIndex: z.union([z.number(), z.string()]).optional(),
+    itemIndex: z.union([z.number(), z.string()]).optional(),
+  })
+  .superRefine((p, ctx) => {
+    if (coerceSectionIndex(p.sectionIndex) == null) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'remove_section_item requires sectionIndex' });
+    }
+    if (coerceItemIndex(p.itemIndex) == null) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'remove_section_item requires itemIndex' });
+    }
+  });
+
+export const DuplicateSectionItemParamsSchema = z
+  .object({
+    sectionIndex: z.union([z.number(), z.string()]).optional(),
+    itemIndex: z.union([z.number(), z.string()]).optional(),
+    title: z.string().optional(),
+    description: z.string().optional(),
+  })
+  .superRefine((p, ctx) => {
+    if (coerceSectionIndex(p.sectionIndex) == null) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'duplicate_section_item requires sectionIndex' });
+    }
+    if (coerceItemIndex(p.itemIndex) == null) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'duplicate_section_item requires itemIndex' });
+    }
+  });
+
+export const UpdateSectionItemParamsSchema = z
+  .object({
+    sectionIndex: z.union([z.number(), z.string()]).optional(),
+    itemIndex: z.union([z.number(), z.string()]).optional(),
+    title: z.string().optional(),
+    description: z.string().optional(),
+    imageUrl: z.string().optional(),
+    alt: z.string().optional(),
+    label: z.string().optional(),
+    href: z.string().optional(),
+    field: z.string().optional(),
+    value: z.string().optional(),
+  })
+  .superRefine((p, ctx) => {
+    if (coerceSectionIndex(p.sectionIndex) == null) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'update_section_item requires sectionIndex' });
+    }
+    if (coerceItemIndex(p.itemIndex) == null) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'update_section_item requires itemIndex' });
+    }
+    const hasPatch =
+      Boolean(p.title?.trim()) ||
+      Boolean(p.description?.trim()) ||
+      Boolean(p.imageUrl?.trim()) ||
+      Boolean(p.alt?.trim()) ||
+      Boolean(p.label?.trim()) ||
+      Boolean(p.href?.trim()) ||
+      (Boolean(p.field?.trim()) && Boolean(p.value?.trim()));
+    if (!hasPatch) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'update_section_item requires at least one field to update',
+      });
+    }
+  });
+
 export const SKILL_PARAM_SCHEMAS: Record<string, z.ZodTypeAny> = {
   update_hero: UpdateHeroParamsSchema,
   update_business_name: UpdateBusinessNameParamsSchema,
@@ -129,6 +228,10 @@ export const SKILL_PARAM_SCHEMAS: Record<string, z.ZodTypeAny> = {
   update_contact: UpdateContactParamsSchema,
   remove_section: RemoveSectionParamsSchema,
   reorder_sections: ReorderSectionsParamsSchema,
+  add_section_item: AddSectionItemParamsSchema,
+  remove_section_item: RemoveSectionItemParamsSchema,
+  duplicate_section_item: DuplicateSectionItemParamsSchema,
+  update_section_item: UpdateSectionItemParamsSchema,
 };
 
 /** Merge step target + params for semantic validation. */

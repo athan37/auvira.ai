@@ -58,6 +58,7 @@ export interface EditTarget {
 
 export type VerificationCheckKind =
   | 'section_background'
+  | 'section_items'
   | 'contact_field'
   | 'hero_field'
   | 'business_name'
@@ -72,6 +73,10 @@ export interface VerificationCheck {
   field?: string;
   expectedValue?: string;
   expectedPattern?: string;
+  operation?: 'add' | 'remove' | 'duplicate' | 'update';
+  itemIndex?: number;
+  expectedLengthDelta?: number;
+  expectedInsertIndex?: number;
 }
 
 export interface VerificationContract {

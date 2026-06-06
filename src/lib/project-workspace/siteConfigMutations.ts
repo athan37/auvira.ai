@@ -660,3 +660,174 @@ export function updateActionItemFieldInSource(
   return updateActionItemInSource(content, sectionIndex, itemIndex, { [field]: value });
 }
 
+const SECTION_ITEM_FIELDS = ['title', 'description', 'imageUrl', 'alt', 'label', 'href'] as const;
+
+export type SectionItemField = (typeof SECTION_ITEM_FIELDS)[number];
+
+export type SectionItemRecord = Partial<Record<SectionItemField, string>>;
+
+function isActionsSection(section: Record<string, unknown>): boolean {
+  return normalizeString(section.type) === 'actions';
+}
+
+function getSectionItemsArray(section: Record<string, unknown>): Array<Record<string, unknown>> {
+  if (!Array.isArray(section.items)) {
+    section.items = [];
+  }
+  return section.items as Array<Record<string, unknown>>;
+}
+
+/** Shallow clone of a section item for duplicate/add-like-this flows. */
+export function cloneSectionItemRecord(item: Record<string, unknown>): SectionItemRecord {
+  const cloned: SectionItemRecord = {};
+  for (const field of SECTION_ITEM_FIELDS) {
+    const value = normalizeString(item[field]);
+    if (value) cloned[field] = value;
+  }
+  return cloned;
+}
+
+function applySectionItemPatch(
+  item: Record<string, unknown>,
+  patch: SectionItemRecord
+): boolean {
+  let changed = false;
+  for (const [key, raw] of Object.entries(patch)) {
+    if (!(SECTION_ITEM_FIELDS as readonly string[]).includes(key)) continue;
+    const value = normalizeString(raw);
+    if (!value) continue;
+    if (item[key] !== value) {
+      item[key] = value;
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+function buildSectionItemRecord(
+  item: SectionItemRecord,
+  fallbackTitle = 'New item'
+): Record<string, unknown> {
+  const next: Record<string, unknown> = {};
+  const title = normalizeString(item.title) ?? fallbackTitle;
+  next.title = title;
+  for (const field of SECTION_ITEM_FIELDS) {
+    if (field === 'title') continue;
+    const value = normalizeString(item[field]);
+    if (value) next[field] = value;
+  }
+  return next;
+}
+
+/**
+ * Add an item to sections[sectionIndex].items (append or insert after index).
+ */
+export function addSectionItemToSource(
+  content: string,
+  sectionIndex: number,
+  item: SectionItemRecord,
+  options?: { insertAfterIndex?: number; fallbackTitle?: string }
+): string | null {
+  if (sectionIndex < 0) return null;
+
+  return mutateSiteConfigSource(content, (config) => {
+    const sections = Array.isArray(config.sections)
+      ? (config.sections as Array<Record<string, unknown>>)
+      : [];
+    const section = sections[sectionIndex];
+    if (!section || isActionsSection(section)) return false;
+
+    const items = getSectionItemsArray(section);
+    const nextItem = buildSectionItemRecord(item, options?.fallbackTitle ?? 'New item');
+    const insertAfterIndex = options?.insertAfterIndex;
+    if (insertAfterIndex != null && insertAfterIndex >= 0 && insertAfterIndex < items.length) {
+      items.splice(insertAfterIndex + 1, 0, nextItem);
+    } else {
+      items.push(nextItem);
+    }
+    section.items = items;
+    return true;
+  });
+}
+
+/** Remove an item from sections[sectionIndex].items by index. */
+export function removeSectionItemFromSource(
+  content: string,
+  sectionIndex: number,
+  itemIndex: number
+): string | null {
+  if (sectionIndex < 0 || itemIndex < 0) return null;
+
+  return mutateSiteConfigSource(content, (config) => {
+    const sections = Array.isArray(config.sections)
+      ? (config.sections as Array<Record<string, unknown>>)
+      : [];
+    const section = sections[sectionIndex];
+    if (!section || isActionsSection(section)) return false;
+
+    const items = Array.isArray(section.items)
+      ? (section.items as Array<Record<string, unknown>>)
+      : [];
+    if (itemIndex >= items.length) return false;
+    items.splice(itemIndex, 1);
+    section.items = items;
+    return true;
+  });
+}
+
+/** Duplicate an item in sections[sectionIndex].items, inserting after the source index. */
+export function duplicateSectionItemInSource(
+  content: string,
+  sectionIndex: number,
+  itemIndex: number,
+  overrides?: SectionItemRecord
+): string | null {
+  if (sectionIndex < 0 || itemIndex < 0) return null;
+
+  return mutateSiteConfigSource(content, (config) => {
+    const sections = Array.isArray(config.sections)
+      ? (config.sections as Array<Record<string, unknown>>)
+      : [];
+    const section = sections[sectionIndex];
+    if (!section || isActionsSection(section)) return false;
+
+    const items = Array.isArray(section.items)
+      ? (section.items as Array<Record<string, unknown>>)
+      : [];
+    const source = items[itemIndex];
+    if (!source) return false;
+
+    const cloned = buildSectionItemRecord(cloneSectionItemRecord(source));
+    if (overrides) applySectionItemPatch(cloned, overrides);
+    items.splice(itemIndex + 1, 0, cloned);
+    section.items = items;
+    return true;
+  });
+}
+
+/** Patch allowlisted fields on sections[sectionIndex].items[itemIndex]. */
+export function updateSectionItemInSource(
+  content: string,
+  sectionIndex: number,
+  itemIndex: number,
+  patch: SectionItemRecord
+): string | null {
+  if (sectionIndex < 0 || itemIndex < 0) return null;
+
+  return mutateSiteConfigSource(content, (config) => {
+    const sections = Array.isArray(config.sections)
+      ? (config.sections as Array<Record<string, unknown>>)
+      : [];
+    const section = sections[sectionIndex];
+    if (!section || isActionsSection(section)) return false;
+
+    const items = Array.isArray(section.items)
+      ? (section.items as Array<Record<string, unknown>>)
+      : [];
+    const item = items[itemIndex];
+    if (!item) return false;
+
+    return applySectionItemPatch(item, patch);
+  });
+}
+

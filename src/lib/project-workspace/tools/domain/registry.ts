@@ -1,6 +1,7 @@
 import { updateActionItemsTool } from './actionItems';
 import { applySectionBackgroundTool } from './applySectionBackground';
 import { findSectionTool } from './findSection';
+import { updateSectionItemsTool } from './sectionItems';
 import {
   addSectionTool,
   removeSectionTool,
@@ -28,6 +29,7 @@ const HANDLERS: Record<DomainToolName, DomainToolHandler> = {
   update_contact_info: updateContactInfoTool,
   update_section_list: updateSectionListTool,
   update_action_items: updateActionItemsTool,
+  update_section_items: updateSectionItemsTool,
   apply_section_background: applySectionBackgroundTool,
   update_theme: updateThemeTool,
   add_section: addSectionTool,
@@ -55,6 +57,10 @@ export const SKILL_TO_DOMAIN_TOOL: Partial<Record<string, DomainToolName>> = {
   add_actions_section: 'update_action_items',
   update_action_item: 'update_action_items',
   remove_action_item: 'update_action_items',
+  add_section_item: 'update_section_items',
+  remove_section_item: 'update_section_items',
+  duplicate_section_item: 'update_section_items',
+  update_section_item: 'update_section_items',
   add_contact_extra_line: 'update_section_list',
   remove_section: 'remove_section',
   reorder_sections: 'reorder_sections',
@@ -201,6 +207,31 @@ export function paramsForSkill(
       action: 'remove_action_item',
       sectionIndex: merged.sectionIndex ?? editContext.target.sectionIndex,
       itemIndex: merged.itemIndex,
+    };
+  }
+
+  if (
+    skill === 'add_section_item' ||
+    skill === 'remove_section_item' ||
+    skill === 'duplicate_section_item' ||
+    skill === 'update_section_item'
+  ) {
+    return {
+      action: skill,
+      sectionIndex: merged.sectionIndex ?? editContext.target.sectionIndex,
+      itemIndex: merged.itemIndex,
+      cloneFromItemIndex: merged.cloneFromItemIndex ?? merged.itemIndex,
+      cloneFromPinned: merged.cloneFromPinned,
+      insertAfterIndex: merged.insertAfterIndex,
+      title: merged.title,
+      description: merged.description,
+      imageUrl: merged.imageUrl,
+      alt: merged.alt,
+      label: merged.label,
+      href: merged.href,
+      field: merged.field,
+      value: merged.value,
+      fieldPath: merged.fieldPath ?? editContext.target.fieldPath,
     };
   }
 

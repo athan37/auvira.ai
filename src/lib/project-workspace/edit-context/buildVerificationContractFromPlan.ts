@@ -84,6 +84,71 @@ export function buildVerificationContractFromPlan(
       }
       continue;
     }
+
+    if (
+      step.skill === 'add_section_item' ||
+      step.skill === 'remove_section_item' ||
+      step.skill === 'duplicate_section_item' ||
+      step.skill === 'update_section_item'
+    ) {
+      const sectionIndex = coerceIndex(merged.sectionIndex);
+      const itemIndex = coerceIndex(merged.itemIndex ?? merged.cloneFromItemIndex);
+      if (sectionIndex == null) continue;
+
+      if (step.skill === 'remove_section_item') {
+        checks.push({
+          kind: 'section_items',
+          sectionIndex,
+          operation: 'remove',
+          itemIndex,
+          expectedLengthDelta: -1,
+        });
+      } else if (step.skill === 'duplicate_section_item') {
+        checks.push({
+          kind: 'section_items',
+          sectionIndex,
+          operation: 'duplicate',
+          itemIndex,
+          expectedLengthDelta: 1,
+          expectedInsertIndex: itemIndex != null ? itemIndex + 1 : undefined,
+          field: typeof merged.title === 'string' ? 'title' : undefined,
+          expectedValue: typeof merged.title === 'string' ? merged.title : undefined,
+        });
+      } else if (step.skill === 'add_section_item') {
+        checks.push({
+          kind: 'section_items',
+          sectionIndex,
+          operation: 'add',
+          itemIndex,
+          expectedLengthDelta: 1,
+          expectedInsertIndex:
+            itemIndex != null && (merged.cloneFromPinned || merged.cloneFromItemIndex != null)
+              ? itemIndex + 1
+              : undefined,
+          field: typeof merged.title === 'string' ? 'title' : undefined,
+          expectedValue: typeof merged.title === 'string' ? merged.title : undefined,
+        });
+      } else if (step.skill === 'update_section_item') {
+        const field =
+          (typeof merged.field === 'string' && merged.field) ||
+          (merged.title ? 'title' : merged.description ? 'description' : undefined);
+        const expectedValue =
+          (typeof merged.value === 'string' && merged.value) ||
+          (typeof merged.title === 'string' && merged.title) ||
+          (typeof merged.description === 'string' && merged.description) ||
+          undefined;
+        checks.push({
+          kind: 'section_items',
+          sectionIndex,
+          operation: 'update',
+          itemIndex,
+          expectedLengthDelta: 0,
+          field,
+          expectedValue,
+        });
+      }
+      continue;
+    }
   }
 
   if (checks.length === 0) {

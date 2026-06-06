@@ -20,7 +20,15 @@ import {
   isSectionScopedCopyEdit,
 } from '@/lib/project-workspace/edit-context/resolveDuplicateCopyTarget';
 import { parseSectionTitleCopyEdit } from '@/lib/project-workspace/edit-shared/resolveSectionTarget';
+import {
+  resolvePinnedSectionItemTarget,
+  sectionHasItemsList,
+} from '@/lib/project-workspace/edit-context/resolveSectionItemTarget';
+import {
+  parseSectionItemStructuralIntent,
+} from '@/lib/project-workspace/edit-context/sectionItemStructuralIntent';
 import type { EditContext } from '@/lib/project-workspace/edit-context/types';
+import type { VerificationCheck } from '@/lib/project-workspace/edit-context/types';
 import type { EditPlan } from '@/lib/project-workspace/planner/editPlan.schema';
 
 function readTagline(content: string): string | undefined {
@@ -602,8 +610,194 @@ export function buildDeterministicPlan(editContext: EditContext): EditPlan | nul
     };
   }
 
+  const sectionItemPlan = tryPinnedSectionItemStructuralPlan(message, editContext);
+  if (sectionItemPlan) return sectionItemPlan;
+
   const categoryActionPlan = tryCategoryActionPlan(message, editContext);
   if (categoryActionPlan) return categoryActionPlan;
+
+  return null;
+}
+
+function sectionItemsVerificationCheck(
+  sectionIndex: number,
+  operation: VerificationCheck['operation'],
+  options?: {
+    itemIndex?: number;
+    expectedLengthDelta?: number;
+    expectedInsertIndex?: number;
+    field?: string;
+    expectedValue?: string;
+  }
+): VerificationCheck {
+  return {
+    kind: 'section_items',
+    sectionIndex,
+    operation,
+    itemIndex: options?.itemIndex,
+    expectedLengthDelta: options?.expectedLengthDelta,
+    expectedInsertIndex: options?.expectedInsertIndex,
+    field: options?.field,
+    expectedValue: options?.expectedValue,
+  };
+}
+
+/** Deterministic structural edits for pinned generic sections[i].items[] cards. */
+function tryPinnedSectionItemStructuralPlan(
+  message: string,
+  editContext: EditContext
+): EditPlan | null {
+  const intent = parseSectionItemStructuralIntent(message);
+  if (!intent) return null;
+
+  const pinned = resolvePinnedSectionItemTarget(editContext);
+  const siteConfigContent = editContext.siteModel.siteConfigContent ?? '';
+
+  if (!pinned) {
+    return {
+      planVersion: 'website-agent',
+      needsClarification: true,
+      clarificationQuestion:
+        'Which section should I change? Drag the section or a card into chat, then ask again.',
+      suggestedReplies: ['Drag the section to chat', 'Name the section in your message'],
+      intent: 'clarification',
+      steps: [],
+      risk: { level: editContext.riskFlags.level, reasons: editContext.riskFlags.reasons },
+    };
+  }
+
+  if (!sectionHasItemsList(siteConfigContent, pinned.sectionIndex)) {
+    return null;
+  }
+
+  if (intent.requiresItemPin && pinned.itemIndex == null) {
+    return {
+      planVersion: 'website-agent',
+      needsClarification: true,
+      clarificationQuestion:
+        'Which card should I use as the reference? Drag the card into chat, then ask again.',
+      suggestedReplies: ['Drag the card to chat', 'Add a new empty card instead'],
+      intent: 'clarification',
+      steps: [],
+      risk: { level: editContext.riskFlags.level, reasons: editContext.riskFlags.reasons },
+    };
+  }
+
+  const { sectionIndex, itemIndex } = pinned;
+  const sectionTitle =
+    editContext.target.title ??
+    editContext.selectedTarget?.sectionTitle ??
+    editContext.sections.find((s) => s.index === sectionIndex)?.title;
+
+  if (intent.operation === 'remove' && itemIndex != null) {
+    return {
+      planVersion: 'website-agent',
+      needsClarification: false,
+      intent: 'section',
+      targets: [{ kind: 'section', sectionIndex, sectionTitle }],
+      verification: [
+        sectionItemsVerificationCheck(sectionIndex, 'remove', {
+          itemIndex,
+          expectedLengthDelta: -1,
+        }),
+      ],
+      risk: { level: editContext.riskFlags.level, reasons: editContext.riskFlags.reasons },
+      steps: [
+        {
+          skill: 'remove_section_item',
+          target: { sectionIndex, title: sectionTitle },
+          params: { sectionIndex, itemIndex },
+        },
+      ],
+    };
+  }
+
+  if (intent.operation === 'duplicate' && itemIndex != null) {
+    return {
+      planVersion: 'website-agent',
+      needsClarification: false,
+      intent: 'section',
+      targets: [{ kind: 'section', sectionIndex, sectionTitle }],
+      verification: [
+        sectionItemsVerificationCheck(sectionIndex, 'duplicate', {
+          itemIndex,
+          expectedLengthDelta: 1,
+          expectedInsertIndex: itemIndex + 1,
+          field: intent.title ? 'title' : undefined,
+          expectedValue: intent.title,
+        }),
+      ],
+      risk: { level: editContext.riskFlags.level, reasons: editContext.riskFlags.reasons },
+      steps: [
+        {
+          skill: 'duplicate_section_item',
+          target: { sectionIndex, title: sectionTitle },
+          params: {
+            sectionIndex,
+            itemIndex,
+            ...(intent.title ? { title: intent.title } : {}),
+          },
+        },
+      ],
+    };
+  }
+
+  if (intent.operation === 'add') {
+    if (intent.cloneFromPinned && itemIndex != null) {
+      return {
+        planVersion: 'website-agent',
+        needsClarification: false,
+        intent: 'section',
+        targets: [{ kind: 'section', sectionIndex, sectionTitle }],
+        verification: [
+          sectionItemsVerificationCheck(sectionIndex, 'add', {
+            itemIndex,
+            expectedLengthDelta: 1,
+            expectedInsertIndex: itemIndex + 1,
+            field: intent.title ? 'title' : undefined,
+            expectedValue: intent.title,
+          }),
+        ],
+        risk: { level: editContext.riskFlags.level, reasons: editContext.riskFlags.reasons },
+        steps: [
+          {
+            skill: 'add_section_item',
+            target: { sectionIndex, title: sectionTitle },
+            params: {
+              sectionIndex,
+              cloneFromItemIndex: itemIndex,
+              cloneFromPinned: true,
+              ...(intent.title ? { title: intent.title } : {}),
+            },
+          },
+        ],
+      };
+    }
+
+    if (intent.title) {
+      return {
+        planVersion: 'website-agent',
+        needsClarification: false,
+        intent: 'section',
+        targets: [{ kind: 'section', sectionIndex, sectionTitle }],
+        verification: [
+          sectionItemsVerificationCheck(sectionIndex, 'add', {
+            expectedLengthDelta: 1,
+            field: 'title',
+            expectedValue: intent.title,
+          }),
+        ],
+        risk: { level: editContext.riskFlags.level, reasons: editContext.riskFlags.reasons },
+        steps: [
+          {
+            skill: 'add_section_item',
+            target: { sectionIndex, title: sectionTitle },
+            params: { sectionIndex, title: intent.title },
+          },
+        ],
+      };
+    }
+  }
 
   return null;
 }

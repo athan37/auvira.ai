@@ -41,7 +41,7 @@ export function classifyEditWhat(message: string): EditWhatKind {
   }
 
   if (
-    (/\b(add|remove|delete|reorder|move|append|insert)\b/.test(lower) ||
+    (/\b(add|remove|delete|reorder|move|append|insert|duplicate)\b/.test(lower) ||
       /\bfaq\b/.test(lower)) &&
     !/\b(background|colour|color)\b/.test(lower)
   ) {

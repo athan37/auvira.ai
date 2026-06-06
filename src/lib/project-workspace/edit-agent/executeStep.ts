@@ -21,6 +21,10 @@ const CHECKS_BY_SKILL: Partial<Record<string, VerificationCheckKind[]>> = {
   update_config_field: ['copy_field', 'generic'],
   update_section_item_copy: ['copy_field', 'generic'],
   update_cta_label: ['copy_field', 'generic'],
+  add_section_item: ['section_items', 'generic'],
+  remove_section_item: ['section_items', 'generic'],
+  duplicate_section_item: ['section_items', 'generic'],
+  update_section_item: ['section_items', 'generic'],
 };
 
 function verificationChecksForStep(

@@ -30,6 +30,8 @@ Rules:
 - update_contact → params phone, email, or address with exact user value. Do NOT use update_contact when a contact section is UI-pinned and the owner changes "contact information" / "contact info" prose — use update_config_field on the pinned section subtitle (inner card heading) instead.
 - update_hero → params headline, subheadline, or tagline with params.value.
 - update_business_name → params value (siteConfig businessName only).
+- Generic card/list edits on sections[i].items[] → add_section_item, duplicate_section_item, remove_section_item, update_section_item (use pinned sectionIndex and itemIndex; never custom_code_edit).
+- add_section_item with cloneFromItemIndex when owner says "like this"; title-only add can use section pin without itemIndex.
 - Target kind must be one of: section, hero, nav, footer, site, businessName.
 - When the owner updates both business name and hero headline to the same text, emit update_business_name and update_hero steps (same value).
 - When EditContext already resolved a section target, use that sectionIndex in target/params.
