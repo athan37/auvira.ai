@@ -16,6 +16,7 @@ import {
   targetPreviewFallbackLabel,
   type PreviewThumbVariant,
 } from '@/lib/preview/targetPreviewThumbnail';
+import { leafContainerKind, resolveTargetChain } from '@/lib/preview/targetChain';
 import type { SelectedTargetInput } from '@/lib/project-workspace/edit-shared/selectedTargetTypes';
 
 interface Props {
@@ -54,6 +55,7 @@ export function PreviewTargetCardLayout({
     width: captureWidth,
     height: captureHeight,
   });
+  const previewLeafContainerKind = leafContainerKind(resolveTargetChain(target));
   const isSectionPreview =
     target.kind === 'hero' ||
     inferPreviewScaleProfile(
@@ -61,7 +63,8 @@ export function PreviewTargetCardLayout({
       source.height,
       target.pinScope,
       target.elementKind,
-      target.kind
+      target.kind,
+      previewLeafContainerKind
     ) === 'section';
   const edgeToEdge = edgeToEdgePreview || isSectionPreview;
   const isCentered = align === 'center';

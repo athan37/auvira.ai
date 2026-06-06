@@ -264,3 +264,21 @@ export function applyPlaceholderGalleryDescriptions(
   }
   return null;
 }
+
+/**
+ * Deterministic caption fallback for compound placement+label flows when LLM captions fail.
+ */
+export function applyCompoundGalleryCaptionFallback(
+  siteConfigContent: string,
+  lastGalleryEdit: LastGalleryEdit,
+  captionMessage?: string
+): string | null {
+  const target = resolveTargetGalleryForCaptions(
+    siteConfigContent,
+    [],
+    lastGalleryEdit,
+    captionMessage
+  );
+  if (!target) return null;
+  return applyPlaceholderGalleryDescriptions(siteConfigContent, target);
+}

@@ -16,7 +16,7 @@ import {
   TARGET_PREVIEW_THUMB_WIDTH,
 } from '@/lib/preview/targetPreviewThumbnail';
 
-export const PREVIEW_SECTION_BRIDGE_VERSION = 52;
+export const PREVIEW_SECTION_BRIDGE_VERSION = 54;
 
 const HIGHLIGHT_CLASS = 'site-editor-section-highlight';
 const HOVER_CLASS = 'site-editor-section-hover';
@@ -267,7 +267,12 @@ function readPayload(el,target,rootType){
   elementNodes=expandItemGridTarget(el,target,elementNodes,idx);
   if(!elementNodes.some(function(n){return n.role==="element"&&n.fieldPath;})){
     var inferred=inferLeafTarget(el,target,idx);
-    if(inferred)elementNodes=elementNodes.concat([inferred]);
+    if(inferred){
+      var pinnedInnerCard=elementNodes.some(function(n){return n.role==="container"&&n.kind==="inner_card";});
+      if(!(pinnedInnerCard&&(!inferred.fieldPath||inferred.kind==="item_card"))){
+        elementNodes=elementNodes.concat([inferred]);
+      }
+    }
   }
   for(var c=0;c<elementNodes.length;c++)chain.push(elementNodes[c]);
   var leaf=chain.length>1?chain[chain.length-1]:null;
@@ -634,6 +639,7 @@ function captureDragPreviewSync(){
 }
 
 function shouldSkipDomBitmapForElementCapture(payload,leafKind){
+  if(payload&&dragState&&dragState.el&&dragState.target&&shouldUseInnerCardPreviewCapture(payload,dragState.el,dragState.target))return true;
   if(leafKind==="button"||leafKind==="contact_field")return true;
   if(leafKind==="heading"||leafKind==="body")return true;
   if(leafKind==="item_card"||leafKind==="item_title"||leafKind==="item_body"||leafKind==="image_caption")return false;
@@ -667,6 +673,10 @@ function captureAndNotifyDragPreview(){
   }
   var styledElement=captureStyledElementPreview(payload,root,captureEl,leafKind,fullSection);
   if(styledElement){finish(styledElement);return;}
+  if(innerCard&&shouldUseInnerCardPreviewCapture(payload,sectionEl,clickTarget)&&typeof captureCardStyledFallback==="function"){
+    var cardStyled=captureCardStyledFallback(innerCard);
+    if(cardStyled){finish(cardStyled);return;}
+  }
   if(shouldSkipDomBitmapForElementCapture(payload,leafKind)){
     finish(null);
     return;

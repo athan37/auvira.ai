@@ -29,6 +29,17 @@ function humanFieldPathLabel(fieldPath: string): string {
   return parsed.field;
 }
 
+export function leafContainerKind(
+  chain: TargetChainNode[] | undefined
+): string | undefined {
+  const leaf = chain?.[chain.length - 1];
+  return leaf?.role === 'container' ? leaf.kind : undefined;
+}
+
+export function isInnerCardContainerPin(target: Pick<SelectedTargetInput, 'targetChain'>): boolean {
+  return leafContainerKind(resolveTargetChain(target)) === 'inner_card';
+}
+
 export function resolvePinScope(target: SelectedTargetInput): PinScope {
   if (target.pinScope === 'element' || target.pinScope === 'section') {
     return target.pinScope;

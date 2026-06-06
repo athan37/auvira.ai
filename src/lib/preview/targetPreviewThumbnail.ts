@@ -1,5 +1,5 @@
 import type { SelectedTargetInput } from '@/lib/project-workspace/edit-shared/selectedTargetTypes';
-import { resolveTargetChain } from '@/lib/preview/targetChain';
+import { leafContainerKind, resolveTargetChain } from '@/lib/preview/targetChain';
 
 const GENERIC_TARGET_LABELS = new Set([
   'Item cards',
@@ -87,8 +87,10 @@ export function inferPreviewScaleProfile(
   sourceHeight: number,
   pinScope?: string,
   elementKind?: string,
-  kind?: string
+  kind?: string,
+  leafContainerKind?: string
 ): PreviewScaleProfile {
+  if (leafContainerKind === 'inner_card') return 'element';
   if (pinScope === 'element') {
     if (elementKind && BARE_PREVIEW_TARGET_HEIGHT[elementKind]) {
       return 'element';
@@ -118,12 +120,18 @@ export function resolveBarePreviewDisplayHeight(options?: {
   pinScope?: string;
   sourceWidth?: number;
   sourceHeight?: number;
+  leafContainerKind?: string;
 }): number | undefined {
+  if (options?.leafContainerKind === 'inner_card') {
+    return BARE_PREVIEW_TARGET_HEIGHT.item_card ?? 76;
+  }
   const profile = inferPreviewScaleProfile(
     options?.sourceWidth ?? 0,
     options?.sourceHeight ?? 0,
     options?.pinScope,
-    options?.elementKind
+    options?.elementKind,
+    undefined,
+    options?.leafContainerKind
   );
   if (profile === 'section') {
     return BARE_PREVIEW_TARGET_HEIGHT.section;
@@ -272,6 +280,7 @@ export function resolvePreviewThumbDisplaySize(
     pinScope?: string;
     kind?: string;
     captureKind?: TargetPreviewCaptureKind;
+    leafContainerKind?: string;
   }
 ): {
   width: number;
@@ -288,7 +297,8 @@ export function resolvePreviewThumbDisplaySize(
     sourceHeight,
     options?.pinScope,
     options?.elementKind,
-    options?.kind
+    options?.kind,
+    options?.leafContainerKind
   );
 
   if (profile === 'section') {
@@ -314,6 +324,7 @@ export function resolvePreviewThumbDisplaySize(
     pinScope: options?.pinScope,
     sourceWidth,
     sourceHeight,
+    leafContainerKind: options?.leafContainerKind,
   });
   if (bareHeight) {
     const maxScale = 4;

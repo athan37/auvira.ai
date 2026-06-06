@@ -21,6 +21,7 @@ import {
   targetPreviewDisplayUrl,
   targetPreviewFallbackLabel,
 } from '@/lib/preview/targetPreviewThumbnail';
+import { leafContainerKind, resolveTargetChain } from '@/lib/preview/targetChain';
 
 interface Props {
   target: SelectedTargetInput;
@@ -110,6 +111,7 @@ function PinnedTargetCard({
   const chipText = formatPreviewTargetChipText(target, 'pinned');
   const canActivate = interactive && Boolean(onActivate);
   const source = resolvePreviewThumbSourceDimensions(target);
+  const previewLeafContainerKind = leafContainerKind(resolveTargetChain(target));
   const isSectionPreview =
     target.kind === 'hero' ||
     inferPreviewScaleProfile(
@@ -117,7 +119,8 @@ function PinnedTargetCard({
       source.height,
       target.pinScope,
       target.elementKind,
-      target.kind
+      target.kind,
+      previewLeafContainerKind
     ) === 'section';
 
   const activate = () => {

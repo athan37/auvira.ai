@@ -124,6 +124,26 @@ describe('inferPreviewScaleProfile', () => {
     expect(inferPreviewScaleProfile(280, 140, 'section')).toBe('section');
     expect(inferPreviewScaleProfile(112, 80, 'section', undefined, 'hero')).toBe('section');
   });
+
+  it('uses element scale for inner card container pins even when pinScope is section', () => {
+    expect(inferPreviewScaleProfile(228, 208, 'section', undefined, 'section', 'inner_card')).toBe(
+      'element'
+    );
+  });
+});
+
+describe('resolvePreviewThumbDisplaySize inner card container', () => {
+  it('uses compact object-contain layout instead of section cover crop', () => {
+    const display = resolvePreviewThumbDisplaySize('pinned', 228, 208, {
+      pinScope: 'section',
+      fullWidth: true,
+      leafContainerKind: 'inner_card',
+      captureKind: 'styled_fallback',
+    });
+    expect(display.fillWidth).toBeUndefined();
+    expect(display.objectFit).toBeUndefined();
+    expect(display.height).toBe(76);
+  });
 });
 
 describe('resolvePreviewThumbDisplaySize section pin', () => {

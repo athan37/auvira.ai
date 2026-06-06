@@ -192,6 +192,7 @@ function inferLeafTarget(rootEl,target,sectionIndex){
       };
     }
     if(hasCardClassHint(node)){
+      if(node.getAttribute&&node.getAttribute("data-site-container-kind")==="inner_card")break;
       var cardLabel=(node.textContent||"").trim().slice(0,80)||"Card";
       return {role:"element",kind:"item_card",label:cardLabel};
     }

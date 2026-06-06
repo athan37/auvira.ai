@@ -10,6 +10,7 @@ import {
   targetPreviewFallbackLabel,
   type PreviewThumbVariant,
 } from '@/lib/preview/targetPreviewThumbnail';
+import { leafContainerKind, resolveTargetChain } from '@/lib/preview/targetChain';
 import type { SelectedTargetInput } from '@/lib/project-workspace/edit-shared/selectedTargetTypes';
 
 interface Props {
@@ -60,6 +61,7 @@ export function PreviewTargetThumbnail({
   const resolvedVariant = resolveVariant(size, variant);
   const src = targetPreviewDisplayUrl(target);
   const fallbackLabel = targetPreviewFallbackLabel(target);
+  const previewLeafContainerKind = leafContainerKind(resolveTargetChain(target));
   const [imageLoaded, setImageLoaded] = useState(false);
   const [showFallback, setShowFallback] = useState(false);
 
@@ -82,6 +84,7 @@ export function PreviewTargetThumbnail({
     pinScope: target.pinScope,
     kind: target.kind,
     captureKind,
+    leafContainerKind: previewLeafContainerKind,
   });
   const sectionPreview = Boolean(display.fillWidth);
   const sectionObjectFit = display.objectFit ?? 'cover';

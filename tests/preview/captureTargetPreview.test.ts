@@ -13,6 +13,7 @@ import {
   pickElementFillColor,
   pickPreviewFrameBackground,
   resolveBackgroundFromChain,
+  resolveBackdropBackgroundFromChain,
   shouldPreferStyledElementCapture,
   shouldUseButtonStyledCapture,
 } from '@/lib/preview/captureTargetPreview';
@@ -103,6 +104,35 @@ describe('resolveBackgroundFromChain', () => {
       },
     ]);
     expect(style?.backgroundImage).toContain('linear-gradient');
+  });
+
+  it('prefers the pinned element gradient over section solid fill', () => {
+    expect(
+      resolveBackgroundFromChain([
+        {
+          backgroundColor: 'rgba(0, 0, 0, 0)',
+          backgroundImage: 'linear-gradient(90deg, rgb(120, 53, 15) 0%, rgb(22, 163, 74) 100%)',
+        },
+        { backgroundColor: 'rgb(220, 38, 38)', backgroundImage: 'none' },
+      ])
+    ).toEqual({
+      backgroundColor: 'rgba(0, 0, 0, 0)',
+      backgroundImage: 'linear-gradient(90deg, rgb(120, 53, 15) 0%, rgb(22, 163, 74) 100%)',
+    });
+  });
+});
+
+describe('resolveBackdropBackgroundFromChain', () => {
+  it('skips the pinned element and uses parent section fill for chip backdrop', () => {
+    expect(
+      resolveBackdropBackgroundFromChain([
+        {
+          backgroundColor: 'rgba(0, 0, 0, 0)',
+          backgroundImage: 'linear-gradient(90deg, rgb(120, 53, 15) 0%, rgb(22, 163, 74) 100%)',
+        },
+        { backgroundColor: 'rgb(220, 38, 38)', backgroundImage: 'none' },
+      ])
+    ).toEqual({ backgroundColor: 'rgb(220, 38, 38)', backgroundImage: 'none' });
   });
 });
 
@@ -204,6 +234,8 @@ describe('parseLinearGradientAngle', () => {
     expect(parseLinearGradientAngle('none')).toBe(90);
     expect(parseLinearGradientAngle('linear-gradient(135deg, #fff, #000)')).toBe(135);
     expect(parseLinearGradientAngle('linear-gradient(rgb(1,2,3), rgb(4,5,6))')).toBe(90);
+    expect(parseLinearGradientAngle('linear-gradient(to right, rgb(1,2,3), rgb(4,5,6))')).toBe(90);
+    expect(parseLinearGradientAngle('linear-gradient(to bottom, #fff, #000)')).toBe(180);
   });
 });
 
@@ -234,6 +266,7 @@ describe('buildElementCaptureBridgeScript', () => {
     expect(script).toContain('measureButtonPaintSize');
     expect(script).toContain('ctx.fillText(label,cx,cy);');
     expect(script).toContain('paintElementBackdrop(ctx,el,outW,outH)');
+    expect(script).toContain('function resolveBackdropBackgroundStyle');
     expect(script).toContain('resolveImmediateBackgroundStyle(el,null)');
     expect(script).not.toMatch(/paintElementBackdrop[\s\S]*resolveSectionComputedStyle/);
     expect(script).not.toMatch(/paintElementBackdrop\(ctx,outW,outH,el\)/);

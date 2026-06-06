@@ -7,6 +7,7 @@ import {
   conversationWithGenericImageConfirmation,
   conversationWithNoisyInterveningTurns,
   countDescriptionsInGallerySection,
+  countGalleryItemDescriptions,
   countSingleImageGalleryDescriptions,
   GENERIC_CONFIRM_CAPTION_FOLLOW_UP,
   NOISY_CAPTION_FOLLOW_UP,
@@ -169,9 +170,7 @@ describeRunLlmIntegration('gallery description ambiguous hard (LLM)', () => {
 
     const siteConfig = await readSyntheticFile(workspacePath, 'src/lib/siteConfig.ts');
     expect(siteConfig).toMatch(/imageUrl/);
-    expect(countSingleImageGalleryDescriptions(siteConfig) +
-      countDescriptionsInGallerySection(siteConfig, 'Our Work') +
-      countDescriptionsInGallerySection(siteConfig, 'Our work')).toBeGreaterThanOrEqual(1);
+    expect(countGalleryItemDescriptions(siteConfig)).toBeGreaterThanOrEqual(1);
   });
 
   it('partial descriptions: finish the rest completes only missing Showcase captions', async () => {

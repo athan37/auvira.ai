@@ -4,6 +4,7 @@ import {
   buildTargetChainFromFlat,
   enrichSelectedTarget,
   findPinnedInnerCardContainer,
+  isInnerCardContainerPin,
   leafChainNode,
   resolvePinScope,
   resolveTargetChain,
@@ -86,5 +87,6 @@ describe('targetChain', () => {
       { role: 'container' as const, label: 'Contact card', kind: 'inner_card' },
     ];
     expect(findPinnedInnerCardContainer(chain)?.label).toBe('Contact card');
+    expect(isInnerCardContainerPin({ targetChain: chain })).toBe(true);
   });
 });

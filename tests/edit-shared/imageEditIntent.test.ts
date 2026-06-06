@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  applyCompoundGalleryCaptionFallback,
   applyPlaceholderGalleryDescriptions,
   isCaptionOnlyFollowUp,
   isCompoundImagePlacementAndCaption,
@@ -309,5 +310,33 @@ describe('imageEditIntent', () => {
     const parsed = JSON.parse(out!.replace(/^export const siteConfig = /, '').replace(/;$/, ''));
     const ourWork = parsed.sections[0];
     expect(ourWork.items.every((i: { description?: string }) => !i.description)).toBe(true);
+  });
+
+  it('applyCompoundGalleryCaptionFallback labels every image in the last placement batch', () => {
+    const freshGallery = `export const siteConfig = {
+  sections: [
+    { type: 'services', title: 'Services', items: [] },
+    {
+      type: 'gallery',
+      title: 'Project Gallery',
+      items: [
+        { title: 'Split 1', imageUrl: '/uploads/split-1.png' },
+        { title: 'Split 2', imageUrl: '/uploads/split-2.png' },
+      ],
+    },
+  ],
+};`;
+    const out = applyCompoundGalleryCaptionFallback(
+      freshGallery,
+      {
+        sectionIndex: 1,
+        title: 'Project Gallery',
+        imageUrls: ['/uploads/split-1.png', '/uploads/split-2.png'],
+        imageCount: 2,
+      },
+      'label each pic.'
+    );
+    expect(out).not.toBeNull();
+    expect(out!.match(/"description"\s*:/g)?.length).toBeGreaterThanOrEqual(2);
   });
 });

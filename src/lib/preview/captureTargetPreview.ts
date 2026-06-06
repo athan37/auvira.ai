@@ -156,6 +156,16 @@ export function resolveBackgroundFromChain(
   return null;
 }
 
+/** Parent/section backgrounds for chip backdrop (skips the pinned element's own fill). */
+export function resolveBackdropBackgroundFromChain(
+  styles: Array<{ backgroundColor?: string; backgroundImage?: string }>
+): { backgroundColor?: string; backgroundImage?: string } | null {
+  for (let i = 1; i < styles.length; i++) {
+    if (hasVisibleBackground(styles[i]!)) return styles[i]!;
+  }
+  return null;
+}
+
 export type SectionPreviewLayout = 'features_grid' | 'hero_split' | 'contact' | 'generic';
 
 /** Extract color stops from a CSS linear-gradient background-image. */
@@ -177,6 +187,10 @@ export function parseLinearGradientAngle(backgroundImage: string | undefined): n
     const deg = parseFloat(match[1]);
     if (Number.isFinite(deg)) return deg;
   }
+  if (/linear-gradient\s*\(\s*to\s+right/i.test(backgroundImage)) return 90;
+  if (/linear-gradient\s*\(\s*to\s+left/i.test(backgroundImage)) return 270;
+  if (/linear-gradient\s*\(\s*to\s+bottom/i.test(backgroundImage)) return 180;
+  if (/linear-gradient\s*\(\s*to\s+top/i.test(backgroundImage)) return 0;
   return 90;
 }
 
@@ -272,6 +286,28 @@ function styleHasVisibleBackground(style){
 
 function resolveImmediateBackgroundStyle(el,elementStyle){
   if(elementStyle&&styleHasVisibleBackground(elementStyle))return elementStyle;
+  if(el){
+    var ownStyle=window.getComputedStyle(el);
+    if(styleHasVisibleBackground(ownStyle))return ownStyle;
+  }
+  var node=el.parentElement;
+  var depth=0;
+  while(node&&depth<8){
+    var ps=window.getComputedStyle(node);
+    if(styleHasVisibleBackground(ps))return ps;
+    node=node.parentElement;
+    depth++;
+  }
+  var section=el.closest&&el.closest("section,nav");
+  if(section){
+    var sectionStyle=window.getComputedStyle(section);
+    if(styleHasVisibleBackground(sectionStyle))return sectionStyle;
+  }
+  return null;
+}
+
+function resolveBackdropBackgroundStyle(el){
+  if(!el)return null;
   var node=el.parentElement;
   var depth=0;
   while(node&&depth<8){
@@ -333,6 +369,10 @@ function parseLinearGradientAngle(backgroundImage){
     var deg=parseFloat(match[1]);
     if(Number.isFinite(deg))return deg;
   }
+  if(/linear-gradient\\s*\\(\\s*to\\s+right/i.test(backgroundImage))return 90;
+  if(/linear-gradient\\s*\\(\\s*to\\s+left/i.test(backgroundImage))return 270;
+  if(/linear-gradient\\s*\\(\\s*to\\s+bottom/i.test(backgroundImage))return 180;
+  if(/linear-gradient\\s*\\(\\s*to\\s+top/i.test(backgroundImage))return 0;
   return 90;
 }
 
@@ -376,7 +416,7 @@ function paintElementBackdrop(ctx,el,outW,outH){
     ctx.fillRect(0,0,outW,outH);
     return;
   }
-  var bgStyle=resolveImmediateBackgroundStyle(el,null);
+  var bgStyle=resolveBackdropBackgroundStyle(el);
   if(bgStyle){
     paintCanvasBackground(ctx,outW,outH,bgStyle);
     return;
@@ -457,24 +497,25 @@ function captureCardStyledFallback(el){
   var rect=el.getBoundingClientRect();
   var cardW=Math.min(Math.max(Math.round(rect.width)||80,72),220);
   var cardH=Math.min(Math.max(Math.round(rect.height)||60,48),200);
-  var edgePad=8;
+  var edgePad=4;
   var outW=cardW+edgePad*2;
   var outH=cardH+edgePad*2;
   var scaled=createScaledCanvas(outW,outH);
   if(!scaled)return null;
   var ctx=scaled.ctx;
-  paintElementBackdrop(ctx,el,outW,outH);
-  roundRect(ctx,edgePad,edgePad,cardW,cardH,parseBorderRadiusPx(style.borderRadius,Math.min(cardH,32)));
-  ctx.fillStyle=pickElementFillColor(style)||"#ffffff";
-  ctx.fill();
+  var radius=parseBorderRadiusPx(style.borderRadius,Math.min(cardH,32));
+  ctx.fillStyle="#f4f4f5";
+  ctx.fillRect(0,0,outW,outH);
+  fillRoundedRectWithStyle(ctx,edgePad,edgePad,cardW,cardH,radius,style,"#ffffff");
   var borderW=parseFloat(style.borderWidth)||0;
   if(borderW>0&&isOpaqueCssColor(style.borderColor)){
     ctx.strokeStyle=style.borderColor;
     ctx.lineWidth=borderW;
+    roundRect(ctx,edgePad,edgePad,cardW,cardH,radius);
     ctx.stroke();
   }
   var imgEl=el.querySelector("img");
-  var textY=edgePad+6;
+  var textY=edgePad+8;
   if(imgEl){
     var imgH=Math.min(Math.round(cardH*0.4),32);
     ctx.fillStyle="rgba(15,23,42,0.08)";
@@ -482,11 +523,31 @@ function captureCardStyledFallback(el){
     ctx.fill();
     textY+=imgH+6;
   }
-  var titleEl=el.querySelector("h3,[data-site-element-kind='item_title'],h2,p");
-  var titleText=titleEl?(titleEl.textContent||"").trim():(el.textContent||"").trim();
-  var titleStyle=titleEl?window.getComputedStyle(titleEl):style;
-  ctx.fillStyle=isOpaqueCssColor(titleStyle.color)?titleStyle.color:"#111827";
-  drawFittedWrapped(ctx,titleText,edgePad+6,textY,cardW-12,cardH-(textY-edgePad)-6,titleStyle,10);
+  var titleEl=el.querySelector("h2,h3,[data-site-element-kind='item_title'],[data-site-element-kind='heading']");
+  var titleText=titleEl?(titleEl.textContent||"").trim():"";
+  if(titleText){
+    var titleStyle=titleEl?window.getComputedStyle(titleEl):style;
+    ctx.fillStyle=isOpaqueCssColor(titleStyle.color)?titleStyle.color:"#111827";
+    drawFittedWrapped(ctx,titleText,edgePad+8,textY,cardW-16,Math.min(28,cardH*0.22),titleStyle,10);
+    textY+=Math.min(30,cardH*0.24);
+  }
+  var fields=el.querySelectorAll("[data-site-element-kind='contact_field']");
+  for(var fi=0;fi<Math.min(fields.length,3);fi++){
+    var field=fields[fi];
+    var fStyle=window.getComputedStyle(field);
+    var fieldH=Math.min(18,Math.max(14,Math.round(cardH*0.12)));
+    fillRoundedRectWithStyle(ctx,edgePad+8,textY,cardW-16,fieldH,6,fStyle,"rgba(255,255,255,0.12)");
+    ctx.fillStyle=isOpaqueCssColor(fStyle.color)?fStyle.color:"#334155";
+    drawFittedLine(ctx,(field.textContent||"").trim(),edgePad+cardW/2,textY+fieldH/2,cardW-20,fieldH-4,fStyle,8,"center");
+    textY+=fieldH+6;
+  }
+  if(!titleText&&!fields.length){
+    var bodyEl=el.querySelector("p,[data-site-element-kind='item_body']");
+    var bodyText=bodyEl?(bodyEl.textContent||"").trim():(el.textContent||"").trim();
+    var bodyStyle=bodyEl?window.getComputedStyle(bodyEl):style;
+    ctx.fillStyle=isOpaqueCssColor(bodyStyle.color)?bodyStyle.color:"#111827";
+    drawFittedWrapped(ctx,bodyText,edgePad+8,textY,cardW-16,cardH-(textY-edgePad)-8,bodyStyle,10);
+  }
   return thumbResult(scaled.canvas,true,outW,outH);
 }
 
