@@ -88,6 +88,7 @@ export async function runImageGallerySectionStrategy(
     attachments,
     siteConfigContent,
     pageContent: pageBefore,
+    selectedTarget: options.selectedTarget,
   });
 
   let updatedSiteConfig: string;
@@ -97,7 +98,8 @@ export async function runImageGallerySectionStrategy(
       plan,
       attachments,
       snapshot,
-      options.ownerMessage
+      options.ownerMessage,
+      options.selectedTarget
     );
   } catch (placementErr) {
     const msg =
@@ -150,7 +152,8 @@ export async function runImageGallerySectionStrategy(
   const pageRendersGalleryImages = (page: string) =>
     pageHasGalleryRenderer(page) ||
     gallerySectionRendersItemImages(page) ||
-    genericSectionRendersItemImages(page);
+    genericSectionRendersItemImages(page) ||
+    /function ActionSection|case\s*['"]actions['"]/.test(page);
 
   if (!pageRendersGalleryImages(pageAfter)) {
     const structural = repairPageTsxStructure(pageAfter);

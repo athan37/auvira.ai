@@ -6,6 +6,19 @@ import {
   valueFromPlanStep,
 } from './resolveConfigTextEdit';
 import { parseConfigFieldPath } from './configFieldPaths';
+import type { PresentationStyleField } from './inferPresentationStyleTarget';
+
+function coercePresentationField(value: unknown): PresentationStyleField {
+  if (
+    value === 'cardClass' ||
+    value === 'titleClass' ||
+    value === 'bodyClass' ||
+    value === 'eyebrowClass'
+  ) {
+    return value;
+  }
+  return 'backgroundClass';
+}
 
 function coerceIndex(value: unknown): number | undefined {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -41,14 +54,17 @@ export function buildVerificationContractFromPlan(
     if (step.skill === 'update_section_style') {
       const sectionIndex = coerceIndex(merged.sectionIndex);
       if (sectionIndex != null) {
+        const presentationField = coercePresentationField(merged.presentationField);
+        const expectedValue =
+          (merged.textClass as string | undefined) ??
+          (merged.backgroundClass as string | undefined) ??
+          (merged.backgroundColor as string | undefined) ??
+          (merged.color as string | undefined);
         checks.push({
           kind: 'section_background',
           sectionIndex,
-          field:
-            merged.presentationField === 'cardClass' ? 'cardClass' : 'backgroundClass',
-          expectedValue:
-            (merged.backgroundClass as string | undefined) ??
-            (merged.backgroundColor as string | undefined),
+          field: presentationField,
+          expectedValue: expectedValue?.trim() || undefined,
         });
       }
       continue;

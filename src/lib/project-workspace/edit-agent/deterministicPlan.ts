@@ -4,7 +4,7 @@ import { findPinnedInnerCardContainer } from '@/lib/preview/targetChain';
 import { inferSelectedTargetField } from '@/lib/project-workspace/edit-context/inferSelectedTargetField';
 import { isUnifiedCopyEditEnabled } from '@/lib/project-workspace/edit-context/unifiedCopyEditFlag';
 import { planFromConfigTextEdit } from '@/lib/project-workspace/edit-agent/planFromConfigTextEdit';
-import { extractSectionBackgroundClassFromMessage } from '@/lib/builder/sectionPresentation';
+import { extractSectionBackgroundClassFromMessage, extractSectionTextClassFromMessage, colorNameToTextClass } from '@/lib/builder/sectionPresentation';
 import {
   extractBackgroundColorFromMessage,
   parseColorSwap,
@@ -409,8 +409,9 @@ export function buildDeterministicPlan(editContext: EditContext): EditPlan | nul
 
   if (editContext.target.sectionIndex != null) {
     const bgClass = extractSectionBackgroundClassFromMessage(message);
+    const textClass = extractSectionTextClassFromMessage(message);
     const color = extractBackgroundColorFromMessage(message);
-    if (bgClass || color) {
+    if (bgClass || textClass || color) {
       const styleTarget = (() => {
         const inferred = inferPresentationStyleTarget(
           message,
@@ -435,17 +436,64 @@ export function buildDeterministicPlan(editContext: EditContext): EditPlan | nul
         }
         return inferred;
       })();
+      const isTextPresentationField =
+        styleTarget.presentationField === 'titleClass' ||
+        styleTarget.presentationField === 'bodyClass' ||
+        styleTarget.presentationField === 'eyebrowClass';
       const isInnerElementStyle =
         styleTarget.presentationField === 'cardClass' && styleTarget.confidence === 'high';
       const hasPinnedSectionTarget =
         editContext.target.sectionIndex != null && !!editContext.selectedTarget;
+      const resolvedTextClass =
+        textClass ?? (color && isTextPresentationField ? colorNameToTextClass(color, message) : null);
+
+      if (isTextPresentationField && resolvedTextClass) {
+        return {
+          planVersion: 'website-agent',
+          needsClarification: false,
+          intent: 'style',
+          targets: [
+            {
+              kind: 'section',
+              sectionIndex: editContext.target.sectionIndex,
+              sectionTitle: editContext.target.title,
+              sectionType: editContext.target.sectionType,
+            },
+          ],
+          verification: [
+            {
+              kind: 'section_background',
+              sectionIndex: editContext.target.sectionIndex,
+              field: styleTarget.presentationField,
+              expectedValue: resolvedTextClass,
+            },
+          ],
+          risk: { level: editContext.riskFlags.level, reasons: editContext.riskFlags.reasons },
+          steps: [
+            {
+              skill: 'update_section_style',
+              target: {
+                sectionIndex: editContext.target.sectionIndex,
+                sectionType: editContext.target.sectionType,
+                title: editContext.target.title,
+              },
+              params: {
+                textClass: resolvedTextClass,
+                backgroundColor: color ?? undefined,
+                presentationField: styleTarget.presentationField,
+              },
+            },
+          ],
+        };
+      }
+
       const hasColorStyleSignal = Boolean(bgClass || color);
       const isSectionStyle =
         hasColorStyleSignal &&
         (what === 'style_background' ||
           what === 'style_card' ||
           isInnerElementStyle ||
-          hasPinnedSectionTarget);
+          (hasPinnedSectionTarget && !isTextPresentationField));
 
       if (isSectionStyle) {
         return {

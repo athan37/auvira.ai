@@ -1,6 +1,7 @@
 import type { ImagePlacementPlan } from './imagePlacementPlan';
 import { wantsNewImageSection } from './imagePlacementIntent';
 import type { SiteStructureSnapshot } from './siteStructureAnalysis';
+import type { SelectedTargetInput } from './selectedTargetTypes';
 
 function messageHasKeyword(message: string, keyword: string): boolean {
   const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -20,8 +21,25 @@ function titleMatchesIntent(title: string, intent: string): boolean {
 export function resolveTargetSectionForImages(
   ownerMessage: string,
   plan: ImagePlacementPlan,
-  snapshot: SiteStructureSnapshot
+  snapshot: SiteStructureSnapshot,
+  selectedTarget?: SelectedTargetInput | null
 ): number {
+  if (selectedTarget?.sectionIndex != null) {
+    const pinned = snapshot.sections[selectedTarget.sectionIndex];
+    if (pinned) {
+      if (
+        pinned.type === 'actions' ||
+        selectedTarget.sectionType === 'actions' ||
+        pinned.actionItemCount > 0
+      ) {
+        return selectedTarget.sectionIndex;
+      }
+      if (pinned.type === 'gallery' || pinned.hasImageItems || pinned.itemCount > 0) {
+        return selectedTarget.sectionIndex;
+      }
+    }
+  }
+
   if (plan.action === 'create_section' || wantsNewImageSection(ownerMessage)) {
     return -1;
   }
@@ -74,6 +92,11 @@ export function resolveTargetSectionForImages(
   }
 
   if (plan.action === 'update_section') {
+    const actionsWithSlots = snapshot.sections.find(
+      (s) => s.type === 'actions' && s.actionItemCount > 0 && s.actionItemsMissingImage > 0
+    );
+    if (actionsWithSlots) return actionsWithSlots.index;
+
     const withImages = snapshot.sections.findIndex((s) => s.hasImageItems);
     if (withImages >= 0) return withImages;
   }

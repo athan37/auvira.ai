@@ -43,7 +43,12 @@ export const CUSTOMER_SITE_TAILWIND_SAFELIST = `  safelist: [
 const SHADED_BG_PATTERN =
   /^bg-(red|yellow|blue|green|orange|purple|pink|teal|cyan|indigo|gray|grey|brown)-(50|100|200|300|400|500|600|700|800|900)$/i;
 
+const SHADED_TEXT_PATTERN =
+  /^text-(red|yellow|blue|green|orange|purple|pink|teal|cyan|indigo|gray|grey|brown|black|white)-(50|100|200|300|400|500|600|700|800|900)$/i;
+
 const FLAT_BG_PATTERN = /^bg-(black|white)$/i;
+
+const FLAT_TEXT_PATTERN = /^text-(black|white)$/i;
 
 function isValidGradientStop(part: string): boolean {
   const match = part.match(/^(from|via|to)-(.+)$/i);
@@ -67,6 +72,14 @@ export function isEmitableTailwindBackgroundClass(className: string): boolean {
     return parts.slice(1).every((part) => isValidGradientStop(part));
   }
   return false;
+}
+
+/** True when a string is a valid Tailwind text color utility (emitable by JIT/safelist). */
+export function isEmitableTailwindTextClass(className: string): boolean {
+  const normalized = className.trim();
+  if (!normalized) return false;
+  if (FLAT_TEXT_PATTERN.test(normalized)) return true;
+  return SHADED_TEXT_PATTERN.test(normalized);
 }
 
 /** True when tailwind.config.js can emit a runtime presentation background class. */
@@ -107,6 +120,48 @@ export function tailwindConfigCoversBackgroundClass(
     const safelistBgPattern =
       /^bg-(red|yellow|blue|green|orange|purple|pink|teal|cyan|indigo|gray|grey|brown)-(50|100|200|300|400|500|600|700|800|900)$/;
     return safelistBgPattern.test(normalized);
+  }
+
+  return tailwindContent.includes(normalized);
+}
+
+/** True when tailwind.config.js can emit a runtime presentation text class. */
+export function tailwindConfigCoversTextClass(
+  tailwindContent: string,
+  className: string
+): boolean {
+  const normalized = className.trim();
+  if (!normalized || !tailwindContent.includes('module.exports')) {
+    return false;
+  }
+
+  if (!isEmitableTailwindTextClass(normalized)) {
+    return false;
+  }
+
+  if (tailwindContent.includes('./src/**/*')) {
+    return true;
+  }
+
+  if (FLAT_TEXT_PATTERN.test(normalized)) {
+    return (
+      /\bsafelist\s*:/.test(tailwindContent) &&
+      (tailwindContent.includes("'text-black'") ||
+        tailwindContent.includes('"text-black"') ||
+        tailwindContent.includes("'text-white'") ||
+        tailwindContent.includes('"text-white"') ||
+        tailwindContent.includes(normalized))
+    );
+  }
+
+  if (!/\bsafelist\s*:/.test(tailwindContent)) {
+    return false;
+  }
+
+  if (SHADED_TEXT_PATTERN.test(normalized)) {
+    const safelistTextPattern =
+      /^text-(red|yellow|blue|green|orange|purple|pink|teal|cyan|indigo|gray|grey|brown|black|white)-(50|100|200|300|400|500|600|700|800|900)$/;
+    return safelistTextPattern.test(normalized);
   }
 
   return tailwindContent.includes(normalized);

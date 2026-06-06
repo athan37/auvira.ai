@@ -54,16 +54,29 @@ export const UpdateSectionStyleParamsSchema = z
     backgroundClass: z.string().optional(),
     backgroundColor: z.string().optional(),
     color: z.string().optional(),
+    textClass: z.string().optional(),
+    presentationField: z.string().optional(),
   })
   .superRefine((p, ctx) => {
     const idx = coerceSectionIndex(p.sectionIndex);
     if (idx == null) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'update_section_style requires sectionIndex' });
     }
-    if (!p.backgroundClass?.trim() && !p.backgroundColor?.trim() && !p.color?.trim()) {
+    const isTextField =
+      p.presentationField === 'titleClass' ||
+      p.presentationField === 'bodyClass' ||
+      p.presentationField === 'eyebrowClass';
+    const hasStyleValue =
+      Boolean(p.backgroundClass?.trim()) ||
+      Boolean(p.backgroundColor?.trim()) ||
+      Boolean(p.color?.trim()) ||
+      Boolean(p.textClass?.trim());
+    if (!hasStyleValue) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'update_section_style requires backgroundClass or backgroundColor',
+        message: isTextField
+          ? 'update_section_style requires textClass or backgroundColor'
+          : 'update_section_style requires backgroundClass or backgroundColor',
       });
     }
   });

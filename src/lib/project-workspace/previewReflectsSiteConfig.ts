@@ -1,4 +1,4 @@
-import { colorNameToBackgroundClass } from '@/lib/builder/sectionPresentation';
+import { colorNameToBackgroundClass, colorNameToTextClass } from '@/lib/builder/sectionPresentation';
 import { parseSiteConfigSource } from '@/lib/site-manager/siteConfigParser';
 import { extractPreviewVerifyHints, htmlShowsTailwindColor } from './verifyPreviewHints';
 import { rendererComponentForSectionType } from './edit-shared/legacySectionPresentation';
@@ -54,6 +54,22 @@ export function sectionPresentationCardClass(
     | undefined;
   const card = section?.presentation?.cardClass;
   return typeof card === 'string' && card.trim() ? card.trim() : null;
+}
+
+type TextPresentationField = 'titleClass' | 'bodyClass' | 'eyebrowClass';
+
+/** Read presentation text class tokens for a section index. */
+export function sectionPresentationTextClass(
+  siteConfigContent: string,
+  sectionIndex: number,
+  field: TextPresentationField
+): string | null {
+  const parsed = parseSiteConfigSource(siteConfigContent);
+  const section = parsed?.sections?.[sectionIndex] as
+    | { presentation?: Partial<Record<TextPresentationField, string>> }
+    | undefined;
+  const value = section?.presentation?.[field];
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
 /** Expected bg-* classes from owner message color words (e.g. red -> bg-red-200). */
@@ -128,6 +144,16 @@ export function sectionRendererUsesPresentationResolver(
   return extracted.content.includes('resolveSectionBackground');
 }
 
+/** Section renderer must call resolveSectionTitleClass for heading color overrides. */
+export function sectionRendererUsesTitleClassResolver(
+  pageContent: string,
+  componentName: string
+): boolean {
+  const extracted = extractSectionComponentSource(pageContent, componentName);
+  if (!extracted) return true;
+  return extracted.content.includes('resolveSectionTitleClass');
+}
+
 /**
  * Poll live preview HTML until a Tailwind class from the saved siteConfig appears.
  * Avoids false positives from unrelated red/green elsewhere on the page.
@@ -191,13 +217,21 @@ export function resolveExpectedPreviewPresentationClasses(
   ownerMessage: string,
   sectionIndex?: number
 ): string[] {
+  const hints = extractPreviewVerifyHints(ownerMessage);
   if (siteConfigContent && sectionIndex != null) {
+    if (hints.isTextColorRequest) {
+      const fromTitle = sectionPresentationTextClass(siteConfigContent, sectionIndex, 'titleClass');
+      if (fromTitle) return [fromTitle];
+    }
     const fromSection = sectionPresentationBackgroundClass(siteConfigContent, sectionIndex);
     if (fromSection) return [fromSection];
   }
   if (siteConfigContent) {
     const fromConfig = presentationBackgroundClassesInSiteConfig(siteConfigContent);
     if (fromConfig.length > 0) return fromConfig;
+  }
+  if (hints.isTextColorRequest && hints.colors.length > 0) {
+    return [...new Set(hints.colors.map((c) => colorNameToTextClass(c, ownerMessage)))];
   }
   return expectedBackgroundClassesFromMessage(ownerMessage);
 }

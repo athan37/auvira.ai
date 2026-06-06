@@ -95,7 +95,9 @@ import {
 import {
   resolveTailwindBackgroundClass,
   normalizeTailwindBackgroundClass,
+  resolveTailwindTextClass,
 } from './tailwindBackgroundResolver';
+import { isTextColorEditRequest } from '@/lib/project-workspace/verifyPreviewHints';
 import { isEmitableTailwindBackgroundClass } from './tailwindPresentationSupport';
 import {
   buildBlackWhiteGradientBackgroundClass,
@@ -289,4 +291,57 @@ export function colorNameToCardClass(color: string): string {
   const normalized = color.trim().toLowerCase();
   if (normalized.includes('border-') || normalized.includes('bg-')) return normalized;
   return `border-${normalized}-300 bg-${normalized}-50`;
+}
+
+/** Map a color name from owner chat to a Tailwind text utility (e.g. "green" -> text-green-600). */
+export function colorNameToTextClass(color: string, ownerMessage?: string): string {
+  return resolveTailwindTextClass(color, ownerMessage);
+}
+
+/** Resolve section title/body text class from owner message when they ask for heading/title color. */
+export function extractSectionTextClassFromMessage(message: string): string | null {
+  if (!isTextColorEditRequest(message)) return null;
+  const color = extractBackgroundColorFromMessage(message);
+  if (!color) return null;
+  return colorNameToTextClass(color, message);
+}
+
+/** Resolve text class for a section edit — owner message wins over planner/LLM args. */
+export function resolveSectionTextClassForEdit(
+  ownerMessage: string,
+  overrides?: {
+    textClass?: string | null;
+    color?: string | null;
+  }
+): string | null {
+  const fromMessage = extractSectionTextClassFromMessage(ownerMessage);
+  if (fromMessage) return fromMessage;
+
+  const explicitClass = overrides?.textClass?.trim();
+  if (explicitClass) {
+    if (explicitClass.startsWith('text-')) return explicitClass;
+    return resolveTailwindTextClass(explicitClass, ownerMessage) || null;
+  }
+
+  const colorWord = overrides?.color?.trim().toLowerCase();
+  if (colorWord && !BACKGROUND_COLOR_META.has(colorWord)) {
+    return colorNameToTextClass(colorWord, ownerMessage) || null;
+  }
+
+  return null;
+}
+
+/** Owner-facing summary for section heading/body text color edits. */
+export function formatSectionTextColorChangeSummary(
+  sectionTitle: string,
+  textClass: string,
+  presentationField: 'titleClass' | 'bodyClass' | 'eyebrowClass' = 'titleClass'
+): string {
+  const label =
+    presentationField === 'bodyClass'
+      ? 'body text'
+      : presentationField === 'eyebrowClass'
+        ? 'eyebrow'
+        : 'heading';
+  return `Changed ${label} color of "${sectionTitle}" to ${textClass}.`;
 }

@@ -287,3 +287,19 @@ export function resolveTailwindBackgroundClass(
 export function listResolvableBackgroundClasses(): string[] {
   return palette().map((entry) => entry.className);
 }
+
+/** Map a resolved bg-* utility to the matching text-* utility. */
+export function backgroundClassToTextClass(backgroundClass: string): string {
+  const trimmed = backgroundClass.trim();
+  if (!trimmed.startsWith('bg-')) return '';
+  return trimmed.replace(/^bg-/, 'text-');
+}
+
+/** Resolve an owner color word or class to a valid Tailwind text utility. */
+export function resolveTailwindTextClass(
+  colorInput: string,
+  ownerMessage?: string
+): string {
+  const backgroundClass = resolveTailwindBackgroundClass(colorInput, ownerMessage);
+  return backgroundClassToTextClass(backgroundClass);
+}

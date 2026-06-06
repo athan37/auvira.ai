@@ -1,5 +1,6 @@
 import { getLLMClient } from '@/lib/llm/llmClient';
 import type { WorkspaceAssetAttachment } from '../workspaceAssetTypes';
+import type { SelectedTargetInput } from './selectedTargetTypes';
 import {
   analyzeSiteStructureForImages,
   buildStructureBriefForPlanner,
@@ -67,7 +68,7 @@ function normalizePlan(raw: LlmPlanResponse, snapshot: SiteStructureSnapshot): I
 
   return {
     action,
-    sectionType: 'gallery',
+    sectionType: String(raw.sectionType || 'gallery').toLowerCase(),
     insertAfterSectionType: action === 'create_section' ? insertAfter : null,
     targetSectionIndex:
       typeof raw.targetSectionIndex === 'number' ? raw.targetSectionIndex : null,
@@ -87,12 +88,17 @@ export async function planImagePlacement(input: {
   siteConfigContent: string;
   pageContent: string;
   pageSnippetMaxChars?: number;
+  selectedTarget?: SelectedTargetInput | null;
 }): Promise<{ plan: ImagePlacementPlan; snapshot: SiteStructureSnapshot; usedLlm: boolean }> {
   const snapshot = analyzeSiteStructureForImages(input.siteConfigContent, input.pageContent);
   const structureBrief = buildStructureBriefForPlanner(snapshot);
   const attachmentList = input.attachments
     .map((a, i) => `  ${i + 1}. ${a.publicUrl} (${a.originalName})`)
     .join('\n');
+
+  const pinnedBrief = input.selectedTarget?.sectionIndex != null
+    ? `Pinned UI target: sectionIndex=${input.selectedTarget.sectionIndex} type=${input.selectedTarget.sectionType ?? 'unknown'} title="${input.selectedTarget.sectionTitle ?? ''}"\n\n`
+    : '';
 
   const pageCap = input.pageSnippetMaxChars ?? 6000;
   const pageSnippet =
@@ -113,6 +119,8 @@ Output a single placement plan (JSON only).
 
 Rules:
 - Prefer UPDATE an existing section that already has imageUrl items if the owner says "these images", "add description", or similar follow-up.
+- If the owner pinned an "actions" section (service packages, menu cards, donation tiers), use update_section with sectionType "actions" and set targetSectionIndex — fill actionItems[].imageUrl slots in order; do NOT convert to gallery.
+- When siteConfig sections include type="actions" with actionItems and no imageUrl, treat each card as an image slot.
 - If the owner asks for another/new/separate section or "create a new section", use create_section even when a gallery already exists — do not overwrite the old gallery.
 - When the owner names a section (e.g. "introduction", "intro", "about"), set action to update_section with targetSectionTitle matching that section — do not create a duplicate gallery elsewhere.
 - Prefer CREATE a dedicated "gallery" section when page has or can use gallery/generic rendering and images are new product/project photos.
@@ -120,7 +128,7 @@ Rules:
 - Do NOT pick contact/faq as insert anchor unless owner asked.
 - sectionType must ALWAYS be "gallery" for uploaded product images (never "services", "generic", or "about" — those layouts do not show imageUrl).
 - Titles/body should match owner intent (professional, short).`,
-    prompt: `Owner request: ${input.ownerMessage}
+    prompt: `${pinnedBrief}Owner request: ${input.ownerMessage}
 
 Uploaded images:
 ${attachmentList}
@@ -143,7 +151,7 @@ Return JSON plan.`,
   }
 
   return {
-    plan: planImagePlacementFallback(snapshot, input.ownerMessage),
+    plan: planImagePlacementFallback(snapshot, input.ownerMessage, input.selectedTarget),
     snapshot,
     usedLlm: false,
   };

@@ -155,7 +155,7 @@ export function enumerateAllowlistedFields(
       ? (section.actionItems as Array<Record<string, unknown>>)
       : [];
     actionItems.forEach((item, itemIndex) => {
-      for (const field of ['name', 'description', 'valueLabel', 'ctaLabel'] as const) {
+      for (const field of ['name', 'description', 'valueLabel', 'ctaLabel', 'imageUrl'] as const) {
         pushEntry(
           entries,
           actionItemFieldPath(sectionIndex, itemIndex, field),

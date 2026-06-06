@@ -8,6 +8,10 @@ export interface SiteSectionSummary {
   hasImageItems: boolean;
   imageItemCount: number;
   itemCount: number;
+  /** Action cards on type=actions sections. */
+  actionItemCount: number;
+  /** Action cards still using gradient placeholder (no uploaded imageUrl). */
+  actionItemsMissingImage: number;
 }
 
 export interface SiteStructureSnapshot {
@@ -41,6 +45,21 @@ function sectionHasImages(
   return { has: withUrl.length > 0, count: withUrl.length };
 }
 
+function actionItemsMissingUploadedImage(
+  actionItems?: Array<{ imageUrl?: string }>
+): { total: number; missing: number } {
+  if (!actionItems?.length) return { total: 0, missing: 0 };
+  const missing = actionItems.filter(
+    (item) =>
+      !(
+        typeof item.imageUrl === 'string' &&
+        item.imageUrl.trim().length > 0 &&
+        item.imageUrl.includes('/uploads/')
+      )
+  ).length;
+  return { total: actionItems.length, missing };
+}
+
 /**
  * Deterministic snapshot of how this site's homepage is structured (config + page renderers).
  */
@@ -51,6 +70,8 @@ export function analyzeSiteStructureForImages(
   const config = parseSiteConfigSource(siteConfigContent);
   const sections: SiteSectionSummary[] = (config?.sections ?? []).map((s, index) => {
     const img = sectionHasImages(s.items);
+    const actionItems = (s as { actionItems?: Array<{ imageUrl?: string }> }).actionItems;
+    const actionSlots = actionItemsMissingUploadedImage(actionItems);
     return {
       index,
       type: String(s.type ?? 'generic').toLowerCase(),
@@ -58,6 +79,8 @@ export function analyzeSiteStructureForImages(
       hasImageItems: img.has,
       imageItemCount: img.count,
       itemCount: s.items?.length ?? 0,
+      actionItemCount: actionSlots.total,
+      actionItemsMissingImage: actionSlots.missing,
     };
   });
 
@@ -85,8 +108,12 @@ export function buildStructureBriefForPlanner(snapshot: SiteStructureSnapshot): 
     lines.push('  (none — site may only use hero + hardcoded blocks)');
   } else {
     for (const s of snapshot.sections) {
+      const actionHint =
+        s.actionItemCount > 0
+          ? ` actionItems=${s.actionItemCount}${s.actionItemsMissingImage > 0 ? ` (${s.actionItemsMissingImage} without imageUrl)` : ''}`
+          : '';
       lines.push(
-        `  [${s.index}] type="${s.type}" title="${s.title}" items=${s.itemCount}${s.hasImageItems ? ` (${s.imageItemCount} with imageUrl)` : ''}`
+        `  [${s.index}] type="${s.type}" title="${s.title}" items=${s.itemCount}${s.hasImageItems ? ` (${s.imageItemCount} with imageUrl)` : ''}${actionHint}`
       );
     }
   }
@@ -127,11 +154,67 @@ function pickInsertAnchorForNewGallery(snapshot: SiteStructureSnapshot): string 
 /** Rule-based fallback when LLM planning is unavailable. */
 export function planImagePlacementFallback(
   snapshot: SiteStructureSnapshot,
-  ownerMessage: string
+  ownerMessage: string,
+  selectedTarget?: { sectionIndex?: number; sectionType?: string; sectionTitle?: string } | null
 ): import('./imagePlacementPlan').ImagePlacementPlan {
   const lower = ownerMessage.toLowerCase();
   const existingGallery = snapshot.sections.find((s) => s.hasImageItems);
   const forceNewSection = wantsNewImageSection(ownerMessage);
+
+  if (
+    selectedTarget?.sectionIndex != null &&
+    snapshot.sections[selectedTarget.sectionIndex]
+  ) {
+    const pinned = snapshot.sections[selectedTarget.sectionIndex]!;
+    if (pinned.type === 'actions' && pinned.actionItemCount > 0) {
+      return {
+        action: 'update_section',
+        sectionType: 'actions',
+        targetSectionIndex: pinned.index,
+        targetSectionTitle: pinned.title,
+        insertAfterSectionType: null,
+        title: pinned.title,
+        body: undefined,
+        reasoning: `Pinned actions section has ${pinned.actionItemCount} card slot(s) for images.`,
+      };
+    }
+  }
+
+  const actionsNeedingImages = snapshot.sections.filter(
+    (s) => s.type === 'actions' && s.actionItemCount > 0 && s.actionItemsMissingImage > 0
+  );
+  if (actionsNeedingImages.length === 1) {
+    const section = actionsNeedingImages[0]!;
+    return {
+      action: 'update_section',
+      sectionType: 'actions',
+      targetSectionIndex: section.index,
+      targetSectionTitle: section.title,
+      insertAfterSectionType: null,
+      title: section.title,
+      body: undefined,
+      reasoning: 'Single actions section with image placeholder cards.',
+    };
+  }
+
+  if (selectedTarget?.sectionTitle) {
+    const byTitle = snapshot.sections.find((s) =>
+      s.title.toLowerCase().includes(selectedTarget.sectionTitle!.toLowerCase()) ||
+      selectedTarget.sectionTitle!.toLowerCase().includes(s.title.toLowerCase())
+    );
+    if (byTitle?.type === 'actions' && byTitle.actionItemCount > 0) {
+      return {
+        action: 'update_section',
+        sectionType: 'actions',
+        targetSectionIndex: byTitle.index,
+        targetSectionTitle: byTitle.title,
+        insertAfterSectionType: null,
+        title: byTitle.title,
+        body: undefined,
+        reasoning: 'Pinned section title matches an actions section with cards.',
+      };
+    }
+  }
 
   if (/\bfirst\s+section\b/i.test(lower) && snapshot.sections.length > 0) {
     const first = snapshot.sections[0];

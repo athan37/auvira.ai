@@ -71,6 +71,25 @@ describe('inferPresentationStyleTarget', () => {
     expect(result.presentationField).toBe('backgroundClass');
   });
 
+  it('routes heading color requests to titleClass', () => {
+    const result = inferPresentationStyleTarget(
+      'change heading color to green',
+      undefined,
+      'Upcoming Events'
+    );
+    expect(result.presentationField).toBe('titleClass');
+    expect(result.confidence).toBe('high');
+  });
+
+  it('routes body text color requests to bodyClass', () => {
+    const result = inferPresentationStyleTarget(
+      'change the body text color to blue',
+      undefined,
+      'About Us'
+    );
+    expect(result.presentationField).toBe('bodyClass');
+  });
+
   it('routes pinned inner card container to cardClass without naming the card', () => {
     const result = inferPresentationStyleTarget(
       'change the background to a blue to green gradient',

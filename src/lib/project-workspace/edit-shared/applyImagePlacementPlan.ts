@@ -1,4 +1,5 @@
 import type { WorkspaceAssetAttachment } from '../workspaceAssetTypes';
+import type { SelectedTargetInput } from './selectedTargetTypes';
 import {
   describeSiteConfigParseFailure,
   parseSiteConfigSource,
@@ -44,6 +45,55 @@ function buildItems(attachments: WorkspaceAssetAttachment[], titles?: string[]) 
 
 function itemHasUploadedImage(item: { imageUrl?: string }): boolean {
   return typeof item.imageUrl === 'string' && item.imageUrl.includes('/uploads/');
+}
+
+type ActionSectionItem = {
+  id?: string;
+  name?: string;
+  description?: string;
+  valueLabel?: string;
+  imageUrl?: string;
+  ctaLabel?: string;
+  actionType?: string;
+};
+
+/** Merge uploads into action card slots, preserving card copy and filling empty imageUrl fields. */
+export function mergeActionSectionItems(
+  existing: ActionSectionItem[] | undefined,
+  attachments: WorkspaceAssetAttachment[]
+): ActionSectionItem[] {
+  if (!existing?.length) {
+    return attachments.map((asset, index) => ({
+      id: `action-${index + 1}`,
+      name: humanizeImageItemTitle(asset.originalName, index),
+      imageUrl: asset.publicUrl,
+      actionType: 'contact',
+    }));
+  }
+
+  const merged = existing.map((item) => ({ ...item }));
+  let attachIdx = 0;
+
+  for (let i = 0; i < merged.length && attachIdx < attachments.length; i++) {
+    if (itemHasUploadedImage(merged[i]!)) continue;
+    merged[i] = {
+      ...merged[i],
+      imageUrl: attachments[attachIdx]!.publicUrl,
+    };
+    attachIdx += 1;
+  }
+
+  while (attachIdx < attachments.length) {
+    merged.push({
+      id: `action-${merged.length + 1}`,
+      name: humanizeImageItemTitle(attachments[attachIdx]!.originalName, attachIdx),
+      imageUrl: attachments[attachIdx]!.publicUrl,
+      actionType: 'contact',
+    });
+    attachIdx += 1;
+  }
+
+  return merged;
 }
 
 /** Merge uploads into a gallery section, replacing empty placeholder slots when present. */
@@ -92,7 +142,8 @@ export function applyImagePlacementToSiteConfig(
   plan: ImagePlacementPlan,
   attachments: WorkspaceAssetAttachment[],
   snapshot: SiteStructureSnapshot,
-  ownerMessage = ''
+  ownerMessage = '',
+  selectedTarget?: SelectedTargetInput | null
 ): string {
   const config = parseSiteConfigSource(siteConfigSource);
   if (!config) {
@@ -104,10 +155,31 @@ export function applyImagePlacementToSiteConfig(
 
   config.sections = stripPlaceholderPhotoSections(config.sections);
 
-  const targetIdx = resolveTargetSectionForImages(ownerMessage, plan, snapshot);
+  const targetIdx = resolveTargetSectionForImages(ownerMessage, plan, snapshot, selectedTarget);
   if (targetIdx >= 0) {
-    const existing = config.sections[targetIdx];
-    const mergedItems = mergeGallerySectionItems(existing.items, attachments);
+    const existing = config.sections[targetIdx] as Record<string, unknown>;
+    const sectionType = String(existing.type ?? '').toLowerCase();
+
+    if (sectionType === 'actions') {
+      const actionItems = mergeActionSectionItems(
+        existing.actionItems as ActionSectionItem[] | undefined,
+        attachments
+      );
+      config.sections[targetIdx] = {
+        ...existing,
+        type: 'actions',
+        actionItems,
+      };
+      return (
+        replaceSiteConfigSectionsInSource(siteConfigSource, config.sections) ??
+        rebuildSiteConfigFile(siteConfigSource, config)
+      );
+    }
+
+    const mergedItems = mergeGallerySectionItems(
+      existing.items as Array<{ title?: string; description?: string; imageUrl?: string }>,
+      attachments
+    );
     config.sections[targetIdx] = {
       ...existing,
       type: 'gallery',

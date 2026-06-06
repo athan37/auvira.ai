@@ -3,7 +3,11 @@ import {
   parseConfigFieldPath,
   readConfigFieldValue,
 } from '@/lib/project-workspace/edit-context/configFieldPaths';
-import { assertSectionColorEditInvariants } from '@/lib/project-workspace/sectionPresentationEdit';
+import type { PresentationStyleField } from '@/lib/project-workspace/edit-context/inferPresentationStyleTarget';
+import {
+  assertSectionColorEditInvariants,
+  type SectionPresentationField,
+} from '@/lib/project-workspace/sectionPresentationEdit';
 import {
   PAGE_TSX,
   SITE_CONFIG,
@@ -35,10 +39,10 @@ export async function verifySourceInvariantsTool(
       }
 
       const section = ctx.editContext.sections.find((s) => s.index === check.sectionIndex);
-      const presentationField =
-        check.field === 'cardClass' ? 'cardClass' : 'backgroundClass';
+      const presentationField = coercePresentationField(check.field);
       const expectedClass =
-        check.expectedValue ?? parseBackgroundFromContent(siteConfig, check.sectionIndex, presentationField);
+        check.expectedValue ??
+        parsePresentationFromContent(siteConfig, check.sectionIndex, presentationField);
 
       if (!expectedClass) {
         continue;
@@ -166,14 +170,30 @@ function readHeroFieldFromSource(content: string, field: string): string | undef
   return match?.[1];
 }
 
-function parseBackgroundFromContent(
+function coercePresentationField(field: unknown): SectionPresentationField {
+  if (
+    field === 'cardClass' ||
+    field === 'titleClass' ||
+    field === 'bodyClass' ||
+    field === 'eyebrowClass'
+  ) {
+    return field;
+  }
+  return 'backgroundClass';
+}
+
+function parsePresentationFromContent(
   content: string,
   sectionIndex: number,
-  field: 'backgroundClass' | 'cardClass' = 'backgroundClass'
+  field: PresentationStyleField = 'backgroundClass'
 ): string {
   const parsed = parseSiteConfigSource(content);
   const section = parsed?.sections?.[sectionIndex] as
-    | { presentation?: { backgroundClass?: string; cardClass?: string } }
+    | {
+        presentation?: Partial<
+          Record<'backgroundClass' | 'cardClass' | 'titleClass' | 'bodyClass' | 'eyebrowClass', string>
+        >;
+      }
     | undefined;
   const value = section?.presentation?.[field];
   return value?.trim() ?? '';

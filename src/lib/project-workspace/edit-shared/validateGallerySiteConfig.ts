@@ -38,7 +38,7 @@ export function stripPlaceholderPhotoSections(
 }
 
 /**
- * Confirms siteConfig contains a gallery section with every uploaded image URL.
+ * Confirms siteConfig contains a gallery or actions section with every uploaded image URL.
  */
 export function validateGalleryInSiteConfigSource(
   siteConfigSource: string,
@@ -55,6 +55,37 @@ export function validateGalleryInSiteConfigSource(
   }
   if (!config.sections?.length) {
     return { ok: false, reason: 'siteConfig has no sections' };
+  }
+
+  const actionCandidates = config.sections.filter((s) => {
+    if (String(s.type ?? '').toLowerCase() !== 'actions') return false;
+    const actionItems = (s as { actionItems?: Array<{ imageUrl?: string }> }).actionItems ?? [];
+    return actionItems.some(
+      (item) => typeof item.imageUrl === 'string' && item.imageUrl.includes('/uploads/')
+    );
+  });
+
+  if (actionCandidates.length > 0) {
+    const actionSection =
+      actionCandidates.find((s) => {
+        const actionItems = (s as { actionItems?: Array<{ imageUrl?: string }> }).actionItems ?? [];
+        const missing = attachments.filter(
+          (a) => !actionItems.some((item) => item.imageUrl === a.publicUrl)
+        );
+        return missing.length === 0;
+      }) ?? actionCandidates[actionCandidates.length - 1];
+
+    const actionItems =
+      (actionSection as { actionItems?: Array<{ imageUrl?: string }> }).actionItems ?? [];
+    const missing = attachments.filter(
+      (a) => !actionItems.some((item) => item.imageUrl === a.publicUrl)
+    );
+    if (missing.length === 0) {
+      return {
+        ok: true,
+        reason: `Actions section "${actionSection.title}" has ${attachments.length} image(s)`,
+      };
+    }
   }
 
   const galleryCandidates = config.sections.filter(

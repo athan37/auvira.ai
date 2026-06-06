@@ -1,12 +1,34 @@
-import { extractSectionBackgroundClassFromMessage, resolveSectionBackgroundClassForEdit } from '@/lib/builder/sectionPresentation';
+import {
+  resolveSectionBackgroundClassForEdit,
+  resolveSectionTextClassForEdit,
+} from '@/lib/builder/sectionPresentation';
 import {
   applySectionBackgroundEdit,
   sectionBackgroundEditFromAgentOptions,
+  type SectionPresentationField,
 } from '@/lib/project-workspace/sectionPresentationEdit';
 import type { DomainToolContext, DomainToolResult } from './types';
 
+const TEXT_PRESENTATION_FIELDS = new Set<SectionPresentationField>([
+  'titleClass',
+  'bodyClass',
+  'eyebrowClass',
+]);
+
+function coercePresentationField(value: unknown): SectionPresentationField {
+  if (
+    value === 'cardClass' ||
+    value === 'titleClass' ||
+    value === 'bodyClass' ||
+    value === 'eyebrowClass'
+  ) {
+    return value;
+  }
+  return 'backgroundClass';
+}
+
 /**
- * Apply section background via the unified presentation pipeline.
+ * Apply section presentation style via the unified presentation pipeline.
  */
 export async function applySectionBackgroundTool(
   ctx: DomainToolContext,
@@ -26,27 +48,46 @@ export async function applySectionBackgroundTool(
     };
   }
 
-  const presentationField =
-    params.presentationField === 'cardClass' || params.presentationField === 'backgroundClass'
-      ? params.presentationField
-      : 'backgroundClass';
+  const presentationField = coercePresentationField(params.presentationField);
+  const isTextField = TEXT_PRESENTATION_FIELDS.has(presentationField);
   const ownerMessage = ctx.editContext.effectiveMessage ?? ctx.editContext.ownerMessage ?? '';
 
   const section = ctx.editContext.sections.find((s) => s.index === sectionIndex);
-  const backgroundClass = resolveSectionBackgroundClassForEdit(ownerMessage, {
-    backgroundClass:
-      typeof params.backgroundClass === 'string' ? params.backgroundClass : undefined,
-    backgroundColor:
-      typeof params.backgroundColor === 'string' ? params.backgroundColor : undefined,
-    color: typeof params.color === 'string' ? params.color : undefined,
-  });
 
-  if (!backgroundClass) {
+  const textClass = isTextField
+    ? resolveSectionTextClassForEdit(ownerMessage, {
+        textClass: typeof params.textClass === 'string' ? params.textClass : undefined,
+        color:
+          typeof params.backgroundColor === 'string'
+            ? params.backgroundColor
+            : typeof params.color === 'string'
+              ? params.color
+              : undefined,
+      })
+    : null;
+
+  const backgroundClass = !isTextField
+    ? resolveSectionBackgroundClassForEdit(ownerMessage, {
+        backgroundClass:
+          typeof params.backgroundClass === 'string' ? params.backgroundClass : undefined,
+        backgroundColor:
+          typeof params.backgroundColor === 'string' ? params.backgroundColor : undefined,
+        color: typeof params.color === 'string' ? params.color : undefined,
+      })
+    : null;
+
+  const appliedClass = isTextField ? textClass : backgroundClass;
+
+  if (!appliedClass) {
     return {
       ok: false,
       changedFiles: [],
       summary: '',
-      invariantErrors: ['Could not resolve background class from request'],
+      invariantErrors: [
+        isTextField
+          ? 'Could not resolve text class from request'
+          : 'Could not resolve background class from request',
+      ],
     };
   }
 
@@ -64,9 +105,13 @@ export async function applySectionBackgroundTool(
     },
     ''
   );
-  pipelineInput.backgroundClass = backgroundClass;
   pipelineInput.presentationField = presentationField;
   pipelineInput.workspace.ownerMessage = ownerMessage;
+  if (isTextField) {
+    pipelineInput.textClass = appliedClass;
+  } else {
+    pipelineInput.backgroundClass = appliedClass;
+  }
 
   const result = await applySectionBackgroundEdit(pipelineInput);
 

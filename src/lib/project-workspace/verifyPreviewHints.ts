@@ -58,6 +58,7 @@ export function isTextColorEditRequest(ownerMessage: string): boolean {
   }
   return (
     messageHasKeyword(lower, 'headline') ||
+    messageHasKeyword(lower, 'heading') ||
     messageHasKeyword(lower, 'title') ||
     messageHasKeyword(lower, 'text')
   );

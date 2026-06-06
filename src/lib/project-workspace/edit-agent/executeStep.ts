@@ -118,9 +118,16 @@ export async function executeStep(
       if (fresh) toolCtx.afterFiles[rel] = fresh;
     }
     if (result.evidence?.backgroundClass && toolCtx.editContext.verificationContract.checks.length) {
+      const presentationField =
+        typeof result.evidence.presentationField === 'string'
+          ? result.evidence.presentationField
+          : undefined;
       for (const check of toolCtx.editContext.verificationContract.checks) {
         if (check.kind === 'section_background') {
           check.expectedValue = result.evidence.backgroundClass;
+          if (presentationField) {
+            check.field = presentationField;
+          }
         }
       }
     }

@@ -7,10 +7,17 @@ import {
   colorNameToBackgroundClass,
   extractSectionBackgroundClassFromMessage,
   formatSectionBackgroundChangeSummary,
+  formatSectionTextColorChangeSummary,
+  resolveSectionTextClassForEdit,
 } from '@/lib/builder/sectionPresentation';
 import { normalizeTailwindBackgroundClass } from '@/lib/builder/tailwindBackgroundResolver';
 import { normalizeGradientBackgroundClass } from '@/lib/builder/sectionPresentation';
-import { tailwindConfigCoversBackgroundClass, isEmitableTailwindBackgroundClass } from '@/lib/builder/tailwindPresentationSupport';
+import {
+  tailwindConfigCoversBackgroundClass,
+  tailwindConfigCoversTextClass,
+  isEmitableTailwindBackgroundClass,
+  isEmitableTailwindTextClass,
+} from '@/lib/builder/tailwindPresentationSupport';
 import { appendSiteConfigPresentationSyncExport, hasInvalidNextJsPageExports, sanitizeSourceForPublish } from '@/lib/site-manager/siteConfigAgentMarkers';
 import { parseSiteConfigSource } from '@/lib/site-manager/siteConfigParser';
 import {
@@ -41,7 +48,9 @@ import {
   presentationWiringIssues,
   sectionPresentationBackgroundClass,
   sectionPresentationCardClass,
+  sectionPresentationTextClass,
   sectionRendererUsesPresentationResolver,
+  sectionRendererUsesTitleClassResolver,
 } from './previewReflectsSiteConfig';
 import type { WebsiteEditAgentOptions } from './edit-shared/types';
 
@@ -64,13 +73,35 @@ export interface SectionPresentationWorkspace {
   ownerMessage?: string;
 }
 
+/** Which presentation token to update on a section. */
+export type SectionPresentationField =
+  | 'backgroundClass'
+  | 'cardClass'
+  | 'titleClass'
+  | 'bodyClass'
+  | 'eyebrowClass';
+
+const TEXT_PRESENTATION_FIELDS = new Set<SectionPresentationField>([
+  'titleClass',
+  'bodyClass',
+  'eyebrowClass',
+]);
+
+function isTextPresentationField(
+  field: SectionPresentationField
+): field is 'titleClass' | 'bodyClass' | 'eyebrowClass' {
+  return TEXT_PRESENTATION_FIELDS.has(field);
+}
+
 export interface ApplySectionBackgroundEditInput {
   workspace: SectionPresentationWorkspace;
   sectionTarget: SectionBackgroundTarget;
   /** Which presentation token to update (default section wrapper background). */
-  presentationField?: 'backgroundClass' | 'cardClass';
-  /** Explicit Tailwind class (e.g. bg-red-600). Takes precedence over colorName. */
+  presentationField?: SectionPresentationField;
+  /** Explicit Tailwind class (e.g. bg-red-600 or text-green-600). Takes precedence over colorName. */
   backgroundClass?: string;
+  /** Explicit Tailwind text class when presentationField is titleClass/bodyClass/eyebrowClass. */
+  textClass?: string;
   /** Color word from owner message when backgroundClass is omitted. */
   colorName?: string;
   projectInfraStatus: ProjectInfraStatus;
@@ -95,7 +126,7 @@ export interface AssertSectionColorEditInvariantsInput {
   sectionIndex: number;
   rendererComponent: string;
   expectedBackgroundClass: string;
-  presentationField?: 'backgroundClass' | 'cardClass';
+  presentationField?: SectionPresentationField;
   infraBaselineReady: boolean;
   changedFiles: string[];
   /** tailwind.config.js content before any pipeline tailwind mutation (infra-ready guard). */
@@ -124,8 +155,30 @@ function readWriteAdapter(workspace: SectionPresentationWorkspace) {
   };
 }
 
-function buildSummary(sectionTitle: string, backgroundClass: string, ownerMessage?: string): string {
-  return formatSectionBackgroundChangeSummary(sectionTitle, backgroundClass, ownerMessage);
+function buildSummary(
+  sectionTitle: string,
+  appliedClass: string,
+  ownerMessage?: string,
+  presentationField: SectionPresentationField = 'backgroundClass'
+): string {
+  if (isTextPresentationField(presentationField)) {
+    return formatSectionTextColorChangeSummary(sectionTitle, appliedClass, presentationField);
+  }
+  return formatSectionBackgroundChangeSummary(sectionTitle, appliedClass, ownerMessage);
+}
+
+function readPresentationClass(
+  siteConfigContent: string,
+  sectionIndex: number,
+  presentationField: SectionPresentationField
+): string | null {
+  if (presentationField === 'cardClass') {
+    return sectionPresentationCardClass(siteConfigContent, sectionIndex);
+  }
+  if (isTextPresentationField(presentationField)) {
+    return sectionPresentationTextClass(siteConfigContent, sectionIndex, presentationField);
+  }
+  return sectionPresentationBackgroundClass(siteConfigContent, sectionIndex);
 }
 
 /** Hard source invariants after a section background edit. */
@@ -145,18 +198,25 @@ export function assertSectionColorEditInvariants(
     changedFiles,
   } = input;
 
-  const actualClass =
-    presentationField === 'cardClass'
-      ? sectionPresentationCardClass(siteConfigContent, sectionIndex)
-      : sectionPresentationBackgroundClass(siteConfigContent, sectionIndex);
+  const actualClass = readPresentationClass(siteConfigContent, sectionIndex, presentationField);
   if (actualClass !== expectedBackgroundClass) {
     errors.push(
       `siteConfig section ${sectionIndex} ${presentationField} is "${actualClass ?? 'missing'}", expected "${expectedBackgroundClass}"`
     );
   }
 
-  if (presentationField === 'backgroundClass' && !sectionRendererUsesPresentationResolver(pageContent, rendererComponent)) {
+  if (
+    presentationField === 'backgroundClass' &&
+    !sectionRendererUsesPresentationResolver(pageContent, rendererComponent)
+  ) {
     errors.push(`${rendererComponent} does not use resolveSectionBackground`);
+  }
+
+  if (
+    presentationField === 'titleClass' &&
+    !sectionRendererUsesTitleClassResolver(pageContent, rendererComponent)
+  ) {
+    errors.push(`${rendererComponent} does not use resolveSectionTitleClass`);
   }
 
   const wiringIssues = presentationWiringIssues(siteConfigContent, pageContent);
@@ -169,12 +229,20 @@ export function assertSectionColorEditInvariants(
     errors.push('page.tsx contains invalid Next.js agent export stubs (must be sanitized)');
   }
 
-  if (tailwindContent && !tailwindConfigCoversBackgroundClass(tailwindContent, expectedBackgroundClass)) {
-    errors.push(`tailwind.config.js does not cover class "${expectedBackgroundClass}"`);
+  if (tailwindContent) {
+    const coversClass = isTextPresentationField(presentationField)
+      ? tailwindConfigCoversTextClass(tailwindContent, expectedBackgroundClass)
+      : tailwindConfigCoversBackgroundClass(tailwindContent, expectedBackgroundClass);
+    if (!coversClass) {
+      errors.push(`tailwind.config.js does not cover class "${expectedBackgroundClass}"`);
+    }
   }
 
-  if (!isEmitableTailwindBackgroundClass(expectedBackgroundClass)) {
-    errors.push(`background class "${expectedBackgroundClass}" is not a valid Tailwind utility`);
+  const isValidClass = isTextPresentationField(presentationField)
+    ? isEmitableTailwindTextClass(expectedBackgroundClass)
+    : isEmitableTailwindBackgroundClass(expectedBackgroundClass);
+  if (!isValidClass) {
+    errors.push(`presentation class "${expectedBackgroundClass}" is not a valid Tailwind utility`);
   }
 
   if (infraBaselineReady) {
@@ -238,23 +306,34 @@ export async function applySectionBackgroundEdit(
 ): Promise<ApplySectionBackgroundEditResult> {
   const { workspace, sectionTarget, projectInfraStatus } = input;
   const presentationField = input.presentationField ?? 'backgroundClass';
+  const isTextField = isTextPresentationField(presentationField);
   const options = workspaceOptions(workspace);
   const infraReady = projectInfraStatus.infraBaselineReady === true;
 
-  const rawBackgroundClass =
-    input.backgroundClass?.trim() ||
-    (workspace.ownerMessage
-      ? extractSectionBackgroundClassFromMessage(workspace.ownerMessage)
-      : null) ||
-    (input.colorName
-      ? colorNameToBackgroundClass(input.colorName, workspace.ownerMessage)
-      : '');
-  const backgroundClass = rawBackgroundClass
-    ? rawBackgroundClass.includes('gradient')
-      ? normalizeGradientBackgroundClass(rawBackgroundClass, workspace.ownerMessage)
-      : normalizeTailwindBackgroundClass(rawBackgroundClass, workspace.ownerMessage)
+  const rawAppliedClass = isTextField
+    ? input.textClass?.trim() ||
+      resolveSectionTextClassForEdit(workspace.ownerMessage ?? '', {
+        textClass: input.textClass,
+        color: input.colorName,
+      }) ||
+      ''
+    : input.backgroundClass?.trim() ||
+      (workspace.ownerMessage
+        ? extractSectionBackgroundClassFromMessage(workspace.ownerMessage)
+        : null) ||
+      (input.colorName
+        ? colorNameToBackgroundClass(input.colorName, workspace.ownerMessage)
+        : '');
+
+  const appliedClass = rawAppliedClass
+    ? isTextField
+      ? rawAppliedClass.trim()
+      : rawAppliedClass.includes('gradient')
+        ? normalizeGradientBackgroundClass(rawAppliedClass, workspace.ownerMessage)
+        : normalizeTailwindBackgroundClass(rawAppliedClass, workspace.ownerMessage)
     : '';
-  if (!backgroundClass) {
+
+  if (!appliedClass) {
     return {
       ok: false,
       backgroundClass: '',
@@ -266,7 +345,11 @@ export async function applySectionBackgroundEdit(
         rendererComponentForSectionType(sectionTarget.sectionType),
       changedFiles: [],
       summary: '',
-      invariantErrors: ['backgroundClass or colorName is required'],
+      invariantErrors: [
+        isTextField
+          ? 'textClass or colorName is required for text color edits'
+          : 'backgroundClass or colorName is required',
+      ],
     };
   }
 
@@ -279,7 +362,7 @@ export async function applySectionBackgroundEdit(
   if (!siteConfigBefore) {
     return {
       ok: false,
-      backgroundClass,
+      backgroundClass: appliedClass,
       sectionIndex,
       sectionType: sectionTarget.sectionType,
       sectionTitle: sectionTarget.title ?? `section ${sectionIndex}`,
@@ -296,29 +379,30 @@ export async function applySectionBackgroundEdit(
     section?.title ?? sectionTarget.title ?? `section ${sectionIndex}`;
   const sectionType = sectionTarget.sectionType || String(section?.type ?? 'generic');
 
-  const colorName = input.colorName ?? backgroundClass.replace(/^bg-/, '');
-  const presentationPatch =
-    presentationField === 'cardClass'
-      ? { cardClass: backgroundClass }
-      : { backgroundClass };
-  const updated = input.backgroundClass
-    ? updateSectionPresentationInSource(siteConfigBefore, sectionIndex, presentationPatch)
-    : updateSectionBackgroundColorInSource(
-        siteConfigBefore,
-        sectionIndex,
-        colorName,
-        workspace.ownerMessage
-      );
+  const colorName = input.colorName ?? appliedClass.replace(/^(?:bg-|text-)/, '');
+  const presentationPatch = isTextField
+    ? { [presentationField]: appliedClass }
+    : presentationField === 'cardClass'
+      ? { cardClass: appliedClass }
+      : { backgroundClass: appliedClass };
+
+  const updated =
+    isTextField || input.textClass || input.backgroundClass
+      ? updateSectionPresentationInSource(siteConfigBefore, sectionIndex, presentationPatch)
+      : updateSectionBackgroundColorInSource(
+          siteConfigBefore,
+          sectionIndex,
+          colorName,
+          workspace.ownerMessage
+        );
 
   const presentationAlreadyCorrect =
-    presentationField === 'cardClass'
-      ? sectionPresentationCardClass(siteConfigBefore, sectionIndex) === backgroundClass
-      : sectionPresentationBackgroundClass(siteConfigBefore, sectionIndex) === backgroundClass;
+    readPresentationClass(siteConfigBefore, sectionIndex, presentationField) === appliedClass;
 
   if ((!updated || updated === siteConfigBefore) && !presentationAlreadyCorrect) {
     return {
       ok: false,
-      backgroundClass,
+      backgroundClass: appliedClass,
       sectionIndex,
       sectionType,
       sectionTitle,
@@ -351,10 +435,10 @@ export async function applySectionBackgroundEdit(
     }
 
     const tailwindBeforeInfra = tailwindBefore;
-    if (
-      tailwindBeforeInfra &&
-      !tailwindConfigCoversBackgroundClass(tailwindBeforeInfra, backgroundClass)
-    ) {
+    const tailwindCovers = isTextField
+      ? tailwindConfigCoversTextClass
+      : tailwindConfigCoversBackgroundClass;
+    if (tailwindBeforeInfra && !tailwindCovers(tailwindBeforeInfra, appliedClass)) {
       const patched = await ensureTailwindPresentationSupport(options);
       if (patched) changedFiles.push('tailwind.config.js');
     }
@@ -396,18 +480,18 @@ export async function applySectionBackgroundEdit(
     tailwindContent: tailwindAfter,
     sectionIndex,
     rendererComponent,
-    expectedBackgroundClass: backgroundClass,
+    expectedBackgroundClass: appliedClass,
     presentationField,
     infraBaselineReady: infraReady,
     changedFiles,
     tailwindContentBefore: tailwindBefore,
   });
 
-  const summary = buildSummary(sectionTitle, backgroundClass, workspace.ownerMessage);
+  const summary = buildSummary(sectionTitle, appliedClass, workspace.ownerMessage, presentationField);
 
   return {
     ok: invariantErrors.length === 0,
-    backgroundClass,
+    backgroundClass: appliedClass,
     sectionIndex,
     sectionType,
     sectionTitle,
@@ -470,9 +554,18 @@ interface PresentationSectionTarget {
   title: string;
   rendererComponent: string;
   backgroundClass: string;
+  presentationField: SectionPresentationField;
 }
 
-/** Sections with a persisted presentation.backgroundClass in siteConfig. */
+const TRACKED_PRESENTATION_FIELDS: SectionPresentationField[] = [
+  'backgroundClass',
+  'cardClass',
+  'titleClass',
+  'bodyClass',
+  'eyebrowClass',
+];
+
+/** Sections with persisted presentation style tokens in siteConfig. */
 export function listSectionsWithPresentationBackground(
   siteConfigContent: string
 ): PresentationSectionTarget[] {
@@ -484,18 +577,21 @@ export function listSectionsWithPresentationBackground(
     const section = parsed.sections[i] as {
       type?: string;
       title?: string;
-      presentation?: { backgroundClass?: string };
+      presentation?: Partial<Record<SectionPresentationField, string>>;
     };
-    const backgroundClass = section.presentation?.backgroundClass?.trim();
-    if (!backgroundClass) continue;
     const sectionType = String(section.type ?? 'generic');
-    targets.push({
-      sectionIndex: i,
-      sectionType,
-      title: section.title ?? `section ${i}`,
-      rendererComponent: rendererComponentForSectionType(sectionType),
-      backgroundClass,
-    });
+    for (const field of TRACKED_PRESENTATION_FIELDS) {
+      const appliedClass = section.presentation?.[field]?.trim();
+      if (!appliedClass) continue;
+      targets.push({
+        sectionIndex: i,
+        sectionType,
+        title: section.title ?? `section ${i}`,
+        rendererComponent: rendererComponentForSectionType(sectionType),
+        backgroundClass: appliedClass,
+        presentationField: field,
+      });
+    }
   }
   return targets;
 }
@@ -513,16 +609,18 @@ export function findSectionIndexWithBackgroundClassChange(
   let changedIndex: number | null = null;
   for (let i = 0; i < afterSections.length; i++) {
     const afterSection = afterSections[i] as {
-      presentation?: { backgroundClass?: string };
+      presentation?: Partial<Record<SectionPresentationField, string>>;
     };
     const beforeSection = beforeParsed?.sections?.[i] as
-      | { presentation?: { backgroundClass?: string } }
+      | { presentation?: Partial<Record<SectionPresentationField, string>> }
       | undefined;
-    const afterBg = afterSection.presentation?.backgroundClass?.trim();
-    const beforeBg = beforeSection?.presentation?.backgroundClass?.trim();
-    if (afterBg && afterBg !== beforeBg) {
-      if (changedIndex != null) return null;
-      changedIndex = i;
+    for (const field of TRACKED_PRESENTATION_FIELDS) {
+      const afterValue = afterSection.presentation?.[field]?.trim();
+      const beforeValue = beforeSection?.presentation?.[field]?.trim();
+      if (afterValue && afterValue !== beforeValue) {
+        if (changedIndex != null) return null;
+        changedIndex = i;
+      }
     }
   }
   return changedIndex;
@@ -560,6 +658,8 @@ function resolveGateSummaryTarget(
     hasImageItems: false,
     imageItemCount: 0,
     itemCount: 0,
+    actionItemCount: 0,
+    actionItemsMissingImage: 0,
   }));
   const best = findBestSectionTitleMatch(titleCandidates, catalogSections);
   if (best) {
@@ -593,7 +693,7 @@ function buildGateSummary(
   });
   if (!target) return undefined;
 
-  return buildSummary(target.title, target.backgroundClass, ownerMessage);
+  return buildSummary(target.title, target.backgroundClass, ownerMessage, target.presentationField);
 }
 
 function collectSectionColorInvariantErrors(
@@ -612,6 +712,7 @@ function collectSectionColorInvariantErrors(
       sectionIndex: target.sectionIndex,
       rendererComponent: target.rendererComponent,
       expectedBackgroundClass: target.backgroundClass,
+      presentationField: target.presentationField,
       infraBaselineReady,
       changedFiles: ['src/lib/siteConfig.ts', 'src/app/page.tsx', 'tailwind.config.js'],
     });
@@ -648,7 +749,7 @@ export async function enforceSectionColorEditReadyAfterApply(
   if (state.targets.length === 0) {
     return {
       ok: false,
-      errors: ['section_style edit did not persist presentation.backgroundClass in siteConfig'],
+      errors: ['section_style edit did not persist presentation overrides in siteConfig'],
       retried: false,
     };
   }
@@ -683,7 +784,10 @@ export async function enforceSectionColorEditReadyAfterApply(
         title: target.title,
         rendererComponent: target.rendererComponent,
       },
-      backgroundClass: target.backgroundClass,
+      ...(isTextPresentationField(target.presentationField)
+        ? { textClass: target.backgroundClass }
+        : { backgroundClass: target.backgroundClass }),
+      presentationField: target.presentationField,
       projectInfraStatus,
     });
   }

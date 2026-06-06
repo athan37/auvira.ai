@@ -1,5 +1,6 @@
 import type { SiteSectionPresentation } from '@/lib/builder/sectionPresentation';
 import { findPinnedInnerCardContainer } from '@/lib/preview/targetChain';
+import { isTextColorEditRequest } from '@/lib/project-workspace/verifyPreviewHints';
 import type { SelectedTargetContext } from './selectedTargetContext';
 
 export type PresentationStyleField = keyof Pick<
@@ -89,6 +90,31 @@ export function inferPresentationStyleTarget(
       label: 'Section background',
       confidence: 'high',
       reason: 'Owner explicitly named whole section',
+    };
+  }
+
+  if (isTextColorEditRequest(message)) {
+    if (/\b(?:body|subtitle|description|subheading|sub-heading)\b/i.test(message)) {
+      return {
+        presentationField: 'bodyClass',
+        label: 'Section body text',
+        confidence: 'high',
+        reason: 'Owner requested body/subtitle text color',
+      };
+    }
+    if (/\beyebrow\b/i.test(message)) {
+      return {
+        presentationField: 'eyebrowClass',
+        label: 'Section eyebrow',
+        confidence: 'high',
+        reason: 'Owner requested eyebrow text color',
+      };
+    }
+    return {
+      presentationField: 'titleClass',
+      label: 'Section heading',
+      confidence: 'high',
+      reason: 'Owner requested heading/title text color',
     };
   }
 

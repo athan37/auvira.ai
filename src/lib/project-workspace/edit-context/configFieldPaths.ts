@@ -13,7 +13,7 @@ export interface ParsedConfigFieldPath {
 }
 
 const FIELD_PATH_RE =
-  /^(hero\.(headline|subheadline|tagline|primaryCta|secondaryCta)|businessName|contact\.(phone|email|address)|sections\[(\d+)\]\.(title|subtitle|body)|sections\[(\d+)\]\.items\[(\d+)\]\.(title|description|imageUrl|alt|label|href)|sections\[(\d+)\]\.actionItems\[(\d+)\]\.(name|description|valueLabel|ctaLabel))$/;
+  /^(hero\.(headline|subheadline|tagline|primaryCta|secondaryCta)|businessName|contact\.(phone|email|address)|sections\[(\d+)\]\.(title|subtitle|body)|sections\[(\d+)\]\.items\[(\d+)\]\.(title|description|imageUrl|alt|label|href)|sections\[(\d+)\]\.actionItems\[(\d+)\]\.(name|description|valueLabel|ctaLabel|imageUrl))$/;
 
 const CONTACT_EXTRA_LINE_RE = /^contact\.extraLines\[(\d+)\]$/;
 

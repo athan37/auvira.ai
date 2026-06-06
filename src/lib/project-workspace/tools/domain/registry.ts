@@ -131,6 +131,7 @@ export function paramsForSkill(
           : editContext.target.sectionIndex,
       backgroundClass: merged.backgroundClass,
       backgroundColor: merged.backgroundColor ?? merged.color,
+      textClass: merged.textClass,
       presentationField: merged.presentationField,
       sectionType: merged.sectionType ?? editContext.target.sectionType,
       title: merged.title ?? editContext.target.title,

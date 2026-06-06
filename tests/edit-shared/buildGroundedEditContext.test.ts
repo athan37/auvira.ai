@@ -54,6 +54,7 @@ function makeSnap(): SiteWorkspaceSnapshot {
 describe('buildGroundedEditContext', () => {
   it('classifies background vs copy WHAT signals', () => {
     expect(classifyEditWhat('change background of first section to yellow')).toBe('style_background');
+    expect(classifyEditWhat('change heading color to green')).toBe('style_text');
     expect(classifyEditWhat('edit text of testimonials section')).toBe('copy');
   });
 

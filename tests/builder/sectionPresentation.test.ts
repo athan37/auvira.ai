@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   colorNameToBackgroundClass,
+  colorNameToTextClass,
+  extractSectionTextClassFromMessage,
   defaultSectionBackgroundKey,
   extractSectionBackgroundClassFromMessage,
   formatSectionBackgroundChangeSummary,
@@ -35,6 +37,13 @@ describe('sectionPresentation', () => {
     );
     expect(colorNameToBackgroundClass('black', 'use a light black background')).toBe(
       'bg-gray-800'
+    );
+  });
+
+  it('maps color names to Tailwind text classes for heading edits', () => {
+    expect(colorNameToTextClass('green')).toBe('text-green-600');
+    expect(extractSectionTextClassFromMessage('change heading color to green')).toBe(
+      'text-green-600'
     );
   });
 
