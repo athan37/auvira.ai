@@ -5,6 +5,12 @@ import { getLLMClient } from '@/lib/llm/llmClient';
 import { buildGenerateSiteSpecPrompt } from '@/lib/agent/prompts';
 import { generateDesignBriefAgent, getDefaultDesignBrief } from '@/lib/agent/generateDesignBriefAgent';
 import { selectTemplateAgent } from '@/lib/agent/selectTemplateAgent';
+import { validateContentFidelity } from '@/lib/agent/validateContentFidelity';
+import type { FactualSiteData } from '@/lib/agent/schemas';
+import {
+  countCloneObservabilityTurns,
+  recordCloneObservabilityTurn,
+} from '@/lib/observability/recordCloneTurn';
 import mongoose from 'mongoose';
 
 export const runtime = 'nodejs';
@@ -67,6 +73,18 @@ export async function POST(
 
     job.proposedWebsitePlan = specResult.data;
 
+    const fidelityResult = validateContentFidelity(
+      specResult.data,
+      job.factualSiteData as FactualSiteData
+    );
+    job.contentFidelity = {
+      passed: fidelityResult.passed,
+      issues: fidelityResult.issues,
+      criticalIssues: fidelityResult.criticalIssues,
+      warnIssues: fidelityResult.warnIssues,
+      hasCriticalFailures: fidelityResult.hasCriticalFailures,
+    };
+
     // Regenerate design brief based on revised spec
     let designBrief;
     try {
@@ -103,6 +121,7 @@ export async function POST(
         $set: {
           proposedWebsitePlan: job.proposedWebsitePlan,
           suggestedTemplate: job.suggestedTemplate,
+          contentFidelity: job.contentFidelity,
         },
         $push: {
           logs: {
@@ -113,6 +132,26 @@ export async function POST(
         },
       }
     );
+
+    const reviseCount =
+      (job.logs ?? []).filter((entry: { stage?: string }) => entry.stage === 'observability').length + 1;
+    await recordCloneObservabilityTurn({
+      jobId: job._id.toString(),
+      projectTitle: job.projectName || job.sourceUrl || 'Clone job',
+      phase: 'revise-plan',
+      turnId: `${job._id.toString()}-revise-${reviseCount}`,
+      turnIndex: countCloneObservabilityTurns(job.logs) + 1,
+      userMessage: revisionInstruction.trim(),
+      reply: fidelityResult.passed
+        ? 'Plan revised; content fidelity passed.'
+        : `Plan revised; fidelity issues: ${fidelityResult.criticalIssues.join(', ') || fidelityResult.issues.slice(0, 3).join('; ')}`,
+      outcome: fidelityResult.passed ? 'success' : 'failed',
+      verifyPass: fidelityResult.passed,
+      siteConfigParsed: {
+        businessName: (job.businessProfile as { businessName?: string })?.businessName,
+        sections: (specResult.data as { sections?: Array<{ type?: string; title?: string }> })?.sections,
+      },
+    });
 
     return NextResponse.json({
       ok: true,

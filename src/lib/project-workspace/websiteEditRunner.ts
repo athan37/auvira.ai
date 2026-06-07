@@ -29,6 +29,9 @@ export interface WebsiteEditResult {
   editMeta?: import('./edit-shared/types').WebsiteEditAgentResult['editMeta'];
   lastGalleryEdit?: import('./edit-shared/types').LastGalleryEdit;
   editFocusStack?: EditFocusStack;
+  agentLatencyBreakdown?: Record<string, number>;
+  plannerPath?: 'deterministic' | 'explorer' | 'llm' | 'clarification';
+  clarificationAnchor?: import('./edit-shared/types').WebsiteEditAgentResult['clarificationAnchor'];
 }
 
 export interface WebsiteEditOptions {
@@ -124,5 +127,8 @@ export async function runWebsiteEdit(
     editMeta: result.editMeta,
     lastGalleryEdit,
     editFocusStack,
+    agentLatencyBreakdown: result.agentLatencyBreakdown,
+    plannerPath: result.plannerPath,
+    clarificationAnchor: result.clarificationAnchor,
   };
 }

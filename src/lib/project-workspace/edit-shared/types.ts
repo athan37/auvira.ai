@@ -226,4 +226,11 @@ export interface WebsiteEditAgentResult {
   editFocusStack?: EditFocusStack;
   /** Target locked when returning needsClarification. */
   clarificationAnchor?: import('@/lib/chat/projectMessageMetadata').ClarificationAnchor;
+  /** Agent sub-phase latency for observability POST /turns. */
+  agentLatencyBreakdown?: Record<string, number>;
+  /** Which planner path produced the edit plan. */
+  plannerPath?: 'deterministic' | 'explorer' | 'llm' | 'clarification';
+  /** User-facing tips when clarification or zero-change block occurs. */
+  guidanceHints?: string[];
+  ambiguityReasons?: string[];
 }

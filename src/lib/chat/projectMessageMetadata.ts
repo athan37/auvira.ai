@@ -34,6 +34,9 @@ export interface ProjectMessageObservabilityMetadata {
   experimentVariant?: string;
   coachingHintCount?: number;
   coachingApplied?: boolean;
+  /** Hint text injected into the planner when coaching was applied (shown in chat hints panel). */
+  coachingHints?: string[];
+  flowType?: 'edit' | 'clone' | 'generate';
 }
 
 /** Target locked while awaiting owner clarification on a multi-turn edit. */
@@ -70,6 +73,9 @@ export interface ProjectMessageMetadata {
   selectedSurfaceId?: string;
   /** Edit target preserved across clarification turns. */
   clarificationAnchor?: ClarificationAnchor;
+  /** Local tips shown on clarification / failure / zero-change turns. */
+  guidanceHints?: string[];
+  ambiguityReasons?: string[];
 }
 
 export interface ChatApiMessage {
@@ -85,6 +91,10 @@ export interface ChatApiMessage {
   errorStage?: string;
   errorJobId?: string;
   selectedTarget?: SelectedTargetInput;
+  arize?: ProjectMessageArizeMetadata;
+  observability?: ProjectMessageObservabilityMetadata;
+  outcome?: ProjectChatOutcome;
+  guidanceHints?: string[];
 }
 
 export function normalizeAttachmentRefs(
@@ -123,5 +133,9 @@ export function mapMessageForApi(args: {
     errorStage: metadata?.errorStage,
     errorJobId: metadata?.editJobId,
     selectedTarget: metadata?.selectedTarget,
+    arize: metadata?.arize,
+    observability: metadata?.observability,
+    outcome: metadata?.outcome,
+    guidanceHints: metadata?.guidanceHints,
   };
 }

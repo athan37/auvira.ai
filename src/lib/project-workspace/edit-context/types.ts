@@ -1,3 +1,4 @@
+import type { AmbiguityReason } from './assessEditAmbiguity';
 import type { SiteSectionPresentation } from '@/lib/builder/sectionPresentation';
 import type { ConversationTurn } from '@/lib/project-workspace/edit-shared/editAmbiguity';
 import type { EditFocusStack } from '@/lib/project-workspace/edit-shared/types';
@@ -147,4 +148,6 @@ export interface BuildEditContextResult {
   needsClarification: boolean;
   clarificationMessage?: string;
   suggestedReplies?: string[];
+  guidanceHints?: string[];
+  ambiguityReasons?: AmbiguityReason[];
 }

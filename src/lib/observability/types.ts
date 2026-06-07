@@ -1,4 +1,8 @@
+import type { MonitorBuilderType } from './normalizeObservabilityBuilderType';
+
 export type ObservabilityEditOutcome = 'success' | 'failed' | 'clarification';
+
+export type ObservabilityFlowType = 'edit' | 'clone' | 'generate';
 
 export interface ObservabilityCoachingContext {
   coachingHints: string[];
@@ -8,8 +12,15 @@ export interface ObservabilityCoachingContext {
   source: string;
 }
 
+export interface ObservabilityTurnPhase {
+  name: string;
+  durationMs: number;
+  outcome?: string;
+  metadata?: Record<string, unknown>;
+}
+
 export interface RecordTurnPayload {
-  builder_type: 'la_mue_edit';
+  builder_type: MonitorBuilderType;
   turn_id: string;
   turn_index: number;
   user_message: string;
@@ -26,6 +37,8 @@ export interface RecordTurnPayload {
   experiment_variant?: string;
   coaching_applied?: boolean;
   coaching_hint_count?: number;
+  /** Flow metadata serialized for Monitor (flow_type, phase_events, clone_phase). */
+  plan?: Record<string, unknown>;
 }
 
 export interface RecordTurnResponse {
@@ -50,5 +63,7 @@ export interface ObservabilityTurnMetadata {
     experimentVariant?: string;
     coachingHintCount?: number;
     coachingApplied?: boolean;
+    coachingHints?: string[];
+    flowType?: ObservabilityFlowType;
   };
 }

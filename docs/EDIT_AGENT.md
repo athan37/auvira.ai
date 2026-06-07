@@ -11,8 +11,34 @@
 ## Pipeline
 
 ```
-buildEditContext → resolveEditTarget → planEdit → executePlan → domain tools → verify → summarize
+buildEditContext → resolveEditTarget → assessEditAmbiguity → planEdit → executePlan → domain tools → verify → summarize
 ```
+
+## Ambiguity gate (`assessEditAmbiguity`)
+
+Single pre-plan gate in `src/lib/project-workspace/edit-context/assessEditAmbiguity.ts`, called from `buildEditContext` after target resolution and duplicate-copy checks.
+
+| Outcome | When |
+|---------|------|
+| **Apply** | Target + value are clear — e.g. ordinal section + solid color smart-defaults to section **background** |
+| **Clarify** | Unresolved/low target, deictic "this section" without pin, ambiguous style scope (card vs section vs text), copy without new value, compound + low confidence |
+| **Zero-change block** | `executePlan` rolls back and returns `needsClarification` if no files changed (never "Updated the page content.") |
+
+`planEdit` skips the LLM when deterministic/explorer paths miss and target confidence is low — returns a clarification plan instead.
+
+### Tips vs coaching (UI)
+
+| Turn | Badge |
+|------|-------|
+| Any edit with hints | **Hints** click panel — local `guidanceHints` + planner coaching when present |
+| Success + coaching applied | **N hints** badge with coaching text from Site Monitor |
+| Clarification / failure | **Hints** badge with ambiguity-gate tips (+ coaching section if both exist) |
+
+Site Monitor coaching is persisted on assistant messages and shown in the hints panel (not hidden on success). Debug: `NEXT_PUBLIC_OBSERVABILITY_DEBUG=1` for Phoenix trace links.
+
+Metadata: `guidanceHints`, `ambiguityReasons` on assistant messages (`projectMessageMetadata.ts`).
+
+Contract tests: `tests/edit-agent/editAmbiguityGate.contract.test.ts`.
 
 ## Shared modules (`edit-shared/`)
 

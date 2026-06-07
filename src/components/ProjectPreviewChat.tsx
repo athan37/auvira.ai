@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/Input';
 import { cn } from '@/lib/cn';
 import { BORDER, CONTROL, TEXT } from '@/content/productTheme';
 import EditErrorTrace from '@/components/project/EditErrorTrace';
+import ObservabilityTraceChip from '@/components/project/ObservabilityTraceChip';
 import { PreviewTargetChip } from '@/components/project/PreviewTargetChip';
 import { PreviewTargetHint } from '@/components/project/PreviewTargetHint';
 import type { SelectedSection } from '@/lib/preview/sectionSelectionProtocol';
@@ -33,6 +34,7 @@ import {
   MISSING_IMAGE_ATTACHMENT_MESSAGE,
 } from '@/lib/project-workspace/edit-shared/imagePlacementIntent';
 import { LEGACY_PROJECT_UNSUPPORTED_MESSAGE } from '@/lib/project-workspace/requireGitLabProject';
+import type { ProjectMessageArizeMetadata, ProjectMessageObservabilityMetadata } from '@/lib/chat/projectMessageMetadata';
 import { useBrowserSpeechRecognition } from '@/lib/hooks/useBrowserSpeechRecognition';
 
 export interface EditCompleteResult {
@@ -63,10 +65,16 @@ type ChatMessage = {
   errorTrace?: string;
   errorStage?: string;
   errorJobId?: string;
+  arize?: ProjectMessageArizeMetadata;
+  observability?: ProjectMessageObservabilityMetadata;
 };
 
 type ChatHistoryApiMessage = Omit<ChatMessage, 'id'> & {
   timestamp?: string | Date;
+  metadata?: {
+    arize?: ProjectMessageArizeMetadata;
+    observability?: ProjectMessageObservabilityMetadata;
+  };
 };
 
 type ChatHistoryResponse = {
@@ -87,8 +95,13 @@ function hydrateHistoryMessages(raw: ChatHistoryApiMessage[]): ChatMessage[] {
         ? `${timestamp}-${index}`
         : `history-${index}-${msg.content.slice(0, 32)}`
     );
-    const { timestamp: _ts, ...rest } = msg;
-    return { ...rest, id };
+    const { timestamp: _ts, metadata, ...rest } = msg;
+    return {
+      ...rest,
+      id,
+      arize: rest.arize ?? metadata?.arize,
+      observability: rest.observability ?? metadata?.observability,
+    };
   });
 }
 
@@ -398,6 +411,14 @@ function ChatMessageBubble({
         {msg.isError && msg.errorTrace && (
           <EditErrorTrace trace={msg.errorTrace} jobId={msg.errorJobId} stage={msg.errorStage} />
         )}
+        {msg.role === 'assistant' ? (
+          <ObservabilityTraceChip
+            arize={msg.arize}
+            observability={msg.observability}
+            outcome={msg.outcome ?? msg.metadata?.outcome}
+            guidanceHints={msg.guidanceHints ?? msg.metadata?.guidanceHints}
+          />
+        ) : null}
         {msg.imagePreviews && msg.imagePreviews.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1.5">
             {msg.imagePreviews.map((src) => (
@@ -717,6 +738,8 @@ export function ProjectPreviewChat({
     let errorStage = '';
     let previewSynced: boolean | undefined;
     let changedFilesFromEdit: string[] | undefined;
+    let streamArize: ProjectMessageArizeMetadata | undefined;
+    let streamObservability: ProjectMessageObservabilityMetadata | undefined;
     let attachments: WorkspaceAssetAttachment[] = [];
 
     try {
@@ -826,6 +849,12 @@ export function ProjectPreviewChat({
               if (doneChangedFiles) {
                 changedFilesFromEdit = doneChangedFiles;
               }
+              if (result.arize && typeof result.arize === 'object') {
+                streamArize = result.arize as ProjectMessageArizeMetadata;
+              }
+              if (result.observability && typeof result.observability === 'object') {
+                streamObservability = result.observability as ProjectMessageObservabilityMetadata;
+              }
             }
           } catch {
             /* skip malformed SSE */
@@ -855,6 +884,8 @@ export function ProjectPreviewChat({
           errorTrace: editFailed && errorTrace ? errorTrace : undefined,
           errorStage: editFailed && errorStage ? errorStage : undefined,
           errorJobId: editFailed && jobId ? jobId : undefined,
+          arize: streamArize,
+          observability: streamObservability,
         },
       ]);
       onEditComplete?.({

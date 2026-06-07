@@ -7,6 +7,10 @@ import { generateDesignBriefAgent, getDefaultDesignBrief } from '@/lib/agent/gen
 import { ensureClonePreviewWorkspace } from '@/lib/clone/ensureClonePreviewWorkspace';
 import { generateCloneWebsiteFiles } from '@/lib/clone/cloneTemplateSelection';
 import { validateGeneratedFiles } from '@/lib/builder/validateGeneratedFiles';
+import {
+  countCloneObservabilityTurns,
+  recordCloneObservabilityTurn,
+} from '@/lib/observability/recordCloneTurn';
 import { spawn } from 'child_process';
 import { writeFileSync, existsSync, mkdirSync, rmSync } from 'fs';
 import { join } from 'path';
@@ -119,9 +123,27 @@ export async function POST(
     // Step 3: Validate files (sync only, skip full build for speed)
     const validationErrors = validateGeneratedFiles(generated.files);
     if (validationErrors.length > 0) {
+      const errReply =
+        'Generated files have issues: ' + validationErrors.map((e) => `${e.file}: ${e.error}`).join('; ');
+      await recordCloneObservabilityTurn({
+        jobId: params.jobId,
+        createdProjectId: job.createdProjectId,
+        projectTitle: job.projectName || job.sourceUrl || 'Clone job',
+        phase: 'preview-chat',
+        turnId: `${params.jobId}-preview-${crypto.randomUUID()}`,
+        turnIndex: countCloneObservabilityTurns(job.logs) + 1,
+        userMessage: message.trim(),
+        reply: errReply,
+        outcome: 'failed',
+        buildGatePass: false,
+        siteConfigParsed: {
+          businessName: (job.businessProfile as { businessName?: string })?.businessName,
+          sections: (updatedSiteSpec as { sections?: Array<{ type?: string; title?: string }> })?.sections,
+        },
+      });
       return NextResponse.json({
         ok: false,
-        error: 'Generated files have issues: ' + validationErrors.map(e => `${e.file}: ${e.error}`).join('; '),
+        error: errReply,
         stage: 'validation_failed',
       }, { status: 422 });
     }
@@ -138,6 +160,23 @@ export async function POST(
     });
 
     // Next.js HMR will pick up the changes automatically
+    await recordCloneObservabilityTurn({
+      jobId: params.jobId,
+      createdProjectId: job.createdProjectId,
+      projectTitle: job.projectName || job.sourceUrl || 'Clone job',
+      phase: 'preview-chat',
+      turnId: `${params.jobId}-preview-${crypto.randomUUID()}`,
+      turnIndex: countCloneObservabilityTurns(job.logs) + 1,
+      userMessage: message.trim(),
+      reply: summaryOfChanges.join('; ') || 'Preview updated.',
+      outcome: 'success',
+      buildGatePass: true,
+      siteConfigParsed: {
+        businessName: (job.businessProfile as { businessName?: string })?.businessName,
+        sections: (updatedSiteSpec as { sections?: Array<{ type?: string; title?: string }> })?.sections,
+      },
+    });
+
     return NextResponse.json({
       ok: true,
       status: 'preview_ready',

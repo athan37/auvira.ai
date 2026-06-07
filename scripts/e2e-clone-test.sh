@@ -107,7 +107,19 @@ if [ "$HTTP" != "200" ]; then
   exit 1
 fi
 
+echo "6) Observability logs on clone job..."
+JOB_FINAL=$(curl -s "$BASE/api/projects/clone/jobs/$JOB_ID" "${CURL_AUTH[@]}")
+OBS_COUNT=$(printf '%s' "$JOB_FINAL" | grep -c '"stage":"observability"' || true)
+echo "Observability log entries: $OBS_COUNT"
+printf '%s' "$JOB_FINAL" | grep -o '"traceId":"[^"]*"' | head -5 | sed 's/^/  - /' || true
+printf '%s' "$JOB_FINAL" | grep -o '"syncStatus":"[^"]*"' | head -5 | sed 's/^/  - /' || true
+if [ "${OBS_COUNT:-0}" -lt 1 ]; then
+  echo "FAILED: expected at least one observability log entry after process/build-preview"
+  exit 1
+fi
+
 echo ""
 echo "=== E2E PASSED ==="
 echo "Review: $BASE/clone/jobs/$JOB_ID"
 echo "Preview: $PREVIEW_URL"
+echo "Project: $BASE/projects/$PROJECT_ID"

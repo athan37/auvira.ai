@@ -16,6 +16,10 @@ import { isVercelServerless } from '@/lib/runtime/isVercelServerless';
 import { isCloneSandboxPreviewEnabled } from '@/lib/runtime/isCloneSandboxPreviewEnabled';
 import { hasCriticalFidelityFailures } from '@/lib/agent/validateContentFidelity';
 import { ensureClonePreviewProject } from '@/lib/clone/persistClonePreview';
+import {
+  countCloneObservabilityTurns,
+  recordCloneObservabilityTurn,
+} from '@/lib/observability/recordCloneTurn';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
@@ -352,6 +356,23 @@ export async function POST(
     const buildResult = await validateGeneratedSite({ files: generated.files, projectName: uniqueName });
     if (!buildResult.ok) {
       const errMsg = 'Build gate failed: ' + buildResult.errors.join('; ');
+      await recordCloneObservabilityTurn({
+        jobId: params.jobId,
+        createdProjectId: job.createdProjectId,
+        projectTitle: job.projectName || job.sourceUrl || 'Clone job',
+        phase: 'build-preview',
+        turnId: `${params.jobId}-build-preview`,
+        turnIndex: countCloneObservabilityTurns(job.logs) + 1,
+        userMessage: 'Build preview for clone job',
+        reply: errMsg,
+        outcome: 'failed',
+        buildGatePass: false,
+        siteConfigParsed: {
+          businessName: (job.businessProfile as { businessName?: string })?.businessName,
+          sections: (siteSpec as { sections?: Array<{ type?: string; title?: string }> })?.sections,
+        },
+        latencyMs: buildResult.durationMs,
+      });
       await markPreviewStepFailed(jobId, 'quality_check', errMsg);
       throw new Error(errMsg);
     }
@@ -444,6 +465,24 @@ export async function POST(
       await setBuildSummaryStatus(jobId, 'ready');
 
       const handoff = await ensurePreviewProjectResponseFields(jobId, userId);
+
+      await recordCloneObservabilityTurn({
+        jobId: params.jobId,
+        createdProjectId: 'projectId' in handoff ? handoff.projectId : job.createdProjectId,
+        projectTitle: job.projectName || job.sourceUrl || 'Clone job',
+        phase: 'build-preview',
+        turnId: `${params.jobId}-build-preview`,
+        turnIndex: countCloneObservabilityTurns(job.logs) + 1,
+        userMessage: 'Build preview for clone job',
+        reply: 'Preview build passed quality checks.',
+        outcome: 'success',
+        buildGatePass: true,
+        siteConfigParsed: {
+          businessName: (job.businessProfile as { businessName?: string })?.businessName,
+          sections: (siteSpec as { sections?: Array<{ type?: string; title?: string }> })?.sections,
+        },
+        latencyMs: buildResult.durationMs,
+      });
 
       return NextResponse.json({
         ok: true,
@@ -548,6 +587,24 @@ export async function POST(
     await setBuildSummaryStatus(jobId, 'ready');
 
     const handoff = await ensurePreviewProjectResponseFields(jobId, userId);
+
+    await recordCloneObservabilityTurn({
+      jobId: params.jobId,
+      createdProjectId: 'projectId' in handoff ? handoff.projectId : job.createdProjectId,
+      projectTitle: job.projectName || job.sourceUrl || 'Clone job',
+      phase: 'build-preview',
+      turnId: `${params.jobId}-build-preview`,
+      turnIndex: countCloneObservabilityTurns(job.logs) + 1,
+      userMessage: 'Build preview for clone job',
+      reply: 'Preview build passed quality checks.',
+      outcome: 'success',
+      buildGatePass: true,
+      siteConfigParsed: {
+        businessName: (job.businessProfile as { businessName?: string })?.businessName,
+        sections: (siteSpec as { sections?: Array<{ type?: string; title?: string }> })?.sections,
+      },
+      latencyMs: buildResult.durationMs,
+    });
 
     return NextResponse.json({
       ok: true,

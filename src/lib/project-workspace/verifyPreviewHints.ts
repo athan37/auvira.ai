@@ -66,10 +66,33 @@ export function isTextColorEditRequest(ownerMessage: string): boolean {
   );
 }
 
+/** True when owner names a section (ordinal or generic) and a solid color without saying "background". */
+export function isSectionScopedSolidColorRequest(ownerMessage: string): boolean {
+  const normalized = stripPinnedTargetSuffix(ownerMessage);
+  const lower = normalized.toLowerCase();
+  const hasColor = COLOR_NAMES.some((c) => messageHasKeyword(lower, c));
+  if (!hasColor || isTextColorEditRequest(ownerMessage)) {
+    return false;
+  }
+
+  if (/\b(?:first|second|third|fourth|fifth|\d+(?:st|nd|rd|th))\s+section\b/i.test(lower)) {
+    return true;
+  }
+
+  return (
+    /\bsection\b/i.test(lower) &&
+    /\b(?:change|make|turn|set|paint)\b/i.test(lower) &&
+    /\bto\b/i.test(lower)
+  );
+}
+
 /** True when the prompt targets visible background / generic color styling. */
 export function isBackgroundColorEditRequest(ownerMessage: string): boolean {
   const normalized = stripPinnedTargetSuffix(ownerMessage);
   if (isGradientBackgroundRequest(normalized)) {
+    return true;
+  }
+  if (isSectionScopedSolidColorRequest(ownerMessage)) {
     return true;
   }
   const lower = normalized.toLowerCase();

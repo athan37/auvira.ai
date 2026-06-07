@@ -14,6 +14,11 @@ import {
 import type { WebsiteEditAgentOptions, WebsiteEditAgentResult } from '@/lib/project-workspace/edit-shared/types';
 import { clarificationAnchorFromTarget } from '@/lib/project-workspace/edit-context/clarificationAnchor';
 import {
+  defaultGuidanceHints,
+  formatAmbiguityClarification,
+  assessEditAmbiguity,
+} from '@/lib/project-workspace/edit-context/assessEditAmbiguity';
+import {
   executeDomainTool,
 } from '@/lib/project-workspace/tools/domain/registry';
 import type { DomainToolContext } from '@/lib/project-workspace/tools/domain/types';
@@ -39,6 +44,7 @@ export async function executePlan(
   beforeHashes?: Record<string, string>
 ): Promise<WebsiteEditAgentResult> {
   if (plan.needsClarification) {
+    const assessment = assessEditAmbiguity(editContext);
     const ownerMessage =
       plan.clarificationQuestion ?? 'What should I change? Please provide more detail.';
     return {
@@ -47,6 +53,10 @@ export async function executePlan(
       ownerMessage,
       error: ownerMessage,
       suggestedReplies: plan.suggestedReplies,
+      guidanceHints:
+        assessment.guidanceHints.length > 0 ? assessment.guidanceHints : defaultGuidanceHints(),
+      ambiguityReasons:
+        assessment.reasons.length > 0 ? assessment.reasons : ['low_confidence_target'],
       strategy: 'section_config',
       tier: 'L3',
       confidence: 'low',
@@ -56,10 +66,15 @@ export async function executePlan(
   }
 
   if (plan.steps.length === 0) {
+    const formatted = formatAmbiguityClarification(['missing_what']);
     return {
       ok: false,
+      needsClarification: true,
       error: 'Empty edit plan',
-      ownerMessage: 'I could not determine what to change. Please be more specific.',
+      ownerMessage: formatted.message,
+      suggestedReplies: formatted.suggestedReplies,
+      guidanceHints: defaultGuidanceHints(),
+      ambiguityReasons: ['missing_what'],
       strategy: 'section_config',
       tier: 'L3',
       confidence: 'low',
@@ -136,6 +151,64 @@ export async function executePlan(
   }
 
   const summaryResult = await executeDomainTool('summarize_actual_changes', toolCtx, {});
+  const finalChanged = computedChanged.length > 0 ? computedChanged : changedFiles;
+
+  const styleIntent =
+    plan.intent === 'style' ||
+    plan.steps.some((s) => s.skill === 'update_section_style' || s.skill === 'update_theme');
+
+  if (finalChanged.length === 0) {
+    await rollbackChangedFiles(options, snapshot, changedFiles);
+
+    if (!styleIntent) {
+      const ownerMessage =
+        summaryResult.summary ||
+        summaries.join(' ') ||
+        'No changes were needed — that value is already set.';
+      return {
+        ok: true,
+        summary: ownerMessage,
+        ownerMessage,
+        changedFiles: [],
+        strategy:
+          plan.steps[0]?.skill === 'update_contact'
+            ? 'contact_field'
+            : 'section_config',
+        tier: 'L0',
+        confidence: 'high',
+        verifyProfile: plan.intent === 'contact' ? 'contact' : 'generic',
+        editMeta: {
+          planVersion: plan.planVersion ?? 'website-agent',
+          intent: plan.intent,
+          skills: plan.steps.map((s) => s.skill),
+        },
+      };
+    }
+
+    const formatted = formatAmbiguityClarification(['missing_value'], {
+      clarificationMessage:
+        'Sorry — your request was too ambiguous for me to apply safely.\n\n' +
+        'I could not find any file changes to make. Try pinning the section from the preview, ' +
+        'or describe what to change (background, text, copy) and the exact value.',
+      suggestedReplies: editContext.sectionCatalog.numberedReplies.slice(0, 3),
+    });
+    return {
+      ok: false,
+      needsClarification: true,
+      error: 'No files were modified',
+      ownerMessage: formatted.message,
+      suggestedReplies: formatted.suggestedReplies,
+      guidanceHints: defaultGuidanceHints(),
+      ambiguityReasons: ['missing_value'],
+      strategy: 'section_config',
+      tier: 'L3',
+      confidence: 'low',
+      verifyProfile: 'generic',
+      changedFiles: [],
+      clarificationAnchor: clarificationAnchorFromTarget(editContext.target),
+    };
+  }
+
   const ownerMessage = summaryResult.summary || summaries.join(' ') || 'Updated your website.';
 
   const styleStep = plan.steps.find((s) => s.skill === 'update_section_style');
@@ -172,7 +245,7 @@ export async function executePlan(
     ok: true,
     summary: ownerMessage,
     ownerMessage,
-    changedFiles: computedChanged.length > 0 ? computedChanged : changedFiles,
+    changedFiles: finalChanged,
     strategy:
       plan.steps[0]?.skill === 'update_section_style'
         ? 'section_style'

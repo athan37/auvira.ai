@@ -9,6 +9,10 @@ import { extractFactualSiteDataAgent } from '@/lib/agent/extractFactualSiteDataA
 import { validateContentFidelity } from '@/lib/agent/validateContentFidelity';
 import { generateDesignBriefAgent, getDefaultDesignBrief } from '@/lib/agent/generateDesignBriefAgent';
 import { selectTemplateAgent } from '@/lib/agent/selectTemplateAgent';
+import {
+  countCloneObservabilityTurns,
+  recordCloneObservabilityTurn,
+} from '@/lib/observability/recordCloneTurn';
 import mongoose from 'mongoose';
 
 export const runtime = 'nodejs';
@@ -201,6 +205,42 @@ export async function POST(
     job.status = 'review_ready';
     job.currentStageLabel = 'Review the proposed website before building.';
     job.progressPercent = 48;
+
+    const observabilityMeta = await recordCloneObservabilityTurn({
+      jobId: job._id.toString(),
+      projectTitle: job.projectName || job.sourceUrl || 'Clone job',
+      phase: 'process',
+      turnId: `${job._id.toString()}-process`,
+      turnIndex: countCloneObservabilityTurns(job.logs) + 1,
+      userMessage: `Generate site plan from ${job.sourceUrl}`,
+      reply: fidelityResult.passed
+        ? 'Proposed site plan generated; content fidelity passed.'
+        : `Proposed site plan generated; fidelity issues: ${fidelityResult.criticalIssues.join(', ') || fidelityResult.issues.slice(0, 3).join('; ')}`,
+      outcome: fidelityResult.passed ? 'success' : 'failed',
+      verifyPass: fidelityResult.passed,
+      siteConfigParsed: {
+        businessName: (job.businessProfile as { businessName?: string })?.businessName,
+        sections: (proposedSiteSpec as { sections?: Array<{ type?: string; title?: string }> })?.sections,
+      },
+      phaseEvents: [
+        { name: 'site_spec_llm', durationMs: 0, outcome: 'success' },
+        {
+          name: 'content_fidelity',
+          durationMs: 0,
+          outcome: fidelityResult.passed ? 'passed' : 'failed',
+          metadata: { criticalCount: fidelityResult.criticalIssues.length },
+        },
+      ],
+    });
+    if (observabilityMeta) {
+      log(job, 'observability', 'Recorded planning turn', {
+        traceId: observabilityMeta.arize.externalId,
+        grade: observabilityMeta.arize.grade,
+        overallScore: observabilityMeta.arize.overallScore,
+        syncStatus: observabilityMeta.arize.syncStatus,
+      });
+    }
+
     await job.save();
 
     return NextResponse.json({

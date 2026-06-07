@@ -10,6 +10,10 @@ import {
 import { buildPlanEditSystemPrompt, buildPlanEditUserPrompt } from './planEditPrompt';
 import { normalizeEditPlanPayload } from './normalizeEditPlan';
 import { buildDeterministicPlan } from '@/lib/project-workspace/edit-agent/deterministicPlan';
+import {
+  assessEditAmbiguity,
+  formatAmbiguityClarification,
+} from '@/lib/project-workspace/edit-context/assessEditAmbiguity';
 import { guardUnsupportedPlanSkills } from './validatePlanSkills';
 import { guardEditPlanSemantics } from './validateEditPlanSemantics';
 import { applyPinnedElementScopeGuard } from './guardPinnedElementScope';
@@ -41,6 +45,7 @@ export interface PlanEditResult {
   ok: boolean;
   plan?: EditPlan;
   error?: string;
+  plannerPath?: 'deterministic' | 'explorer' | 'llm' | 'clarification';
 }
 
 function isLegacyInput(input: PlanEditInputUnion): input is LegacyPlanEditInput {
@@ -80,6 +85,7 @@ export async function planEdit(input: PlanEditInputUnion): Promise<PlanEditResul
       return {
         ok: true,
         plan: guardEditPlanSemantics(applyPinnedElementScopeGuard(normalized, editContext), editContext),
+        plannerPath: 'deterministic',
       };
     }
   }
@@ -95,6 +101,7 @@ export async function planEdit(input: PlanEditInputUnion): Promise<PlanEditResul
       return {
         ok: true,
         plan: guardEditPlanSemantics(applyPinnedElementScopeGuard(normalized, editContext), editContext),
+        plannerPath: 'explorer',
       };
     }
   }
@@ -106,12 +113,41 @@ export async function planEdit(input: PlanEditInputUnion): Promise<PlanEditResul
       return {
         ok: true,
         plan: guardEditPlanSemantics(applyPinnedElementScopeGuard(guarded, editContext), editContext),
+        plannerPath: 'clarification',
       };
     }
   }
 
   if (deterministicOnly) {
     return { ok: false, error: 'No deterministic plan available' };
+  }
+
+  if (
+    editContext.target.confidence === 'low' ||
+    editContext.target.needsClarification
+  ) {
+    const assessment = assessEditAmbiguity(editContext);
+    const formatted = assessment.blocked
+      ? formatAmbiguityClarification(assessment.reasons, assessment)
+      : formatAmbiguityClarification(['low_confidence_target']);
+    return {
+      ok: true,
+      plan: {
+        planVersion: 'website-agent',
+        needsClarification: true,
+        clarificationQuestion: formatted.message,
+        suggestedReplies:
+          assessment.suggestedReplies ??
+          editContext.sectionCatalog.numberedReplies.slice(0, 4),
+        intent: 'clarification',
+        steps: [],
+        risk: {
+          level: editContext.riskFlags.level,
+          reasons: editContext.riskFlags.reasons,
+        },
+      },
+      plannerPath: 'clarification',
+    };
   }
 
   const llm = getLLMClient();
@@ -154,6 +190,7 @@ export async function planEdit(input: PlanEditInputUnion): Promise<PlanEditResul
       return {
         ok: true,
         plan: guardEditPlanSemantics(applyPinnedElementScopeGuard(normalized, editContext), editContext),
+        plannerPath: 'llm',
       };
     }
 

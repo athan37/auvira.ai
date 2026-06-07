@@ -213,6 +213,8 @@ export async function POST(
       let conversationHistory: { role: 'user' | 'assistant'; content: string }[] = [];
       let coachingContext: ObservabilityCoachingContext | null = null;
       let turnIndex = 0;
+      let lastAgentLatencyBreakdown: Record<string, number> | undefined;
+      let lastPlannerPath: 'deterministic' | 'explorer' | 'llm' | 'clarification' | undefined;
 
       const targetSectionLabel =
         selectedTarget?.sectionTitle ??
@@ -231,6 +233,8 @@ export async function POST(
           businessName?: string;
           sections?: Array<{ type?: string; title?: string; items?: unknown[] }>;
         } | null;
+        agentLatencyBreakdown?: Record<string, number>;
+        plannerPath?: 'deterministic' | 'explorer' | 'llm' | 'clarification';
       }): Promise<ObservabilityTurnMetadata | null> {
         if (!isObservabilityEnabled() || !jobId) return null;
         try {
@@ -249,6 +253,10 @@ export async function POST(
             targetSection: targetSectionLabel,
             needsClarification: args.needsClarification,
             coachingContext,
+            requestedBuilderType: 'la_mue_edit',
+            flowType: 'edit',
+            agentLatencyBreakdown: args.agentLatencyBreakdown ?? lastAgentLatencyBreakdown,
+            plannerPath: args.plannerPath ?? lastPlannerPath,
           });
         } catch {
           return null;
@@ -260,7 +268,10 @@ export async function POST(
         technicalMessage?: string;
         error?: unknown;
         hasPartialChanges?: boolean;
-        extra?: Record<string, unknown>;
+        extra?: Record<string, unknown> & {
+          guidanceHints?: string[];
+          ambiguityReasons?: string[];
+        };
       };
 
       const baseEditContext = (): Record<string, unknown> => ({
@@ -315,6 +326,8 @@ export async function POST(
             changedFiles: Array.isArray(options.extra?.changedPaths)
               ? options.extra.changedPaths.map(String)
               : undefined,
+            guidanceHints: options.extra?.guidanceHints,
+            ambiguityReasons: options.extra?.ambiguityReasons,
             timing: {
               totalMs: editTimer.totalMs(),
               phases: editTimer.summary(),
@@ -504,6 +517,9 @@ export async function POST(
           }
         );
 
+        lastAgentLatencyBreakdown = agentResult.agentLatencyBreakdown;
+        lastPlannerPath = agentResult.plannerPath;
+
         if (agentResult.rawOutput) {
           await appendEditJobLog(jobId, 'agent_stdout', 'Agent output', {
             excerpt: agentResult.rawOutput.slice(0, 2000),
@@ -542,6 +558,8 @@ export async function POST(
                 editJobId: jobId,
                 outcome: 'clarification',
                 suggestedReplies: agentResult.suggestedReplies,
+                guidanceHints: agentResult.guidanceHints,
+                ambiguityReasons: agentResult.ambiguityReasons,
                 errorStage: 'needs_clarification',
                 strategy: agentResult.strategy,
                 clarificationAnchor: agentResult.clarificationAnchor,
@@ -579,7 +597,11 @@ export async function POST(
                 needsClarification: true,
                 ownerMessage: agentResult.ownerMessage || agentResult.error,
                 suggestedReplies: agentResult.suggestedReplies,
+                guidanceHints: agentResult.guidanceHints,
+                ambiguityReasons: agentResult.ambiguityReasons,
                 errorStage: 'needs_clarification',
+                arize: observabilityMeta?.arize ?? { syncStatus: 'pending' },
+                observability: observabilityMeta?.observability,
               },
             });
             closeStream();
@@ -1251,6 +1273,8 @@ export async function POST(
               slowestPhase: slowest?.phase,
               slowestMs: slowest?.durationMs,
             },
+            arize: observabilityMeta?.arize ?? { syncStatus: 'pending' },
+            observability: observabilityMeta?.observability,
           },
         });
       } catch (error) {

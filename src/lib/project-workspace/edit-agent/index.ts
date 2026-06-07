@@ -3,6 +3,7 @@ import { clarificationAnchorFromTarget } from '@/lib/project-workspace/edit-cont
 import { planEdit } from '@/lib/project-workspace/planner/planEdit';
 import { routeAttachmentEdits } from '@/lib/project-workspace/edit-shared/attachmentRouter';
 import { computeWorkspaceHashes } from '@/lib/project-workspace/workspaceEditShared';
+import { AgentPhaseTimer } from '@/lib/observability/agentPhaseTimer';
 import type { AgentStepEvent, WebsiteEditAgentOptions, WebsiteEditAgentResult } from '@/lib/project-workspace/edit-shared/types';
 import { executePlan } from './executePlan';
 
@@ -22,6 +23,8 @@ export async function runWebsiteEditAgent(
   options: WebsiteEditAgentOptions,
   onStep?: (event: AgentStepEvent) => void
 ): Promise<WebsiteEditAgentResult> {
+  const phaseTimer = new AgentPhaseTimer();
+
   emitStep(onStep, 'v3_context', 'Understanding your site', 'active');
 
   let beforeHashes: Record<string, string>;
@@ -39,6 +42,7 @@ export async function runWebsiteEditAgent(
     return attachmentResult;
   }
 
+  phaseTimer.start('agent_context');
   const contextResult = await buildEditContext({
     workspacePath: options.workspacePath,
     mode: options.mode,
@@ -49,6 +53,7 @@ export async function runWebsiteEditAgent(
     editFocusStack: options.editFocusStack,
     selectedTarget: options.selectedTarget,
   });
+  phaseTimer.finish('agent_context');
 
   emitStep(onStep, 'v3_context', 'Understanding your site', 'completed');
 
@@ -59,21 +64,26 @@ export async function runWebsiteEditAgent(
       error: contextResult.clarificationMessage,
       ownerMessage: contextResult.clarificationMessage,
       suggestedReplies: contextResult.suggestedReplies,
+      guidanceHints: contextResult.guidanceHints,
+      ambiguityReasons: contextResult.ambiguityReasons,
       strategy: 'section_config',
       tier: 'L3',
       confidence: 'low',
       clarificationAnchor: clarificationAnchorFromTarget(contextResult.context.target),
+      agentLatencyBreakdown: phaseTimer.toLatencyBreakdown(),
     };
   }
 
   emitStep(onStep, 'v3_plan', 'Planning the edit', 'active');
 
+  phaseTimer.start('agent_plan');
   const planResult = await planEdit({
     editContext: contextResult.context,
     userPrompt: options.ownerMessage,
     hasAttachments: (options.attachments?.length ?? 0) > 0,
     coachingContext: options.coachingContext,
   });
+  phaseTimer.finish('agent_plan');
 
   if (!planResult.ok || !planResult.plan) {
     emitStep(onStep, 'v3_plan', 'Planning the edit', 'failed');
@@ -84,18 +94,22 @@ export async function runWebsiteEditAgent(
       strategy: 'section_config',
       tier: 'L3',
       confidence: 'low',
+      plannerPath: planResult.plannerPath,
+      agentLatencyBreakdown: phaseTimer.toLatencyBreakdown(),
     };
   }
 
   emitStep(onStep, 'v3_plan', 'Planning the edit', 'completed');
   emitStep(onStep, 'v3_execute', 'Applying the edit', 'active');
 
+  phaseTimer.start('agent_execute');
   const result = await executePlan(
     planResult.plan,
     contextResult.context,
     options,
     beforeHashes
   );
+  phaseTimer.finish('agent_execute');
 
   emitStep(
     onStep,
@@ -104,5 +118,9 @@ export async function runWebsiteEditAgent(
     result.ok ? 'completed' : 'failed'
   );
 
-  return result;
+  return {
+    ...result,
+    plannerPath: planResult.plannerPath,
+    agentLatencyBreakdown: phaseTimer.toLatencyBreakdown(),
+  };
 }

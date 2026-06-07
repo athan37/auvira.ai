@@ -3,6 +3,7 @@ import { parseSiteConfigSource } from '@/lib/site-manager/siteConfigParser';
 import { buildEnrichedSiteStructure } from '@/lib/project-workspace/edit-shared/resolveSectionTarget';
 import { buildSiteSectionCatalog } from '@/lib/project-workspace/edit-shared/siteSectionCatalog';
 import { getSiteModel } from '@/lib/project-workspace/site-model/getSiteModel';
+import { assessEditAmbiguity } from './assessEditAmbiguity';
 import { buildVerificationContract } from './buildVerificationContract';
 import { resolveDuplicateCopyTarget } from './resolveDuplicateCopyTarget';
 import { resolveEditTargetAsync } from './resolveEditTarget';
@@ -217,11 +218,26 @@ export async function buildEditContext(
   }
 
   if (target.needsClarification && target.clarificationMessage) {
+    const ambiguity = assessEditAmbiguity(draftContext);
     return {
       context: draftContext,
       needsClarification: true,
       clarificationMessage: target.clarificationMessage,
       suggestedReplies: target.suggestedReplies,
+      guidanceHints: ambiguity.guidanceHints,
+      ambiguityReasons: ambiguity.reasons.length > 0 ? ambiguity.reasons : ['missing_target'],
+    };
+  }
+
+  const ambiguity = assessEditAmbiguity(draftContext);
+  if (ambiguity.blocked) {
+    return {
+      context: draftContext,
+      needsClarification: true,
+      clarificationMessage: ambiguity.clarificationMessage,
+      suggestedReplies: ambiguity.suggestedReplies,
+      guidanceHints: ambiguity.guidanceHints,
+      ambiguityReasons: ambiguity.reasons,
     };
   }
 

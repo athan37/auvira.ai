@@ -2,23 +2,35 @@ import { createObservabilityConversation, createObservabilityProject } from './c
 import { editorConversationId } from './conversationId';
 import { isObservabilityEnabled } from './config';
 
-/** Idempotent register project + editor conversation with Site Monitor. */
+export interface ObservabilityConversationRegistration {
+  conversationId: string;
+  title?: string;
+}
+
+/** Idempotent register project + conversations with Site Monitor. */
 export async function ensureObservabilityRegistration(input: {
   projectId: string;
   title: string;
+  conversations?: ObservabilityConversationRegistration[];
 }): Promise<void> {
   if (!isObservabilityEnabled()) return;
+
+  const conversations = input.conversations ?? [
+    { conversationId: editorConversationId(input.projectId), title: 'Editor chat' },
+  ];
 
   try {
     await createObservabilityProject({
       projectId: input.projectId,
       title: input.title,
     });
-    await createObservabilityConversation({
-      projectId: input.projectId,
-      conversationId: editorConversationId(input.projectId),
-      title: 'Editor chat',
-    });
+    for (const conversation of conversations) {
+      await createObservabilityConversation({
+        projectId: input.projectId,
+        conversationId: conversation.conversationId,
+        title: conversation.title,
+      });
+    }
   } catch (error) {
     console.warn('[observability] registration failed', {
       projectId: input.projectId,
