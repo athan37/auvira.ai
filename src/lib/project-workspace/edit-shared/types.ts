@@ -224,4 +224,6 @@ export interface WebsiteEditAgentResult {
   editFocus?: EditFocus;
   /** Updated focus stack after this edit completes. */
   editFocusStack?: EditFocusStack;
+  /** Target locked when returning needsClarification. */
+  clarificationAnchor?: import('@/lib/chat/projectMessageMetadata').ClarificationAnchor;
 }

@@ -110,12 +110,24 @@ export function normalizeEditFocusStack(raw: unknown): EditFocusStack | null {
 
   const normalized: EditFocus[] = [];
   for (const item of items) {
+    if (!item || typeof item !== 'object' || typeof item.at !== 'string') continue;
+    if (item.kind === 'hero') {
+      normalized.push({
+        kind: 'hero',
+        sectionIndex: typeof item.sectionIndex === 'number' ? item.sectionIndex : -1,
+        sectionTitle: typeof item.sectionTitle === 'string' ? item.sectionTitle : 'Hero',
+        sectionType: 'hero',
+        at: item.at,
+        editJobId: typeof item.editJobId === 'string' ? item.editJobId : undefined,
+        backgroundClass:
+          typeof item.backgroundClass === 'string' ? item.backgroundClass : undefined,
+      });
+      continue;
+    }
     if (
-      item &&
       typeof item.sectionIndex === 'number' &&
       typeof item.sectionTitle === 'string' &&
-      typeof item.kind === 'string' &&
-      typeof item.at === 'string'
+      typeof item.kind === 'string'
     ) {
       normalized.push(item as EditFocus);
     }

@@ -4,19 +4,23 @@ Connects the editor edit stream to [la-mue-site-monitor](https://github.com/lamn
 
 ## Environment variables
 
+Observability is **on by default** when `OBSERVABILITY_API_KEY` is set. Use `=0` to opt out.
+
 ```env
-OBSERVABILITY_ENABLED=0              # master: register, GET context, POST turns
-OBSERVABILITY_COACHING_ENABLED=0     # inject hints into planEdit (requires observability on)
-OBSERVABILITY_API_URL=https://la-mue-site-monitor-production.up.railway.app
+# Optional — omit or =1 for on; set =0 to disable
+OBSERVABILITY_ENABLED=1
+OBSERVABILITY_COACHING_ENABLED=1
+
+OBSERVABILITY_API_URL=https://la-mue-site-monitor-production.up.railway.app  # default if unset
 OBSERVABILITY_TENANT_ID=la-mue
 OBSERVABILITY_API_KEY=<secret>
 OBSERVABILITY_TIMEOUT_MS=5000        # optional, default 5000
 ```
 
-| Flag | When `=1` |
-|------|-----------|
-| `OBSERVABILITY_ENABLED` | `POST /projects`, `POST /conversations`, `GET /context`, `POST /turns`, store `trace_id` on chat messages |
-| `OBSERVABILITY_COACHING_ENABLED` | Append coaching hints to [`buildPlanEditSystemPrompt`](../src/lib/project-workspace/planner/planEditPrompt.ts) |
+| Flag | Default | When off (`=0`) |
+|------|---------|-----------------|
+| `OBSERVABILITY_ENABLED` | on (if API key set) | No sidecar HTTP; edits unchanged |
+| `OBSERVABILITY_COACHING_ENABLED` | on | Turns still recorded; planner prompts unchanged |
 
 When observability is on but coaching is off, context is still fetched and logged to the edit job (`observability_context` log entry) — planner prompts are unchanged.
 
@@ -60,9 +64,19 @@ Filter spans named `builder.turn` in [Phoenix Cloud](https://app.phoenix.arize.c
 
 ## Rollout
 
-1. Enable `OBSERVABILITY_ENABLED=1` on staging; keep coaching off
-2. Confirm turns in monitor `/demo` and Phoenix
-3. Enable `OBSERVABILITY_COACHING_ENABLED=1` after traces look correct
+Defaults are **on** when `OBSERVABILITY_API_KEY` is configured (coaching included).
+
+To run observe-only (record turns without planner hints):
+
+```env
+OBSERVABILITY_COACHING_ENABLED=0
+```
+
+To disable entirely:
+
+```env
+OBSERVABILITY_ENABLED=0
+```
 
 ## Tests
 

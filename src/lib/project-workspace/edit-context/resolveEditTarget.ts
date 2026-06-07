@@ -1,4 +1,9 @@
-import { resolveEffectiveEditMessage } from '@/lib/chat/conversationContextForEdit';
+import {
+  messageRefersToHeroStyle,
+  resolveClarificationAnchorFromHistory,
+  resolveEffectiveEditMessage,
+  resolveExplicitSectionTarget,
+} from '@/lib/chat/conversationContextForEdit';
 import { classifyEditWhat } from '@/lib/project-workspace/edit-context/classifyEditWhat';
 import { resolveSectionWithCatalogLLM } from '@/lib/project-workspace/edit-shared/resolveSectionWithCatalogLLM';
 import type { ConversationTurn } from '@/lib/project-workspace/edit-shared/editAmbiguity';
@@ -117,11 +122,74 @@ export function resolveEditTargetSync(
     return fromSelection;
   }
 
-  const effectiveMessage = resolveEffectiveEditMessage(message, history, editFocusStack, selectedTarget);
+  const explicitSection = resolveExplicitSectionTarget(message, catalog, history);
+  if (explicitSection?.sectionIndex != null && explicitSection.confidence === 'high') {
+    return {
+      kind: 'section',
+      sectionIndex: explicitSection.sectionIndex,
+      sectionType: explicitSection.sectionType,
+      title: explicitSection.title,
+      rendererComponent: explicitSection.rendererComponent,
+      confidence: 'high',
+      candidates: [
+        toCandidate(
+          'section',
+          explicitSection.sectionIndex,
+          explicitSection.sectionType,
+          explicitSection.title,
+          'high',
+          explicitSection.reason ?? 'Current-turn catalog match'
+        ),
+      ],
+      needsClarification: false,
+      reason: explicitSection.reason ?? 'Current-turn catalog match',
+    };
+  }
+
+  const effectiveMessage = resolveEffectiveEditMessage(message, history, editFocusStack, selectedTarget, {
+    catalog,
+  });
   const lower = effectiveMessage.toLowerCase();
 
-  if (/\b(hero|headline|tagline|subheadline)\b/i.test(lower) && !/\bsection\b/i.test(lower)) {
-    return heroTarget('high', 'Hero keyword match');
+  const clarificationAnchor = resolveClarificationAnchorFromHistory(history, {
+    currentMessage: message,
+    catalog,
+  });
+  if (clarificationAnchor?.kind === 'hero' && styleEditNeedsSectionTarget(effectiveMessage)) {
+    return heroTarget('high', 'Clarification anchor: hero');
+  }
+  if (
+    clarificationAnchor?.kind === 'section' &&
+    clarificationAnchor.sectionIndex != null &&
+    styleEditNeedsSectionTarget(effectiveMessage)
+  ) {
+    const section = catalog.sections.find((s) => s.index === clarificationAnchor.sectionIndex);
+    if (section) {
+      return {
+        kind: 'section',
+        sectionIndex: section.index,
+        sectionType: section.type,
+        title: section.title,
+        rendererComponent: section.rendererComponent,
+        confidence: 'high',
+        candidates: [
+          toCandidate(
+            'section',
+            section.index,
+            section.type,
+            section.title,
+            'high',
+            'Clarification anchor: section'
+          ),
+        ],
+        needsClarification: false,
+        reason: 'Clarification anchor: section',
+      };
+    }
+  }
+
+  if (messageRefersToHeroStyle(effectiveMessage)) {
+    return heroTarget('high', 'Hero style target');
   }
 
   const titleCandidates = extractSectionTitleCandidates(effectiveMessage);
@@ -247,6 +315,14 @@ export function resolveEditTargetSync(
   }
 
   const what = classifyEditWhat(effectiveMessage);
+  if (
+    what.startsWith('style_') &&
+    /\b(this|that)\s+section\b/i.test(effectiveMessage) &&
+    messageRefersToHeroStyle(effectiveMessage)
+  ) {
+    return heroTarget('high', 'Deictic hero section reference');
+  }
+
   if (
     what.startsWith('style_') &&
     /\b(this|that)\s+section\b/i.test(effectiveMessage) &&

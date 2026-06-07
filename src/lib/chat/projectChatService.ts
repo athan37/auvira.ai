@@ -17,6 +17,7 @@ import {
   mapMessageForApi,
   normalizeAttachmentRefs,
   type ChatApiMessage,
+  type ClarificationAnchor,
   type ProjectMessageMetadata,
 } from './projectMessageMetadata';
 
@@ -111,17 +112,30 @@ export async function buildConversationHistory(input: {
     projectId: projectObjectId,
     role: { $in: ['user', 'assistant'] },
   })
-    .select('role content')
+    .select('role content metadata')
     .sort({ createdAt: -1 })
     .limit(maxTurns)
     .lean();
 
   return docs
     .reverse()
-    .map((doc) => ({
-      role: doc.role === 'assistant' ? ('assistant' as const) : ('user' as const),
-      content: String(doc.content || '').slice(0, 2000),
-    }));
+    .map((doc) => {
+      const meta = doc.metadata as ProjectMessageMetadata | undefined;
+      const metadata: Record<string, unknown> | undefined =
+        meta?.selectedTarget || meta?.clarificationAnchor
+          ? {
+              ...(meta.selectedTarget ? { selectedTarget: meta.selectedTarget } : {}),
+              ...(meta.clarificationAnchor
+                ? { clarificationAnchor: meta.clarificationAnchor as ClarificationAnchor }
+                : {}),
+            }
+          : undefined;
+      return {
+        role: doc.role === 'assistant' ? ('assistant' as const) : ('user' as const),
+        content: String(doc.content || '').slice(0, 2000),
+        ...(metadata ? { metadata } : {}),
+      };
+    });
 }
 
 /** Most recent gallery placement artifact from assistant message metadata. */

@@ -28,6 +28,7 @@ import {
   assertCoachedMeetsOrBeatsControl,
   buildCatalogClarification,
   COACHING_CARD_NOT_SECTION,
+  COACHING_HERO_NOT_SECTION,
   COACHING_NUMBERED_REPLY,
   COACHING_RECENCY_OVERRIDE,
   COACHING_WRONG_NUMBER_CORRECTION,
@@ -36,6 +37,12 @@ import {
   readSiteConfig,
   runObservabilityAb,
 } from './observabilityAccuracyHarness';
+import {
+  heroClarificationHistoryThroughTurn2,
+  heroClarificationReplaySiteSpec,
+  HERO_CLARIFICATION_TURN3,
+} from '../support/heroClarificationReplaySiteSpec';
+import { mustSucceed } from '../support/llmEditScenario';
 
 describeRunLlmIntegration('observability accuracy hard A/B (control vs coached)', () => {
   let controlPath: string | undefined;
@@ -358,6 +365,52 @@ describeRunLlmIntegration('observability accuracy hard A/B (control vs coached)'
         coachedValid,
         'coached arm should set cardClass gradient without changing section background'
       ).toBe(true);
+    },
+    LLM_TEST_TIMEOUT_MS
+  );
+
+  it(
+    'hero clarification: coached meets control on final gradient turn (HERO_SECTION_CONFUSION)',
+    async () => {
+      const history = heroClarificationHistoryThroughTurn2();
+
+      const ab = await runObservabilityAb({
+        siteSpec: heroClarificationReplaySiteSpec(),
+        ownerMessage: HERO_CLARIFICATION_TURN3,
+        conversationHistory: history,
+        coaching: COACHING_HERO_NOT_SECTION,
+        controlProjectId: 'obs-hero-clarify-control',
+        coachedProjectId: 'obs-hero-clarify-coached',
+      });
+      controlPath = ab.controlWorkspacePath;
+      coachedPath = ab.coachedWorkspacePath;
+
+      const validateHeroEdit = async (workspacePath: string) => {
+        const page = await readSyntheticFile(workspacePath, 'src/app/page.tsx');
+        const siteConfig = await readSyntheticFile(workspacePath, 'src/lib/siteConfig.ts');
+        const aboutBg = sectionBackgroundClass(parseSections(siteConfig)[1] ?? {}) ?? '';
+        return Boolean(page.match(/heroBg/i) && !aboutBg.match(/from-blue|to-green|gradient/i));
+      };
+
+      const controlValid = await validateHeroEdit(controlPath);
+      const coachedValid = await validateHeroEdit(coachedPath);
+      const controlScore = accuracyScore(ab.control, controlValid);
+      const coachedScore = accuracyScore(ab.coached, coachedValid);
+
+      mustSucceed(ab.control, 'control should succeed on hero clarification final turn');
+      mustSucceed(ab.coached, 'coached should succeed on hero clarification final turn');
+
+      assertCoachedMeetsOrBeatsControl({
+        label: 'hero-clarification-gradient',
+        control: ab.control,
+        coached: ab.coached,
+        controlScore,
+        coachedScore,
+      });
+
+      expect(coachedValid, 'coached arm should update hero background without About Us gradient').toBe(
+        true
+      );
     },
     LLM_TEST_TIMEOUT_MS
   );

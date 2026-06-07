@@ -42,6 +42,22 @@ function isDeicticImageMessage(message: string): boolean {
   );
 }
 
+function heroFocusTarget(reason: string): EditTarget {
+  return {
+    kind: 'hero',
+    confidence: 'high',
+    candidates: [
+      {
+        kind: 'hero',
+        confidence: 'high',
+        reason,
+      },
+    ],
+    needsClarification: false,
+    reason,
+  };
+}
+
 /**
  * Resolve deictic references ("that section", "that image") using the edit focus stack.
  */
@@ -54,6 +70,11 @@ export function resolveDeicticTargetFromFocus(
   if (extractSectionTitleCandidates(message).length > 0) return null;
 
   const top = focusStack.items[0]!;
+
+  if (top.kind === 'hero' && styleEditNeedsSectionTarget(message)) {
+    return heroFocusTarget(`Edit focus: hero (${top.sectionTitle})`);
+  }
+
   const section = catalog.sections.find((s) => s.index === top.sectionIndex);
   if (!section) return null;
 
@@ -114,6 +135,11 @@ export function enrichMessageWithEditFocus(
 
   const trimmed = message.trim();
   const top = focusStack.items[0]!;
+
+  if (top.kind === 'hero' && styleEditNeedsSectionTarget(trimmed)) {
+    return `${trimmed} (target: hero)`;
+  }
+
   const targetHint = `section index ${top.sectionIndex}; title "${top.sectionTitle}"`;
 
   if (isGalleryDescriptionRequest(trimmed)) {

@@ -1,16 +1,34 @@
-/** True when OBSERVABILITY_ENABLED=1 and API key + URL are configured. */
+/** Production Site Monitor when OBSERVABILITY_API_URL is unset. */
+export const DEFAULT_OBSERVABILITY_API_URL =
+  'https://la-mue-site-monitor-production.up.railway.app';
+
+function isObservabilityExplicitlyDisabled(): boolean {
+  return process.env.OBSERVABILITY_ENABLED === '0';
+}
+
+function isCoachingExplicitlyDisabled(): boolean {
+  return process.env.OBSERVABILITY_COACHING_ENABLED === '0';
+}
+
+/**
+ * True when observability is on (default) and API key + URL are available.
+ * Set OBSERVABILITY_ENABLED=0 to opt out.
+ */
 export function isObservabilityEnabled(): boolean {
-  if (process.env.OBSERVABILITY_ENABLED !== '1') return false;
+  if (isObservabilityExplicitlyDisabled()) return false;
   return Boolean(
-    process.env.OBSERVABILITY_API_URL?.trim() &&
-      process.env.OBSERVABILITY_API_KEY?.trim()
+    observabilityApiBaseUrl() && process.env.OBSERVABILITY_API_KEY?.trim()
   );
 }
 
-/** True when coaching hints may be injected into planEdit (requires observability on). */
+/**
+ * True when coaching hints may be injected into planEdit (default on when observability is on).
+ * Set OBSERVABILITY_COACHING_ENABLED=0 to record turns without changing the planner.
+ */
 export function isObservabilityCoachingEnabled(): boolean {
   if (!isObservabilityEnabled()) return false;
-  return process.env.OBSERVABILITY_COACHING_ENABLED === '1';
+  if (isCoachingExplicitlyDisabled()) return false;
+  return true;
 }
 
 export function observabilityTenantId(): string {
@@ -18,7 +36,8 @@ export function observabilityTenantId(): string {
 }
 
 export function observabilityApiBaseUrl(): string {
-  const raw = process.env.OBSERVABILITY_API_URL?.trim() ?? '';
+  const raw =
+    process.env.OBSERVABILITY_API_URL?.trim() || DEFAULT_OBSERVABILITY_API_URL;
   return raw.replace(/\/$/, '');
 }
 

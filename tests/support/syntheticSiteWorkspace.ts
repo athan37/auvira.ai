@@ -55,9 +55,12 @@ export type CreateSyntheticWorkspaceOptions = {
 
 const PRESET_KEYS = [
   'pageBg',
+  'heroBg',
   'surfaceBg',
   'mutedBg',
+  'navBg',
   'contactBg',
+  'footerBg',
   'card',
 ] as const;
 
@@ -138,13 +141,29 @@ export function buildSyntheticPageSource(
     })
     .join('\n');
 
-  const presetInit = PRESET_KEYS.map((k) => `${k}: "bg-slate-200"`).join(', ');
+  const presetInit = PRESET_KEYS.map((k) =>
+    k === 'card' ? `${k}: "border bg-white"` : `${k}: "bg-slate-200"`
+  ).join(', ');
 
   return `${SECTION_PRESENTATION_RUNTIME}
 
 import { siteConfig } from "../lib/siteConfig";
 
-const preset = { ${presetInit}, card: "border bg-white" };
+const preset = { ${presetInit} };
+
+function HeroSection() {
+  return (
+    <section
+      data-site-section-id="hero"
+      data-site-section-type="hero"
+      data-site-section-title="Hero"
+      className={"relative overflow-hidden " + preset.heroBg + " px-4 py-24 text-white"}
+    >
+      <h1>{siteConfig.hero.headline}</h1>
+      <p>{siteConfig.hero.subheadline}</p>
+    </section>
+  );
+}
 
 ${components.map((c) => c.source).join('\n\n')}
 
@@ -159,6 +178,7 @@ ${switchCases}
 export default function Home() {
   return (
     <main>
+      <HeroSection />
       {siteConfig.sections.map((section, index) => (
         <SectionRenderer key={index} section={section} />
       ))}

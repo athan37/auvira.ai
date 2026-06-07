@@ -12,6 +12,7 @@ import {
   mergeVerificationContracts,
 } from '@/lib/project-workspace/edit-context/buildVerificationContractFromPlan';
 import type { WebsiteEditAgentOptions, WebsiteEditAgentResult } from '@/lib/project-workspace/edit-shared/types';
+import { clarificationAnchorFromTarget } from '@/lib/project-workspace/edit-context/clarificationAnchor';
 import {
   executeDomainTool,
 } from '@/lib/project-workspace/tools/domain/registry';
@@ -50,6 +51,7 @@ export async function executePlan(
       tier: 'L3',
       confidence: 'low',
       verifyProfile: 'generic',
+      clarificationAnchor: clarificationAnchorFromTarget(editContext.target),
     };
   }
 
@@ -137,8 +139,17 @@ export async function executePlan(
   const ownerMessage = summaryResult.summary || summaries.join(' ') || 'Updated your website.';
 
   const styleStep = plan.steps.find((s) => s.skill === 'update_section_style');
+  const themeStep = plan.steps.find((s) => s.skill === 'update_theme');
   const editFocus =
-    styleStep && editContext.target.sectionIndex != null
+    themeStep && editContext.target.kind === 'hero'
+      ? {
+          kind: 'hero' as const,
+          sectionIndex: -1,
+          sectionTitle: 'Hero',
+          sectionType: 'hero',
+          at: new Date().toISOString(),
+        }
+      : styleStep && editContext.target.sectionIndex != null
       ? {
           kind: 'section_style' as const,
           sectionIndex: editContext.target.sectionIndex,

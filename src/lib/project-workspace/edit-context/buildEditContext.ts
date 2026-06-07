@@ -137,7 +137,8 @@ export async function buildEditContext(
     input.ownerMessage,
     input.conversationHistory ?? [],
     input.editFocusStack,
-    input.selectedTarget
+    input.selectedTarget,
+    { catalog: sectionCatalog }
   );
 
   const target = await resolveEditTargetAsync(

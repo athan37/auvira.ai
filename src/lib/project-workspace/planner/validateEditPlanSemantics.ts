@@ -83,7 +83,23 @@ export function validateEditPlanSemantics(
     }
   }
 
-  if (issues.length === 0) return null;
+  if (issues.length === 0) {
+    const sectionStyleOnHeroThread =
+      editContext.target.kind === 'hero' &&
+      plan.steps.some((step) => step.skill === 'update_section_style') &&
+      !plan.steps.some((step) => step.skill === 'update_theme');
+
+    if (sectionStyleOnHeroThread) {
+      return {
+        ok: true,
+        plan: clarificationPlan(
+          'This edit thread is about the hero background — I will apply a hero theme change, not a content section background. Please confirm the gradient or color again.',
+          ['Blue to green gradient on hero', 'Solid color on hero background', 'Hero at the top — entire background'],
+        ),
+      };
+    }
+    return null;
+  }
 
   const question =
     issues.length === 1

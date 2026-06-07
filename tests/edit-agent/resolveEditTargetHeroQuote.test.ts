@@ -47,4 +47,12 @@ describe('resolveEditTarget hero headline quote', () => {
     expect(target.confidence).toBe('high');
     expect(target.needsClarification).toBe(false);
   });
+
+  it('routes "improve color of this section (hero section)" to hero target', () => {
+    const catalog = buildSiteSectionCatalog(SITE_CONFIG_SNIPPET, '');
+    const message = 'improve color of this section (hero section)';
+    const target = resolveEditTargetSync(message, siteModel(), catalog);
+    expect(target.kind).toBe('hero');
+    expect(target.confidence).toBe('high');
+  });
 });

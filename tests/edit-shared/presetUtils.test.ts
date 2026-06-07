@@ -4,6 +4,7 @@ import {
   extractColorTokenAfterTo,
   isGradientBackgroundRequest,
   parseColorSwap,
+  setPresetHeroBackground,
   swapTailwindColorInText,
 } from '../../src/lib/project-workspace/edit-shared/preset/presetUtils';
 import {
@@ -66,6 +67,18 @@ describe('presetUtils', () => {
     expect(extractColorTokenAfterTo('change background to color red')).toBe('red');
     expect(extractColorTokenAfterTo('change background to a dark blue')).toBe('dark blue');
     expect(extractColorTokenAfterTo('change background to gradient orange')).toBe('orange');
+  });
+
+  it('setPresetHeroBackground updates JS object literal heroBg values', () => {
+    const preset = `{ pageBg: "bg-slate-200", heroBg: "bg-slate-200", card: "border bg-white" }`;
+    const gradient = 'bg-[linear-gradient(135deg,#2563eb_0%,#22c55e_100%)]';
+    const updated = setPresetHeroBackground(preset, gradient);
+    expect(updated).toContain(`heroBg: "${gradient}"`);
+    expect(updated).not.toContain('heroBg: "bg-slate-200"');
+
+    const singleQuoted = `{ heroBg: 'bg-gradient-to-br from-red-800 to-red-900' }`;
+    const next = setPresetHeroBackground(singleQuoted, 'bg-green-600');
+    expect(next).toContain("heroBg: 'bg-green-600'");
   });
 
   it('extractSectionBackgroundClassFromMessage resolves gradient classes with explicit hue', () => {

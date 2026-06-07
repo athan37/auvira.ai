@@ -6,6 +6,8 @@ import {
   extractSectionTitleFromListReply,
   formatConversationForIntentClarifier,
   formatWeightedConversationForPrompt,
+  messageExplicitlyExcludesHero,
+  messageRefersToHeroStyle,
   resolveEffectiveEditMessage,
   wasRecentGalleryImageSectionCreated,
 } from '../../src/lib/chat/conversationContextForEdit';
@@ -202,5 +204,68 @@ describe('conversationContextForEdit', () => {
     ]);
     expect(merged).toContain('Your HVAC Website Should Work as Hard as You Do');
     expect(merged).toContain('#16a34a');
+  });
+
+  it('merges 4-turn hero clarification: hero section → Background color → Blue to green gradient', () => {
+    const history = [
+      { role: 'user' as const, content: 'improve color of this section (hero section)' },
+      {
+        role: 'assistant' as const,
+        content: 'Which color would you like to improve on the hero section?',
+      },
+      { role: 'user' as const, content: 'Background color' },
+      {
+        role: 'assistant' as const,
+        content:
+          'What background color or gradient would you like for this section? For example, solid color or gradient.',
+      },
+    ];
+    const merged = resolveEffectiveEditMessage('Blue to green gradient', history);
+    expect(merged.toLowerCase()).toContain('hero');
+    expect(merged.toLowerCase()).toContain('improve color');
+    expect(merged.toLowerCase()).toContain('gradient');
+  });
+
+  it('messageRefersToHeroStyle ignores explicit not-the-hero scoping', () => {
+    const msg =
+      'Change the first content section (not the hero) background to teal — the one titled Everything You Need to Grow Your Business';
+    expect(messageExplicitlyExcludesHero(msg)).toBe(true);
+    expect(messageRefersToHeroStyle(msg)).toBe(false);
+    expect(messageRefersToHeroStyle('improve color of this section (hero section)')).toBe(true);
+  });
+
+  it('does not merge hero clarification when current turn has explicit catalog section target', async () => {
+    const history = [
+      { role: 'user' as const, content: 'improve color of this section (hero section)' },
+      {
+        role: 'assistant' as const,
+        content: 'Which color would you like to improve on the hero section?',
+      },
+      { role: 'user' as const, content: 'Background color' },
+      {
+        role: 'assistant' as const,
+        content: 'What background color or gradient would you like for this section?',
+      },
+      { role: 'user' as const, content: 'Blue to green gradient' },
+      { role: 'assistant' as const, content: 'Updated hero background.' },
+    ];
+    const servicesMsg = 'Make the section about services have a purple background';
+    const { buildSiteSectionCatalog } = await import(
+      '@/lib/project-workspace/edit-shared/siteSectionCatalog'
+    );
+    const { heroClarificationReplaySiteSpec } = await import(
+      '../support/heroClarificationReplaySiteSpec'
+    );
+    const { buildSyntheticSiteConfigSource, buildSyntheticPageSource } = await import(
+      '../support/syntheticSiteWorkspace'
+    );
+    const spec = heroClarificationReplaySiteSpec();
+    const catalog = buildSiteSectionCatalog(
+      buildSyntheticSiteConfigSource(spec),
+      buildSyntheticPageSource(spec, 'wired')
+    );
+    expect(resolveEffectiveEditMessage(servicesMsg, history, null, null, { catalog })).toBe(
+      servicesMsg
+    );
   });
 });

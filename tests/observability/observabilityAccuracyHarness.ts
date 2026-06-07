@@ -75,6 +75,18 @@ export const COACHING_CARD_NOT_SECTION: ObservabilityCoachingContext = {
   source: 'phoenix_traces',
 };
 
+/** Coaching after hero clarification thread mis-routed to a content section. */
+export const COACHING_HERO_NOT_SECTION: ObservabilityCoachingContext = {
+  coachingHints: [
+    'User clarified hero background across multiple turns — use update_theme with scope hero, not update_section_style.',
+    'Do not route gradient or color follow-ups to About/services sections after hero was named in the thread.',
+  ],
+  constraints: { hero_not_content_section: true },
+  qualitySnapshot: { latest_grade: 'D', latest_overall_score: 0.4, trend: 'declining' },
+  recurringIssues: ['HERO_SECTION_CONFUSION'],
+  source: 'phoenix_traces',
+};
+
 /** Coaching after build-gate failure on Tailwind class edits. */
 export const COACHING_BUILD_GATE: ObservabilityCoachingContext = {
   coachingHints: [

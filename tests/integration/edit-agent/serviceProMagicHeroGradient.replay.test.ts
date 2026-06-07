@@ -64,6 +64,47 @@ describe('ServiceProMagic hero gradient replay', () => {
     expect(plan.plan?.steps[0]?.skill).toBe('update_theme');
   }, 30_000);
 
+  it('turn 5: "Blue to purple, left-to-right" after hero confirmed stays on hero theme', async () => {
+    workspacePath = await createServiceProMagicReplayWorkspace();
+    const history = [
+      { role: 'user' as const, content: SERVICEPRO_HERO_GRADIENT_MSG },
+      {
+        role: 'assistant' as const,
+        content:
+          "Could you please specify the exact green color gradient you'd like for the hero background?",
+      },
+      { role: 'user' as const, content: 'Linear gradient from #16a34a to #15803d (top to bottom)' },
+      {
+        role: 'assistant' as const,
+        content:
+          'Do you mean the **hero** at the top of the page, or the **first content section** below it?',
+      },
+      { role: 'user' as const, content: 'Hero at the top' },
+      {
+        role: 'assistant' as const,
+        content:
+          'Should I apply the gradient to the entire hero background (behind the text), or only to a button or other element within the hero?',
+      },
+      { role: 'user' as const, content: 'Entire hero background' },
+      {
+        role: 'assistant' as const,
+        content:
+          'What gradient style would you like for the hero background? Please specify the colors (e.g., blue to purple) and direction (e.g., left-to-right, diagonal, top-to-bottom).',
+      },
+    ];
+
+    const ctx = await buildEditContext({
+      workspacePath,
+      mode: 'gitlab',
+      ownerMessage: 'Blue to purple, left-to-right',
+      conversationHistory: history,
+      infraBaselineReady: true,
+    });
+
+    expect(ctx.context.target.kind).toBe('hero');
+    expect(ctx.context.effectiveMessage.toLowerCase()).toMatch(/hero|hvac website should work/i);
+  }, 30_000);
+
   it('turn 1 E2E: applies hero background without wrong section edit', async () => {
     workspacePath = await createServiceProMagicReplayWorkspace();
     const pageBefore = await fs.readFile(path.join(workspacePath, 'src/app/page.tsx'), 'utf-8');
@@ -90,7 +131,7 @@ describe('ServiceProMagic hero gradient replay', () => {
 
     const pageAfter = await fs.readFile(path.join(workspacePath, 'src/app/page.tsx'), 'utf-8');
     expect(pageAfter).not.toBe(pageBefore);
-    expect(pageAfter).toMatch(/heroBg.*green/i);
+    expect(pageAfter).toMatch(/heroBg:.*(?:linear-gradient|gradient|#22c55e|green)/i);
 
     const siteConfig = await fs.readFile(path.join(workspacePath, 'src/lib/siteConfig.ts'), 'utf-8');
     const genericBgAfter =

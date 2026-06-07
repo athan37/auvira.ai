@@ -1,4 +1,5 @@
 import { buildEditContext } from '@/lib/project-workspace/edit-context/buildEditContext';
+import { clarificationAnchorFromTarget } from '@/lib/project-workspace/edit-context/clarificationAnchor';
 import { planEdit } from '@/lib/project-workspace/planner/planEdit';
 import { routeAttachmentEdits } from '@/lib/project-workspace/edit-shared/attachmentRouter';
 import { computeWorkspaceHashes } from '@/lib/project-workspace/workspaceEditShared';
@@ -61,6 +62,7 @@ export async function runWebsiteEditAgent(
       strategy: 'section_config',
       tier: 'L3',
       confidence: 'low',
+      clarificationAnchor: clarificationAnchorFromTarget(contextResult.context.target),
     };
   }
 

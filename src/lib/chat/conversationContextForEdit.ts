@@ -1,6 +1,9 @@
 import type { ConversationTurn } from '@/lib/project-workspace/edit-shared/editAmbiguity';
+import type { ClarificationAnchor } from '@/lib/chat/projectMessageMetadata';
 import { enrichMessageWithEditFocus } from '@/lib/project-workspace/edit-shared/resolveEditFocus';
 import type { EditFocusStack } from '@/lib/project-workspace/edit-shared/types';
+import type { SiteSectionCatalog } from '@/lib/project-workspace/edit-shared/siteSectionCatalog';
+import { matchSectionFromMessage } from '@/lib/project-workspace/edit-shared/siteSectionCatalog';
 import { isGalleryDescriptionRequest } from '@/lib/project-workspace/edit-shared/galleryItemDescriptionStrategy';
 import { isCompoundImagePlacementAndCaption } from '@/lib/project-workspace/edit-shared/imageEditIntent';
 import {
@@ -52,6 +55,128 @@ export function wasSectionListClarificationAsked(history: ConversationTurn[]): b
         /Which section should I update/i.test(m.content) ||
         /I found .* sections that could match|Reply with the number/i.test(m.content))
   );
+}
+
+/** True when assistant asked about hero color/background/gradient. */
+export function wasHeroStyleClarificationAsked(history: ConversationTurn[]): boolean {
+  return history.some(
+    (turn) =>
+      turn.role === 'assistant' &&
+      /\bhero\b/i.test(turn.content) &&
+      /\b(color|colour|background|gradient|shade)\b/i.test(turn.content)
+  );
+}
+
+/** Latest clarification anchor stored on assistant metadata, or inferred from hero clarify thread. */
+export function resolveClarificationAnchorFromHistory(
+  history: ConversationTurn[],
+  options?: { currentMessage?: string; catalog?: SiteSectionCatalog }
+): ClarificationAnchor | null {
+  if (
+    options?.catalog &&
+    options.currentMessage &&
+    hasExplicitHighConfidenceSectionTarget(options.currentMessage, options.catalog, history)
+  ) {
+    return null;
+  }
+  for (let i = history.length - 1; i >= 0; i--) {
+    const turn = history[i];
+    if (turn.role !== 'assistant') continue;
+    const meta = turn.metadata as { clarificationAnchor?: ClarificationAnchor } | undefined;
+    if (meta?.clarificationAnchor?.kind) {
+      return meta.clarificationAnchor;
+    }
+  }
+  if (wasHeroStyleClarificationAsked(history)) {
+    return { kind: 'hero' };
+  }
+  return null;
+}
+
+/** True when the owner explicitly scopes the edit away from the hero. */
+export function messageExplicitlyExcludesHero(message: string): boolean {
+  const lower = message.toLowerCase();
+  return (
+    /\bnot\s+the\s+hero\b/i.test(lower) ||
+    /\(\s*not\s+the\s+hero\s*\)/i.test(lower) ||
+    /\bexcluding\s+the\s+hero\b/i.test(lower) ||
+    /\b(first|1st)\s+content\s+section\b/i.test(lower)
+  );
+}
+
+/** True when message explicitly refers to hero styling (including "hero section"). */
+export function messageRefersToHeroStyle(message: string): boolean {
+  const lower = message.toLowerCase();
+  if (messageExplicitlyExcludesHero(message)) {
+    return false;
+  }
+  if (/\bhero\s+section\b/i.test(lower) || /\(\s*hero\s+section\s*\)/i.test(lower)) {
+    return true;
+  }
+  if (/\b(hero|headline|tagline|subheadline)\b/i.test(lower) && !/\bsection\b/i.test(lower)) {
+    return true;
+  }
+  if (
+    /\bhero\b/i.test(lower) &&
+    /\b(color|colour|background|gradient|style|improve)\b/i.test(lower)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function findOriginalHeroStyleUserTurn(
+  history: ConversationTurn[],
+  excludeContent?: string
+): ConversationTurn | null {
+  const exclude = excludeContent?.trim();
+  for (let i = 0; i < history.length; i++) {
+    const turn = history[i];
+    if (turn.role !== 'user') continue;
+    const content = turn.content.trim();
+    if (exclude && content === exclude) continue;
+    if (messageRefersToHeroStyle(content)) {
+      return turn;
+    }
+  }
+  if (wasHeroStyleClarificationAsked(history)) {
+    for (let i = 0; i < history.length; i++) {
+      const turn = history[i];
+      if (turn.role !== 'user') continue;
+      const content = turn.content.trim();
+      if (exclude && content === exclude) continue;
+      if (content.length >= 10 && /\b(color|colour|background|gradient|improve|style)\b/i.test(content)) {
+        return turn;
+      }
+    }
+  }
+  return null;
+}
+
+function isHeroClarificationFollowUp(message: string): boolean {
+  const trimmed = message.trim();
+  if (trimmed.length >= 120) return false;
+  return (
+    /\b(background|gradient|color|colour|shade)\b/i.test(trimmed) ||
+    /gradient|#[0-9a-f]{3,8}\b|linear|rgba?\(/i.test(trimmed) ||
+    /\b(blue|green|red|purple|yellow|orange|pink|teal)\b/i.test(trimmed)
+  );
+}
+
+function mergeHeroClarificationReply(message: string, history: ConversationTurn[]): string | null {
+  if (
+    !wasHeroStyleClarificationAsked(history) &&
+    !resolveClarificationAnchorFromHistory(history, { currentMessage: message })
+  ) {
+    return null;
+  }
+  if (!isHeroClarificationFollowUp(message)) return null;
+
+  const original = findOriginalHeroStyleUserTurn(history, message.trim());
+  if (original) {
+    return `${original.content} — hero clarification follow-up: ${message.trim()} (target: hero)`;
+  }
+  return `${message.trim()} (target: hero background; prior turns clarified hero section)`;
 }
 
 /** True when assistant asked which inner surface to edit (explorer clarifier). */
@@ -249,10 +374,18 @@ function mergeHeroStyleFollowUp(message: string, history: ConversationTurn[]): s
   const trimmed = message.trim();
   const hasStyleDetail =
     /gradient|#[0-9a-f]{3,8}\b|linear|rgba?\(/i.test(trimmed) ||
+    /\b(blue|green|red|purple|yellow|orange|pink|teal)\b.*\b(to|→)\b.*\b(blue|green|red|purple|yellow|orange|pink|teal)\b/i.test(
+      trimmed
+    ) ||
     /\b(entire|whole)\s+hero\b/i.test(trimmed) ||
     /\bhero\s+at\s+the\s+top\b/i.test(trimmed);
 
   if (!hasStyleDetail) return null;
+
+  const original = findOriginalHeroStyleUserTurn(history, trimmed);
+  if (original) {
+    return `${original.content} — follow-up: ${trimmed} (target: hero)`;
+  }
 
   const heroConfirmed = history.some(
     (turn) => turn.role === 'user' && /\bhero\b/i.test(turn.content)
@@ -272,6 +405,10 @@ function mergeHeroStyleFollowUp(message: string, history: ConversationTurn[]): s
     if (refersToHero) {
       return `${turn.content} — follow-up: ${trimmed}`;
     }
+  }
+
+  if (wasHeroStyleClarificationAsked(history)) {
+    return `${trimmed} (target: hero background)`;
   }
 
   return null;
@@ -395,6 +532,51 @@ function mergeSameSectionPinReply(
 }
 
 /**
+ * Merge only direct clarification replies (numbered picks, surface labels) — not thread carry-over.
+ */
+export function resolveClarificationRepliesOnly(
+  message: string,
+  history: ConversationTurn[] = []
+): string {
+  const recent = history.slice(-DEFAULT_EDIT_CONTEXT_TURNS);
+  return (
+    mergeTestimonialOptionReply(message, recent) ??
+    mergeSurfaceClarificationReply(message, recent) ??
+    mergeSectionNumberReply(message, recent) ??
+    mergeSameSectionPinReply(message, recent) ??
+    message
+  );
+}
+
+/**
+ * Resolve a section target from the current owner message only — no hero/deictic thread merges.
+ */
+export function resolveExplicitSectionTarget(
+  message: string,
+  catalog: SiteSectionCatalog,
+  history: ConversationTurn[] = []
+) {
+  const clarified = resolveClarificationRepliesOnly(message, history);
+  return matchSectionFromMessage(clarified, catalog, {
+    history,
+    skipThreadMerges: true,
+  });
+}
+
+/**
+ * True when the current turn names a content section with high catalog confidence.
+ * Fresh explicit targets override stale clarification-thread context (hero, deictic, focus).
+ */
+export function hasExplicitHighConfidenceSectionTarget(
+  message: string,
+  catalog: SiteSectionCatalog,
+  history: ConversationTurn[] = []
+): boolean {
+  const match = resolveExplicitSectionTarget(message, catalog, history);
+  return match?.sectionIndex != null && match.confidence === 'high';
+}
+
+/**
  * Merge clarification follow-ups and short replies with prior user intent.
  * Closest messages in history carry the most weight when resolving.
  */
@@ -402,10 +584,18 @@ export function resolveEffectiveEditMessage(
   message: string,
   history: ConversationTurn[] = [],
   editFocusStack?: EditFocusStack | null,
-  selectedTarget?: import('@/lib/project-workspace/edit-shared/selectedTargetTypes').SelectedTargetInput | null
+  selectedTarget?: import('@/lib/project-workspace/edit-shared/selectedTargetTypes').SelectedTargetInput | null,
+  options?: { catalog?: SiteSectionCatalog }
 ): string {
   const recent = history.slice(-DEFAULT_EDIT_CONTEXT_TURNS);
   const skipFocusEnrichment = Boolean(selectedTarget);
+
+  if (
+    options?.catalog &&
+    hasExplicitHighConfidenceSectionTarget(message, options.catalog, history)
+  ) {
+    return resolveClarificationRepliesOnly(message, history);
+  }
 
   return (
     mergeTestimonialOptionReply(message, recent) ??
@@ -415,6 +605,7 @@ export function resolveEffectiveEditMessage(
     mergeCompoundImageEditMessage(message) ??
     (!skipFocusEnrichment ? enrichMessageWithEditFocus(message, editFocusStack) : null) ??
     (!skipFocusEnrichment && editFocusStack?.items.length ? null : mergeGalleryDescriptionFollowUp(message, recent)) ??
+    mergeHeroClarificationReply(message, recent) ??
     mergeHeroStyleFollowUp(message, recent) ??
     mergeStyleFollowUp(message, recent) ??
     (!skipFocusEnrichment && editFocusStack?.items.length ? null : mergeDeicticFollowUp(message, recent)) ??

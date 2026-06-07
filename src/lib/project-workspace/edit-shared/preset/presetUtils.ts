@@ -148,10 +148,26 @@ export function setPresetCardBackground(presetJson: string, toColor: string): st
   });
 }
 
+/** Escape a class string for embedding inside a JS/TS preset string literal. */
+function escapePresetStringValue(value: string, quote: "'" | '"'): string {
+  return value.replace(/\\/g, '\\\\').replace(new RegExp(quote, 'g'), `\\${quote}`);
+}
+
 /** Replace preset.heroBg with an explicit Tailwind background class (solid or gradient). */
 export function setPresetHeroBackground(presetJson: string, backgroundClass: string): string {
-  const re = /("heroBg"\s*:\s*")([^"]*)(")/gi;
-  return presetJson.replace(re, `$1${backgroundClass}$3`);
+  const re = /\bheroBg\s*:\s*(['"])(.*?)\1/s;
+  if (re.test(presetJson)) {
+    return presetJson.replace(re, (_match, quote: string) => {
+      const q = quote as "'" | '"';
+      return `heroBg: ${q}${escapePresetStringValue(backgroundClass, q)}${q}`;
+    });
+  }
+
+  const trimmed = presetJson.trimEnd();
+  if (!trimmed.endsWith('}')) return presetJson;
+  const inner = trimmed.slice(0, -1).trimEnd();
+  const sep = inner.endsWith('{') ? '' : ', ';
+  return `${inner}${sep}heroBg: "${escapePresetStringValue(backgroundClass, '"')}"}`;
 }
 
 /** Set text-* preset keys to a target text color class. */

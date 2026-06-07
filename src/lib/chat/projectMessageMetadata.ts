@@ -36,6 +36,13 @@ export interface ProjectMessageObservabilityMetadata {
   coachingApplied?: boolean;
 }
 
+/** Target locked while awaiting owner clarification on a multi-turn edit. */
+export interface ClarificationAnchor {
+  kind: 'hero' | 'section';
+  sectionIndex?: number;
+  title?: string;
+}
+
 export interface ProjectMessageMetadata {
   clientMessageId?: string;
   editJobId?: string;
@@ -61,6 +68,8 @@ export interface ProjectMessageMetadata {
   selectedTarget?: SelectedTargetInput;
   /** Surface picked from explorer clarification (maps to fieldPath server-side). */
   selectedSurfaceId?: string;
+  /** Edit target preserved across clarification turns. */
+  clarificationAnchor?: ClarificationAnchor;
 }
 
 export interface ChatApiMessage {

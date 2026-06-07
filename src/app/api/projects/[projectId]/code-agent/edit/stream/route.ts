@@ -544,6 +544,22 @@ export async function POST(
                 suggestedReplies: agentResult.suggestedReplies,
                 errorStage: 'needs_clarification',
                 strategy: agentResult.strategy,
+                clarificationAnchor: agentResult.clarificationAnchor,
+                ...(agentResult.clarificationAnchor?.kind === 'hero'
+                  ? {
+                      editFocusStack: {
+                        items: [
+                          {
+                            kind: 'hero' as const,
+                            sectionIndex: -1,
+                            sectionTitle: 'Hero',
+                            sectionType: 'hero',
+                            at: new Date().toISOString(),
+                          },
+                        ],
+                      },
+                    }
+                  : {}),
                 timing: {
                   totalMs: editTimer.totalMs(),
                   phases: editTimer.summary(),

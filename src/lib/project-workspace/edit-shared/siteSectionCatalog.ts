@@ -263,6 +263,8 @@ export interface CatalogMatchOptions {
   history?: ConversationTurn[];
   /** When true, skip deictic-only low-confidence path (caller handles clarification). */
   fuzzyOnly?: boolean;
+  /** When true, match against `message` as-is (no resolveEffectiveEditMessage thread merges). */
+  skipThreadMerges?: boolean;
 }
 
 /**
@@ -274,7 +276,9 @@ export function matchSectionFromMessage(
   options: CatalogMatchOptions = {}
 ): SectionTargetResult | null {
   const history = options.history ?? [];
-  const effectiveMessage = resolveEffectiveEditMessage(message, history);
+  const effectiveMessage = options.skipThreadMerges
+    ? message
+    : resolveEffectiveEditMessage(message, history);
   const { sections, snapshot } = catalog;
 
   for (const { pattern, index } of ORDINAL_PATTERNS) {
