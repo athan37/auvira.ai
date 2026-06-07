@@ -33,7 +33,9 @@
     "test:diff-local": "node --env-file=.env -e \"require('child_process').execSync('npx --yes tsx scripts/test-diff-api-local.ts', {stdio:'inherit'})\"",
     "test:build-gate-local": "node --env-file=.env -e \"require('child_process').execSync('npx --yes tsx scripts/test-build-gate-local.ts', {stdio:'inherit'})\"",
     "build:preview-dom-capture": "node scripts/build-preview-dom-capture.mjs",
-    "test:watch": "vitest",
+    "test:observability": "node --env-file=.env ./node_modules/vitest/vitest.mjs run tests/observability",
+    "test:observability:live": "RUN_OBSERVABILITY_INTEGRATION_TESTS=true node --env-file=.env ./node_modules/vitest/vitest.mjs run tests/observability/liveMonitor.observability.integration.test.ts tests/observability/accuracyComparison.observability.integration.test.ts",
+    "test:observability:accuracy:llm": "VITEST_LLM_SUITE=1 node --env-file=.env ./node_modules/vitest/vitest.mjs run tests/observability/observabilityAccuracy.llm.test.ts tests/observability/observabilityAccuracyHard.llm.test.ts",
     "clean": "rm -rf .next",
     "build:clean": "npm run clean && npm run build",
     "dev:wait": "sh scripts/wait-for-dev.sh"

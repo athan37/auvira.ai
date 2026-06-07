@@ -16,6 +16,8 @@ import { applyPinnedElementScopeGuard } from './guardPinnedElementScope';
 import { normalizeMisroutedCopyPlan } from '@/lib/project-workspace/edit-agent/planFromConfigTextEdit';
 import { tryExplorerPlan } from '@/lib/project-workspace/edit-agent/tryExplorerPlan';
 import { isUnifiedCopyEditEnabled } from '@/lib/project-workspace/edit-context/unifiedCopyEditFlag';
+import { isObservabilityCoachingEnabled } from '@/lib/observability/config';
+import type { ObservabilityCoachingContext } from '@/lib/observability/types';
 
 const PLAN_MAX_TOKENS = parseInt(process.env.WEBSITE_EDIT_MAX_TOKENS || '4096', 10);
 
@@ -24,6 +26,7 @@ export interface PlanEditInput {
   userPrompt: string;
   deterministicOnly?: boolean;
   hasAttachments?: boolean;
+  coachingContext?: ObservabilityCoachingContext | null;
 }
 
 /** @deprecated Prefer editContext — builds minimal context from siteModel for legacy tests. */
@@ -112,7 +115,13 @@ export async function planEdit(input: PlanEditInputUnion): Promise<PlanEditResul
   }
 
   const llm = getLLMClient();
-  const system = buildPlanEditSystemPrompt();
+  const coachingForPrompt =
+    !isLegacyInput(input) &&
+    isObservabilityCoachingEnabled() &&
+    input.coachingContext
+      ? input.coachingContext
+      : null;
+  const system = buildPlanEditSystemPrompt(coachingForPrompt);
   const basePrompt = buildPlanEditUserPrompt(editContext, userPrompt);
 
   let lastError = 'Planner returned invalid plan';

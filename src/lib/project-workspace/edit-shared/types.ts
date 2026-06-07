@@ -195,6 +195,8 @@ export interface WebsiteEditAgentOptions {
   sectionCatalog?: import('./siteSectionCatalog').SiteSectionCatalog;
   /** When true, skip inline tailwind/page infra repairs (migration baseline ready). */
   infraBaselineReady?: boolean;
+  /** Site Monitor coaching hints (injected when OBSERVABILITY_COACHING_ENABLED=1). */
+  coachingContext?: import('@/lib/observability/types').ObservabilityCoachingContext | null;
 }
 
 export interface WebsiteEditAgentResult {

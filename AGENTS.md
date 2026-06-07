@@ -85,6 +85,7 @@ npm run test:all                # final gate before merge/push
 | Synthetic test harness | `tests/support/syntheticSiteWorkspace.ts`, `tests/support/sectionColorEditContract.ts`, `tests/support/llmEditScenario.ts` |
 | LLM edit-error suites | `tests/edit-agent/copyEdit.llm.test.ts`, `structuralEdit.llm.test.ts`, `plannerGuards.llm.test.ts`, `reportAccuracy.llm.test.ts` |
 | LLM test gate | `tests/llmTestGate.ts` |
+| Site Monitor observability | `src/lib/observability/`, `docs/OBSERVABILITY.md` — `npm run test:observability`, live: `npm run test:observability:live` |
 
 ## Preview section drag-to-chat
 

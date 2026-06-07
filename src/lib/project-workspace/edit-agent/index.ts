@@ -70,6 +70,7 @@ export async function runWebsiteEditAgent(
     editContext: contextResult.context,
     userPrompt: options.ownerMessage,
     hasAttachments: (options.attachments?.length ?? 0) > 0,
+    coachingContext: options.coachingContext,
   });
 
   if (!planResult.ok || !planResult.plan) {

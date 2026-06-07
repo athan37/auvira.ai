@@ -26,6 +26,14 @@ export interface ProjectMessageArizeMetadata {
   syncStatus: ArizeSyncStatus;
   syncedAt?: string;
   externalId?: string;
+  grade?: string;
+  overallScore?: number;
+}
+
+export interface ProjectMessageObservabilityMetadata {
+  experimentVariant?: string;
+  coachingHintCount?: number;
+  coachingApplied?: boolean;
 }
 
 export interface ProjectMessageMetadata {
@@ -41,6 +49,7 @@ export interface ProjectMessageMetadata {
   previewVersion?: number;
   strategy?: string;
   arize?: ProjectMessageArizeMetadata;
+  observability?: ProjectMessageObservabilityMetadata;
   lastGalleryEdit?: {
     sectionIndex: number;
     title: string;

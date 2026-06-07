@@ -62,6 +62,20 @@ import {
 import { migrateSubtitleStyleMarkersInSource } from '@/lib/project-workspace/siteConfigMutations';
 import { detectCopyEditAlreadyApplied } from '@/lib/project-workspace/edit-context/detectCopyEditAlreadyApplied';
 import { tryDeterministicCopyFallback } from '@/lib/project-workspace/edit-context/tryDeterministicCopyFallback';
+import { ProjectEditJob } from '@/models/ProjectEditJob';
+import {
+  ensureObservabilityRegistration,
+  fetchCoachingContext,
+  isObservabilityCoachingEnabled,
+  isObservabilityEnabled,
+  loadSiteConfigForObservability,
+  recordEditTurn,
+} from '@/lib/observability';
+import type {
+  ObservabilityCoachingContext,
+  ObservabilityEditOutcome,
+  ObservabilityTurnMetadata,
+} from '@/lib/observability/types';
 import { promises as fs } from 'fs';
 import path from 'path';
 import crypto from 'crypto';
@@ -197,6 +211,49 @@ export async function POST(
       let beforeHashes: Record<string, string> = {};
       const editTimer = new EditStepTimer();
       let conversationHistory: { role: 'user' | 'assistant'; content: string }[] = [];
+      let coachingContext: ObservabilityCoachingContext | null = null;
+      let turnIndex = 0;
+
+      const targetSectionLabel =
+        selectedTarget?.sectionTitle ??
+        selectedTarget?.elementLabel ??
+        selectedTarget?.targetChain?.find((node) => node.role === 'section')?.label ??
+        null;
+
+      async function recordObservabilityTurnForEdit(args: {
+        outcome: ObservabilityEditOutcome;
+        reply: string;
+        verifyPass?: boolean;
+        buildGatePass?: boolean;
+        changedFiles?: string[];
+        needsClarification?: boolean;
+        siteConfigParsed?: {
+          businessName?: string;
+          sections?: Array<{ type?: string; title?: string; items?: unknown[] }>;
+        } | null;
+      }): Promise<ObservabilityTurnMetadata | null> {
+        if (!isObservabilityEnabled() || !jobId) return null;
+        try {
+          return await recordEditTurn({
+            projectId,
+            turnId: jobId,
+            turnIndex,
+            userMessage: message,
+            reply: args.reply,
+            outcome: args.outcome,
+            verifyPass: args.verifyPass,
+            buildGatePass: args.buildGatePass,
+            changedFiles: args.changedFiles,
+            siteConfigParsed: args.siteConfigParsed ?? null,
+            editTimer,
+            targetSection: targetSectionLabel,
+            needsClarification: args.needsClarification,
+            coachingContext,
+          });
+        } catch {
+          return null;
+        }
+      }
 
       type FailOptions = {
         stage: EditFailureStage;
@@ -232,6 +289,21 @@ export async function POST(
           await logEditFailureTrace(jobId, report);
           await logEditTimingSummary(jobId, editTimer).catch(() => {});
         }
+        const observabilityMeta = await recordObservabilityTurnForEdit({
+          outcome: 'failed',
+          reply: ownerMessage,
+          changedFiles: Array.isArray(options.extra?.changedPaths)
+            ? options.extra.changedPaths.map(String)
+            : undefined,
+          buildGatePass:
+            typeof options.extra?.buildGatePass === 'boolean'
+              ? options.extra.buildGatePass
+              : undefined,
+          verifyPass:
+            typeof options.extra?.verifyPass === 'boolean'
+              ? options.extra.verifyPass
+              : undefined,
+        });
         await appendAssistantMessage({
           projectId: project._id,
           content: ownerMessage,
@@ -249,6 +321,8 @@ export async function POST(
               slowestPhase: editTimer.slowest()?.phase,
               slowestMs: editTimer.slowest()?.durationMs,
             },
+            arize: observabilityMeta?.arize ?? { syncStatus: 'pending' },
+            observability: observabilityMeta?.observability,
           },
         }).catch(() => {});
 
@@ -325,6 +399,9 @@ export async function POST(
           previewVersionBefore,
         });
         jobId = job._id.toString();
+        if (isObservabilityEnabled()) {
+          turnIndex = await ProjectEditJob.countDocuments({ projectId: project._id });
+        }
         await appendUserMessage({
           projectId: project._id,
           content: message,
@@ -387,6 +464,20 @@ export async function POST(
         editTimer.start('agent');
         await appendEditJobLog(jobId, 'agent_started', 'Running code agent', { agent: 'ts' });
 
+        if (isObservabilityEnabled()) {
+          await ensureObservabilityRegistration({
+            projectId,
+            title: project.name || 'Untitled project',
+          });
+          coachingContext = await fetchCoachingContext({ projectId, userMessage: message });
+          await appendEditJobLog(jobId, 'observability_context', 'Fetched monitor context', {
+            hintCount: coachingContext?.coachingHints.length ?? 0,
+            source: coachingContext?.source ?? 'none',
+            recurringIssues: coachingContext?.recurringIssues ?? [],
+            coachingInjected: isObservabilityCoachingEnabled(),
+          });
+        }
+
         const agentResult = await runWebsiteEdit(
           {
           workspacePath,
@@ -402,6 +493,7 @@ export async function POST(
             editJobId: jobId,
             infraStatus: project.infraStatus,
             infraVersion: project.infraVersion,
+            coachingContext: isObservabilityCoachingEnabled() ? coachingContext : undefined,
           },
           (stepEvent) => {
             emit('step', {
@@ -436,9 +528,16 @@ export async function POST(
             emit('step', { id: 'apply_change', label: 'Applying your requested change', status: 'completed' });
             emit('step', { id: 'validate', label: 'Checking the preview', status: 'completed' });
             emit('step', { id: 'finish', label: 'Need a quick detail', status: 'completed' });
+            const clarificationReply =
+              agentResult.ownerMessage || agentResult.error || 'Need one more detail.';
+            const observabilityMeta = await recordObservabilityTurnForEdit({
+              outcome: 'clarification',
+              reply: clarificationReply,
+              needsClarification: true,
+            });
             await appendAssistantMessage({
               projectId: project._id,
-              content: agentResult.ownerMessage || agentResult.error || 'Need one more detail.',
+              content: clarificationReply,
               metadata: {
                 editJobId: jobId,
                 outcome: 'clarification',
@@ -451,6 +550,8 @@ export async function POST(
                   slowestPhase: editTimer.slowest()?.phase,
                   slowestMs: editTimer.slowest()?.durationMs,
                 },
+                arize: observabilityMeta?.arize ?? { syncStatus: 'pending' },
+                observability: observabilityMeta?.observability,
               },
             }).catch(() => {});
             emit('done', {
@@ -795,6 +896,7 @@ export async function POST(
                 validationWarnings: validation.warnings,
                 buildLogExcerpt: excerpt,
                 changedPaths,
+                buildGatePass: false,
               },
             }
           );
@@ -1078,6 +1180,17 @@ export async function POST(
         await logEditTimingSummary(jobId, editTimer);
         const timingSummary = editTimer.summary();
         const slowest = editTimer.slowest();
+        const siteConfigParsed = workspacePath
+          ? await loadSiteConfigForObservability({ workspacePath, gateway: gateway ?? undefined })
+          : null;
+        const observabilityMeta = await recordObservabilityTurnForEdit({
+          outcome: 'success',
+          reply: successOwnerMessage,
+          verifyPass: editStreamOutcome.previewSynced,
+          buildGatePass: true,
+          changedFiles: changedPaths,
+          siteConfigParsed,
+        });
         await appendAssistantMessage({
           projectId: project._id,
           content: successOwnerMessage,
@@ -1095,6 +1208,8 @@ export async function POST(
             strategy: agentResult.strategy,
             lastGalleryEdit: agentResult.lastGalleryEdit,
             editFocusStack: agentResult.editFocusStack,
+            arize: observabilityMeta?.arize ?? { syncStatus: 'pending' },
+            observability: observabilityMeta?.observability,
           },
         });
 

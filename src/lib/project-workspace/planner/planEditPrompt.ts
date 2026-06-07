@@ -13,6 +13,7 @@ import { formatSelectedTargetForMessage } from '@/lib/project-workspace/edit-con
 import {
   formatSelectedTargetContextBlock,
 } from '@/lib/project-workspace/edit-context/selectedTargetContext';
+import type { ObservabilityCoachingContext } from '@/lib/observability/types';
 import { EDIT_SKILL_NAMES } from './editPlan.schema';
 
 const PLANNER_SYSTEM = `You are Website Edit Agent planner for small business sites (siteConfig.ts + section-loop page.tsx).
@@ -38,8 +39,32 @@ Rules:
 - If ambiguous or missing value, set needsClarification true, steps [], clarificationQuestion, suggestedReplies (2+).
 - Do not invent business facts.`;
 
-export function buildPlanEditSystemPrompt(): string {
-  return PLANNER_SYSTEM;
+function formatCoachingBlock(coaching: ObservabilityCoachingContext): string {
+  const hints =
+    coaching.coachingHints.length > 0
+      ? coaching.coachingHints.map((hint) => `- ${hint}`).join('\n')
+      : '- (none)';
+  const constraints =
+    Object.keys(coaching.constraints).length > 0
+      ? JSON.stringify(coaching.constraints, null, 2)
+      : '{}';
+  return [
+    '',
+    '## Coaching from prior edits',
+    hints,
+    '',
+    'Constraints:',
+    constraints,
+  ].join('\n');
+}
+
+export function buildPlanEditSystemPrompt(
+  coaching?: ObservabilityCoachingContext | null
+): string {
+  if (!coaching || coaching.coachingHints.length === 0) {
+    return PLANNER_SYSTEM;
+  }
+  return `${PLANNER_SYSTEM}${formatCoachingBlock(coaching)}`;
 }
 
 export function buildPlanEditUserPrompt(editContext: EditContext, userPrompt: string): string {

@@ -45,6 +45,7 @@ export interface WebsiteEditOptions {
   editJobId?: string;
   infraStatus?: 'pending' | 'ready' | 'failed' | string;
   infraVersion?: number;
+  coachingContext?: import('@/lib/observability/types').ObservabilityCoachingContext | null;
 }
 
 /**
@@ -91,6 +92,7 @@ export async function runWebsiteEdit(
     editFocusStack: options.editFocusStack,
     selectedTarget: options.selectedTarget,
     infraBaselineReady,
+    coachingContext: options.coachingContext,
   };
   const result = await runWebsiteEditAgent(agentOptions, onStep);
 
