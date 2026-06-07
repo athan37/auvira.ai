@@ -5,6 +5,7 @@ import { Card, CardBody } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { BrandLogo } from '@/components/marketing/BrandLogo';
 import { BRAND } from '@/content/marketing';
+import { TEXT } from '@/content/productTheme';
 
 export default function SignInPage() {
   const error =
@@ -19,10 +20,10 @@ export default function SignInPage() {
           <div className="flex justify-center mb-4">
             <BrandLogo size="md" />
           </div>
-          <h1 className="text-3xl font-semibold tracking-[-0.03em] text-[#1d1d1f] mb-2">
+          <h1 className={`text-3xl font-semibold tracking-[-0.03em] mb-2 ${TEXT.primary}`}>
             {BRAND.tagline}
           </h1>
-          <p className="text-[17px] leading-[1.47] text-[#6e6e73]">
+          <p className={`text-[17px] leading-[1.47] ${TEXT.muted}`}>
             Sign in to create and manage your websites.
           </p>
         </div>
@@ -43,8 +44,8 @@ export default function SignInPage() {
 
             <Button
               onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
-              variant="secondary"
-              className="w-full gap-3 !rounded-xl !border-[#d2d2d7] !bg-white !text-[#1d1d1f] hover:!bg-[#f5f5f7] !no-underline"
+              variant="primary"
+              className="w-full gap-3 !no-underline"
               size="lg"
               type="button"
             >
@@ -69,7 +70,7 @@ export default function SignInPage() {
               Continue with Google
             </Button>
 
-            <p className="mt-6 text-center text-sm text-[#86868b]">
+            <p className={`mt-6 text-center text-sm ${TEXT.tertiary}`}>
               By signing in you agree to use First Site for your business websites.
             </p>
           </CardBody>

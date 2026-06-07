@@ -1,7 +1,9 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { Spinner } from '@/components/ui/Spinner';
+import { cn } from '@/lib/cn';
+import { Loading } from '@/components/ui/Loading';
+import { TEXT } from '@/content/productTheme';
 
 export const LazyChangedFilesPanel = dynamic(
   () =>
@@ -35,8 +37,8 @@ export const LazyBusinessWatchCard = dynamic(
 
 function PanelLoader({ label }: { label: string }) {
   return (
-    <div className="flex items-center justify-center gap-2 py-8 text-sm text-zinc-500">
-      <Spinner size="sm" />
+    <div className={cn('flex items-center justify-center gap-2 py-8 text-sm', TEXT.muted)}>
+      <Loading size="sm" />
       {label}
     </div>
   );

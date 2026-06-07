@@ -15,7 +15,9 @@ import { UnpublishedChangesBadge } from '@/components/UnpublishedChangesBadge';
 import { ownerProjectStatusLabel } from '@/lib/owner/ownerCopy';
 import { Badge, statusToBadgeTone } from '@/components/ui/Badge';
 import { Alert } from '@/components/ui/Alert';
-import { Spinner } from '@/components/ui/Spinner';
+import { LoadingShell } from '@/components/ui/LoadingShell';
+import { Toast } from '@/components/ui/Toast';
+import { ACCENT, SURFACE, TEXT } from '@/content/productTheme';
 import { projectSupportsV3Edits } from '@/lib/project-workspace/requireGitLabProject';
 import { SectionDragGhost } from '@/components/project/SectionDragGhost';
 import { formatPreviewTargetLabel } from '@/lib/preview/previewTargetChipLabels';
@@ -29,6 +31,7 @@ import type {
   TargetPreviewThumbMessage,
 } from '@/lib/preview/targetPreviewThumbnail';
 import { uploadTargetPreviewThumbnail } from '@/lib/preview/uploadTargetPreviewThumbnail';
+import { cn } from '@/lib/cn';
 
 const SECTION_DRAG_THRESHOLD = 6;
 
@@ -472,19 +475,15 @@ export default function ProjectPage() {
   }, [sessionStatus, projectId, fetchProject, devBypassAuth]);
 
   if ((!devBypassAuth && sessionStatus === 'loading') || loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-brand-canvas">
-        <Spinner />
-      </div>
-    );
+    return <LoadingShell message="Opening project…" />;
   }
 
   if (error || !project) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-zinc-50 px-4">
+      <div className={`min-h-screen flex items-center justify-center px-4 ${SURFACE.alt}`}>
         <div className="text-center">
           <p className="text-red-600 mb-4">{error || 'Project not found'}</p>
-          <Link href="/dashboard" className="text-zinc-950 hover:underline text-sm">
+          <Link href="/dashboard" className={`text-sm ${ACCENT.link} hover:underline`}>
             ← Back to dashboard
           </Link>
         </div>
@@ -497,7 +496,7 @@ export default function ProjectPage() {
       variant="editor"
       breadcrumb={
         <span className="truncate">
-          <Link href="/dashboard" className="hover:text-zinc-800">
+          <Link href="/dashboard" className={`${ACCENT.link} hover:underline`}>
             Dashboard
           </Link>
           <span className="mx-1">/</span>
@@ -517,7 +516,7 @@ export default function ProjectPage() {
               href={project.gitlab.webUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs text-zinc-500 hover:text-zinc-950 hidden sm:inline"
+              className={cn('text-xs hidden sm:inline', TEXT.tertiary, 'hover:text-[#1d1d1f]')}
             >
               Backup (advanced)
             </a>
@@ -530,11 +529,7 @@ export default function ProjectPage() {
           <Alert variant="warning">{scratchWarning}</Alert>
         </div>
       )}
-      {sectionToast && (
-        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 px-4 py-2 rounded-lg bg-zinc-900 text-white text-sm shadow-lg">
-          {sectionToast}
-        </div>
-      )}
+      {sectionToast && <Toast message={sectionToast} />}
       {sectionDrag ? (
         <SectionDragGhost
           payload={sectionDrag.payload}
@@ -576,12 +571,14 @@ export default function ProjectPage() {
           {(sectionDrag || sectionDragPending) && (
             <div
               className={`pointer-events-none absolute inset-0 z-10 rounded-xl border-2 border-dashed transition-colors ${
-                isChatDropActive ? 'border-brand-500 bg-brand-50/60' : 'border-brand-300/80 bg-brand-50/20'
+                isChatDropActive
+                  ? 'border-rose-500 bg-rose-50/60 ring-2 ring-rose-400 ring-offset-2'
+                  : 'border-rose-300/80 bg-rose-50/20'
               }`}
               aria-hidden
             >
               <div className="absolute inset-0 flex items-center justify-center">
-                <span className="rounded-lg bg-white/90 px-3 py-1.5 text-sm font-medium text-brand-700 shadow-sm">
+                <span className="rounded-lg bg-white/90 px-3 py-1.5 text-sm font-medium text-rose-700 shadow-sm">
                   {isChatDropActive
                     ? 'Release to add to chat'
                     : sectionDragPending

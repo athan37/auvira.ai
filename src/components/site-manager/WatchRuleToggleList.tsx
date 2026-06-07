@@ -1,5 +1,7 @@
 'use client';
 
+import { BORDER, TEXT } from '@/content/productTheme';
+import { cn } from '@/lib/cn';
 import { SITE_MANAGER_COPY } from '@/lib/owner/ownerCopy';
 
 export interface WatchMonitorItem {
@@ -18,15 +20,21 @@ interface Props {
 
 export function WatchRuleToggleList({ monitors, onToggle, disabled }: Props) {
   if (!monitors.length) {
-    return <p className="text-sm text-zinc-500">Confirm your business details to see what we can check.</p>;
+    return <p className={cn('text-sm', TEXT.muted)}>Confirm your business details to see what we can check.</p>;
   }
   return (
     <ul className="space-y-2">
       {monitors.map((m) => (
-        <li key={m.id} className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-3 py-2">
+        <li
+          key={m.id}
+          className={cn(
+            'flex items-center justify-between rounded-lg border bg-white px-3 py-2',
+            BORDER.hairline
+          )}
+        >
           <div>
             <p className="text-sm font-medium">{m.label}</p>
-            <p className="text-xs text-zinc-500">{SITE_MANAGER_COPY.weCheckThis}</p>
+            <p className={cn('text-xs', TEXT.muted)}>{SITE_MANAGER_COPY.weCheckThis}</p>
           </div>
           <label className="flex items-center gap-2 text-xs">
             <input

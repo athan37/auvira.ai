@@ -1,5 +1,9 @@
 'use client';
 
+import { Button } from '@/components/ui/Button';
+import { BORDER, RADIUS, TEXT } from '@/content/productTheme';
+import { cn } from '@/lib/cn';
+
 interface BuildStep {
   key: string;
   label: string;
@@ -52,10 +56,10 @@ function getStepIcon(step: BuildStep) {
 
 function getStepColor(step: BuildStep) {
   switch (step.status) {
-    case 'done': return 'text-green-600 bg-green-50 border-green-200';
+    case 'done': return 'text-rose-700 bg-rose-50 border-rose-200';
     case 'failed': return 'text-red-600 bg-red-50 border-red-200';
-    case 'running': return 'text-brand-600 bg-brand-50 border-brand-200';
-    default: return 'text-zinc-400 bg-zinc-50 border-zinc-200';
+    case 'running': return 'text-rose-600 bg-rose-50 border-rose-200';
+    default: return cn(TEXT.tertiary, 'bg-[#f5f5f7] border-[#d2d2d7]/60');
   }
 }
 
@@ -74,17 +78,16 @@ export default function BuildDeployProgressCard({ status, buildSteps, deployment
   const waitStep = buildSteps.find(s => s.key === 'wait_for_vercel');
 
   return (
-    <div className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
-      <div className="px-4 py-3 border-b border-zinc-200 bg-brand-50">
-        <h2 className="font-medium text-brand-800 text-sm">Build & Deploy Progress</h2>
-        <p className="text-xs text-brand-600 mt-0.5">{stageLabel}</p>
+    <div className={cn('glass-card overflow-hidden', BORDER.hairline)}>
+      <div className={cn('px-4 py-3 border-b bg-rose-50/60', BORDER.hairline)}>
+        <h2 className={cn('font-medium text-sm text-rose-900')}>Build & Deploy Progress</h2>
+        <p className="text-xs text-rose-700 mt-0.5">{stageLabel}</p>
       </div>
       <div className="p-4 space-y-3">
-        {/* Build steps */}
         {activeSteps.map((step) => {
           const duration = stepDuration(step);
           return (
-            <div key={step.key} className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${getStepColor(step)}`}>
+            <div key={step.key} className={cn('flex items-center gap-2 px-3 py-2 rounded-lg border', getStepColor(step))}>
               <span className="text-base w-5 text-center">{getStepIcon(step)}</span>
               <span className="text-sm flex-1">{BUILD_STEP_LABELS[step.key] || step.key}</span>
               {duration && <span className="text-xs opacity-75">{duration}</span>}
@@ -95,16 +98,20 @@ export default function BuildDeployProgressCard({ status, buildSteps, deployment
           );
         })}
 
-        {/* Vercel wait step or deployment */}
         {(waitStep || deployment) && (
-          <div className={`mt-2 px-3 py-2 rounded-lg border ${waitStep?.status === 'running' ? 'text-blue-600 bg-blue-50 border-blue-200' : 'text-zinc-400 bg-zinc-50 border-zinc-200'}`}>
+          <div className={cn(
+            'mt-2 px-3 py-2 rounded-lg border',
+            waitStep?.status === 'running'
+              ? 'text-rose-600 bg-rose-50 border-rose-200'
+              : cn(TEXT.tertiary, 'bg-[#f5f5f7] border-[#d2d2d7]/60')
+          )}>
             {waitStep ? (
               <>
                 <span className="text-base w-5 text-center inline-block">
                   {waitStep.status === 'done' ? '✓' : waitStep.status === 'running' ? '◐' : '○'}
                 </span>
                 <span className="text-sm ml-2">Waiting for Vercel to finish building</span>
-                {waitStep.status === 'done' && <span className="text-xs text-green-600 ml-2">✓ done</span>}
+                {waitStep.status === 'done' && <span className="text-xs text-rose-600 ml-2">✓ done</span>}
               </>
             ) : (
               <span className="text-sm">Waiting for Vercel to finish building...</span>
@@ -112,40 +119,36 @@ export default function BuildDeployProgressCard({ status, buildSteps, deployment
           </div>
         )}
 
-        {/* Deployment info */}
         {deployment && (
-          <div className="mt-3 pt-3 border-t border-zinc-100 space-y-1.5">
+          <div className={cn('mt-3 pt-3 border-t space-y-1.5', BORDER.hairline)}>
             {!deployment.vercelProjectId && !deployment.vercelProjectName && (
               <div className="text-xs text-yellow-600 bg-yellow-50 border border-yellow-200 rounded px-2 py-1.5">
                 ⚠ Deployment metadata is missing. Please open the project workspace or retry.
               </div>
             )}
             {deployment.expectedProductionUrl && !deployment.ready && (
-              <div className="text-xs text-zinc-500">
-                Expected URL: <span className="font-mono text-zinc-700">{deployment.expectedProductionUrl}</span>
+              <div className={cn('text-xs', TEXT.muted)}>
+                Expected URL: <span className={cn('font-mono', TEXT.primary)}>{deployment.expectedProductionUrl}</span>
               </div>
             )}
             {deployment.note && !deployment.ready && (
-              <div className="text-xs text-zinc-400">{deployment.note}</div>
+              <div className={cn('text-xs', TEXT.tertiary)}>{deployment.note}</div>
             )}
             {deployment.inspectorUrl && (
               <a
                 href={deployment.inspectorUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-brand-600 hover:underline block"
+                className="text-xs text-rose-700 hover:text-rose-600 hover:underline block"
               >
                 View Vercel build →
               </a>
             )}
             {deployment.ready && deployment.liveUrl && (
-              <a
-                href={deployment.liveUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-sm bg-green-600 text-white px-3 py-1.5 rounded-lg hover:bg-green-700"
-              >
-                ✓ Open live site
+              <a href={deployment.liveUrl} target="_blank" rel="noopener noreferrer">
+                <Button variant="primary" size="sm">
+                  ✓ Open live site
+                </Button>
               </a>
             )}
           </div>

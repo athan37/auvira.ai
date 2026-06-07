@@ -1,20 +1,33 @@
 import { cn } from '@/lib/cn';
+import { CONTROL } from '@/content/productTheme';
 
 type CardVariant = 'default' | 'glass';
 
 const variantClasses: Record<CardVariant, string> = {
   default: 'rounded-2xl border border-[#d2d2d7]/80 bg-white shadow-card',
-  glass: 'glass-card',
+  glass: 'glass-card shadow-card',
 };
 
 export function Card({
   className,
   variant = 'default',
+  interactive = false,
   children,
   ...props
-}: React.HTMLAttributes<HTMLDivElement> & { variant?: CardVariant }) {
+}: React.HTMLAttributes<HTMLDivElement> & {
+  variant?: CardVariant;
+  /** Adds hover elevation for clickable cards. */
+  interactive?: boolean;
+}) {
   return (
-    <div className={cn(variantClasses[variant], className)} {...props}>
+    <div
+      className={cn(
+        variantClasses[variant],
+        interactive && CONTROL.cardInteractive,
+        className
+      )}
+      {...props}
+    >
       {children}
     </div>
   );

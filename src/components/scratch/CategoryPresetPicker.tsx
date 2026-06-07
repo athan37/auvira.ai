@@ -1,6 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/cn';
+import { ACCENT, BORDER, TEXT } from '@/content/productTheme';
 import {
   getCategoryPreset,
   listCategoryPresets,
@@ -45,8 +46,8 @@ export function CategoryPresetPicker({ selectedId, onSelect, disabled }: Props) 
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-sm font-semibold text-zinc-900">What kind of website?</h2>
-        <p className="text-xs text-zinc-500 mt-0.5">
+        <h2 className={cn('text-sm font-semibold', TEXT.primary)}>What kind of website?</h2>
+        <p className={cn('text-xs mt-0.5', TEXT.muted)}>
           Pick a category — we&apos;ll add the right sections, packages, and action buttons.
         </p>
       </div>
@@ -63,8 +64,8 @@ export function CategoryPresetPicker({ selectedId, onSelect, disabled }: Props) 
               className={cn(
                 'relative rounded-2xl border p-4 text-left transition-all',
                 selected
-                  ? 'border-zinc-900 ring-2 ring-zinc-900/10 shadow-md'
-                  : 'border-zinc-200 hover:border-zinc-300 hover:shadow-sm',
+                  ? 'border-rose-600 ring-2 ring-rose-500/20 shadow-rose-cta'
+                  : cn('hover:shadow-sm', BORDER.hairline, 'hover:border-rose-200'),
                 disabled && 'opacity-60 cursor-not-allowed'
               )}
             >
@@ -80,22 +81,22 @@ export function CategoryPresetPicker({ selectedId, onSelect, disabled }: Props) 
                 <p className="mt-1 text-lg font-semibold">{preset.label}</p>
                 {selected ? <CategoryWireframe categoryId={preset.id} /> : null}
               </div>
-              <p className="mt-3 text-sm text-zinc-600">{preset.description}</p>
+              <p className={cn('mt-3 text-sm', TEXT.muted)}>{preset.description}</p>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {preset.exampleBusinesses.map((chip) => (
                   <span
                     key={chip}
-                    className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600"
+                    className={cn('rounded-full px-2 py-0.5 text-xs', ACCENT.pill)}
                   >
                     {chip}
                   </span>
                 ))}
               </div>
               {layout ? (
-                <p className="mt-2 text-xs text-zinc-400">Suggested layout: {layout.name}</p>
+                <p className={cn('mt-2 text-xs', TEXT.tertiary)}>Suggested layout: {layout.name}</p>
               ) : null}
               {selected ? (
-                <span className="absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-full bg-zinc-900 text-xs text-white">
+                <span className="absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-full bg-rose-600 text-xs text-white">
                   ✓
                 </span>
               ) : null}

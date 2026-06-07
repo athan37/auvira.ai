@@ -60,6 +60,8 @@ module.exports = {
         glass: '0 2px 16px rgb(0 0 0 / 0.06)',
         product: '0 8px 40px rgb(0 0 0 / 0.12)',
         'rose-glass': '0 20px 60px rgba(200, 62, 95, 0.12)',
+        'rose-cta': '0 1px 2px rgba(0, 0, 0, 0.06), 0 4px 16px rgba(200, 62, 95, 0.32)',
+        'rose-cta-hover': '0 2px 4px rgba(0, 0, 0, 0.08), 0 8px 24px rgba(200, 62, 95, 0.38)',
       },
       borderRadius: {
         DEFAULT: '8px',
@@ -72,11 +74,20 @@ module.exports = {
         'brand-cta': 'linear-gradient(180deg, #0077ed 0%, #0071e3 100%)',
         'dark-band': 'linear-gradient(180deg, #000000 0%, #1d1d1f 100%)',
         'rose-gradient': 'linear-gradient(135deg, #D24460 0%, #C83E5F 45%, #BD365E 100%)',
+        'rose-gradient-cta': 'linear-gradient(180deg, #E85672 0%, #D24460 38%, #BD365E 100%)',
         'rose-glow': 'radial-gradient(circle at center, rgba(210,68,96,0.22), transparent 60%)',
         'rose-glow-soft': 'radial-gradient(ellipse 70% 45% at 50% 0%, rgba(210,68,96,0.08), transparent 55%)',
       },
       transitionTimingFunction: {
         apple: 'cubic-bezier(0.25, 0.1, 0.25, 1)',
+      },
+      keyframes: {
+        'rose-shimmer-sweep': {
+          '100%': { transform: 'translateX(100%)' },
+        },
+      },
+      animation: {
+        'rose-shimmer': 'rose-shimmer-sweep 1.4s ease-in-out infinite',
       },
     },
   },

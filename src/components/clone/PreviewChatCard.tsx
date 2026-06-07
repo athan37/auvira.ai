@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
+import { TEXT } from '@/content/productTheme';
+import { cn } from '@/lib/cn';
 
 interface Props {
   jobId: string;
@@ -73,12 +75,12 @@ export default function PreviewChatCard({ jobId }: Props) {
   return (
     <Card className="shadow-sm">
       <CardHeader>
-        <h2 className="font-semibold text-zinc-900 text-sm">Chat to edit preview</h2>
-        <p className="text-xs text-zinc-500 mt-0.5">Ask for changes before deploying</p>
+        <h2 className={cn('font-semibold text-sm', TEXT.primary)}>Chat to edit preview</h2>
+        <p className={cn('text-xs mt-0.5', TEXT.muted)}>Ask for changes before deploying</p>
       </CardHeader>
       <CardBody className="space-y-3">
         {messages.length === 0 && (
-          <p className="text-xs text-zinc-400 italic">
+          <p className={cn('text-xs italic', TEXT.tertiary)}>
             Example: &ldquo;Make the hero more premium&rdquo;, &ldquo;Add emergency service
             CTA&rdquo;, &ldquo;Use warmer colors&rdquo;
           </p>
@@ -87,7 +89,7 @@ export default function PreviewChatCard({ jobId }: Props) {
           {messages.map((msg, i) => (
             <div
               key={i}
-              className={`text-xs ${msg.role === 'user' ? 'text-zinc-900' : 'text-zinc-600'}`}
+              className={cn('text-xs', msg.role === 'user' ? TEXT.primary : TEXT.muted)}
             >
               <span className="font-semibold">{msg.role === 'user' ? 'You: ' : 'Assistant: '}</span>
               {msg.content}
@@ -107,13 +109,13 @@ export default function PreviewChatCard({ jobId }: Props) {
             disabled={sending}
             className="flex-1 text-sm"
           />
-          <Button type="button" onClick={handleSend} disabled={sending || !message.trim()} size="sm">
+          <Button type="button" variant="primary" onClick={handleSend} disabled={sending || !message.trim()} size="sm">
             {sending ? '…' : 'Send'}
           </Button>
         </div>
 
         {success && (
-          <p className="text-xs text-emerald-700">
+          <p className="text-xs text-rose-700">
             Preview updated! Refresh the iframe above to see changes.
           </p>
         )}

@@ -1,16 +1,18 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { cn } from '@/lib/cn';
 import {
   editStatusLabel,
   formatEditJobError,
 } from '@/lib/project-workspace/editJobMessages';
 import { formatDurationMs } from '@/lib/project-workspace/editTimingShared';
+import { BORDER, TEXT } from '@/content/productTheme';
 import { Alert } from '@/components/ui/Alert';
 import { Badge, statusToBadgeTone } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardBody } from '@/components/ui/Card';
-import { Spinner } from '@/components/ui/Spinner';
+import { Loading } from '@/components/ui/Loading';
 import EditErrorTrace from '@/components/project/EditErrorTrace';
 import { FileDiffViewer } from '@/components/project/FileDiffViewer';
 
@@ -98,8 +100,8 @@ export function ChangedFilesPanel({
     return (
       <Card>
         <CardBody className="flex items-center gap-3 py-6">
-          <Spinner size="sm" />
-          <p className="text-sm text-zinc-600">Edit in progress…</p>
+          <Loading size="sm" />
+          <p className={cn('text-sm', TEXT.muted)}>Edit in progress…</p>
         </CardBody>
       </Card>
     );
@@ -109,8 +111,8 @@ export function ChangedFilesPanel({
     return (
       <Card>
         <CardBody className="flex items-center gap-3 py-6">
-          <Spinner size="sm" />
-          <p className="text-sm text-zinc-500">Loading edit details…</p>
+          <Loading size="sm" />
+          <p className={cn('text-sm', TEXT.muted)}>Loading edit details…</p>
         </CardBody>
       </Card>
     );
@@ -121,19 +123,19 @@ export function ChangedFilesPanel({
     return (
       <Card>
         <CardBody className="space-y-2">
-          <h3 className="text-sm font-semibold text-zinc-900">Changes</h3>
+          <h3 className={cn('text-sm font-semibold', TEXT.primary)}>Changes</h3>
           {missingJob ? (
             <>
               <Alert variant="warning">
                 {data?.error ||
                   'Could not load this edit. Check Chat for the latest message, then try sending your request again.'}
               </Alert>
-              <p className="text-xs text-zinc-500">
+              <p className={cn('text-xs', TEXT.muted)}>
                 Job reference: <span className="font-mono">{jobId}</span>
               </p>
             </>
           ) : (
-            <p className="text-xs text-zinc-500">
+            <p className={cn('text-xs', TEXT.muted)}>
               After you edit the site in Chat, changed files and undo will appear here.
             </p>
           )}
@@ -214,7 +216,7 @@ export function ChangedFilesPanel({
     <Card>
       <CardBody className="space-y-3">
         <div className="flex items-center justify-between gap-2">
-          <h3 className="text-sm font-semibold text-zinc-900">Latest edit</h3>
+          <h3 className={cn('text-sm font-semibold', TEXT.primary)}>Latest edit</h3>
           <Badge tone={statusToBadgeTone(isIncomplete ? 'incomplete' : data.status)}>
             {statusLabel}
           </Badge>
@@ -249,14 +251,14 @@ export function ChangedFilesPanel({
         )}
 
         {data.summary && !isFailed && (
-          <p className="text-xs text-zinc-600">{data.summary}</p>
+          <p className={cn('text-xs', TEXT.muted)}>{data.summary}</p>
         )}
 
         {data.timing && data.timing.phases.length > 0 && (
-          <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 space-y-1.5">
-            <p className="text-xs font-medium text-zinc-800">Edit timing</p>
+          <div className={cn('rounded-lg border px-3 py-2 space-y-1.5 bg-[#f5f5f7]', BORDER.hairline)}>
+            <p className={cn('text-xs font-medium', TEXT.primary)}>Edit timing</p>
             {data.timing.totalMs != null && (
-              <p className="text-[11px] text-zinc-500">
+              <p className={cn('text-[11px]', TEXT.muted)}>
                 Total {formatDurationMs(data.timing.totalMs)}
                 {data.timing.slowestPhase
                   ? ` · slowest: ${data.timing.slowestPhase.replace(/_/g, ' ')}`
@@ -266,11 +268,11 @@ export function ChangedFilesPanel({
                   : ''}
               </p>
             )}
-            <ul className="text-[11px] text-zinc-600 space-y-0.5">
+            <ul className={cn('text-[11px] space-y-0.5', TEXT.muted)}>
               {data.timing.phases.map((p) => (
                 <li key={p.phase} className="flex justify-between gap-2">
                   <span className="capitalize">{p.phase.replace(/_/g, ' ')}</span>
-                  <span className="font-mono text-zinc-500 shrink-0">
+                  <span className={cn('font-mono shrink-0', TEXT.tertiary)}>
                     {formatDurationMs(p.durationMs)}
                   </span>
                 </li>
@@ -285,33 +287,33 @@ export function ChangedFilesPanel({
 
         {changedCount > 0 && (
           <>
-            <p className="text-xs font-medium text-zinc-700">
+            <p className={cn('text-xs font-medium', TEXT.primary)}>
               Files touched ({changedCount})
             </p>
             <ul className="text-xs space-y-1">
               {data.changedFiles.map((f) => {
                 const isOpen = expandedFile === f.path;
                 return (
-                  <li key={f.path} className="rounded-md border border-zinc-100 bg-white">
+                  <li key={f.path} className={cn('rounded-md border bg-white', BORDER.hairline)}>
                     <button
                       type="button"
                       onClick={() => setExpandedFile(isOpen ? null : f.path)}
-                      className="flex w-full items-center justify-between gap-2 px-2 py-1.5 font-mono text-zinc-700 hover:bg-zinc-50 rounded-md text-left"
+                      className={cn(
+                        'flex w-full items-center justify-between gap-2 px-2 py-1.5 font-mono hover:bg-[#f5f5f7] rounded-md text-left',
+                        TEXT.primary
+                      )}
                       aria-expanded={isOpen}
                     >
                       <span className="flex items-center gap-1.5 min-w-0">
-                        <span
-                          className="text-zinc-400 shrink-0 w-3"
-                          aria-hidden
-                        >
+                        <span className={cn('shrink-0 w-3', TEXT.tertiary)} aria-hidden>
                           {isOpen ? '▾' : '▸'}
                         </span>
                         <span className="truncate">{f.path}</span>
                       </span>
-                      <span className="flex-shrink-0 text-zinc-500 text-[10px]">
+                      <span className={cn('flex-shrink-0 text-[10px]', TEXT.muted)}>
                         {f.status}
                         {f.additions || f.deletions ? (
-                          <span className="ml-1 text-zinc-400">
+                          <span className={cn('ml-1', TEXT.tertiary)}>
                             +{f.additions || 0}/-{f.deletions || 0}
                           </span>
                         ) : null}
@@ -339,12 +341,12 @@ export function ChangedFilesPanel({
             <button
               type="button"
               onClick={() => setShowLog((v) => !v)}
-              className="text-xs text-zinc-950 hover:underline"
+              className={cn('text-xs hover:underline', TEXT.primary)}
             >
               {showLog ? 'Hide' : 'Show'} build log
             </button>
             {showLog && (
-              <pre className="mt-2 text-xs bg-zinc-50 border border-zinc-200 rounded-lg p-2 max-h-32 overflow-auto whitespace-pre-wrap">
+              <pre className={cn('mt-2 text-xs rounded-lg p-2 max-h-32 overflow-auto whitespace-pre-wrap bg-[#f5f5f7] border', BORDER.hairline)}>
                 {data.buildLog}
               </pre>
             )}
@@ -356,25 +358,25 @@ export function ChangedFilesPanel({
             <button
               type="button"
               onClick={() => setShowAgentLogs((v) => !v)}
-              className="text-xs text-zinc-950 hover:underline"
+              className={cn('text-xs hover:underline', TEXT.primary)}
             >
               {showAgentLogs ? 'Hide' : 'Show'} agent activity
             </button>
             {showAgentLogs && (
-              <ul className="mt-2 text-xs space-y-1 max-h-28 overflow-y-auto text-zinc-600">
+              <ul className={cn('mt-2 text-xs space-y-1 max-h-28 overflow-y-auto', TEXT.muted)}>
                 {data.logs
                   .filter((log) => log.type !== 'error_trace' && log.type !== 'timing_summary')
                   .map((log, i) => (
                     <li key={i}>
-                      <span className="text-zinc-400">{log.type}</span> {log.message}
+                      <span className={TEXT.tertiary}>{log.type}</span> {log.message}
                       {typeof log.metadata?.durationMs === 'number' ? (
-                        <span className="text-zinc-400">
+                        <span className={TEXT.tertiary}>
                           {' '}
                           ({formatDurationMs(log.metadata.durationMs as number)})
                         </span>
                       ) : null}
                       {log.type === 'error_detail' && log.metadata?.stage ? (
-                        <span className="text-zinc-400"> ({String(log.metadata.stage)})</span>
+                        <span className={TEXT.tertiary}> ({String(log.metadata.stage)})</span>
                       ) : null}
                     </li>
                   ))}

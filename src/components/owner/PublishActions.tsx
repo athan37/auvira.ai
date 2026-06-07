@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { cn } from '@/lib/cn';
 import { Alert } from '@/components/ui/Alert';
 import { Button } from '@/components/ui/Button';
-import { Card, CardBody } from '@/components/ui/Card';
-import { Spinner } from '@/components/ui/Spinner';
+import { Loading } from '@/components/ui/Loading';
+import { ACCENT, BORDER, TEXT } from '@/content/productTheme';
 import { OWNER_COPY } from '@/lib/owner/ownerCopy';
 
 type PublishMode = 'editor' | 'clone';
@@ -192,16 +193,16 @@ export function PublishActions({
   return (
     <div className="space-y-3">
       {!compact && (
-        <p className="text-xs text-zinc-500">
-          <strong className="text-zinc-700">{OWNER_COPY.draftPreview}</strong> is what you see on the
-          left. <strong className="text-zinc-700">{OWNER_COPY.liveWebsite}</strong> is your public
+        <p className={cn('text-xs', TEXT.muted)}>
+          <strong className={TEXT.primary}>{OWNER_COPY.draftPreview}</strong> is what you see on the
+          left. <strong className={TEXT.primary}>{OWNER_COPY.liveWebsite}</strong> is your public
           address after you publish.
         </p>
       )}
 
       {canBackup && (
         <div className="space-y-2">
-          {!compact && <p className="text-xs text-zinc-500">{OWNER_COPY.backupCopyHint}</p>}
+          {!compact && <p className={cn('text-xs', TEXT.muted)}>{OWNER_COPY.backupCopyHint}</p>}
           <Button
             className="w-full"
             variant="secondary"
@@ -210,7 +211,7 @@ export function PublishActions({
           >
             {saving ? (
               <>
-                <Spinner size="sm" />
+                <Loading size="sm" />
                 Saving backup…
               </>
             ) : (
@@ -218,24 +219,24 @@ export function PublishActions({
             )}
           </Button>
           {mode === 'editor' && !needsSave && (
-            <p className="text-xs text-zinc-500">{OWNER_COPY.noUnsaved}</p>
+            <p className={cn('text-xs', TEXT.muted)}>{OWNER_COPY.noUnsaved}</p>
           )}
           {saveSuccess && <Alert variant="success">{saveSuccessDetail || 'Backup saved.'}</Alert>}
           {saveError && <Alert variant="error">{saveError}</Alert>}
         </div>
       )}
 
-      <div className={canBackup ? 'space-y-2 border-t border-zinc-100 pt-3' : 'space-y-2'}>
-        {!compact && <p className="text-xs text-zinc-500">{OWNER_COPY.publishLiveHint}</p>}
+      <div className={canBackup ? cn('space-y-2 border-t pt-3', BORDER.hairline) : 'space-y-2'}>
+        {!compact && <p className={cn('text-xs', TEXT.muted)}>{OWNER_COPY.publishLiveHint}</p>}
         <Button className="w-full" onClick={handlePublish} disabled={deployInProgress}>
           {deploying ? (
             <>
-              <Spinner size="sm" className="border-white border-t-transparent" />
+              <Loading size="sm" />
               Preparing publish…
             </>
           ) : polling || isVercelBuilding ? (
             <>
-              <Spinner size="sm" className="border-white border-t-transparent" />
+              <Loading size="sm" />
               Updating live site…
             </>
           ) : (
@@ -244,22 +245,20 @@ export function PublishActions({
         </Button>
 
         {deploySuccess && (
-          <Card className="border-emerald-200 bg-emerald-50/50">
-            <CardBody className="space-y-2">
-              <p className="text-sm font-medium text-emerald-800">Publish started</p>
-              {deployNote && <p className="text-xs text-emerald-700">{deployNote}</p>}
-              {productionUrl && (
-                <a
-                  href={productionUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-emerald-700 hover:underline block truncate"
-                >
-                  Open live site →
-                </a>
-              )}
-            </CardBody>
-          </Card>
+          <Alert variant="success" className="text-xs">
+            <p className="font-medium">Publish started</p>
+            {deployNote && <p className="mt-1 opacity-90">{deployNote}</p>}
+            {productionUrl && (
+              <a
+                href={productionUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cn('mt-1 block truncate', ACCENT.link, 'hover:underline')}
+              >
+                Open live site →
+              </a>
+            )}
+          </Alert>
         )}
         {deployError && <Alert variant="error">{deployError}</Alert>}
       </div>
@@ -267,7 +266,7 @@ export function PublishActions({
       {mode === 'clone' && projectId && (
         <Link
           href={`/projects/${projectId}`}
-          className="block text-center text-xs text-zinc-500 hover:text-zinc-800"
+          className={cn('block text-center text-xs', TEXT.muted, 'hover:text-[#1d1d1f]')}
         >
           Open editor to keep editing →
         </Link>
@@ -277,7 +276,7 @@ export function PublishActions({
           href={gitlabWebUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="block text-center text-xs text-zinc-400 hover:text-zinc-600"
+          className={cn('block text-center text-xs', TEXT.tertiary, 'hover:text-[#6e6e73]')}
         >
           View backup (advanced)
         </a>

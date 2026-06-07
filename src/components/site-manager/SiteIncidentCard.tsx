@@ -1,6 +1,8 @@
 'use client';
 
 import { Button } from '@/components/ui/Button';
+import { cn } from '@/lib/cn';
+import { TEXT } from '@/content/productTheme';
 import { SITE_MANAGER_COPY } from '@/lib/owner/ownerCopy';
 
 interface Props {
@@ -31,7 +33,7 @@ export function SiteIncidentCard({
       {proposalTitle && (
         <div className="rounded-md bg-white border border-amber-100 p-2 text-sm">
           <p className="font-medium">{proposalTitle}</p>
-          {proposalSummary && <p className="text-xs text-zinc-600 mt-1">{proposalSummary}</p>}
+          {proposalSummary && <p className={cn('text-xs mt-1', TEXT.muted)}>{proposalSummary}</p>}
         </div>
       )}
       <div className="flex gap-2">

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { TEXT } from '@/content/productTheme';
 import { SITE_MANAGER_COPY } from '@/lib/owner/ownerCopy';
 
 export interface BusinessProfileFormData {
@@ -35,7 +36,7 @@ export function BusinessProfileEditor({ initial, onSave, onConfirm, saving }: Pr
 
   return (
     <div className="space-y-3 text-sm">
-      <p className="text-zinc-600">Confirm the details we should keep correct on your live website.</p>
+      <p className={TEXT.muted}>Confirm the details we should keep correct on your live website.</p>
       <Input placeholder="Business name" value={form.businessName ?? ''} onChange={(e) => setForm({ ...form, businessName: e.target.value })} />
       <Input placeholder="Phone number" value={form.phone ?? ''} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
       <Input placeholder="Email" value={form.email ?? ''} onChange={(e) => setForm({ ...form, email: e.target.value })} />

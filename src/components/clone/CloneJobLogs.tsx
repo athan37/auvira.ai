@@ -1,5 +1,8 @@
 'use client';
 
+import { BORDER, RADIUS, SURFACE, TEXT } from '@/content/productTheme';
+import { cn } from '@/lib/cn';
+
 interface Log {
   timestamp: string;
   stage: string;
@@ -18,16 +21,16 @@ export default function CloneJobLogs({ logs, defaultOpen = false }: Props) {
   }
 
   return (
-    <details className="bg-white rounded-xl border border-zinc-200 overflow-hidden" open={defaultOpen}>
-      <summary className="px-4 py-3 border-b border-zinc-200 bg-zinc-50 cursor-pointer hover:bg-zinc-100">
-        <span className="font-medium text-zinc-700 text-sm">Build logs</span>
-        <span className="text-xs text-zinc-400 ml-2">({logs.length} entries)</span>
+    <details className={cn('bg-white overflow-hidden border', RADIUS.card, BORDER.hairline)} open={defaultOpen}>
+      <summary className={cn('px-4 py-3 border-b cursor-pointer hover:bg-[#ebebed]', SURFACE.alt, BORDER.hairline)}>
+        <span className={cn('font-medium text-sm', TEXT.primary)}>Build logs</span>
+        <span className={cn('text-xs ml-2', TEXT.tertiary)}>({logs.length} entries)</span>
       </summary>
-      <div className="max-h-48 overflow-y-auto p-3 bg-zinc-900">
+      <div className="max-h-48 overflow-y-auto p-3 bg-[#1d1d1f]">
         {logs.map((log, i) => (
-          <div key={i} className="text-xs font-mono text-zinc-300 mb-1.5">
-            <span className="text-zinc-500">[{new Date(log.timestamp).toLocaleTimeString()}]</span>{' '}
-            <span className="text-brand-400">[{log.stage}]</span> {log.message}
+          <div key={i} className="text-xs font-mono text-[#f5f5f7] mb-1.5">
+            <span className={TEXT.tertiary}>[{new Date(log.timestamp).toLocaleTimeString()}]</span>{' '}
+            <span className="text-rose-400">[{log.stage}]</span> {log.message}
           </div>
         ))}
       </div>

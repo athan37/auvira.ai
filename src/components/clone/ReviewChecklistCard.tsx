@@ -1,5 +1,9 @@
 'use client';
 
+import { Badge } from '@/components/ui/Badge';
+import { BORDER, RADIUS, SURFACE, TEXT } from '@/content/productTheme';
+import { cn } from '@/lib/cn';
+
 interface ReviewChecklist {
   businessNameFound: boolean;
   contactInfoFound: boolean;
@@ -27,10 +31,10 @@ interface Props {
 function ChecklistItem({ label, found }: { label: string; found: boolean }) {
   return (
     <div className="flex items-start gap-2">
-      <span className={`w-4 text-center text-sm ${found ? 'text-green-500' : 'text-yellow-500'}`}>
+      <span className={cn('w-4 text-center text-sm', found ? 'text-rose-600' : 'text-yellow-500')}>
         {found ? '✓' : '⚠'}
       </span>
-      <span className="text-sm text-zinc-700">{label}</span>
+      <span className={cn('text-sm', TEXT.primary)}>{label}</span>
     </div>
   );
 }
@@ -50,15 +54,13 @@ export default function ReviewChecklistCard({
   const warnFidelity = contentFidelity?.warnIssues ?? [];
 
   return (
-    <div className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
-      <div className="px-4 py-3 border-b border-zinc-200 bg-green-50">
-        <h2 className="font-medium text-green-800 text-sm">Please Review Before Building</h2>
+    <div className={cn('bg-white overflow-hidden border', RADIUS.card, BORDER.hairline)}>
+      <div className={cn('px-4 py-3 border-b bg-rose-50/60', BORDER.hairline)}>
+        <h2 className={cn('font-medium text-sm text-rose-900')}>Please Review Before Building</h2>
       </div>
       <div className="p-4 space-y-4">
-        {/* Confidence summary */}
-        <p className="text-sm text-zinc-700">{confidenceMessage}</p>
+        <p className={cn('text-sm', TEXT.primary)}>{confidenceMessage}</p>
 
-        {/* Checklist items */}
         <div className="space-y-1.5">
           <ChecklistItem label="Business name looks correct" found={checklist.businessNameFound} />
           <ChecklistItem label="Contact info looks correct" found={checklist.contactInfoFound} />
@@ -66,7 +68,6 @@ export default function ReviewChecklistCard({
           <ChecklistItem label="Proposed sections look good" found={checklist.sectionsFound} />
         </div>
 
-        {/* Blocking issues */}
         {blockingIssues.length > 0 && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-3 space-y-1">
             <p className="text-xs font-semibold text-red-700">Blocking issues — please resolve:</p>
@@ -76,7 +77,6 @@ export default function ReviewChecklistCard({
           </div>
         )}
 
-        {/* Review recommended */}
         {checklist.requiredWarnings.length > 0 && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 space-y-1">
             <p className="text-xs font-semibold text-yellow-700">Review recommended:</p>
@@ -86,17 +86,15 @@ export default function ReviewChecklistCard({
           </div>
         )}
 
-        {/* Optional missing info */}
         {checklist.optionalWarnings.length > 0 && (
-          <div className="bg-zinc-50 border border-zinc-200 rounded-lg p-3 space-y-1">
-            <p className="text-xs font-semibold text-zinc-500">Optional — not required to build:</p>
+          <div className={cn('border rounded-lg p-3 space-y-1', SURFACE.alt, BORDER.hairline)}>
+            <p className={cn('text-xs font-semibold', TEXT.muted)}>Optional — not required to build:</p>
             {checklist.optionalWarnings.map((w, i) => (
-              <p key={i} className="text-xs text-zinc-500">• {w}</p>
+              <p key={i} className={cn('text-xs', TEXT.muted)}>• {w}</p>
             ))}
           </div>
         )}
 
-        {/* Critical content fidelity */}
         {criticalFidelity.length > 0 && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-3">
             <p className="text-xs font-semibold text-red-700">Critical content fidelity issues — build blocked:</p>
@@ -106,7 +104,6 @@ export default function ReviewChecklistCard({
           </div>
         )}
 
-        {/* Warn-only content fidelity */}
         {warnFidelity.length > 0 && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
             <p className="text-xs font-semibold text-yellow-700">Content fidelity warnings:</p>
@@ -117,20 +114,19 @@ export default function ReviewChecklistCard({
         )}
 
         {contentFidelity?.passed && contentFidelity.issues.length === 0 && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-            <p className="text-xs text-green-700">✓ Content fidelity passed</p>
+          <div className="flex items-center gap-2">
+            <Badge tone="success">Content fidelity passed</Badge>
           </div>
         )}
 
         {contentFidelity?.passed && contentFidelity.issues.length > 0 && warnFidelity.length > 0 && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-            <p className="text-xs text-green-700">✓ No critical fidelity issues — you may build with warnings above</p>
+          <div className="flex items-center gap-2">
+            <Badge tone="success">No critical fidelity issues — you may build with warnings above</Badge>
           </div>
         )}
 
-        {/* Missing details note */}
         {(!hasBlocking && (checklist.requiredWarnings.length > 0 || checklist.optionalWarnings.length > 0)) && (
-          <p className="text-xs text-zinc-400 italic">
+          <p className={cn('text-xs italic', TEXT.tertiary)}>
             Missing details can be added later through chat.
           </p>
         )}

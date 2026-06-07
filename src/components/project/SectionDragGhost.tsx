@@ -77,7 +77,7 @@ export function SectionDragGhost({
 
   return (
     <div
-      className="fixed z-[100] pointer-events-none overflow-hidden rounded-xl border border-zinc-200/80 border-l-[3px] border-l-brand-500 bg-white py-2 shadow-xl transition-transform duration-150 ease-out"
+      className="fixed z-[100] pointer-events-none overflow-hidden rounded-xl border border-l-[3px] border-l-rose-500 bg-white py-2 shadow-xl transition-transform duration-150 ease-out border-[#d2d2d7]/80"
       style={{
         left: position.left,
         top: position.top,
@@ -86,7 +86,7 @@ export function SectionDragGhost({
       }}
       aria-hidden
     >
-      <div className="px-2.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-1.5">
+      <div className="px-2.5 text-[10px] font-semibold uppercase tracking-wider text-[#6e6e73] mb-1.5">
         Edit target
       </div>
       <PreviewTargetCardLayout

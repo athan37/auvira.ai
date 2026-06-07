@@ -1,22 +1,12 @@
-import { cn } from '@/lib/cn';
+import { Loading, type LoadingSize } from './Loading';
 
+/** @deprecated Use Loading — kept for backward compatibility. */
 export function Spinner({
   className,
   size = 'md',
 }: {
   className?: string;
-  size?: 'sm' | 'md' | 'lg';
+  size?: LoadingSize;
 }) {
-  const sizes = { sm: 'h-4 w-4 border-2', md: 'h-8 w-8 border-[3px]', lg: 'h-12 w-12 border-4' };
-  return (
-    <div
-      className={cn(
-        'animate-spin rounded-full border-zinc-950 border-t-transparent',
-        sizes[size],
-        className
-      )}
-      role="status"
-      aria-label="Loading"
-    />
-  );
+  return <Loading variant="inline" size={size} className={className} />;
 }

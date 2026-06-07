@@ -12,7 +12,11 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PageContainer } from '@/components/ui/PageContainer';
-import { Spinner } from '@/components/ui/Spinner';
+import { LoadingShell } from '@/components/ui/LoadingShell';
+import { ACCENT, TEXT } from '@/content/productTheme';
+
+/** Dev only — set `true` to preview LoadingShell on /dashboard. Revert before commit. */
+const DEV_PREVIEW_LOADING = false;
 
 interface Project {
   id: string;
@@ -74,7 +78,7 @@ function ProjectCard({ project }: { project: Project }) {
             href={project.liveUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-brand-600 hover:underline font-medium"
+            className={`${ACCENT.link} hover:underline font-medium`}
           >
             Live site →
           </a>
@@ -89,7 +93,7 @@ function ProjectCard({ project }: { project: Project }) {
 
 function ActiveCloneJobCard({ job }: { job: ActiveCloneJob }) {
   return (
-    <Card variant="glass" className="p-4 border-brand-200/40 bg-brand-50/30">
+    <Card variant="glass" className="p-4 border-rose-200/40 bg-rose-50/30">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-[#1d1d1f] truncate">
@@ -98,7 +102,7 @@ function ActiveCloneJobCard({ job }: { job: ActiveCloneJob }) {
           <p className="text-xs text-[#6e6e73] mt-0.5">{job.currentStageLabel}</p>
           <div className="mt-2 w-full bg-[#d2d2d7]/60 rounded-full h-1">
             <div
-              className="bg-brand-600 h-1 rounded-full"
+              className="bg-rose-600 h-1 rounded-full"
               style={{ width: `${job.progressPercent}%` }}
             />
           </div>
@@ -144,12 +148,8 @@ function DashboardContent() {
       });
   }, [status]);
 
-  if (status === 'loading' || loading) {
-    return (
-      <div className="flex items-center justify-center py-24">
-        <Spinner />
-      </div>
-    );
+  if (DEV_PREVIEW_LOADING || loading) {
+    return <LoadingShell message="Loading dashboard…" />;
   }
 
   if (error) {
@@ -221,6 +221,12 @@ function DashboardContent() {
 }
 
 export default function DashboardPage() {
+  const { status } = useSession();
+
+  if (DEV_PREVIEW_LOADING || status === 'loading') {
+    return <LoadingShell message="Loading dashboard…" />;
+  }
+
   return (
     <AppShell variant="default" title="Dashboard">
       <DashboardContent />

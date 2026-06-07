@@ -1,6 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/cn';
+import { ACCENT, TEXT } from '@/content/productTheme';
 import {
   getLayoutStartersByCategory,
   recommendLayoutStarterForIndustry,
@@ -93,12 +94,12 @@ export function StarterGalleryPicker({
     <div className="space-y-4">
       {!hideHeader && (
         <div>
-          <h3 className="text-sm font-semibold text-zinc-900">Choose a layout template</h3>
-          <p className="text-xs text-zinc-500 mt-0.5">
+          <h3 className={cn('text-sm font-semibold', TEXT.primary)}>Choose a layout template</h3>
+          <p className={cn('text-xs mt-0.5', TEXT.muted)}>
             Pick the page structure and hero style. Color theme is chosen separately below.
           </p>
           {recommended && (
-            <p className="text-xs text-indigo-600 mt-1">
+            <p className="text-xs text-rose-700 mt-1">
               Recommended for {industry.trim()}: {recommended.name}
             </p>
           )}
@@ -107,7 +108,7 @@ export function StarterGalleryPicker({
 
       {Object.entries(grouped).map(([useCase, starters]) => (
         <div key={useCase} className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{useCase}</p>
+          <p className={cn('text-xs font-semibold uppercase tracking-wide', TEXT.muted)}>{useCase}</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {starters.map((starter) => {
               const selected = starter.id === selectedId;
@@ -121,8 +122,8 @@ export function StarterGalleryPicker({
                   className={cn(
                     'text-left rounded-xl border p-3 transition-all',
                     selected
-                      ? 'border-zinc-900 ring-2 ring-zinc-900/10 bg-zinc-50'
-                      : 'border-zinc-200 hover:border-zinc-300 bg-white',
+                      ? 'border-rose-600 ring-2 ring-rose-500/20 bg-rose-50 shadow-rose-cta'
+                      : 'border-[#d2d2d7]/80 hover:border-rose-200 bg-white',
                     disabled && 'opacity-60 cursor-not-allowed'
                   )}
                 >
@@ -136,17 +137,17 @@ export function StarterGalleryPicker({
                   </div>
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-zinc-900">{starter.name}</p>
+                      <p className={cn('text-sm font-medium', TEXT.primary)}>{starter.name}</p>
                     </div>
                     {isRecommended && (
-                      <span className="shrink-0 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
+                      <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold', ACCENT.pill)}>
                         Recommended
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-zinc-500 mt-1 line-clamp-2">{starter.description}</p>
+                  <p className={cn('text-xs mt-1 line-clamp-2', TEXT.muted)}>{starter.description}</p>
                   {selected && (
-                    <span className="inline-block mt-2 text-xs font-medium text-zinc-700">Selected</span>
+                    <span className={cn('inline-block mt-2 text-xs font-medium', ACCENT.link)}>Selected</span>
                   )}
                 </button>
               );

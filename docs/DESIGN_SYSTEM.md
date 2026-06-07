@@ -1,6 +1,6 @@
 # Design System — Apple-style UI
 
-Single source of truth for First Site product chrome. Inspired by [apple.com](https://www.apple.com) patterns: neutral canvas, system blue accent, frosted glass, editorial typography, restrained motion.
+Single source of truth for First Site product chrome. Inspired by [apple.com](https://www.apple.com) patterns: neutral canvas, **rose accent**, frosted glass, editorial typography, restrained motion.
 
 ## Colors
 
@@ -15,15 +15,51 @@ Single source of truth for First Site product chrome. Inspired by [apple.com](ht
 | Text secondary | `--color-text-muted` | `#6e6e73` | Subcopy |
 | Text tertiary | `--color-text-tertiary` | `#86868b` | Meta labels |
 | Border | `--color-border` | `#d2d2d7` | Hairlines |
-| Accent | `--color-accent` | `#0071e3` | Primary actions, links |
-| Accent hover | `--color-accent-hover` | `#0077ed` | Hover |
-| Accent muted | `--color-accent-muted` | `#e8f2ff` | Soft wash |
+| Accent | `--rose-raspberry` / rose-* | `#C83E5F` | Primary actions, links, tabs |
+| Accent hover | `--rose-text-hover` | `#C83E5F` | Hover |
+| Accent muted | `--rose-pale` | `#F1CDD7` | Soft wash, nav pills |
 | Glass fill | `--color-glass` | `rgb(255 255 255 / 0.72)` | Frosted panels |
 | Glass border | `--color-border-glass` | `rgb(255 255 255 / 0.8)` | Glass rim |
 | Danger | — | `#ff3b30` | Destructive |
 | Success | — | `#34c759` | Status only |
 
 Tailwind: `brand-*` maps to the blue accent scale for backward compatibility. Prefer semantic classes: `text-brand-600`, `bg-brand-600`, `text-[#6e6e73]`.
+
+## Canvas (page background)
+
+Product pages use a **neutral layered canvas** — not flat white. Rose atmosphere is **landing-only** (hero, promo); product chrome stays cool grey.
+
+### Utilities
+
+| Class | Usage |
+|-------|--------|
+| `.bg-brand-canvas` | Full-page roots: `body`, `AppShell`, landing wrapper, sign-in |
+| `.bg-canvas-alt` | Alternate bands: card headers, toolbar strips, error states |
+
+### Layer stack (`.bg-brand-canvas`)
+
+1. Base vertical gradient `#fbfbfd` → `#f5f5f7`
+2. Top vignette (ellipse at 50% -30%)
+3. Top-right corner wash
+4. Bottom-left corner wash
+
+CSS variables: `--canvas-gradient-base`, `--canvas-gradient-top`, `--canvas-gradient-corner-tr`, `--canvas-gradient-corner-bl`.
+
+### Alt bands (`.bg-canvas-alt`)
+
+1. Base `#f5f5f7` → `#ebebed`
+2. Subtle top highlight (white wash)
+3. Bottom vignette
+
+Use `SURFACE.canvas` / `SURFACE.alt` from `@/content/productTheme` — do not hardcode `bg-white` or flat `bg-[#f5f5f7]` for page-level roots.
+
+### Landing vs product
+
+| Zone | Background |
+|------|------------|
+| Product (dashboard, editor, clone, scratch) | Neutral canvas only |
+| Landing hero / promo | Neutral base + localized `.bg-rose-atmosphere` overlays |
+| Cards / inputs | `#ffffff` or `glass-card` (foreground surfaces, not page canvas) |
 
 ## Typography
 
@@ -37,18 +73,26 @@ Font stack: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", 
 | Section H2 | `text-3xl sm:text-4xl lg:text-5xl font-semibold tracking-[-0.03em]` |
 | Body | `text-[17px] leading-[1.47] text-[#6e6e73]` |
 | Eyebrow | `text-xs font-semibold uppercase tracking-[0.08em] text-[#6e6e73]` |
-| Link | `text-brand-600 hover:underline underline-offset-4` |
+| Link | `text-rose-700 hover:underline underline-offset-4` |
 
 ## Buttons
 
-| Variant | Tailwind pattern |
-|---------|------------------|
-| Primary | `bg-brand-600 text-white rounded-full hover:bg-brand-500` |
-| Secondary | `text-brand-600 hover:underline` (text link) |
-| Ghost | `text-[#6e6e73] hover:text-[#1d1d1f]` |
-| Glass | `glass-panel rounded-full` |
+| Variant | Pattern | Use |
+|---------|---------|-----|
+| Primary | `.btn-rose-primary` + `border-white/25` | Main CTAs — vertical `--rose-gradient-cta`, top sheen, `--rose-shadow-cta` |
+| Secondary | `.btn-rose-outline` | Visible outline pills (dashboard, rollback, sync) |
+| Secondary link | `secondaryLink` / `secondaryRose` | Inline underline CTAs (landing text links) |
+| Glass | `.btn-glass` | Attach, mic, tertiary actions |
+| Ghost | minimal + `hover:bg-black/[0.04]` | Toolbar icons |
+| Danger | `.btn-danger` | Destructive actions |
 
-Sizes: `sm` h-8, `md` h-9, `lg` h-11.
+**Typography:** `font-medium tracking-[-0.01em]` on all button variants.
+
+**Sizes:** `sm` h-8, `md` h-10, `lg` h-11 (all `rounded-full`).
+
+**Shadows:** Use `--rose-shadow-cta` on buttons; reserve `--rose-shadow-glass` for cards/promo only.
+
+**Small controls:** `.chip-rose` (prompt pills, tags), `.btn-icon` (chevrons, icon buttons).
 
 Use `Button` from `@/components/ui/Button` or `MarketingLink` on public pages.
 
@@ -82,25 +126,93 @@ Helpers: `@/components/motion` — `FadeIn`, `ScrollReveal`, `StaggerChildren`, 
 
 Respect `prefers-reduced-motion`: no transforms, opacity-only or instant.
 
+## Loading (SVG Rose Ring)
+
+Unified loading system for product chrome. Do **not** use raw `animate-spin` or border-only spinners in app UI.
+
+### Anatomy
+
+1. **Dual SVG rings** — `RoseOrbitSvg` (Apple Watch style): thin gray tracks, rose gradient outer arc + pale inner arc, both rotate clockwise at different speeds, tick bezel, arc-tip dots, breathing rose core
+2. **Floating orbs** — `LoadingBackdrop` soft blurred rose/white blobs (framer-motion figure-8 drift)
+3. **Copy stack** — brand eyebrow, message + animated ellipsis, 4px gradient indeterminate progress bar
+4. **Rose glow** — subtle `ROSE.glowSoft` overlay (~12% opacity) on full-screen shell
+
+CSS pseudo-element orbits (`.loader-orbit::before/::after`) and glass ribbons are **deprecated** — SVG guarantees visible pixels in all browsers.
+
+### Components
+
+| Component | Import | When to use |
+|-----------|--------|-------------|
+| `RoseOrbitSvg` | `@/components/ui/RoseOrbitSvg` | Dual-ring SVG hero/inline graphic |
+| `Loading` | `@/components/ui/Loading` | Inline / section waits; sizes `sm` / `md` / `lg` / `xl` |
+| `LoadingShell` | `@/components/ui/LoadingShell` | Full-page cinematic wait — orbs + SVG rings + copy |
+| `LoadingBackdrop` | `@/components/ui/LoadingBackdrop` | Internal — floating orbs (used by `LoadingShell`) |
+| `SkeletonBlock` / `SkeletonText` / `SkeletonCircle` | `@/components/ui/Skeleton` | Content placeholders while data loads |
+| `Spinner` | `@/components/ui/Spinner` | **Deprecated alias** → `Loading variant="inline"` |
+
+**Full-screen rule:** `LoadingShell` renders `RoseOrbitSvg` (128px) directly on canvas — never nest inside a white `glass-card`.
+
+**Choreography:** Rings fade/scale in first; brand + message + progress bar follow ~120ms later; hero label uses animated ellipsis dots.
+
+### Sizes (`Loading` → `RoseOrbitSvg`)
+
+| Size | SVG px | When |
+|------|--------|------|
+| `sm` | 22 | Buttons, panel rows, lazy sidebar |
+| `md` | 44 | Preview bootstrap, panel centers |
+| `lg` | 64 | Section waits |
+| `xl` | 80 | Large inline waits |
+| (shell) | 128 | `LoadingShell` full-screen hero |
+
+### Tokens
+
+```ts
+import { LOADING } from '@/content/productTheme';
+// LOADING.ringSpin, ringSpinReverse, ringStatic, ringPrimary, ringSecondary,
+// ringCore, progressTrack, progressShimmer, heroEllipsis, skeleton
+```
+
+### Reduced motion
+
+When `prefers-reduced-motion: reduce` (or `useReducedMotion()`):
+
+- Ring rotation disabled (static arcs at fixed angles; both same direction when frozen)
+- Core breathe disabled
+- Backdrop orbs static (no drift)
+- Shell entrance is instant (no scale fade)
+- Hero ellipsis static (`...`)
+- Progress shimmer static at partial fill
+
+### Skeleton shimmer
+
+`.skeleton-rose` — `#f5f5f7` base with transform-based rose shimmer sweep (`::after`).
+
+**Out of scope:** generated site runtime loaders in `src/lib/preview/` and builder templates.
+
 ## Layout
 
 - Content max width: `max-w-[980px]` (hero), `max-w-7xl` (wide sections)
 - Section padding: `py-20 lg:py-28`
-- Page canvas: `bg-brand-canvas` (neutral, not green)
+- Page canvas: `bg-brand-canvas` — layered neutral grey, not flat white
 
 ## Visual QA checklist
 
-- [ ] No green accent on product chrome
-- [ ] Primary buttons are blue pills
+- [ ] Page canvas shows soft grey depth (not flat white) on dashboard, editor, clone
+- [ ] Primary buttons are rose gradient pills
 - [ ] Glass nav blurs content behind it
 - [ ] Dark sections use `#1d1d1f` or `#000`
-- [ ] Focus rings use blue at 20% opacity
+- [ ] Focus rings use rose at 35% opacity
+- [ ] Chat bubbles use consistent `rounded-2xl` + glass/rose clarify
+- [ ] Editor tabs use rose active underline
+- [ ] Clone flow has no green CTAs
 - [ ] Mobile nav sheet works on landing
 - [ ] Reduced motion disables parallax/float
+- [ ] Full-screen loading shows dual SVG rose rings + floating orbs + progress bar
+- [ ] Button inline loads use `Loading size="sm"` without layout stretch
 
-## Raspberry accent (landing only)
+## Raspberry accent (app-wide)
 
-Parallel to blue `brand-*` — use `rose-*` **only** on the public landing page and marketing components.
+Rose is the **primary accent** across landing and product chrome. Use `productTheme.ts` and `marketingTheme.ts` for semantic class names.
 
 | Token | CSS variable / Tailwind | Value | Usage |
 |-------|-------------------------|-------|--------|
@@ -110,12 +222,29 @@ Parallel to blue `brand-*` — use `rose-*` **only** on the public landing page 
 | Soft rose | `--rose-soft` / `rose-300` | `#DD8399` | Rings, subtle highlights |
 | Pale rose | `--rose-pale` / `rose-50` | `#F1CDD7` | Nav active pill wash |
 
-### When to use rose vs brand
+### Chat bubbles
 
-| Context | Accent |
-|---------|--------|
-| Landing CTAs, hero glow, promo band | `rose-*` |
-| Dashboard, editor, sign-in, clone flows | `brand-*` (blue) |
+| Role | Class / pattern |
+|------|-----------------|
+| User | `.chat-bubble-user` — `#1d1d1f` fill |
+| Assistant | `.chat-bubble-assistant` — glass + hairline |
+| Clarification | `.chat-bubble-clarify` — rose-50 wash |
+| Error | `bg-red-50 border-red-200` — destructive only |
+
+### Editor layout
+
+- Sidebar shell: `rounded-2xl`, tab bar glass, active tab `.editor-tab-active`
+- Pinned targets: `.target-pin-card`
+- Drop zone: `ring-rose-400 bg-rose-50/40`
+
+### Toast
+
+Use `Toast` from `@/components/ui/Toast` — glass-dark pill, bottom center.
+
+### Status colors
+
+- **Success** `#34c759` / `Badge tone="success"` — status only, never primary CTAs
+- **Destructive** red unchanged
 
 ### Rose utilities (globals.css)
 
@@ -152,5 +281,5 @@ Do **not** embed rose radials in `.bg-brand-canvas` — atmosphere layers only.
 
 - [ ] Canvas reads neutral; raspberry visible on CTAs, glow, preview promo, hovers
 - [ ] Only **one** full gradient section (`#preview` promo)
-- [ ] App chrome still blue
+- [ ] App chrome uses rose CTAs and focus rings
 - [ ] Focus rings on rose CTAs use `ring-rose-500/35`

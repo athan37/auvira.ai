@@ -1,15 +1,17 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { cn } from '@/lib/cn';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Spinner } from '@/components/ui/Spinner';
+import { Loading } from '@/components/ui/Loading';
 import { Alert } from '@/components/ui/Alert';
 import { SITE_MANAGER_COPY } from '@/lib/owner/ownerCopy';
 import { BusinessProfileEditor, type BusinessProfileFormData } from './BusinessProfileEditor';
 import { WatchRuleToggleList, type WatchMonitorItem } from './WatchRuleToggleList';
 import { SiteIncidentCard } from './SiteIncidentCard';
 import { SiteManagerStatusBadge } from './SiteManagerStatusBadge';
+import { TEXT } from '@/content/productTheme';
 
 type WatchStatus = 'healthy' | 'setup' | 'issue' | 'fixing' | 'fixed';
 
@@ -48,7 +50,7 @@ export function BusinessWatchCard({ projectId, onRefresh }: Props) {
     return (
       <Card>
         <CardBody className="flex justify-center py-8">
-          <Spinner size="sm" />
+          <Loading size="sm" />
         </CardBody>
       </Card>
     );
@@ -99,7 +101,7 @@ export function BusinessWatchCard({ projectId, onRefresh }: Props) {
             {copy && !data?.incident && (
               <div>
                 <p className="text-sm font-medium">{copy.headline}</p>
-                <p className="text-sm text-zinc-600 mt-1">{copy.body}</p>
+                <p className={cn('text-sm mt-1', TEXT.muted)}>{copy.body}</p>
               </div>
             )}
 

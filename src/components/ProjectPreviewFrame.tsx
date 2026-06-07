@@ -1,6 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { cn } from '@/lib/cn';
+import { Loading } from '@/components/ui/Loading';
 import {
   buildSiteSectionClearMessage,
   buildSiteSectionFocusMessage,
@@ -23,6 +25,7 @@ import {
 import { usePageVisible } from '@/lib/hooks/usePageVisible';
 import { markEditorVital, recordIframeReload } from '@/lib/metrics/clientVitals';
 import { PREVIEW_IFRAME_SETTLE_MS } from '@/lib/project-workspace/previewReloadAfterEdit';
+import { BORDER, RADIUS, SURFACE, TEXT } from '@/content/productTheme';
 
 interface WorkspaceStatus {
   ok?: boolean;
@@ -441,9 +444,16 @@ export function ProjectPreviewFrame({
   const progress = stageProgress(setupStage);
 
   return (
-    <div className="flex flex-col h-full bg-zinc-50 rounded-lg border border-zinc-200 overflow-hidden shadow-card">
-      <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-zinc-200/80">
-        <span className="text-sm font-medium text-zinc-700 truncate">
+    <div
+      className={cn(
+        'flex flex-col h-full overflow-hidden shadow-card border',
+        RADIUS.card,
+        SURFACE.alt,
+        BORDER.hairline
+      )}
+    >
+      <div className="flex items-center justify-between px-4 py-3 glass-nav">
+        <span className={cn('text-sm font-medium truncate', TEXT.primary)}>
           {previewMode === 'sandbox'
             ? 'Dev preview'
             : previewMode === 'live'
@@ -458,14 +468,19 @@ export function ProjectPreviewFrame({
         <div className="flex items-center gap-2">
           {previewReady && !selectionAvailable && (
             <span
-              className="text-[10px] text-zinc-500 hidden sm:inline"
+              className={cn('text-[10px] hidden sm:inline', TEXT.muted)}
               title="Drag sections to chat in editor preview"
             >
               Drag sections in editor preview
             </span>
           )}
           {previewReady && (
-            <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-800 capitalize">
+            <span
+              className={cn(
+                'text-xs font-medium px-2 py-0.5 rounded-md capitalize bg-[#f5f5f7]',
+                TEXT.primary
+              )}
+            >
               {setupStage === 'ready'
                 ? previewMode === 'sandbox'
                   ? 'Dev'
@@ -476,13 +491,17 @@ export function ProjectPreviewFrame({
             </span>
           )}
           {previewReady && iframeLoading && (
-            <span className="text-xs text-zinc-500">Loading page…</span>
+            <span className={cn('text-xs', TEXT.muted)}>Loading page…</span>
           )}
           <button
             type="button"
             onClick={handleRefresh}
             disabled={!previewReady}
-            className="p-1.5 text-zinc-500 hover:text-zinc-700 hover:bg-zinc-100 rounded-md transition disabled:opacity-40"
+            className={cn(
+              'p-1.5 rounded-md transition disabled:opacity-40',
+              TEXT.muted,
+              'hover:text-[#1d1d1f] hover:bg-[#f5f5f7]'
+            )}
             title="Refresh preview"
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -510,26 +529,26 @@ export function ProjectPreviewFrame({
                     bootstrapStarted.current = false;
                     window.location.reload();
                   }}
-                  className="text-sm text-zinc-950 hover:underline"
+                  className={cn('text-sm hover:underline', TEXT.primary)}
                 >
                   Try again
                 </button>
               </>
             ) : (
               <>
-                <div className="animate-spin h-8 w-8 border-2 border-zinc-950 border-t-transparent rounded-full mb-4" />
-                <p className="text-sm font-medium text-zinc-800 mb-1">{setupLabel}</p>
-                <p className="text-xs text-zinc-500 mb-4 text-center max-w-sm">
+                <Loading size="lg" className="mb-4" />
+                <p className={cn('text-sm font-medium mb-1', TEXT.primary)}>{setupLabel}</p>
+                <p className={cn('text-xs mb-4 text-center max-w-sm', TEXT.muted)}>
                   First open clones from GitLab and may install dependencies. This can take a few
                   minutes.
                 </p>
-                <div className="w-full max-w-xs h-1.5 bg-zinc-200 rounded-full overflow-hidden">
+                <div className="w-full max-w-xs h-1.5 bg-[#d2d2d7]/80 rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-zinc-950 transition-all duration-500 ease-out"
+                    className="h-full bg-rose-600 transition-all duration-500 ease-out"
                     style={{ width: `${progress}%` }}
                   />
                 </div>
-                <p className="text-xs text-gray-400 mt-2 capitalize">
+                <p className={cn('text-xs mt-2 capitalize', TEXT.tertiary)}>
                   {setupStage.replace(/_/g, ' ')}
                 </p>
               </>

@@ -5,7 +5,9 @@ import { Alert } from '@/components/ui/Alert';
 import { Button } from '@/components/ui/Button';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
-import { Spinner } from '@/components/ui/Spinner';
+import { Loading } from '@/components/ui/Loading';
+import { cn } from '@/lib/cn';
+import { BORDER, TEXT } from '@/content/productTheme';
 
 interface ProductRow {
   id: string;
@@ -102,7 +104,7 @@ export function ProductCatalogPanel({ projectId }: Props) {
   if (loading) {
     return (
       <div className="flex justify-center py-8">
-        <Spinner />
+        <Loading size="md" />
       </div>
     );
   }
@@ -110,8 +112,8 @@ export function ProductCatalogPanel({ projectId }: Props) {
   return (
     <Card>
       <CardHeader>
-        <h3 className="text-sm font-semibold text-zinc-900">Product catalog</h3>
-        <p className="text-xs text-zinc-500 mt-0.5">
+        <h3 className={cn('text-sm font-semibold', TEXT.primary)}>Product catalog</h3>
+        <p className={cn('text-xs mt-0.5', TEXT.muted)}>
           Add products to show on your site. Online checkout (Stripe) comes in a later phase.
         </p>
       </CardHeader>
@@ -139,11 +141,11 @@ export function ProductCatalogPanel({ projectId }: Props) {
         {products.length > 0 && (
           <ul className="space-y-2 text-sm">
             {products.map((p) => (
-              <li key={p.id} className="border border-zinc-100 rounded-lg p-2">
-                <p className="font-medium text-zinc-800">{p.name}</p>
-                {p.description && <p className="text-xs text-zinc-500">{p.description}</p>}
+              <li key={p.id} className={cn('border rounded-lg p-2', BORDER.hairline)}>
+                <p className={cn('font-medium', TEXT.primary)}>{p.name}</p>
+                {p.description && <p className={cn('text-xs', TEXT.muted)}>{p.description}</p>}
                 {p.price != null && (
-                  <p className="text-xs text-zinc-600 mt-0.5">${p.price.toFixed(2)}</p>
+                  <p className={cn('text-xs mt-0.5', TEXT.muted)}>${p.price.toFixed(2)}</p>
                 )}
               </li>
             ))}

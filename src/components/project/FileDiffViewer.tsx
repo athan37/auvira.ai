@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Spinner } from '@/components/ui/Spinner';
+import { cn } from '@/lib/cn';
+import { Loading } from '@/components/ui/Loading';
+import { BORDER, TEXT } from '@/content/productTheme';
 
 export interface FileDiffResponse {
   ok: boolean;
@@ -23,11 +25,11 @@ interface Props {
 }
 
 function colorizePatchLine(line: string): string {
-  if (line.startsWith('+++') || line.startsWith('---')) return 'text-zinc-500';
+  if (line.startsWith('+++') || line.startsWith('---')) return TEXT.muted;
   if (line.startsWith('@@')) return 'text-blue-700';
   if (line.startsWith('+')) return 'text-emerald-800 bg-emerald-50';
   if (line.startsWith('-')) return 'text-red-800 bg-red-50';
-  return 'text-zinc-700';
+  return 'text-[#1d1d1f]';
 }
 
 export function FileDiffViewer({ projectId, jobId, filePath, expanded }: Props) {
@@ -66,8 +68,8 @@ export function FileDiffViewer({ projectId, jobId, filePath, expanded }: Props) 
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 py-3 pl-2 text-xs text-zinc-500">
-        <Spinner size="sm" />
+      <div className={cn('flex items-center gap-2 py-3 pl-2 text-xs', TEXT.muted)}>
+        <Loading size="sm" />
         Loading diff…
       </div>
     );
@@ -84,8 +86,8 @@ export function FileDiffViewer({ projectId, jobId, filePath, expanded }: Props) 
   const lines = data.patch.split('\n');
 
   return (
-    <div className="mt-1 ml-1 border-l-2 border-zinc-200 pl-2 space-y-1">
-      <p className="text-[10px] text-zinc-500">
+    <div className="mt-1 ml-1 border-l-2 border-[#d2d2d7]/80 pl-2 space-y-1">
+      <p className={cn('text-[10px]', TEXT.muted)}>
         {data.status} · before {data.beforeLineCount ?? 0} lines → after{' '}
         {data.afterLineCount ?? 0} lines
         {data.truncated ? ' · diff truncated for display' : ''}
@@ -93,7 +95,12 @@ export function FileDiffViewer({ projectId, jobId, filePath, expanded }: Props) 
           ? ' · after side is current workspace (may differ if you edited again)'
           : ''}
       </p>
-      <pre className="text-[11px] leading-relaxed rounded-md border border-zinc-200 bg-zinc-50 p-2 max-h-64 overflow-auto whitespace-pre-wrap font-mono">
+      <pre
+        className={cn(
+          'text-[11px] leading-relaxed rounded-md p-2 max-h-64 overflow-auto whitespace-pre-wrap font-mono bg-[#f5f5f7] border',
+          BORDER.hairline
+        )}
+      >
         {lines.map((line, i) => (
           <div key={`${i}-${line.slice(0, 8)}`} className={colorizePatchLine(line)}>
             {line || ' '}

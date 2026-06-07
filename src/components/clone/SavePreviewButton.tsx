@@ -2,6 +2,10 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { ACCENT, BORDER, RADIUS, TEXT } from '@/content/productTheme';
+import { cn } from '@/lib/cn';
 
 interface Props {
   jobId: string;
@@ -46,54 +50,51 @@ export default function SavePreviewButton({
   };
 
   return (
-    <div className="space-y-2 rounded-xl border border-zinc-200 bg-white p-4">
+    <div className={cn('space-y-2 border bg-white p-4', RADIUS.card, BORDER.hairline)}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-semibold text-zinc-900">
+          <h3 className={cn('text-sm font-semibold', TEXT.primary)}>
             {isSaved ? 'Project saved' : 'Save your work'}
           </h3>
-          <p className="text-xs text-zinc-500 mt-0.5">
+          <p className={cn('text-xs mt-0.5', TEXT.muted)}>
             {isSaved
               ? 'Committed to GitLab. Return anytime from your dashboard to edit and test.'
               : 'Commit to GitLab so you can leave and continue editing later — no Vercel deploy yet.'}
           </p>
         </div>
-        {isSaved && (
-          <span className="shrink-0 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
-            Saved
-          </span>
-        )}
+        {isSaved && <Badge tone="success">Saved</Badge>}
       </div>
 
-      <button
+      <Button
         type="button"
+        variant="primary"
         onClick={handleSave}
         disabled={saving}
-        className="w-full rounded-lg bg-brand-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-700 disabled:opacity-50"
+        className="w-full"
+        size="lg"
       >
         {saving
           ? 'Saving to GitLab...'
           : isSaved
             ? 'Save latest changes'
             : 'Save to GitLab'}
-      </button>
+      </Button>
 
       {error && <p className="text-xs text-red-500 text-center">{error}</p>}
 
       {isSaved && projectId && (
         <div className="flex flex-col gap-2 pt-1">
-          <Link
-            href={`/projects/${projectId}`}
-            className="w-full rounded-lg border border-brand-200 bg-brand-50 px-4 py-2.5 text-center text-sm font-medium text-brand-700 hover:bg-brand-100"
-          >
-            Open project workspace →
+          <Link href={`/projects/${projectId}`}>
+            <Button variant="glass" className="w-full">
+              Open project workspace →
+            </Button>
           </Link>
           {gitlabRepoUrl && (
             <a
               href={gitlabRepoUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-center text-xs text-zinc-500 hover:text-brand-600 hover:underline"
+              className={cn('text-center text-xs hover:underline', TEXT.muted, ACCENT.link)}
             >
               View on GitLab
             </a>

@@ -1,4 +1,5 @@
 import { cn } from '@/lib/cn';
+import { TEXT } from '@/content/productTheme';
 
 export function EmptyState({
   title,
@@ -13,8 +14,10 @@ export function EmptyState({
 }) {
   return (
     <div className={cn('text-center py-12 px-6', className)}>
-      <h3 className="text-lg font-medium text-zinc-900 mb-1">{title}</h3>
-      {description && <p className="text-sm text-zinc-500 mb-6 max-w-md mx-auto">{description}</p>}
+      <h3 className={cn('text-lg font-medium mb-1', TEXT.primary)}>{title}</h3>
+      {description && (
+        <p className={cn('text-sm mb-6 max-w-md mx-auto', TEXT.muted)}>{description}</p>
+      )}
       {action}
     </div>
   );

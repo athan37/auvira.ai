@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/cn';
+import { BORDER, CONTROL, TEXT } from '@/content/productTheme';
 import { PreviewTargetCardLayout } from '@/components/project/PreviewTargetCardLayout';
 import {
   formatPreviewTargetBreadcrumb,
@@ -45,7 +46,7 @@ function ClearPinButton({ label, onClear }: { label: string; onClear: () => void
         event.stopPropagation();
         onClear();
       }}
-      className="shrink-0 rounded-md p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
+      className={cn('shrink-0 rounded-lg p-1 btn-icon h-7 w-7', TEXT.tertiary, 'hover:text-[#1d1d1f]')}
       aria-label={`Clear pinned target ${label}`}
       title="Clear selection"
     >
@@ -59,7 +60,7 @@ function ClearPinButton({ label, onClear }: { label: string; onClear: () => void
 function TargetCardHeader({ onClear, label }: { onClear: () => void; label: string }) {
   return (
     <div className="flex items-center justify-between gap-2">
-      <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+      <span className={cn('text-[10px] font-semibold uppercase tracking-wider', TEXT.muted)}>
         Edit target
       </span>
       <ClearPinButton label={label} onClear={onClear} />
@@ -74,12 +75,12 @@ function pinnedCardSurfaceClass(options: {
   className?: string;
 }): string {
   return cn(
-    'w-full overflow-hidden rounded-xl border border-zinc-200/80 border-l-[3px] border-l-brand-500 bg-white shadow-sm transition-colors',
+    'target-pin-card w-full overflow-hidden transition-colors',
     options.interactive &&
       (options.active
-        ? 'cursor-pointer ring-2 ring-brand-400/40 ring-offset-1'
-        : 'cursor-pointer hover:border-zinc-300 hover:shadow'),
-    options.pulsing && 'ring-2 ring-brand-400/50 ring-offset-1',
+        ? 'cursor-pointer ring-2 ring-rose-400/40 ring-offset-1'
+        : cn('cursor-pointer hover:shadow', BORDER.hairline, 'hover:border-[#d2d2d7]')),
+    options.pulsing && 'ring-2 ring-rose-400/50 ring-offset-1',
     options.className
   );
 }
@@ -210,12 +211,14 @@ function UsedTargetPill({
     <div
       data-section-chat-label
       className={cn(
-        'inline-flex max-w-full items-center gap-2 rounded-md border border-zinc-200/80 bg-zinc-100 px-2 py-1 text-xs text-zinc-800 transition-colors',
+        'inline-flex max-w-full items-center gap-2 rounded-xl px-2 py-1 text-xs transition-colors',
+        CONTROL.chip,
+        TEXT.primary,
         interactive &&
           (active
-            ? 'cursor-pointer ring-2 ring-zinc-400/50 ring-offset-1'
-            : 'cursor-pointer hover:bg-zinc-200/80'),
-        pulsing && 'ring-2 ring-zinc-400/50 ring-offset-1',
+            ? 'cursor-pointer ring-2 ring-rose-400/50 ring-offset-1'
+            : 'cursor-pointer hover:bg-rose-50/60'),
+        pulsing && 'ring-2 ring-rose-400/50 ring-offset-1',
         className
       )}
       title={interactive ? `Show ${label} in preview` : chipText}

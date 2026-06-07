@@ -1,9 +1,5 @@
-import { Spinner } from '@/components/ui/Spinner';
+import { LoadingShell } from '@/components/ui/LoadingShell';
 
 export default function ProjectLoading() {
-  return (
-    <div className="flex items-center justify-center min-h-[40vh]">
-      <Spinner />
-    </div>
-  );
+  return <LoadingShell message="Opening project…" />;
 }

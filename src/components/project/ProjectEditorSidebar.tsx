@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/cn';
+import { ACCENT, BORDER, RADIUS, TEXT } from '@/content/productTheme';
 import { ProjectPreviewChat, type EditCompleteResult } from '@/components/ProjectPreviewChat';
 import { OWNER_COPY } from '@/lib/owner/ownerCopy';
 import {
@@ -96,13 +97,17 @@ export function ProjectEditorSidebar({
   return (
     <div
       className={cn(
-        'flex flex-col h-full min-h-0 relative rounded-xl transition-shadow',
-        isSectionDragging && 'ring-2 ring-brand-300 ring-offset-2',
-        isChatDropActive && 'ring-2 ring-brand-500 ring-offset-2 bg-brand-50/40'
+        'flex flex-col h-full min-h-0 relative transition-shadow',
+        RADIUS.card,
+        isSectionDragging && 'ring-2 ring-rose-300 ring-offset-2',
+        isChatDropActive && ACCENT.dropZone
       )}
     >
       <div
-        className="flex border-b border-zinc-200/80 bg-white rounded-t-xl overflow-hidden shrink-0"
+        className={cn(
+          'flex glass-panel overflow-hidden shrink-0 rounded-t-2xl border-b',
+          BORDER.hairline
+        )}
         role="tablist"
         aria-label="Project editor"
       >
@@ -118,8 +123,8 @@ export function ProjectEditorSidebar({
             className={cn(
               'flex-1 py-2.5 text-sm font-medium transition-colors',
               tab === t.id
-                ? 'text-zinc-950 border-b-2 border-zinc-950 bg-zinc-50'
-                : 'text-zinc-500 hover:text-zinc-800 hover:bg-zinc-50'
+                ? cn('editor-tab-active bg-white/60', TEXT.primary)
+                : cn(TEXT.muted, 'hover:text-[#1d1d1f] hover:bg-white/40')
             )}
           >
             {t.label}
@@ -129,7 +134,8 @@ export function ProjectEditorSidebar({
 
       <div
         className={cn(
-          'flex-1 min-h-0 bg-zinc-50/50 rounded-b-xl border border-t-0 border-zinc-200/80 relative',
+          'flex-1 min-h-0 glass-panel rounded-b-2xl border border-t-0 relative',
+          BORDER.hairline,
           needsSave && tab === 'changes' ? 'pb-20' : ''
         )}
       >
@@ -233,7 +239,12 @@ export function ProjectEditorSidebar({
       </div>
 
       {needsSave && tab === 'changes' && (
-        <div className="absolute bottom-0 left-0 right-0 p-3 bg-white/95 backdrop-blur border-t border-zinc-200 rounded-b-xl shadow-lg z-10">
+        <div
+          className={cn(
+            'absolute bottom-0 left-0 right-0 p-3 glass-panel border-t rounded-b-2xl shadow-lg z-10',
+            BORDER.hairline
+          )}
+        >
           <LazySaveDeployActions
             projectId={projectId}
             needsSave={needsSave}
@@ -243,7 +254,7 @@ export function ProjectEditorSidebar({
             onDeploySuccess={onDeploySuccess}
             compact
           />
-          <p className="text-[10px] text-zinc-400 text-center mt-1">{OWNER_COPY.publishLiveHint}</p>
+          <p className={cn('text-[10px] text-center mt-1', TEXT.tertiary)}>{OWNER_COPY.publishLiveHint}</p>
         </div>
       )}
     </div>

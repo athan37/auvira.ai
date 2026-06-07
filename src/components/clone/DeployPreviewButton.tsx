@@ -1,6 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import { Button } from '@/components/ui/Button';
+import { TEXT } from '@/content/productTheme';
+import { cn } from '@/lib/cn';
 
 interface Props {
   jobId: string;
@@ -32,17 +35,19 @@ export default function DeployPreviewButton({ jobId, onDeployStart }: Props) {
 
   return (
     <div className="space-y-2">
-      <button
+      <Button
+        variant="primary"
         onClick={handleDeploy}
         disabled={deploying}
-        className="w-full bg-green-600 text-white px-4 py-3 rounded-lg text-sm font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors"
+        className="w-full"
+        size="lg"
       >
         {deploying ? 'Starting deployment...' : 'Deploy Website'}
-      </button>
+      </Button>
       {error && (
         <p className="text-xs text-red-500 text-center">{error}</p>
       )}
-      <p className="text-xs text-zinc-400 text-center">
+      <p className={cn('text-xs text-center', TEXT.tertiary)}>
         Publishes to Vercel. Save to GitLab first if you want to return later without deploying yet.
       </p>
     </div>

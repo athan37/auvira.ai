@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/cn';
+import { BORDER, TEXT } from '@/content/productTheme';
 import {
   SECTION_PREVIEW_THUMB_MAX,
   resolvePreviewThumbDisplaySize,
@@ -101,7 +102,7 @@ export function PreviewTargetThumbnail({
       <>
         {progressive && !imageLoaded ? (
           <div
-            className={cn('animate-pulse rounded-xl bg-zinc-200/80', widthClass)}
+            className={cn('animate-pulse rounded-xl bg-[#d2d2d7]/80', widthClass)}
             style={sectionStyle}
             aria-hidden
           />
@@ -135,7 +136,7 @@ export function PreviewTargetThumbnail({
       <>
         {progressive && !imageLoaded ? (
           <div
-            className={cn('animate-pulse rounded-xl bg-zinc-200/80 mx-auto', bleedClass)}
+            className={cn('animate-pulse rounded-xl bg-[#d2d2d7]/80 mx-auto', bleedClass)}
             style={{
               width: display.width,
               height: display.height,
@@ -168,7 +169,8 @@ export function PreviewTargetThumbnail({
   if (!fallbackLabel) return null;
 
   const fallbackFrameClass = cn(
-    'relative shrink-0 overflow-hidden rounded-md border border-zinc-200/80 bg-white p-2 shadow-sm',
+    'relative shrink-0 overflow-hidden rounded-md border bg-white p-2 shadow-sm',
+    BORDER.hairline,
     fullWidth && 'w-full',
     className
   );
@@ -182,7 +184,7 @@ export function PreviewTargetThumbnail({
   if (progressive && !showFallback) {
     return (
       <div
-        className={cn(fallbackFrameClass, 'animate-pulse bg-zinc-200/80')}
+        className={cn(fallbackFrameClass, 'animate-pulse bg-[#d2d2d7]/80')}
         style={fallbackStyle}
         aria-hidden
       />
@@ -191,7 +193,7 @@ export function PreviewTargetThumbnail({
 
   return (
     <div className={fallbackFrameClass} style={fallbackStyle} aria-hidden>
-      <p className="line-clamp-4 text-[10px] font-semibold leading-snug text-zinc-900">
+      <p className={cn('line-clamp-4 text-[10px] font-semibold leading-snug', TEXT.primary)}>
         {fallbackLabel}
       </p>
     </div>

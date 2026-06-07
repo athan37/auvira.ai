@@ -3,8 +3,10 @@
 import { Badge, statusToBadgeTone } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
-import { Spinner } from '@/components/ui/Spinner';
+import { Loading } from '@/components/ui/Loading';
+import { ACCENT, BORDER, TEXT } from '@/content/productTheme';
 import { useEffect, useRef, useState } from 'react';
+import { cn } from '@/lib/cn';
 import { ownerDeploymentBadgeLabel, OWNER_COPY } from '@/lib/owner/ownerCopy';
 
 interface Deployment {
@@ -145,40 +147,40 @@ export function PublishedStatusCard({
   return (
     <Card>
       <CardHeader>
-        <h2 className="font-medium text-zinc-700 text-sm">Save & deploy status</h2>
+        <h2 className={cn('font-medium text-sm', TEXT.muted)}>Save & deploy status</h2>
       </CardHeader>
       <CardBody className="space-y-4">
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-xs text-zinc-500">Last backup saved</span>
-            <span className="text-xs text-zinc-700">{formatRelativeTime(lastPublishedAt)}</span>
+            <span className={cn('text-xs', TEXT.muted)}>Last backup saved</span>
+            <span className={cn('text-xs', TEXT.primary)}>{formatRelativeTime(lastPublishedAt)}</span>
           </div>
           {gitlabWebUrl ? (
             <a
               href={gitlabWebUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs text-zinc-950 hover:underline block truncate"
+              className={cn('text-xs block truncate', ACCENT.link, 'hover:underline')}
             >
               View backup copy (advanced)
             </a>
           ) : (
-            <p className="text-xs text-zinc-500">Save a backup copy before publishing live.</p>
+            <p className={cn('text-xs', TEXT.muted)}>Save a backup copy before publishing live.</p>
           )}
         </div>
 
-        <div className="border-t border-zinc-100 pt-3 space-y-2">
+        <div className={cn('border-t pt-3 space-y-2', BORDER.hairline)}>
           <div className="flex items-center justify-between gap-2">
-            <span className="text-xs text-zinc-500">{OWNER_COPY.liveWebsite}</span>
+            <span className={cn('text-xs', TEXT.muted)}>{OWNER_COPY.liveWebsite}</span>
             <div className="flex items-center gap-1.5">
-              {polling && isBuilding && <Spinner size="sm" />}
+              {polling && isBuilding && <Loading size="sm" />}
               <Badge tone={statusToBadgeTone(commitVerified ? 'ready' : displayStatus)}>
                 {ownerDeploymentBadgeLabel(displayStatus, commitVerified)}
               </Badge>
             </div>
           </div>
 
-          <p className="text-xs text-zinc-500">
+          <p className={cn('text-xs', TEXT.muted)}>
             Use the production URL below after deploy. Old links with random IDs in the URL are
             frozen snapshots and do not update.
           </p>
@@ -186,7 +188,7 @@ export function PublishedStatusCard({
           {liveUrl && commitVerified ? (
             <>
               {commitShort && (
-                <p className="text-xs text-zinc-600 font-mono">
+                <p className={cn('text-xs font-mono', TEXT.muted)}>
                   Deployed commit {commitShort} from your preview
                 </p>
               )}
@@ -197,7 +199,7 @@ export function PublishedStatusCard({
                 href={liveUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-zinc-950 hover:underline block truncate"
+                className={cn('text-xs block truncate', ACCENT.link, 'hover:underline')}
               >
                 {liveUrl.replace(/^https?:\/\//, '')}
               </a>
@@ -208,9 +210,9 @@ export function PublishedStatusCard({
               </a>
             </>
           ) : hasVercel ? (
-            <p className="text-xs text-zinc-600">
+            <p className={cn('text-xs', TEXT.muted)}>
               {commitShort && isBuilding && (
-                <span className="block font-mono text-zinc-700 mb-1">
+                <span className={cn('block font-mono mb-1', TEXT.primary)}>
                   Building commit {commitShort}
                   {deployment?.expectedProductionUrl
                     ? ` → ${deployment.expectedProductionUrl.replace(/^https?:\/\//, '')}`
@@ -221,13 +223,13 @@ export function PublishedStatusCard({
                 ? pollNote || 'Vercel is building your site (usually 1–3 minutes).'
                 : pollNote || 'Checking Vercel deployment status…'}
               {pollTimedOut && deployment?.expectedProductionUrl && (
-                <span className="block mt-2 text-zinc-500">
+                <span className={cn('block mt-2', TEXT.muted)}>
                   Still waiting? Check{' '}
                   <a
                     href={deployment.expectedProductionUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-zinc-950 hover:underline"
+                    className={cn(ACCENT.link, 'hover:underline')}
                   >
                     {deployment.expectedProductionUrl.replace(/^https?:\/\//, '')}
                   </a>{' '}
@@ -236,7 +238,7 @@ export function PublishedStatusCard({
               )}
             </p>
           ) : (
-            <p className="text-xs text-zinc-600">
+            <p className={cn('text-xs', TEXT.muted)}>
               Not published yet. Use <strong>Publish live site</strong> when your draft looks right.
             </p>
           )}
@@ -246,7 +248,7 @@ export function PublishedStatusCard({
               href={inspectorUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs text-zinc-500 hover:text-zinc-950 hover:underline block"
+              className={cn('text-xs block', TEXT.muted, ACCENT.link, 'hover:underline')}
             >
               View build logs on Vercel
             </a>

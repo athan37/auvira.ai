@@ -22,7 +22,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={inter.variable}>
-      <body className="min-h-screen font-sans">
+      <body className="min-h-screen font-sans bg-brand-canvas">
         <Providers>{children}</Providers>
       </body>
     </html>

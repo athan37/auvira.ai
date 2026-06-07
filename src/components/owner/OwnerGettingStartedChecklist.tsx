@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/Card';
 import { cn } from '@/lib/cn';
+import { BORDER, TEXT } from '@/content/productTheme';
 
 const STORAGE_KEY = 'site-agent-getting-started-dismissed';
 
@@ -45,12 +46,12 @@ function StepList({ context }: { context: ChecklistContext }) {
     <ol className="space-y-2">
       {steps.map((step, i) => (
         <li key={step.title} className="flex gap-2.5 text-sm">
-          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-zinc-900 text-[10px] font-semibold text-white">
+          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-rose-600 text-[10px] font-semibold text-white">
             {i + 1}
           </span>
           <div>
-            <p className="font-medium text-zinc-800 text-xs leading-snug">{step.title}</p>
-            <p className="text-[11px] text-zinc-500 leading-snug mt-0.5">{step.detail}</p>
+            <p className={cn('font-medium text-xs leading-snug', TEXT.primary)}>{step.title}</p>
+            <p className={cn('text-[11px] leading-snug mt-0.5', TEXT.muted)}>{step.detail}</p>
           </div>
         </li>
       ))}
@@ -80,26 +81,28 @@ export function OwnerGettingStartedChecklist({ context, className, variant = 'ca
 
   if (variant === 'compact') {
     return (
-      <div className={cn('shrink-0 border-t border-zinc-200/80 bg-white', className)}>
+      <div className={cn('shrink-0 border-t bg-white', BORDER.hairline, className)}>
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
           aria-expanded={expanded}
-          className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left hover:bg-zinc-50 transition-colors"
+          className={cn(
+            'flex w-full items-center justify-between gap-2 px-3 py-2 text-left transition-colors hover:bg-[#f5f5f7]'
+          )}
         >
-          <span className="text-xs font-medium text-zinc-700">{title}</span>
-          <span className="text-[10px] text-zinc-400 shrink-0" aria-hidden>
+          <span className={cn('text-xs font-medium', TEXT.primary)}>{title}</span>
+          <span className={cn('text-[10px] shrink-0', TEXT.tertiary)} aria-hidden>
             {expanded ? '▲' : '▼'}
           </span>
         </button>
         {expanded && (
-          <div className="px-3 pb-3 pt-0 border-t border-zinc-100">
+          <div className={cn('px-3 pb-3 pt-0 border-t', BORDER.hairline)}>
             <div className="flex items-start justify-between gap-2 mb-2 pt-2">
-              <p className="text-[11px] text-zinc-500 leading-snug">{subtitle}</p>
+              <p className={cn('text-[11px] leading-snug', TEXT.muted)}>{subtitle}</p>
               <button
                 type="button"
                 onClick={dismiss}
-                className="text-[10px] text-zinc-400 hover:text-zinc-700 shrink-0"
+                className={cn('text-[10px] shrink-0', TEXT.tertiary, 'hover:text-[#1d1d1f]')}
               >
                 Dismiss
               </button>
@@ -112,16 +115,16 @@ export function OwnerGettingStartedChecklist({ context, className, variant = 'ca
   }
 
   return (
-    <Card className={cn('p-4 border-zinc-200 bg-white', className)}>
+    <Card variant="glass" className={cn('p-4', className)}>
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h2 className="text-sm font-semibold text-zinc-900">{title}</h2>
-          <p className="text-xs text-zinc-500 mt-0.5">{subtitle}</p>
+          <h2 className={cn('text-sm font-semibold', TEXT.primary)}>{title}</h2>
+          <p className={cn('text-xs mt-0.5', TEXT.muted)}>{subtitle}</p>
         </div>
         <button
           type="button"
           onClick={dismiss}
-          className="text-xs text-zinc-500 hover:text-zinc-800 shrink-0"
+          className={cn('text-xs shrink-0', TEXT.muted, 'hover:text-[#1d1d1f]')}
         >
           Dismiss
         </button>

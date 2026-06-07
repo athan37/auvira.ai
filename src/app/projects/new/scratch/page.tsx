@@ -15,8 +15,10 @@ import { Alert } from '@/components/ui/Alert';
 import { Button } from '@/components/ui/Button';
 import { Input, Textarea } from '@/components/ui/Input';
 import { PageContainer } from '@/components/ui/PageContainer';
-import { Spinner } from '@/components/ui/Spinner';
+import { Loading } from '@/components/ui/Loading';
+import { LoadingShell } from '@/components/ui/LoadingShell';
 import { cn } from '@/lib/cn';
+import { ACCENT, BORDER, SURFACE, TEXT } from '@/content/productTheme';
 import type { WebsitePlan } from '@/lib/agent/schemas';
 import {
   getCategoryPreset,
@@ -56,7 +58,7 @@ const HOW_IT_WORKS = [
 ] as const;
 
 const selectClassName =
-  'w-full h-11 rounded-xl border border-[#d2d2d7] bg-white px-4 text-[17px] text-[#1d1d1f] focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:bg-[#f5f5f7] disabled:text-[#86868b]';
+  'w-full h-11 rounded-xl border border-[#d2d2d7] bg-white px-4 text-[17px] text-[#1d1d1f] focus:border-rose-600 focus:outline-none focus:ring-2 focus:ring-rose-500/20 disabled:bg-[#f5f5f7] disabled:text-[#86868b]';
 
 function ScratchProgressSteps({ stage }: { stage: ScratchProgressStage }) {
   if (stage === 'idle' || stage === 'revising') return null;
@@ -65,8 +67,8 @@ function ScratchProgressSteps({ stage }: { stage: ScratchProgressStage }) {
   const activeIndex = stageOrder.indexOf(stage);
 
   return (
-    <div className="rounded-2xl border border-[#d2d2d7]/80 bg-[#f5f5f7] p-4 space-y-3">
-      <p className="text-sm font-medium text-[#1d1d1f]">Creating your website</p>
+    <div className={cn('rounded-2xl border p-4 space-y-3', BORDER.hairline, SURFACE.alt)}>
+      <p className={cn('text-sm font-medium', TEXT.primary)}>Creating your website</p>
       <ol className="space-y-2">
         {SCRATCH_PROGRESS_STEPS.map((step, index) => {
           const done = index < activeIndex;
@@ -76,16 +78,16 @@ function ScratchProgressSteps({ stage }: { stage: ScratchProgressStage }) {
               <span
                 className={`flex h-5 w-5 items-center justify-center rounded-full text-xs font-semibold ${
                   done
-                    ? 'bg-brand-100 text-brand-700'
+                    ? 'bg-rose-100 text-rose-700'
                     : active
-                      ? 'bg-brand-600 text-white'
+                      ? 'bg-rose-600 text-white'
                       : 'bg-[#d2d2d7]/60 text-[#86868b]'
                 }`}
               >
                 {done ? '✓' : index + 1}
               </span>
-              <span className={active ? 'font-medium text-zinc-900' : 'text-zinc-600'}>{step.label}</span>
-              {active && <Spinner size="sm" />}
+              <span className={active ? cn('font-medium', TEXT.primary) : TEXT.muted}>{step.label}</span>
+              {active && <Loading variant="inline" size="sm" />}
             </li>
           );
         })}
@@ -106,13 +108,15 @@ function ScratchStepPill({
   onReview: () => void;
 }) {
   return (
-    <div className="inline-flex rounded-lg border border-zinc-200 bg-zinc-50 p-0.5">
+    <div className={cn('inline-flex rounded-xl border p-0.5', BORDER.hairline, SURFACE.alt)}>
       <button
         type="button"
         onClick={onIntake}
         className={cn(
-          'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-          step === 'intake' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-600 hover:text-zinc-900'
+          'rounded-lg px-3 py-1.5 text-sm font-medium transition-all',
+          step === 'intake'
+            ? cn('btn-rose-outline text-rose-700', TEXT.primary)
+            : cn(TEXT.muted, 'hover:text-[#1d1d1f]')
         )}
       >
         Intake
@@ -122,8 +126,10 @@ function ScratchStepPill({
         onClick={onReview}
         disabled={!hasPlan}
         className={cn(
-          'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-          step === 'review' ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-600 hover:text-zinc-900',
+          'rounded-lg px-3 py-1.5 text-sm font-medium transition-all',
+          step === 'review'
+            ? cn('btn-rose-outline text-rose-700', TEXT.primary)
+            : cn(TEXT.muted, 'hover:text-[#1d1d1f]'),
           !hasPlan && 'cursor-not-allowed opacity-50'
         )}
       >
@@ -135,9 +141,9 @@ function ScratchStepPill({
 
 function HowItWorks() {
   return (
-    <div className="rounded-xl border border-zinc-200 bg-white p-5 sm:p-6">
-      <h3 className="text-sm font-medium text-zinc-700 mb-2">How it works</h3>
-      <ol className="text-sm text-zinc-500 space-y-1 list-decimal list-inside">
+    <div className={cn('rounded-xl border bg-white p-5 sm:p-6', BORDER.hairline)}>
+      <h3 className={cn('text-sm font-medium mb-2', TEXT.primary)}>How it works</h3>
+      <ol className={cn('text-sm space-y-1 list-decimal list-inside', TEXT.muted)}>
         {HOW_IT_WORKS.map((item) => (
           <li key={item}>{item}</li>
         ))}
@@ -182,11 +188,7 @@ export default function NewScratchPage() {
   }
 
   if (status === 'loading') {
-    return (
-      <div className="flex items-center justify-center py-24">
-        <Spinner />
-      </div>
-    );
+    return <LoadingShell message="Loading…" />;
   }
 
   const intakePayload = {
@@ -408,7 +410,7 @@ export default function NewScratchPage() {
     >
       {loading && progressStage === 'planning' ? (
         <>
-          <Spinner size="sm" />
+          <Loading variant="inline" size="sm" />
           Creating plan…
         </>
       ) : (
@@ -421,7 +423,7 @@ export default function NewScratchPage() {
     <Button type="button" className="w-full" disabled={loading || !websitePlan} onClick={handleBuild}>
       {loading && progressStage === 'building' ? (
         <>
-          <Spinner size="sm" />
+          <Loading variant="inline" size="sm" />
           Building your website…
         </>
       ) : (
@@ -434,7 +436,7 @@ export default function NewScratchPage() {
     <AppShell
       variant="minimal"
       breadcrumb={
-        <Link href="/dashboard" className="hover:text-zinc-800">
+        <Link href="/dashboard" className={cn(ACCENT.link, 'hover:underline')}>
           Start with a prompt
         </Link>
       }
@@ -443,8 +445,8 @@ export default function NewScratchPage() {
         <div className="space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-bold text-zinc-900 mb-2">Start with a prompt</h1>
-              <p className="text-zinc-600 max-w-2xl">
+              <h1 className={cn('text-2xl font-bold mb-2', TEXT.primary)}>Start with a prompt</h1>
+              <p className={cn('max-w-2xl', TEXT.muted)}>
                 {step === 'category'
                   ? 'Choose your business type — we’ll tailor sections, packages, and CTAs for you.'
                   : step === 'intake'
@@ -517,7 +519,7 @@ export default function NewScratchPage() {
                   >
                     <div className="space-y-4">
                       <div>
-                        <label htmlFor="businessName" className="block text-sm font-medium text-zinc-700 mb-1">
+                        <label htmlFor="businessName" className={cn('block text-sm font-medium mb-1', TEXT.primary)}>
                           Business name *
                         </label>
                         <Input
@@ -529,7 +531,7 @@ export default function NewScratchPage() {
                         />
                       </div>
                       <div>
-                        <label htmlFor="industry" className="block text-sm font-medium text-zinc-700 mb-1">
+                        <label htmlFor="industry" className={cn('block text-sm font-medium mb-1', TEXT.primary)}>
                           Industry *
                         </label>
                         <Input
@@ -541,7 +543,7 @@ export default function NewScratchPage() {
                         />
                       </div>
                       <div>
-                        <label htmlFor="location" className="block text-sm font-medium text-zinc-700 mb-1">
+                        <label htmlFor="location" className={cn('block text-sm font-medium mb-1', TEXT.primary)}>
                           Location
                         </label>
                         <Input
@@ -552,7 +554,7 @@ export default function NewScratchPage() {
                         />
                       </div>
                       <div>
-                        <label htmlFor="services" className="block text-sm font-medium text-zinc-700 mb-1">
+                        <label htmlFor="services" className={cn('block text-sm font-medium mb-1', TEXT.primary)}>
                           Services
                         </label>
                         <Input
@@ -563,7 +565,7 @@ export default function NewScratchPage() {
                         />
                       </div>
                       <div>
-                        <label htmlFor="mainGoal" className="block text-sm font-medium text-zinc-700 mb-1">
+                        <label htmlFor="mainGoal" className={cn('block text-sm font-medium mb-1', TEXT.primary)}>
                           Main goal
                         </label>
                         <select
@@ -586,15 +588,15 @@ export default function NewScratchPage() {
                     <button
                       type="button"
                       onClick={() => setOptionalOpen((open) => !open)}
-                      className="flex w-full items-center justify-between text-sm font-medium text-zinc-700"
+                      className={cn('flex w-full items-center justify-between text-sm font-medium', TEXT.primary)}
                     >
                       <span>{optionalOpen ? 'Hide optional fields' : 'Add contact info and notes'}</span>
-                      <span className="text-zinc-400">{optionalOpen ? '−' : '+'}</span>
+                      <span className={TEXT.tertiary}>{optionalOpen ? '−' : '+'}</span>
                     </button>
                     {optionalOpen && (
                       <div className="space-y-4 pt-2">
                         <div>
-                          <label htmlFor="targetCustomers" className="block text-sm font-medium text-zinc-700 mb-1">
+                          <label htmlFor="targetCustomers" className={cn('block text-sm font-medium mb-1', TEXT.primary)}>
                             Target customers
                           </label>
                           <Input
@@ -605,7 +607,7 @@ export default function NewScratchPage() {
                           />
                         </div>
                         <div>
-                          <label htmlFor="phone" className="block text-sm font-medium text-zinc-700 mb-1">
+                          <label htmlFor="phone" className={cn('block text-sm font-medium mb-1', TEXT.primary)}>
                             Phone
                           </label>
                           <Input
@@ -616,7 +618,7 @@ export default function NewScratchPage() {
                           />
                         </div>
                         <div>
-                          <label htmlFor="email" className="block text-sm font-medium text-zinc-700 mb-1">
+                          <label htmlFor="email" className={cn('block text-sm font-medium mb-1', TEXT.primary)}>
                             Email
                           </label>
                           <Input
@@ -628,7 +630,7 @@ export default function NewScratchPage() {
                           />
                         </div>
                         <div>
-                          <label htmlFor="notes" className="block text-sm font-medium text-zinc-700 mb-1">
+                          <label htmlFor="notes" className={cn('block text-sm font-medium mb-1', TEXT.primary)}>
                             Style notes
                           </label>
                           <Textarea
@@ -674,10 +676,10 @@ export default function NewScratchPage() {
                   />
 
                   {showRevisionInput ? (
-                    <div className="rounded-xl border border-zinc-200 bg-white p-4 space-y-3">
+                    <div className={cn('rounded-xl border bg-white p-4 space-y-3', BORDER.hairline)}>
                       <div>
-                        <h2 className="text-sm font-medium text-zinc-900">Revise plan</h2>
-                        <p className="text-xs text-zinc-500 mt-0.5">
+                        <h2 className={cn('text-sm font-medium', TEXT.primary)}>Revise plan</h2>
+                        <p className={cn('text-xs mt-0.5', TEXT.muted)}>
                           Describe how you want the proposed plan changed before building.
                         </p>
                       </div>
@@ -696,7 +698,7 @@ export default function NewScratchPage() {
                         >
                           {loading && progressStage === 'revising' ? (
                             <>
-                              <Spinner size="sm" />
+                              <Loading variant="inline" size="sm" />
                               Revising…
                             </>
                           ) : (
@@ -786,7 +788,7 @@ export default function NewScratchPage() {
         </div>
       </PageContainer>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-zinc-200 bg-white/95 p-4 backdrop-blur supports-[backdrop-filter]:bg-white/80 lg:hidden">
+      <div className={cn('fixed inset-x-0 bottom-0 z-30 border-t bg-white/95 p-4 backdrop-blur supports-[backdrop-filter]:bg-white/80 lg:hidden', BORDER.hairline)}>
         <div className="mx-auto max-w-6xl">
           {step === 'category'
             ? categoryPrimaryButton

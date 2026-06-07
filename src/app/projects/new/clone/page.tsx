@@ -12,7 +12,9 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardBody } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { PageContainer } from '@/components/ui/PageContainer';
-import { Spinner } from '@/components/ui/Spinner';
+import { LoadingShell } from '@/components/ui/LoadingShell';
+import { ACCENT } from '@/content/productTheme';
+import { cn } from '@/lib/cn';
 import type { LayoutStarter } from '@/lib/builder/layoutStarters';
 import { getTemplateGallery, type TemplateGalleryEntry } from '@/lib/builder/templateGallery';
 
@@ -37,11 +39,7 @@ export default function NewClonePage() {
   }
 
   if (status === 'loading') {
-    return (
-      <div className="flex items-center justify-center py-24">
-        <Spinner />
-      </div>
-    );
+    return <LoadingShell message="Loading…" />;
   }
 
   const handleStart = async (e: React.FormEvent) => {
@@ -82,7 +80,7 @@ export default function NewClonePage() {
     <AppShell
       variant="minimal"
       breadcrumb={
-        <Link href="/dashboard" className="hover:text-zinc-800">
+        <Link href="/dashboard" className={cn(ACCENT.link, 'hover:underline')}>
           Refresh from URL
         </Link>
       }

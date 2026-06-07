@@ -1,6 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/cn';
+import { ACCENT, BORDER, TEXT } from '@/content/productTheme';
 import type { LayoutStarter } from '@/lib/builder/layoutStarters';
 import { recommendLayoutStarterForIndustry } from '@/lib/builder/layoutStarters';
 import type { TemplateGalleryEntry } from '@/lib/builder/templateGallery';
@@ -37,7 +38,8 @@ function PreviewMockup({
   return (
     <div
       className={cn(
-        'relative isolate overflow-hidden rounded-lg border border-zinc-200/80',
+        'relative isolate overflow-hidden rounded-lg border',
+        BORDER.hairline,
         compact ? 'h-16 w-24 shrink-0' : 'h-32 w-full'
       )}
       style={{
@@ -80,18 +82,19 @@ export function ScratchDesignPreviewPanel({
     return (
       <div
         className={cn(
-          'flex items-center gap-3 rounded-xl border border-zinc-200 bg-white p-3 lg:hidden',
+          'flex items-center gap-3 rounded-xl border bg-white p-3 lg:hidden',
+          BORDER.hairline,
           className
         )}
       >
         <PreviewMockup starter={selectedStarter} accentColor={selectedTheme.accentColor} compact />
         <div className="min-w-0 flex-1 space-y-1">
-          <p className="truncate text-sm font-medium text-zinc-900">
+          <p className={cn('truncate text-sm font-medium', TEXT.primary)}>
             {businessName?.trim() || 'Your business'}
           </p>
           <div className="flex flex-wrap gap-1">
             {selectedStarter && (
-              <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-700">
+              <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-medium', ACCENT.pill)}>
                 {selectedStarter.name}
               </span>
             )}
@@ -110,30 +113,31 @@ export function ScratchDesignPreviewPanel({
   return (
     <div
       className={cn(
-        'rounded-xl border border-zinc-200 bg-white p-4 space-y-4 self-start',
+        'rounded-xl border bg-white p-4 space-y-4 self-start',
+        BORDER.hairline,
         sticky && 'lg:sticky lg:top-[4.5rem] lg:z-10',
         className
       )}
     >
       <div>
-        <h3 className="text-sm font-semibold text-zinc-900">Design preview</h3>
-        <p className="text-xs text-zinc-500 mt-0.5">Layout structure with your chosen color theme</p>
+        <h3 className={cn('text-sm font-semibold', TEXT.primary)}>Design preview</h3>
+        <p className={cn('text-xs mt-0.5', TEXT.muted)}>Layout structure with your chosen color theme</p>
       </div>
 
       <PreviewMockup starter={selectedStarter} accentColor={selectedTheme.accentColor} />
 
       <div className="space-y-2">
-        <p className="text-sm font-medium text-zinc-900 truncate">
+        <p className={cn('text-sm font-medium truncate', TEXT.primary)}>
           {businessName?.trim() || 'Your business name'}
         </p>
         {industry?.trim() && (
-          <p className="text-xs text-zinc-500 truncate">{industry.trim()}</p>
+          <p className={cn('text-xs truncate', TEXT.muted)}>{industry.trim()}</p>
         )}
       </div>
 
       <div className="flex flex-wrap gap-1.5">
         {selectedStarter ? (
-          <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-800">
+          <span className={cn('rounded-full px-2.5 py-1 text-xs font-medium', ACCENT.pill)}>
             {selectedStarter.name}
           </span>
         ) : (
@@ -148,32 +152,32 @@ export function ScratchDesignPreviewPanel({
           {selectedTheme.name}
         </span>
         {isRecommended && industry?.trim() && (
-          <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700">
+          <span className={cn('rounded-full px-2.5 py-1 text-xs font-medium', ACCENT.pill)}>
             Recommended for {industry.trim()}
           </span>
         )}
       </div>
 
       {showReadiness && readinessItems.length > 0 && (
-        <ul className="space-y-1.5 border-t border-zinc-100 pt-3">
+        <ul className={cn('space-y-1.5 border-t pt-3', BORDER.hairline)}>
           {readinessItems.map((item) => (
             <li key={item.label} className="flex items-center gap-2 text-xs">
               <span
                 className={cn(
                   'flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold',
-                  item.done ? 'bg-emerald-100 text-emerald-700' : 'bg-zinc-100 text-zinc-400'
+                  item.done ? 'bg-rose-100 text-rose-700' : 'bg-[#f5f5f7] text-[#86868b]'
                 )}
               >
                 {item.done ? '✓' : '·'}
               </span>
-              <span className={item.done ? 'text-zinc-700' : 'text-zinc-500'}>{item.label}</span>
+              <span className={item.done ? TEXT.primary : TEXT.muted}>{item.label}</span>
             </li>
           ))}
         </ul>
       )}
 
       {children && (
-        <div className="space-y-3 border-t border-zinc-100 pt-3">{children}</div>
+        <div className={cn('space-y-3 border-t pt-3', BORDER.hairline)}>{children}</div>
       )}
     </div>
   );

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
 import { Textarea } from '@/components/ui/Input';
 import { cn } from '@/lib/cn';
+import { BORDER, CONTROL, TEXT } from '@/content/productTheme';
 import EditErrorTrace from '@/components/project/EditErrorTrace';
 import { PreviewTargetChip } from '@/components/project/PreviewTargetChip';
 import { PreviewTargetHint } from '@/components/project/PreviewTargetHint';
@@ -196,18 +197,18 @@ const VOICE_EMPTY_TRANSCRIPT_MESSAGE = "Didn't catch that — try again.";
 
 function StepIcon({ status }: { status: AgentStepStatus }) {
   if (status === 'pending') {
-    return <div className="w-4 h-4 rounded-full border-2 border-zinc-300 flex-shrink-0" />;
+    return <div className="w-4 h-4 rounded-full border-2 border-[#d2d2d7] flex-shrink-0" />;
   }
   if (status === 'active') {
     return (
-      <div className="w-4 h-4 rounded-full border-2 border-zinc-950 flex-shrink-0 flex items-center justify-center">
-        <div className="w-2 h-2 bg-zinc-950 rounded-full animate-pulse" />
+      <div className="w-4 h-4 rounded-full border-2 border-[#1d1d1f] flex-shrink-0 flex items-center justify-center">
+        <div className="w-2 h-2 bg-[#1d1d1f] rounded-full animate-pulse" />
       </div>
     );
   }
   if (status === 'completed') {
     return (
-      <div className="w-4 h-4 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
+      <div className="w-4 h-4 rounded-full bg-rose-600 flex items-center justify-center flex-shrink-0">
         <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
         </svg>
@@ -274,10 +275,9 @@ function ChevronButton({
       disabled={disabled}
       aria-label={label}
       className={cn(
-        'flex h-7 w-7 shrink-0 items-center justify-center rounded-md border transition-colors',
-        disabled
-          ? 'border-transparent text-zinc-300 cursor-not-allowed'
-          : 'border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 hover:bg-zinc-50 hover:text-zinc-900'
+        'btn-icon h-7 w-7 shrink-0 rounded-lg',
+        !disabled && TEXT.muted,
+        disabled && 'cursor-not-allowed border-transparent bg-transparent text-[#d2d2d7] shadow-none hover:translate-y-0'
       )}
     >
       <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -359,18 +359,18 @@ function ChatMessageBubble({
         ) : null}
         <div
           className={cn(
-            'rounded-lg px-3 py-2 text-sm w-full',
+            'text-sm w-full',
             msg.role === 'user'
-              ? 'bg-zinc-950 text-white'
+              ? 'chat-bubble-user'
               : msg.isClarification
-                ? 'bg-sky-50 border border-sky-200 text-sky-950 shadow-sm'
+                ? 'chat-bubble-clarify'
                 : msg.isError
-                  ? 'bg-red-50 border border-red-200 text-red-900 shadow-sm'
-                  : 'bg-white border border-zinc-200 text-zinc-800 shadow-sm'
+                  ? 'bg-red-50 border border-red-200 text-red-900 shadow-sm rounded-2xl px-3 py-2'
+                  : 'chat-bubble-assistant'
           )}
         >
         {msg.isClarification && (
-          <p className="text-xs font-semibold uppercase tracking-wide text-sky-800 mb-1">
+          <p className="text-xs font-semibold uppercase tracking-wide text-rose-800 mb-1">
             Quick question
           </p>
         )}
@@ -388,7 +388,7 @@ function ChatMessageBubble({
                 type="button"
                 disabled={sending || !previewReady}
                 onClick={() => onApplyPrompt(reply)}
-                className="text-left text-xs px-2.5 py-1.5 rounded-md border border-sky-200 bg-white text-sky-900 hover:bg-sky-100/80 transition-colors disabled:opacity-50"
+                className={cn('text-left text-xs px-3 py-1.5 rounded-full text-[#1d1d1f] disabled:opacity-50', CONTROL.chip)}
               >
                 {reply}
               </button>
@@ -434,8 +434,8 @@ function AgentStepNavigator({
   return (
     <div
       className={cn(
-        'mt-2 flex items-center gap-2 rounded-lg border px-2 py-1.5',
-        failed ? 'border-red-200 bg-red-50/80' : 'border-zinc-200/80 bg-zinc-50/80'
+        'mt-2 flex items-center gap-2 rounded-xl border px-2 py-1.5 shadow-sm',
+        failed ? 'border-red-200 bg-red-50/80' : cn(BORDER.hairline, 'glass-panel')
       )}
       aria-live="polite"
       aria-atomic="true"
@@ -450,15 +450,15 @@ function AgentStepNavigator({
       <span
         className={cn(
           'min-w-0 flex-1 truncate text-sm',
-          step.status === 'pending' && 'text-zinc-400',
-          step.status === 'active' && 'font-medium text-zinc-950',
-          step.status === 'completed' && 'text-zinc-600',
+          step.status === 'pending' && TEXT.tertiary,
+          step.status === 'active' && cn('font-medium', TEXT.primary),
+          step.status === 'completed' && TEXT.muted,
           step.status === 'failed' && 'text-red-600'
         )}
       >
         {step.label}
       </span>
-      <span className="shrink-0 text-[10px] tabular-nums text-zinc-400">
+      <span className={cn('shrink-0 text-[10px] tabular-nums', TEXT.tertiary)}>
         {safeIndex + 1}/{steps.length}
       </span>
       <ChevronButton
@@ -992,14 +992,14 @@ export function ProjectPreviewChat({
   const stepsFailed = agentSteps.some((s) => s.status === 'failed');
 
   return (
-    <Card className="flex flex-col h-full min-h-0 shadow-sm">
+    <Card variant="glass" className="flex flex-col h-full min-h-0 shadow-sm">
       <CardHeader>
         {showSteps && agentSteps.length > 0 ? (
           <>
             <h2
               className={cn(
                 'font-semibold',
-                stepsFailed ? 'text-red-800' : 'text-zinc-900'
+                stepsFailed ? 'text-red-800' : TEXT.primary
               )}
             >
               {stepsFailed ? "Couldn't update your website" : 'Updating your website'}
@@ -1016,8 +1016,8 @@ export function ProjectPreviewChat({
           </>
         ) : (
           <>
-            <h2 className="font-semibold text-zinc-900">Edit your website</h2>
-            <p className="text-xs text-zinc-500">
+            <h2 className={cn('font-semibold', TEXT.primary)}>Edit your website</h2>
+            <p className={cn('text-xs', TEXT.muted)}>
               Describe changes or attach photos — preview updates before you publish
             </p>
           </>
@@ -1033,7 +1033,7 @@ export function ProjectPreviewChat({
           )}
 
           {historyLoading && !showSteps && !historyError && (
-            <p className="text-sm text-zinc-500 text-center py-4 px-4">Loading chat history…</p>
+            <p className={cn('text-sm text-center py-4 px-4', TEXT.muted)}>Loading chat history…</p>
           )}
 
           {!historyLoading && messages.length === 0 && !showSteps && (
@@ -1045,7 +1045,7 @@ export function ProjectPreviewChat({
               )}
               {previewReady && (
                 <>
-                  <p className="text-sm text-zinc-500 text-center py-4">
+                  <p className={cn('text-sm text-center py-4', TEXT.muted)}>
                     Try a quick change, attach photos, or describe what you want.
                   </p>
                   <div className="flex flex-wrap gap-2 justify-center">
@@ -1054,7 +1054,7 @@ export function ProjectPreviewChat({
                         key={p}
                         type="button"
                         onClick={() => applyPrompt(p)}
-                        className="text-xs px-3 py-1.5 rounded-md border border-zinc-200 bg-white text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50 transition-colors"
+                        className={cn('text-xs px-3 py-1.5 rounded-full', CONTROL.chip, TEXT.primary)}
                       >
                         {p}
                       </button>
@@ -1094,7 +1094,11 @@ export function ProjectPreviewChat({
           )}
         </div>
 
-        <form ref={chatFormRef} onSubmit={handleSubmit} className="p-3 border-t border-zinc-200/80 shrink-0 space-y-2">
+        <form
+          ref={chatFormRef}
+          onSubmit={handleSubmit}
+          className={cn('p-3 border-t shrink-0 space-y-2', BORDER.hairline)}
+        >
           <div ref={chipAnchorRef}>
             <PreviewTargetHint
               visible={showTargetHint}
@@ -1129,12 +1133,12 @@ export function ProjectPreviewChat({
                   <img
                     src={img.previewUrl}
                     alt={img.file.name}
-                    className="h-16 w-16 rounded-lg object-cover border border-zinc-200"
+                    className={cn('h-16 w-16 rounded-lg object-cover border', BORDER.hairline)}
                   />
                   <button
                     type="button"
                     onClick={() => removePendingImage(img.id)}
-                    className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-zinc-900 text-white text-xs leading-none"
+                    className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-[#1d1d1f] text-white text-xs leading-none"
                     aria-label={`Remove ${img.file.name}`}
                   >
                     ×
@@ -1189,7 +1193,7 @@ export function ProjectPreviewChat({
             />
             <Button
               type="button"
-              variant="secondary"
+              variant="glass"
               size="sm"
               disabled={
                 inputDisabled || speech.listening || pendingImages.length >= MAX_IMAGES_PER_UPLOAD
@@ -1204,7 +1208,7 @@ export function ProjectPreviewChat({
             {speech.supported ? (
               <Button
                 type="button"
-                variant="secondary"
+                variant="glass"
                 size="sm"
                 disabled={inputDisabled}
                 onClick={handleMicToggle}

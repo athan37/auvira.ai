@@ -15,5 +15,5 @@ export const ROSE = {
   glassPremium: 'glass-rose-premium glass-specular-edge',
   shineOverlay: 'rose-shine-overlay',
   btnPrimary: 'btn-rose-primary',
-  navPill: 'rounded-full bg-rose-50 px-3 py-1 text-rose-700 ring-1 ring-rose-300/40',
+  navPill: 'rounded-full bg-rose-50 px-3 py-1 text-rose-700 ring-1 ring-rose-300/40 shadow-sm',
 } as const;

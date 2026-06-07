@@ -21,7 +21,10 @@ import { AppShell } from '@/components/layout/AppShell';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { PageContainer } from '@/components/ui/PageContainer';
-import { Spinner } from '@/components/ui/Spinner';
+import { LoadingShell } from '@/components/ui/LoadingShell';
+import { Loading } from '@/components/ui/Loading';
+import { ACCENT, BORDER, SURFACE, TEXT } from '@/content/productTheme';
+import { cn } from '@/lib/cn';
 import Link from 'next/link';
 import type { TemplateGalleryEntry } from '@/lib/builder/templateGallery';
 import { getLayoutStarter, type LayoutStarter, type LayoutStarterId } from '@/lib/builder/layoutStarters';
@@ -211,20 +214,20 @@ const BLOCKING_FIELDS = ['businessName'];
 
 function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
-    queued: 'bg-[#f5f5f7] text-[#6e6e73]',
-    crawling: 'bg-brand-50 text-brand-700',
-    extracting: 'bg-brand-50 text-brand-700',
+    queued: cn(SURFACE.alt, TEXT.muted),
+    crawling: 'bg-rose-50 text-rose-700',
+    extracting: 'bg-rose-50 text-rose-700',
     planning: 'bg-amber-50 text-amber-800',
     review_ready: 'bg-emerald-50 text-emerald-800',
-    preview_building: 'bg-brand-50 text-brand-700',
-    preview_ready: 'bg-brand-50 text-brand-700',
-    building: 'bg-brand-50 text-brand-700',
-    deploying: 'bg-brand-50 text-brand-700',
+    preview_building: 'bg-rose-50 text-rose-700',
+    preview_ready: 'bg-rose-50 text-rose-700',
+    building: 'bg-rose-50 text-rose-700',
+    deploying: 'bg-rose-50 text-rose-700',
     completed: 'bg-emerald-50 text-emerald-800',
     failed: 'bg-red-50 text-red-700',
   };
   return (
-    <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${colors[status] || 'bg-[#f5f5f7] text-[#6e6e73]'}`}>
+    <span className={cn('text-xs font-semibold px-2.5 py-0.5 rounded-full', colors[status] || cn(SURFACE.alt, TEXT.muted))}>
       {status.replace('_', ' ')}
     </span>
   );
@@ -404,14 +407,7 @@ export default function CloneJobPage() {
   };
 
   if (sessionStatus === 'loading' || loading) {
-    return (
-      <AppShell variant="minimal">
-        <div className="flex flex-col items-center justify-center py-24 gap-3">
-          <Spinner />
-          <p className="text-sm text-[#6e6e73]">Loading clone job...</p>
-        </div>
-      </AppShell>
-    );
+    return <LoadingShell message="Loading clone job…" />;
   }
 
   if (error || !job) {
@@ -419,7 +415,7 @@ export default function CloneJobPage() {
       <AppShell variant="minimal">
         <PageContainer narrow className="py-24 text-center">
           <p className="text-red-600 mb-4">{error || 'Job not found'}</p>
-          <Link href="/dashboard" className="text-brand-600 hover:underline text-sm">
+          <Link href="/dashboard" className={cn('hover:underline text-sm', ACCENT.link)}>
             ← Back to Dashboard
           </Link>
         </PageContainer>
@@ -453,31 +449,31 @@ export default function CloneJobPage() {
       <PageContainer className="py-6">
         <Card variant="glass" className="p-4 mb-6">
           <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-            <Link href="/dashboard" className="text-sm text-[#6e6e73] hover:text-[#1d1d1f] shrink-0">
+            <Link href="/dashboard" className={cn('text-sm shrink-0', TEXT.muted, 'hover:text-[#1d1d1f]')}>
               ← Dashboard
             </Link>
-            <div className="text-xs text-[#86868b]">
+            <div className={cn('text-xs', TEXT.tertiary)}>
               {elapsedStr} · {updatedStr}
             </div>
           </div>
           <div className="w-full bg-[#d2d2d7]/60 rounded-full h-1.5">
             <div
-              className="bg-brand-600 h-1.5 rounded-full transition-all duration-500"
+              className="bg-rose-gradient h-1.5 rounded-full transition-all duration-500"
               style={{ width: `${job.progressPercent}%` }}
             />
           </div>
           <div className="flex items-center justify-between mt-1.5">
-            <span className="text-xs text-[#6e6e73]">{job.currentStageLabel}</span>
-            <span className="text-xs text-[#86868b]">{job.progressPercent}%</span>
+            <span className={cn('text-xs', TEXT.muted)}>{job.currentStageLabel}</span>
+            <span className={cn('text-xs', TEXT.tertiary)}>{job.progressPercent}%</span>
           </div>
         </Card>
 
       {phaseDesc && (
-        <div className="bg-[#f5f5f7] border border-[#d2d2d7]/60 rounded-2xl px-4 py-3 mb-6">
+        <div className={cn(SURFACE.alt, 'border rounded-2xl px-4 py-3 mb-6', BORDER.hairline)}>
           <div className="flex items-start gap-4">
-            <p className="text-xs text-[#1d1d1f] flex-1">{phaseDesc}</p>
+            <p className={cn('text-xs flex-1', TEXT.primary)}>{phaseDesc}</p>
             {NEXT_PHASE[job.status] && job.status !== 'completed' && job.status !== 'failed' && (
-              <p className="text-xs text-[#6e6e73] flex-shrink-0">Next: {NEXT_PHASE[job.status]}</p>
+              <p className={cn('text-xs flex-shrink-0', TEXT.muted)}>Next: {NEXT_PHASE[job.status]}</p>
             )}
           </div>
         </div>
@@ -549,7 +545,7 @@ export default function CloneJobPage() {
           {/* RIGHT COLUMN — Actions (2/5) */}
           <div className="lg:col-span-2 space-y-4">
             {isReviewReady && job.suggestedTemplate && (
-              <div className="bg-white rounded-xl border border-[#d2d2d7] p-4 space-y-4">
+              <div className={cn('bg-white rounded-2xl border p-4 space-y-4', BORDER.hairline)}>
                 <StarterGalleryPicker
                   selectedId={
                     selectedLayoutId ??
@@ -603,8 +599,8 @@ export default function CloneJobPage() {
 
             {/* Revise plan input */}
             {isReviewReady && showRevisionInput && (
-              <div className="bg-white rounded-xl border border-[#d2d2d7] overflow-hidden">
-                <div className="px-4 py-3 border-b border-[#d2d2d7] bg-yellow-50">
+              <div className={cn('bg-white rounded-2xl border overflow-hidden', BORDER.hairline)}>
+                <div className="px-4 py-3 border-b border-yellow-200 bg-yellow-50">
                   <h2 className="font-medium text-yellow-800 text-sm">Revise Plan</h2>
                   <p className="text-xs text-yellow-600 mt-0.5">Tell us how to improve the proposed plan</p>
                 </div>
@@ -613,22 +609,23 @@ export default function CloneJobPage() {
                     value={revisionNote}
                     onChange={e => setRevisionNote(e.target.value)}
                     placeholder='e.g. "Make it more premium", "Emphasize emergency service", "Add a pricing section"'
-                    className="w-full text-sm border border-[#d2d2d7] rounded-lg p-2 h-24 resize-none focus:outline-none focus:ring-1 focus:ring-brand-500"
+                    className={cn('w-full text-sm border rounded-xl p-2 h-24 resize-none focus:outline-none focus:ring-1 focus:ring-rose-500/35', BORDER.hairline)}
                   />
                   <div className="flex gap-2">
-                    <button
+                    <Button
                       onClick={handleRevisePlan}
                       disabled={revising || !revisionNote.trim()}
-                      className="flex-1 bg-yellow-500 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-yellow-600 disabled:opacity-50"
+                      variant="primary"
+                      className="flex-1"
                     >
                       {revising ? 'Revising...' : 'Apply Revision'}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={() => setShowRevisionInput(false)}
-                      className="px-3 py-1.5 bg-[#f5f5f7] text-[#6e6e73] rounded-lg text-sm hover:bg-[#ebebed]"
+                      variant="ghost"
                     >
                       Cancel
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -636,12 +633,13 @@ export default function CloneJobPage() {
 
             {/* Revise plan button (review_ready only) */}
             {isReviewReady && !showRevisionInput && (
-              <button
+              <Button
                 onClick={() => setShowRevisionInput(true)}
-                className="w-full bg-white border border-[#d2d2d7] text-[#6e6e73] px-4 py-2 rounded-lg text-sm hover:bg-[#f5f5f7]"
+                variant="glass"
+                className="w-full"
               >
                 Revise Plan
-              </button>
+              </Button>
             )}
 
             {/* Build/deploy progress */}
@@ -660,22 +658,25 @@ export default function CloneJobPage() {
                 !job.reviewChecklist.businessNameFound ||
                 (job.contentFidelity ? hasCriticalFidelityFailures(job.contentFidelity) : false);
               return (
-              <div className="bg-white rounded-xl border border-[#d2d2d7] overflow-hidden">
-                <div className="px-4 py-3 border-t-4 border-green-500">
+              <div className={cn('bg-white rounded-2xl border overflow-hidden', BORDER.hairline)}>
+                <div className="px-4 py-3 border-t-4 border-rose-500">
                   <div className="space-y-2">
-                    <button
+                    <Button
                       onClick={handleApproveBuild}
                       disabled={approving || hasBlocking}
-                      className="w-full bg-brand-600 text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-brand-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      variant="primary"
+                      className="w-full"
+                      size="lg"
                     >
                       {approving ? 'Building preview...' : 'Build Preview'}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={() => router.push('/dashboard')}
-                      className="w-full bg-[#f5f5f7] text-[#6e6e73] px-4 py-2 rounded-lg text-sm hover:bg-[#ebebed] transition-colors"
+                      variant="ghost"
+                      className="w-full"
                     >
                       Cancel
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -684,10 +685,10 @@ export default function CloneJobPage() {
 
             {/* In progress spinner */}
             {isInProgress && !isReviewReady && (
-              <div className="bg-white rounded-xl border border-[#d2d2d7] p-6 text-center">
-                <div className="animate-spin w-6 h-6 border-2 border-brand-600 border-t-transparent rounded-full mx-auto mb-3"></div>
-                <p className="text-[#6e6e73] text-sm">{job.currentStageLabel}</p>
-                <p className="text-[#86868b] text-xs mt-1">You can keep this page open to watch progress. If you leave, you can return from your dashboard.</p>
+              <div className={cn('bg-white rounded-2xl border p-6 text-center', BORDER.hairline)}>
+                <Loading size="md" className="mx-auto mb-4" />
+                <p className={cn('text-sm', TEXT.muted)}>{job.currentStageLabel}</p>
+                <p className={cn('text-xs mt-1', TEXT.tertiary)}>You can keep this page open to watch progress. If you leave, you can return from your dashboard.</p>
               </div>
             )}
 
@@ -698,25 +699,25 @@ export default function CloneJobPage() {
 
             {/* Building spinner */}
             {isBuilding && (
-              <div className="bg-white rounded-xl border border-[#d2d2d7] p-6 text-center">
-                <div className="animate-spin w-6 h-6 border-2 border-brand-600 border-t-transparent rounded-full mx-auto mb-3"></div>
-                <p className="text-[#6e6e73] text-sm">{job.currentStageLabel}</p>
-                <p className="text-[#86868b] text-xs mt-1">Building takes 1-3 min.</p>
+              <div className={cn('bg-white rounded-2xl border p-6 text-center', BORDER.hairline)}>
+                <Loading size="md" className="mx-auto mb-4" />
+                <p className={cn('text-sm', TEXT.muted)}>{job.currentStageLabel}</p>
+                <p className={cn('text-xs mt-1', TEXT.tertiary)}>Building takes 1-3 min.</p>
               </div>
             )}
 
             {/* Deploying — preview stays live */}
             {isDeploying && (
-              <div className="bg-white rounded-xl border border-[#d2d2d7] p-6 text-center">
-                <div className="animate-spin w-6 h-6 border-2 border-brand-600 border-t-transparent rounded-full mx-auto mb-3"></div>
-                <p className="text-[#6e6e73] text-sm">{job.currentStageLabel}</p>
-                <p className="text-[#86868b] text-xs mt-1">Your preview is still available while we publish the website.</p>
+              <div className={cn('bg-white rounded-2xl border p-6 text-center', BORDER.hairline)}>
+                <Loading size="md" className="mx-auto mb-4" />
+                <p className={cn('text-sm', TEXT.muted)}>{job.currentStageLabel}</p>
+                <p className={cn('text-xs mt-1', TEXT.tertiary)}>Your preview is still available while we publish the website.</p>
                 {job.preview?.url && (
                   <a
                     href={job.preview.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-block mt-2 text-xs text-brand-600 hover:underline"
+                    className={cn('inline-block mt-2 text-xs hover:underline', ACCENT.link)}
                   >
                     View preview →
                   </a>
@@ -726,10 +727,10 @@ export default function CloneJobPage() {
 
             {/* Preview building spinner */}
             {isPreviewBuilding && (
-              <div className="bg-white rounded-xl border border-[#d2d2d7] p-6 text-center">
-                <div className="animate-spin w-6 h-6 border-2 border-brand-600 border-t-transparent rounded-full mx-auto mb-3"></div>
-                <p className="text-[#6e6e73] text-sm">{job.currentStageLabel}</p>
-                <p className="text-[#86868b] text-xs mt-1">This takes 1-2 minutes. You can keep this page open.</p>
+              <div className={cn('bg-white rounded-2xl border p-6 text-center', BORDER.hairline)}>
+                <Loading size="md" className="mx-auto mb-4" />
+                <p className={cn('text-sm', TEXT.muted)}>{job.currentStageLabel}</p>
+                <p className={cn('text-xs mt-1', TEXT.tertiary)}>This takes 1-2 minutes. You can keep this page open.</p>
               </div>
             )}
 
@@ -740,11 +741,11 @@ export default function CloneJobPage() {
                 <LiveBuildSummaryCard buildSummary={job.buildSummary} status={job.status} />
 
                 {/* Preview banner */}
-                <div className="bg-brand-50 border border-brand-200 rounded-xl p-4">
+                <div className="bg-rose-50/60 border border-rose-200/80 rounded-2xl p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="text-brand-600 font-semibold text-sm">Preview is ready!</span>
+                    <span className="text-rose-700 font-semibold text-sm">Preview is ready!</span>
                   </div>
-                  <p className="text-xs text-brand-700">
+                  <p className="text-xs text-rose-800">
                     This is your draft preview on this device — not your live website yet. Publish when ready.
                   </p>
                 </div>
@@ -761,14 +762,14 @@ export default function CloneJobPage() {
 
                 {/* Preview iframe */}
                 {job.preview.url && (
-                  <div className="rounded-xl overflow-hidden border border-[#d2d2d7] bg-white">
-                    <div className="bg-[#f5f5f7] px-3 py-1.5 border-b border-[#d2d2d7] flex items-center justify-between">
-                      <span className="text-xs text-[#6e6e73]">Website preview</span>
+                  <div className={cn('rounded-2xl overflow-hidden border bg-white', BORDER.hairline)}>
+                    <div className={cn('px-3 py-1.5 border-b flex items-center justify-between', SURFACE.alt, BORDER.hairline)}>
+                      <span className={cn('text-xs', TEXT.muted)}>Website preview</span>
                       <a
                         href={job.preview.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs text-brand-600 hover:underline"
+                        className={cn('text-xs hover:underline', ACCENT.link)}
                       >
                         Open in new tab →
                       </a>

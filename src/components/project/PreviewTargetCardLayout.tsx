@@ -1,6 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/cn';
+import { TEXT } from '@/content/productTheme';
 import { Badge } from '@/components/ui/Badge';
 import {
   formatPreviewTargetCompactBreadcrumb,
@@ -91,17 +92,17 @@ export function PreviewTargetCardLayout({
         )}
       >
         <div className={cn('flex flex-wrap items-center gap-2', isCentered && 'justify-center')}>
-          <Badge tone="info" className="shrink-0">
+          <Badge tone="rose" className="shrink-0">
             {display.scopeLabel}
           </Badge>
         </div>
-        <p className="text-sm font-semibold text-zinc-950 break-words line-clamp-2">{primaryLabel}</p>
+        <p className={cn('text-sm font-semibold break-words line-clamp-2', TEXT.primary)}>{primaryLabel}</p>
         {breadcrumb ? (
-          <p className="text-[11px] text-zinc-500 break-words line-clamp-1">{breadcrumb}</p>
+          <p className={cn('text-[11px] break-words line-clamp-1', TEXT.muted)}>{breadcrumb}</p>
         ) : null}
       </div>
       {showHint ? (
-        <p className={cn('text-[11px] text-zinc-500 pt-0.5', edgeToEdge && 'px-3')}>
+        <p className={cn('text-[11px] pt-0.5', TEXT.muted, edgeToEdge && 'px-3')}>
           Describe what to change in the box below
         </p>
       ) : null}

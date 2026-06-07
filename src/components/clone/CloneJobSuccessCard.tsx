@@ -1,5 +1,11 @@
 'use client';
 
+import Link from 'next/link';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { ACCENT, BORDER, RADIUS, SURFACE, TEXT } from '@/content/productTheme';
+import { cn } from '@/lib/cn';
+
 interface GitLabInfo {
   repoUrl?: string;
   webUrl?: string;
@@ -25,65 +31,60 @@ interface Props {
 
 export default function CloneJobSuccessCard({ createdProjectId, deployment, gitlab, suggestedTemplate }: Props) {
   return (
-    <div className="bg-green-50 border border-green-200 rounded-xl overflow-hidden">
-      <div className="px-4 py-3 border-b border-green-200 bg-green-100">
-        <h2 className="font-medium text-green-800 text-sm">Your website is ready!</h2>
-        <p className="text-xs text-green-600 mt-0.5">Deployment complete and live</p>
+    <div className={cn(SURFACE.card, RADIUS.card, 'overflow-hidden', BORDER.hairline, 'border')}>
+      <div className={cn('px-4 py-3 border-b', BORDER.hairline, 'bg-rose-50/60')}>
+        <div className="flex items-center gap-2">
+          <h2 className={cn('font-medium text-sm', TEXT.primary)}>Your website is ready!</h2>
+          <Badge tone="success">Live</Badge>
+        </div>
+        <p className={cn('text-xs mt-0.5', TEXT.muted)}>Deployment complete and live</p>
       </div>
       <div className="p-4 space-y-3">
-        {/* Action buttons */}
         <div className="flex flex-wrap gap-2">
           {deployment?.liveUrl ? (
-            <a
-              href={deployment.liveUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-              </svg>
-              Open Website
+            <a href={deployment.liveUrl} target="_blank" rel="noopener noreferrer">
+              <Button variant="primary" size="sm">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+                Open Website
+              </Button>
             </a>
           ) : (
-            <div className="inline-flex items-center gap-1.5 bg-zinc-100 text-zinc-400 px-4 py-2 rounded-lg text-sm">
+            <div className={cn('inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm', SURFACE.alt, TEXT.tertiary)}>
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               Waiting for live URL...
             </div>
           )}
-          <a
-            href={`/projects/${createdProjectId}`}
-            className="inline-flex items-center gap-1.5 bg-white border border-green-300 text-green-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-50"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-            </svg>
-            Open editor
-          </a>
-          {gitlab?.webUrl || gitlab?.repoUrl ? (
-            <a
-              href={gitlab.webUrl || gitlab.repoUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 bg-white border border-zinc-300 text-zinc-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-zinc-50"
-            >
+          <Link href={`/projects/${createdProjectId}`}>
+            <Button variant="glass" size="sm">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
               </svg>
-              View GitLab Repo
+              Open editor
+            </Button>
+          </Link>
+          {gitlab?.webUrl || gitlab?.repoUrl ? (
+            <a href={gitlab.webUrl || gitlab.repoUrl} target="_blank" rel="noopener noreferrer">
+              <Button variant="ghost" size="sm">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                </svg>
+                View GitLab Repo
+              </Button>
             </a>
           ) : null}
         </div>
 
         {deployment?.liveUrl && (
-          <div className="pt-3 border-t border-green-200">
-            <p className="text-xs font-semibold text-green-700 mb-2">Website preview</p>
-            <div className="rounded-lg overflow-hidden border border-green-200 bg-white">
+          <div className={cn('pt-3 border-t', BORDER.hairline)}>
+            <p className={cn('text-xs font-semibold mb-2', TEXT.primary)}>Website preview</p>
+            <div className={cn('rounded-xl overflow-hidden border bg-white', BORDER.hairline)}>
               <iframe
                 src={deployment.liveUrl}
-                className="w-full h-64 rounded-lg"
+                className="w-full h-64 rounded-xl"
                 title="Website preview"
                 allowFullScreen
               />
@@ -91,21 +92,23 @@ export default function CloneJobSuccessCard({ createdProjectId, deployment, gitl
           </div>
         )}
 
-        {/* What was created */}
-        <div className="pt-3 border-t border-green-200 space-y-1">
-          <p className="text-xs font-semibold text-green-700">What was created:</p>
-          {gitlab?.repoUrl && <p className="text-xs text-green-600">• GitLab repository</p>}
-          {deployment?.provider && <p className="text-xs text-green-600">• Vercel deployment</p>}
-          {suggestedTemplate && <p className="text-xs text-green-600">• Template: {suggestedTemplate.category} / {suggestedTemplate.variant}</p>}
+        <div className={cn('pt-3 border-t space-y-1', BORDER.hairline)}>
+          <p className={cn('text-xs font-semibold', TEXT.primary)}>What was created:</p>
+          {gitlab?.repoUrl && <p className={cn('text-xs', TEXT.muted)}>• GitLab repository</p>}
+          {deployment?.provider && <p className={cn('text-xs', TEXT.muted)}>• Vercel deployment</p>}
+          {suggestedTemplate && (
+            <p className={cn('text-xs', TEXT.muted)}>
+              • Template: {suggestedTemplate.category} / {suggestedTemplate.variant}
+            </p>
+          )}
         </div>
 
-        {/* Vercel inspector */}
         {deployment?.inspectorUrl && (
           <a
             href={deployment.inspectorUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs text-green-600 hover:underline block"
+            className={cn('text-xs hover:underline block', ACCENT.link)}
           >
             View Vercel deployment details →
           </a>
