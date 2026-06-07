@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { signOut, useSession } from 'next-auth/react';
 import { useState } from 'react';
 import { cn } from '@/lib/cn';
+import { BrandLogo } from '@/components/marketing/BrandLogo';
 import { Button } from '@/components/ui/Button';
 import { PageContainer } from '@/components/ui/PageContainer';
 
@@ -12,9 +13,11 @@ type ShellVariant = 'default' | 'editor' | 'wizard' | 'minimal';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard' },
-  { href: '/projects/new/clone', label: 'New from URL' },
+  { href: '/projects/new/scratch', label: 'Start with a prompt' },
+  { href: '/projects/new/clone', label: 'Refresh from URL' },
 ];
 
+/** Authenticated app chrome — Apple glass aesthetic. */
 export function AppShell({
   variant = 'default',
   title,
@@ -35,14 +38,14 @@ export function AppShell({
   const showSideNav = variant === 'default';
 
   return (
-    <div className="min-h-screen bg-[#fafafa] flex flex-col">
-      <header className="sticky top-0 z-40 border-b border-zinc-200 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/80">
-        <PageContainer className="flex h-14 items-center justify-between gap-4">
+    <div className="min-h-screen bg-brand-canvas flex flex-col">
+      <header className="sticky top-0 z-40 glass-nav">
+        <PageContainer className="flex h-12 items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
             {showSideNav && (
               <button
                 type="button"
-                className="md:hidden p-2 rounded-md text-zinc-600 hover:bg-zinc-100"
+                className="md:hidden p-2 rounded-full text-[#6e6e73] hover:bg-black/5"
                 onClick={() => setMobileOpen((o) => !o)}
                 aria-label="Toggle menu"
               >
@@ -51,23 +54,23 @@ export function AppShell({
                 </svg>
               </button>
             )}
-            <Link href="/dashboard" className="font-semibold text-zinc-950 shrink-0 tracking-tight">
-              Site Agent
+            <Link href="/dashboard" className="shrink-0">
+              <BrandLogo size="sm" />
             </Link>
             {breadcrumb && (
-              <span className="hidden sm:flex items-center gap-2 text-sm text-zinc-500 truncate">
+              <span className="hidden sm:flex items-center gap-2 text-sm text-[#86868b] truncate">
                 <span aria-hidden>/</span>
                 {breadcrumb}
               </span>
             )}
             {title && !breadcrumb && (
-              <span className="hidden sm:block text-sm font-medium text-zinc-600 truncate">{title}</span>
+              <span className="hidden sm:block text-sm font-medium text-[#6e6e73] truncate">{title}</span>
             )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {actions}
             {session?.user?.email && (
-              <span className="hidden lg:inline text-xs text-zinc-500 max-w-[160px] truncate">
+              <span className="hidden lg:inline text-xs text-[#86868b] max-w-[160px] truncate">
                 {session.user.email}
               </span>
             )}
@@ -82,8 +85,8 @@ export function AppShell({
         {showSideNav && (
           <aside
             className={cn(
-              'border-r border-zinc-200 bg-white w-52 shrink-0',
-              mobileOpen ? 'absolute inset-y-14 left-0 z-30 shadow-card-hover md:static md:shadow-none' : 'hidden md:block'
+              'border-r border-[#d2d2d7]/60 bg-white/60 backdrop-blur-xl w-52 shrink-0',
+              mobileOpen ? 'absolute inset-y-12 left-0 z-30 shadow-glass md:static md:shadow-none' : 'hidden md:block'
             )}
           >
             <nav className="p-3 space-y-0.5">
@@ -95,10 +98,10 @@ export function AppShell({
                     href={item.href}
                     onClick={() => setMobileOpen(false)}
                     className={cn(
-                      'block rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                      'block rounded-xl px-3 py-2 text-sm font-normal transition-colors',
                       active
-                        ? 'bg-zinc-100 text-zinc-950'
-                        : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-950'
+                        ? 'bg-brand-50 text-brand-700'
+                        : 'text-[#6e6e73] hover:bg-[#f5f5f7] hover:text-[#1d1d1f]'
                     )}
                   >
                     {item.label}

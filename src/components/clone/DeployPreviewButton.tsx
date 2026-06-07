@@ -42,7 +42,7 @@ export default function DeployPreviewButton({ jobId, onDeployStart }: Props) {
       {error && (
         <p className="text-xs text-red-500 text-center">{error}</p>
       )}
-      <p className="text-xs text-gray-400 text-center">
+      <p className="text-xs text-zinc-400 text-center">
         Publishes to Vercel. Save to GitLab first if you want to return later without deploying yet.
       </p>
     </div>

@@ -19,7 +19,7 @@ export function buildProductsSection(products: CatalogProductInput[]) {
     type: 'services' as const,
     title: 'Our Products',
     subtitle: 'Browse our catalog — contact us to purchase.',
-    body: 'Product listings from your Site Agent catalog.',
+    body: 'Product listings from your First Site catalog.',
     items: published.map((p) => ({
       title: p.price != null ? `${p.name} — ${formatPrice(p.price, p.currency)}` : p.name,
       description: p.description || (p.externalUrl ? `Learn more: ${p.externalUrl}` : undefined),

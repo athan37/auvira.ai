@@ -54,8 +54,8 @@ function getStepColor(step: BuildStep) {
   switch (step.status) {
     case 'done': return 'text-green-600 bg-green-50 border-green-200';
     case 'failed': return 'text-red-600 bg-red-50 border-red-200';
-    case 'running': return 'text-indigo-600 bg-indigo-50 border-indigo-200';
-    default: return 'text-gray-400 bg-gray-50 border-gray-200';
+    case 'running': return 'text-brand-600 bg-brand-50 border-brand-200';
+    default: return 'text-zinc-400 bg-zinc-50 border-zinc-200';
   }
 }
 
@@ -74,10 +74,10 @@ export default function BuildDeployProgressCard({ status, buildSteps, deployment
   const waitStep = buildSteps.find(s => s.key === 'wait_for_vercel');
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <div className="px-4 py-3 border-b border-gray-200 bg-indigo-50">
-        <h2 className="font-medium text-indigo-800 text-sm">Build & Deploy Progress</h2>
-        <p className="text-xs text-indigo-600 mt-0.5">{stageLabel}</p>
+    <div className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
+      <div className="px-4 py-3 border-b border-zinc-200 bg-brand-50">
+        <h2 className="font-medium text-brand-800 text-sm">Build & Deploy Progress</h2>
+        <p className="text-xs text-brand-600 mt-0.5">{stageLabel}</p>
       </div>
       <div className="p-4 space-y-3">
         {/* Build steps */}
@@ -97,7 +97,7 @@ export default function BuildDeployProgressCard({ status, buildSteps, deployment
 
         {/* Vercel wait step or deployment */}
         {(waitStep || deployment) && (
-          <div className={`mt-2 px-3 py-2 rounded-lg border ${waitStep?.status === 'running' ? 'text-blue-600 bg-blue-50 border-blue-200' : 'text-gray-400 bg-gray-50 border-gray-200'}`}>
+          <div className={`mt-2 px-3 py-2 rounded-lg border ${waitStep?.status === 'running' ? 'text-blue-600 bg-blue-50 border-blue-200' : 'text-zinc-400 bg-zinc-50 border-zinc-200'}`}>
             {waitStep ? (
               <>
                 <span className="text-base w-5 text-center inline-block">
@@ -114,26 +114,26 @@ export default function BuildDeployProgressCard({ status, buildSteps, deployment
 
         {/* Deployment info */}
         {deployment && (
-          <div className="mt-3 pt-3 border-t border-gray-100 space-y-1.5">
+          <div className="mt-3 pt-3 border-t border-zinc-100 space-y-1.5">
             {!deployment.vercelProjectId && !deployment.vercelProjectName && (
               <div className="text-xs text-yellow-600 bg-yellow-50 border border-yellow-200 rounded px-2 py-1.5">
                 ⚠ Deployment metadata is missing. Please open the project workspace or retry.
               </div>
             )}
             {deployment.expectedProductionUrl && !deployment.ready && (
-              <div className="text-xs text-gray-500">
-                Expected URL: <span className="font-mono text-gray-700">{deployment.expectedProductionUrl}</span>
+              <div className="text-xs text-zinc-500">
+                Expected URL: <span className="font-mono text-zinc-700">{deployment.expectedProductionUrl}</span>
               </div>
             )}
             {deployment.note && !deployment.ready && (
-              <div className="text-xs text-gray-400">{deployment.note}</div>
+              <div className="text-xs text-zinc-400">{deployment.note}</div>
             )}
             {deployment.inspectorUrl && (
               <a
                 href={deployment.inspectorUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-indigo-600 hover:underline block"
+                className="text-xs text-brand-600 hover:underline block"
               >
                 View Vercel build →
               </a>

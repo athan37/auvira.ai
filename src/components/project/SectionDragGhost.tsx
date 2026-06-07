@@ -77,7 +77,7 @@ export function SectionDragGhost({
 
   return (
     <div
-      className="fixed z-[100] pointer-events-none overflow-hidden rounded-xl border border-zinc-200/80 border-l-[3px] border-l-blue-500 bg-white py-2 shadow-xl transition-transform duration-150 ease-out"
+      className="fixed z-[100] pointer-events-none overflow-hidden rounded-xl border border-zinc-200/80 border-l-[3px] border-l-brand-500 bg-white py-2 shadow-xl transition-transform duration-150 ease-out"
       style={{
         left: position.left,
         top: position.top,

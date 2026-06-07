@@ -21,6 +21,7 @@ export const EDIT_SKILL_NAMES = [
   'remove_section_item',
   'duplicate_section_item',
   'update_section_item',
+  'add_contact_extra_line',
   'remove_section',
   'reorder_sections',
   'replace_image',

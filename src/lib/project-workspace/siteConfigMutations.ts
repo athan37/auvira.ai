@@ -583,7 +583,7 @@ export function addActionItemToSource(
       actionType: item.actionType,
       ctaLabel: normalizeString(item.ctaLabel) ?? defaultCtaForActionType(item.actionType),
     });
-    actionItems.push(nextItem);
+    actionItems.push(nextItem as unknown as Record<string, unknown>);
     actions.actionItems = actionItems;
     return true;
   });

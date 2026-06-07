@@ -83,22 +83,22 @@ export default function NewClonePage() {
       variant="minimal"
       breadcrumb={
         <Link href="/dashboard" className="hover:text-zinc-800">
-          Clone a website
+          Refresh from URL
         </Link>
       }
     >
       <PageContainer narrow className="py-10">
-        <Card>
+        <Card variant="glass">
           <CardBody className="p-8">
-            <h1 className="text-2xl font-bold text-zinc-900 mb-2">Clone a website</h1>
-            <p className="text-zinc-600 mb-6">
-              Paste your current site URL, then pick a layout template and color theme. We copy your
-              content into the new look — then you review and publish.
+            <h1 className="text-3xl font-semibold tracking-[-0.03em] text-[#1d1d1f] mb-2">Refresh from URL</h1>
+            <p className="text-[17px] leading-[1.47] text-[#6e6e73] mb-6">
+              Already have a website? Paste the URL and we&apos;ll rebuild it in a modern layout.
+              Pick colors, preview the draft, and publish when it feels right.
             </p>
 
             <form onSubmit={handleStart} className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-zinc-700 mb-1" htmlFor="url">
+                <label className="block text-sm font-medium text-[#1d1d1f] mb-1" htmlFor="url">
                   Website URL
                 </label>
                 <Input
@@ -113,7 +113,7 @@ export default function NewClonePage() {
 
               <div>
                 <label
-                  className="block text-sm font-medium text-zinc-700 mb-1"
+                  className="block text-sm font-medium text-[#1d1d1f] mb-1"
                   htmlFor="projectName"
                 >
                   Project name (optional)
@@ -149,7 +149,7 @@ export default function NewClonePage() {
                 </Button>
                 <Link href="/projects/new/scratch">
                   <Button type="button" variant="secondary">
-                    Start without a URL
+                    Start with a prompt instead
                   </Button>
                 </Link>
                 <Link href="/dashboard">
@@ -160,9 +160,9 @@ export default function NewClonePage() {
               </div>
             </form>
 
-            <div className="mt-8 pt-6 border-t border-zinc-100">
-              <h3 className="text-sm font-medium text-zinc-700 mb-2">How it works</h3>
-              <ol className="text-sm text-zinc-500 space-y-1 list-decimal list-inside">
+            <div className="mt-8 pt-6 border-t border-[#d2d2d7]/60">
+              <h3 className="text-sm font-medium text-[#1d1d1f] mb-2">How it works</h3>
+              <ol className="text-sm text-[#6e6e73] space-y-1 list-decimal list-inside">
                 <li>Crawl your existing site for content and contact info</li>
                 <li>Review the proposed plan (change layout or theme anytime before build)</li>
                 <li>Build a draft preview with your chosen structure and colors</li>

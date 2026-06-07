@@ -876,7 +876,7 @@ export function ProjectPreviewChat({
       const message =
         error instanceof Error ? error.message : 'Something went wrong. Please try again.';
       const clientTrace = [
-        '=== Site Agent — Client-side failure ===',
+        '=== First Site — Client-side failure ===',
         `time: ${new Date().toISOString()}`,
         `projectId: ${projectId}`,
         jobId ? `jobId: ${jobId}` : 'jobId: (not assigned)',

@@ -151,8 +151,8 @@ export function enumerateAllowlistedFields(
       }
     });
 
-    const actionItems = Array.isArray(section.actionItems)
-      ? (section.actionItems as Array<Record<string, unknown>>)
+    const actionItems = Array.isArray((section as { actionItems?: unknown[] }).actionItems)
+      ? ((section as { actionItems: unknown[] }).actionItems as Array<Record<string, unknown>>)
       : [];
     actionItems.forEach((item, itemIndex) => {
       for (const field of ['name', 'description', 'valueLabel', 'ctaLabel', 'imageUrl'] as const) {

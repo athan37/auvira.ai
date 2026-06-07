@@ -35,8 +35,8 @@ function getColor(status: BuildSummaryItem['status']) {
   switch (status) {
     case 'done': return 'text-green-600 bg-green-50 border-green-200';
     case 'failed': return 'text-red-600 bg-red-50 border-red-200';
-    case 'running': return 'text-indigo-600 bg-indigo-50 border-indigo-200';
-    default: return 'text-gray-400 bg-gray-50 border-gray-200';
+    case 'running': return 'text-brand-600 bg-brand-50 border-brand-200';
+    default: return 'text-zinc-400 bg-zinc-50 border-zinc-200';
   }
 }
 
@@ -50,10 +50,10 @@ export default function LiveBuildSummaryCard({ buildSummary, status }: Props) {
   if (!shouldShow || items.length === 0) return null;
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <div className="px-4 py-3 border-b border-gray-200 bg-indigo-50">
-        <h2 className="font-medium text-indigo-800 text-sm">Website draft being created</h2>
-        <p className="text-xs text-indigo-600 mt-0.5">We&apos;re turning the approved plan into a preview you can review and edit.</p>
+    <div className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
+      <div className="px-4 py-3 border-b border-zinc-200 bg-brand-50">
+        <h2 className="font-medium text-brand-800 text-sm">Website draft being created</h2>
+        <p className="text-xs text-brand-600 mt-0.5">We&apos;re turning the approved plan into a preview you can review and edit.</p>
       </div>
       <div className="p-4 space-y-2">
         {items.map((item) => (

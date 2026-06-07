@@ -1,6 +1,10 @@
-# AI Website Migration Agent (Site Agent)
+# First Site (`ai-website-migration-agent`)
 
-Turn an outdated business website into a clean Git-backed Next.js site, then maintain it through plain-language chat. Owners can **clone an existing URL** or **start from scratch**, review an AI-generated plan, publish through a build gate, and iterate in a project workspace with live preview.
+**Love at first site.** Describe your business in plain language — First Site builds your website, no code required.
+
+Turn an outdated business website into a clean live site, or start from a short prompt. Review a draft preview, refine in chat, and publish when it feels right.
+
+**Design system:** See [`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md) for Apple-style UI tokens, components, and motion guidelines.
 
 **Package name:** `ai-website-migration-agent`  
 **Node:** `>=20 <21` (see `engines` in [`package.json`](package.json))
@@ -9,7 +13,7 @@ Turn an outdated business website into a clean Git-backed Next.js site, then mai
 
 ## Overview
 
-Site Agent is a Next.js application that:
+First Site is a Next.js application that:
 
 1. **Extracts** business facts from an existing site (clone mode) or a short intake form (scratch mode)
 2. **Generates** a one-page Next.js + Tailwind site from deterministic templates — the LLM produces JSON (`siteConfig`, copy, colors), not React source
@@ -24,8 +28,8 @@ Authenticated owners get a dashboard, per-project editor (preview + chat + publi
 
 | Mode | Entry | Flow |
 |------|--------|------|
-| **Clone** | Dashboard → **New from URL** or `/projects/new/clone` | Crawl → plan → template pick → build preview → save backup → publish live |
-| **Scratch** | Dashboard → **Start without a URL** or `/projects/new/scratch` | Intake form → plan → build → publish |
+| **Clone** | Dashboard → **Refresh from URL** or `/projects/new/clone` | Crawl → plan → template pick → build preview → save backup → publish live |
+| **Scratch** | Dashboard → **Start with a prompt** or `/projects/new/scratch` | Intake form → plan → build → publish |
 
 ### Owner-facing UI
 
@@ -308,7 +312,7 @@ For agent workflow details, test harness paths, and preview drag-to-chat trouble
 
 ## Deployment
 
-### This app (Site Agent)
+### This app (First Site)
 
 1. Connect the GitHub repo to [Vercel](https://vercel.com)
 2. **Production branch:** `main`

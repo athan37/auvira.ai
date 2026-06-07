@@ -214,12 +214,15 @@ export function recommendCategoryFromIndustry(industry?: string): WebsiteCategor
 export function buildActionItemsFromModule(module: CategoryActionModule): ActionItem[] {
   const seeds = module.seedItems ?? [];
   if (!seeds.length) return [];
-  return seeds.map((seed) =>
-    createActionItem({
-      ...seed,
-      actionType: seed.actionType ?? module.defaultActionType,
-    })
-  );
+  return seeds
+    .filter((seed): seed is Partial<ActionItem> & { name: string } => Boolean(seed.name?.trim()))
+    .map((seed) =>
+      createActionItem({
+        ...seed,
+        name: seed.name,
+        actionType: seed.actionType ?? module.defaultActionType,
+      })
+    );
 }
 
 /** Build actions section objects for siteConfig. */

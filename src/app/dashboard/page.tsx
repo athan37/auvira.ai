@@ -44,17 +44,17 @@ function ProjectCard({ project }: { project: Project }) {
   const vercelTriggerFailed = project.deploymentStatus === 'trigger_failed';
 
   return (
-    <Card className="p-5 hover:border-zinc-300 hover:shadow-card-hover transition-all h-full flex flex-col">
+    <Card variant="glass" className="p-5 hover:shadow-glass transition-all h-full flex flex-col">
       <Link href={`/projects/${project.id}`} className="flex-1 block">
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="min-w-0">
-            <h3 className="font-semibold text-zinc-900 text-lg truncate">{project.name}</h3>
+            <h3 className="font-semibold text-[#1d1d1f] text-lg truncate">{project.name}</h3>
             <div className="flex items-center gap-2 mt-1 flex-wrap">
               <Badge tone={tone}>{status}</Badge>
               {project.hasUnpublishedChanges && <Badge tone="warning">Unpublished edits</Badge>}
             </div>
           </div>
-          <span className="text-xs text-zinc-400 capitalize shrink-0">{project.mode}</span>
+          <span className="text-xs text-[#86868b] capitalize shrink-0">{project.mode}</span>
         </div>
         {vercelTriggerFailed && (
           <Alert variant="warning" className="mb-2 text-xs">
@@ -62,24 +62,24 @@ function ProjectCard({ project }: { project: Project }) {
           </Alert>
         )}
         {project.siteTitle && (
-          <p className="text-sm text-zinc-600 mb-2 line-clamp-2">{project.siteTitle}</p>
+          <p className="text-sm text-[#6e6e73] mb-2 line-clamp-2">{project.siteTitle}</p>
         )}
         {project.sourceUrl && (
-          <p className="text-xs text-zinc-400 truncate">Source: {project.sourceUrl}</p>
+          <p className="text-xs text-[#86868b] truncate">Source: {project.sourceUrl}</p>
         )}
       </Link>
-      <div className="flex flex-wrap items-center gap-3 mt-4 pt-3 border-t border-zinc-100 text-xs">
+      <div className="flex flex-wrap items-center gap-3 mt-4 pt-3 border-t border-[#d2d2d7]/60 text-xs">
         {project.liveUrl && (
           <a
             href={project.liveUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-zinc-950 hover:underline font-medium"
+            className="text-brand-600 hover:underline font-medium"
           >
             Live site →
           </a>
         )}
-        <span className="text-zinc-400 ml-auto">
+        <span className="text-[#86868b] ml-auto">
           {new Date(project.lastEditedAt || project.updatedAt).toLocaleDateString()}
         </span>
       </div>
@@ -89,16 +89,16 @@ function ProjectCard({ project }: { project: Project }) {
 
 function ActiveCloneJobCard({ job }: { job: ActiveCloneJob }) {
   return (
-    <Card className="p-4 border-indigo-100 bg-indigo-50/30">
+    <Card variant="glass" className="p-4 border-brand-200/40 bg-brand-50/30">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-zinc-900 truncate">
+          <p className="text-sm font-medium text-[#1d1d1f] truncate">
             {job.projectName || job.sourceUrl}
           </p>
-          <p className="text-xs text-zinc-600 mt-0.5">{job.currentStageLabel}</p>
-          <div className="mt-2 w-full bg-zinc-200 rounded-full h-1">
+          <p className="text-xs text-[#6e6e73] mt-0.5">{job.currentStageLabel}</p>
+          <div className="mt-2 w-full bg-[#d2d2d7]/60 rounded-full h-1">
             <div
-              className="bg-indigo-600 h-1 rounded-full"
+              className="bg-brand-600 h-1 rounded-full"
               style={{ width: `${job.progressPercent}%` }}
             />
           </div>
@@ -164,17 +164,17 @@ function DashboardContent() {
     <PageContainer className="py-8">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-zinc-900">Your websites</h1>
-          <p className="text-sm text-zinc-500 mt-1">
-            {projects.length} project{projects.length !== 1 ? 's' : ''}
+          <h1 className="text-3xl font-semibold tracking-[-0.03em] text-[#1d1d1f]">Your websites</h1>
+          <p className="text-sm text-[#6e6e73] mt-1">
+            {projects.length} site{projects.length !== 1 ? 's' : ''} — describe, preview, publish
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link href="/projects/new/scratch">
-            <Button variant="secondary">Start without a URL</Button>
+            <Button variant="secondary">Start with a prompt</Button>
           </Link>
           <Link href="/projects/new/clone">
-            <Button>Clone site + pick theme</Button>
+            <Button>Refresh from URL</Button>
           </Link>
         </div>
       </div>
@@ -183,7 +183,7 @@ function DashboardContent() {
 
       {activeJobs.length > 0 && (
         <div className="mb-8">
-          <h2 className="text-sm font-semibold text-zinc-800 mb-3">In progress</h2>
+          <h2 className="text-sm font-semibold text-[#1d1d1f] mb-3">In progress</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {activeJobs.map((job) => (
               <ActiveCloneJobCard key={job.id} job={job} />
@@ -193,17 +193,17 @@ function DashboardContent() {
       )}
 
       {projects.length === 0 ? (
-        <Card>
+        <Card variant="glass">
           <EmptyState
             title="No websites yet"
-            description="Clone an existing site, or start from a template without a URL."
+            description="Describe your business or paste an existing URL — First Site builds the draft for you."
             action={
               <div className="flex flex-wrap gap-2 justify-center">
-                <Link href="/projects/new/clone">
-                  <Button>Clone from URL</Button>
-                </Link>
                 <Link href="/projects/new/scratch">
-                  <Button variant="secondary">Start from template</Button>
+                  <Button>Start with a prompt</Button>
+                </Link>
+                <Link href="/projects/new/clone">
+                  <Button variant="secondary">Refresh from URL</Button>
                 </Link>
               </div>
             }

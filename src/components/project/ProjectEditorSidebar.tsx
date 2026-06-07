@@ -97,8 +97,8 @@ export function ProjectEditorSidebar({
     <div
       className={cn(
         'flex flex-col h-full min-h-0 relative rounded-xl transition-shadow',
-        isSectionDragging && 'ring-2 ring-blue-300 ring-offset-2',
-        isChatDropActive && 'ring-2 ring-blue-500 ring-offset-2 bg-blue-50/40'
+        isSectionDragging && 'ring-2 ring-brand-300 ring-offset-2',
+        isChatDropActive && 'ring-2 ring-brand-500 ring-offset-2 bg-brand-50/40'
       )}
     >
       <div

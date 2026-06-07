@@ -19,7 +19,14 @@ export type EditIntentKind =
 
 export type RiskLevel = 'low' | 'medium' | 'high';
 
-export type EditTargetKind = 'section' | 'hero' | 'nav' | 'footer' | 'site';
+export type EditTargetKind =
+  | 'section'
+  | 'hero'
+  | 'nav'
+  | 'footer'
+  | 'site'
+  | 'action_value'
+  | 'action_cta';
 
 /** Section row in EditContext with presentation and renderer metadata. */
 export interface EditSectionInfo {
@@ -54,6 +61,8 @@ export interface EditTarget {
   clarificationMessage?: string;
   suggestedReplies?: string[];
   reason?: string;
+  /** Pinned config field path when target resolves to a leaf element. */
+  fieldPath?: string;
 }
 
 export type VerificationCheckKind =

@@ -156,7 +156,7 @@ async function bootstrapGitlabProject(
     }
     if (!healthy) {
       const reason = !portOk
-        ? 'port is reserved for Site Agent app'
+        ? 'port is reserved for First Site app'
         : 'preview does not match workspace';
       console.warn(
         `[bootstrap] Stale preview on port ${port} for ${projectId} (${reason}) — restarting`

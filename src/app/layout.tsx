@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import Providers from '@/components/Providers';
+import { BRAND } from '@/content/marketing';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -10,9 +11,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'Site Agent — AI Website Migration',
-  description:
-    'Turn an outdated business website into a clean Git-backed site, then maintain it through chat.',
+  title: `${BRAND.name} — ${BRAND.tagline}`,
+  description: BRAND.description,
 };
 
 export default function RootLayout({

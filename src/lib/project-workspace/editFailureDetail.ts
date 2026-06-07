@@ -130,7 +130,7 @@ export function buildEditFailureReport(input: EditFailureReportInput): EditFailu
   };
 
   const lines: string[] = [
-    '=== Site Agent — Edit failure trace ===',
+    '=== First Site — Edit failure trace ===',
     `time: ${timestamp}`,
     `jobId: ${input.jobId}`,
     `projectId: ${input.projectId}`,

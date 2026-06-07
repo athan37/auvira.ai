@@ -473,7 +473,7 @@ export default function ProjectPage() {
 
   if ((!devBypassAuth && sessionStatus === 'loading') || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-zinc-50">
+      <div className="min-h-screen flex items-center justify-center bg-brand-canvas">
         <Spinner />
       </div>
     );
@@ -576,12 +576,12 @@ export default function ProjectPage() {
           {(sectionDrag || sectionDragPending) && (
             <div
               className={`pointer-events-none absolute inset-0 z-10 rounded-xl border-2 border-dashed transition-colors ${
-                isChatDropActive ? 'border-blue-500 bg-blue-50/60' : 'border-blue-300/80 bg-blue-50/20'
+                isChatDropActive ? 'border-brand-500 bg-brand-50/60' : 'border-brand-300/80 bg-brand-50/20'
               }`}
               aria-hidden
             >
               <div className="absolute inset-0 flex items-center justify-center">
-                <span className="rounded-lg bg-white/90 px-3 py-1.5 text-sm font-medium text-blue-700 shadow-sm">
+                <span className="rounded-lg bg-white/90 px-3 py-1.5 text-sm font-medium text-brand-700 shadow-sm">
                   {isChatDropActive
                     ? 'Release to add to chat'
                     : sectionDragPending

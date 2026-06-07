@@ -1,18 +1,20 @@
 import { cn } from '@/lib/cn';
 
+type CardVariant = 'default' | 'glass';
+
+const variantClasses: Record<CardVariant, string> = {
+  default: 'rounded-2xl border border-[#d2d2d7]/80 bg-white shadow-card',
+  glass: 'glass-card',
+};
+
 export function Card({
   className,
+  variant = 'default',
   children,
   ...props
-}: React.HTMLAttributes<HTMLDivElement>) {
+}: React.HTMLAttributes<HTMLDivElement> & { variant?: CardVariant }) {
   return (
-    <div
-      className={cn(
-        'rounded-lg border border-zinc-200 bg-white shadow-card',
-        className
-      )}
-      {...props}
-    >
+    <div className={cn(variantClasses[variant], className)} {...props}>
       {children}
     </div>
   );
@@ -24,7 +26,7 @@ export function CardHeader({
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cn('px-4 py-3 border-b border-zinc-200/80', className)} {...props}>
+    <div className={cn('px-4 py-3 border-b border-[#d2d2d7]/80', className)} {...props}>
       {children}
     </div>
   );

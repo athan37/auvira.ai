@@ -56,7 +56,7 @@ const HOW_IT_WORKS = [
 ] as const;
 
 const selectClassName =
-  'w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-950 focus:border-zinc-950 focus:outline-none focus:ring-2 focus:ring-zinc-950/10 disabled:bg-zinc-50 disabled:text-zinc-500';
+  'w-full h-11 rounded-xl border border-[#d2d2d7] bg-white px-4 text-[17px] text-[#1d1d1f] focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:bg-[#f5f5f7] disabled:text-[#86868b]';
 
 function ScratchProgressSteps({ stage }: { stage: ScratchProgressStage }) {
   if (stage === 'idle' || stage === 'revising') return null;
@@ -65,8 +65,8 @@ function ScratchProgressSteps({ stage }: { stage: ScratchProgressStage }) {
   const activeIndex = stageOrder.indexOf(stage);
 
   return (
-    <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 space-y-3">
-      <p className="text-sm font-medium text-zinc-800">Creating your website</p>
+    <div className="rounded-2xl border border-[#d2d2d7]/80 bg-[#f5f5f7] p-4 space-y-3">
+      <p className="text-sm font-medium text-[#1d1d1f]">Creating your website</p>
       <ol className="space-y-2">
         {SCRATCH_PROGRESS_STEPS.map((step, index) => {
           const done = index < activeIndex;
@@ -76,10 +76,10 @@ function ScratchProgressSteps({ stage }: { stage: ScratchProgressStage }) {
               <span
                 className={`flex h-5 w-5 items-center justify-center rounded-full text-xs font-semibold ${
                   done
-                    ? 'bg-emerald-100 text-emerald-700'
+                    ? 'bg-brand-100 text-brand-700'
                     : active
-                      ? 'bg-zinc-900 text-white'
-                      : 'bg-zinc-200 text-zinc-500'
+                      ? 'bg-brand-600 text-white'
+                      : 'bg-[#d2d2d7]/60 text-[#86868b]'
                 }`}
               >
                 {done ? '✓' : index + 1}
@@ -435,7 +435,7 @@ export default function NewScratchPage() {
       variant="minimal"
       breadcrumb={
         <Link href="/dashboard" className="hover:text-zinc-800">
-          Start without a URL
+          Start with a prompt
         </Link>
       }
     >
@@ -443,10 +443,10 @@ export default function NewScratchPage() {
         <div className="space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-bold text-zinc-900 mb-2">Start from a template</h1>
+              <h1 className="text-2xl font-bold text-zinc-900 mb-2">Start with a prompt</h1>
               <p className="text-zinc-600 max-w-2xl">
                 {step === 'category'
-                  ? 'Choose a website category — we’ll tailor sections, packages, and CTAs for your business type.'
+                  ? 'Choose your business type — we’ll tailor sections, packages, and CTAs for you.'
                   : step === 'intake'
                   ? 'Tell us about your business, then pick a layout template and color theme. We will propose a plan before building.'
                   : 'Review your proposed website plan, revise if needed, then confirm to build.'}

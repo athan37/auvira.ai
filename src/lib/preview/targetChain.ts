@@ -37,7 +37,7 @@ export function leafContainerKind(
 }
 
 export function isInnerCardContainerPin(target: Pick<SelectedTargetInput, 'targetChain'>): boolean {
-  return leafContainerKind(resolveTargetChain(target)) === 'inner_card';
+  return leafContainerKind(target.targetChain) === 'inner_card';
 }
 
 export function resolvePinScope(target: SelectedTargetInput): PinScope {

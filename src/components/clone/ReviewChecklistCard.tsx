@@ -30,7 +30,7 @@ function ChecklistItem({ label, found }: { label: string; found: boolean }) {
       <span className={`w-4 text-center text-sm ${found ? 'text-green-500' : 'text-yellow-500'}`}>
         {found ? '✓' : '⚠'}
       </span>
-      <span className="text-sm text-gray-700">{label}</span>
+      <span className="text-sm text-zinc-700">{label}</span>
     </div>
   );
 }
@@ -50,13 +50,13 @@ export default function ReviewChecklistCard({
   const warnFidelity = contentFidelity?.warnIssues ?? [];
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <div className="px-4 py-3 border-b border-gray-200 bg-green-50">
+    <div className="bg-white rounded-xl border border-zinc-200 overflow-hidden">
+      <div className="px-4 py-3 border-b border-zinc-200 bg-green-50">
         <h2 className="font-medium text-green-800 text-sm">Please Review Before Building</h2>
       </div>
       <div className="p-4 space-y-4">
         {/* Confidence summary */}
-        <p className="text-sm text-gray-700">{confidenceMessage}</p>
+        <p className="text-sm text-zinc-700">{confidenceMessage}</p>
 
         {/* Checklist items */}
         <div className="space-y-1.5">
@@ -88,10 +88,10 @@ export default function ReviewChecklistCard({
 
         {/* Optional missing info */}
         {checklist.optionalWarnings.length > 0 && (
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 space-y-1">
-            <p className="text-xs font-semibold text-gray-500">Optional — not required to build:</p>
+          <div className="bg-zinc-50 border border-zinc-200 rounded-lg p-3 space-y-1">
+            <p className="text-xs font-semibold text-zinc-500">Optional — not required to build:</p>
             {checklist.optionalWarnings.map((w, i) => (
-              <p key={i} className="text-xs text-gray-500">• {w}</p>
+              <p key={i} className="text-xs text-zinc-500">• {w}</p>
             ))}
           </div>
         )}
@@ -130,7 +130,7 @@ export default function ReviewChecklistCard({
 
         {/* Missing details note */}
         {(!hasBlocking && (checklist.requiredWarnings.length > 0 || checklist.optionalWarnings.length > 0)) && (
-          <p className="text-xs text-gray-400 italic">
+          <p className="text-xs text-zinc-400 italic">
             Missing details can be added later through chat.
           </p>
         )}

@@ -220,6 +220,11 @@ export const UpdateSectionItemParamsSchema = z
     }
   });
 
+export const AddContactExtraLineParamsSchema = z.object({
+  value: z.string().min(1, 'add_contact_extra_line requires value'),
+  line: z.string().optional(),
+});
+
 export const SKILL_PARAM_SCHEMAS: Record<string, z.ZodTypeAny> = {
   update_hero: UpdateHeroParamsSchema,
   update_business_name: UpdateBusinessNameParamsSchema,
@@ -232,6 +237,7 @@ export const SKILL_PARAM_SCHEMAS: Record<string, z.ZodTypeAny> = {
   remove_section_item: RemoveSectionItemParamsSchema,
   duplicate_section_item: DuplicateSectionItemParamsSchema,
   update_section_item: UpdateSectionItemParamsSchema,
+  add_contact_extra_line: AddContactExtraLineParamsSchema,
 };
 
 /** Merge step target + params for semantic validation. */

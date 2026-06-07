@@ -46,7 +46,7 @@ export default function CloneJobSuccessCard({ createdProjectId, deployment, gitl
               Open Website
             </a>
           ) : (
-            <div className="inline-flex items-center gap-1.5 bg-gray-100 text-gray-400 px-4 py-2 rounded-lg text-sm">
+            <div className="inline-flex items-center gap-1.5 bg-zinc-100 text-zinc-400 px-4 py-2 rounded-lg text-sm">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
@@ -67,7 +67,7 @@ export default function CloneJobSuccessCard({ createdProjectId, deployment, gitl
               href={gitlab.webUrl || gitlab.repoUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 bg-white border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50"
+              className="inline-flex items-center gap-1.5 bg-white border border-zinc-300 text-zinc-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-zinc-50"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />

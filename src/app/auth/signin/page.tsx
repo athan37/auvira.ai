@@ -2,6 +2,9 @@
 
 import { signIn } from 'next-auth/react';
 import { Card, CardBody } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { BrandLogo } from '@/components/marketing/BrandLogo';
+import { BRAND } from '@/content/marketing';
 
 export default function SignInPage() {
   const error =
@@ -10,17 +13,24 @@ export default function SignInPage() {
       : null;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-vercel-grid px-4">
+    <div className="min-h-screen flex items-center justify-center bg-brand-canvas px-4">
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-zinc-900 mb-2">Site Agent</h1>
-          <p className="text-lg text-zinc-600">Sign in to manage your website projects</p>
+          <div className="flex justify-center mb-4">
+            <BrandLogo size="md" />
+          </div>
+          <h1 className="text-3xl font-semibold tracking-[-0.03em] text-[#1d1d1f] mb-2">
+            {BRAND.tagline}
+          </h1>
+          <p className="text-[17px] leading-[1.47] text-[#6e6e73]">
+            Sign in to create and manage your websites.
+          </p>
         </div>
 
-        <Card className="shadow-sm">
+        <Card variant="glass" className="shadow-glass rounded-3xl">
           <CardBody className="p-8">
             {error && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-2xl text-red-700 text-sm">
                 {error === 'AccessDenied'
                   ? 'Sign-in was denied after Google returned. Usually MONGODB_URI is missing, wrong, or Atlas is blocking Vercel (allow 0.0.0.0/0 in Network Access). Check Vercel function logs.'
                   : error === 'Configuration'
@@ -31,12 +41,14 @@ export default function SignInPage() {
               </div>
             )}
 
-            <button
+            <Button
               onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
-              className="w-full flex items-center justify-center gap-3 bg-white border border-zinc-200 rounded-lg px-6 py-4 text-zinc-700 font-semibold hover:bg-zinc-50 hover:border-zinc-300 transition-colors duration-150"
+              variant="secondary"
+              className="w-full gap-3 !rounded-xl !border-[#d2d2d7] !bg-white !text-[#1d1d1f] hover:!bg-[#f5f5f7] !no-underline"
+              size="lg"
               type="button"
             >
-              <svg className="w-6 h-6" viewBox="0 0 24 24" aria-hidden>
+              <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24" aria-hidden>
                 <path
                   fill="#4285F4"
                   d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -55,10 +67,10 @@ export default function SignInPage() {
                 />
               </svg>
               Continue with Google
-            </button>
+            </Button>
 
-            <p className="mt-6 text-center text-sm text-zinc-500">
-              By signing in, you agree to have your website projects stored securely.
+            <p className="mt-6 text-center text-sm text-[#86868b]">
+              By signing in you agree to use First Site for your business websites.
             </p>
           </CardBody>
         </Card>

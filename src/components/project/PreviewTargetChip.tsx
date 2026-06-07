@@ -74,12 +74,12 @@ function pinnedCardSurfaceClass(options: {
   className?: string;
 }): string {
   return cn(
-    'w-full overflow-hidden rounded-xl border border-zinc-200/80 border-l-[3px] border-l-blue-500 bg-white shadow-sm transition-colors',
+    'w-full overflow-hidden rounded-xl border border-zinc-200/80 border-l-[3px] border-l-brand-500 bg-white shadow-sm transition-colors',
     options.interactive &&
       (options.active
-        ? 'cursor-pointer ring-2 ring-blue-400/40 ring-offset-1'
+        ? 'cursor-pointer ring-2 ring-brand-400/40 ring-offset-1'
         : 'cursor-pointer hover:border-zinc-300 hover:shadow'),
-    options.pulsing && 'ring-2 ring-blue-400/50 ring-offset-1',
+    options.pulsing && 'ring-2 ring-brand-400/50 ring-offset-1',
     options.className
   );
 }

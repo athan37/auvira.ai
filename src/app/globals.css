@@ -3,25 +3,84 @@
 @tailwind utilities;
 
 :root {
-  --color-bg: #fafafa;
+  --color-canvas: #fbfbfd;
+  --color-canvas-alt: #f5f5f7;
+  --color-bg: #fbfbfd;
   --color-surface: #ffffff;
-  --color-border: #eaeaea;
-  --color-text: #000000;
-  --color-text-muted: #666666;
-  --color-accent: #000000;
+  --color-surface-dark: #1d1d1f;
+  --color-surface-black: #000000;
+  --color-border: #d2d2d7;
+  --color-text: #1d1d1f;
+  --color-text-muted: #6e6e73;
+  --color-text-tertiary: #86868b;
+  --color-accent: #0071e3;
+  --color-accent-hover: #0077ed;
+  --color-accent-muted: #e8f2ff;
+  --color-glass: rgb(255 255 255 / 0.72);
+  --color-border-glass: rgb(255 255 255 / 0.8);
 }
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+
   body {
-    @apply bg-[#fafafa] text-zinc-950 antialiased;
+    @apply text-[#1d1d1f] antialiased;
+    background-color: var(--color-canvas);
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% -20%, rgb(0 0 0 / 0.03), transparent),
+      radial-gradient(ellipse 60% 40% at 100% 0%, rgb(0 0 0 / 0.02), transparent);
   }
 }
 
 @layer utilities {
-  /* Subtle dot grid — similar to Vercel marketing/auth backgrounds */
-  .bg-vercel-grid {
-    background-color: #fafafa;
-    background-image: radial-gradient(circle, rgb(228 228 231 / 0.9) 1px, transparent 1px);
-    background-size: 24px 24px;
+  .bg-brand-canvas {
+    background-color: var(--color-canvas);
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% -20%, rgb(0 0 0 / 0.03), transparent),
+      radial-gradient(ellipse 60% 40% at 100% 0%, rgb(0 0 0 / 0.02), transparent);
+  }
+
+  .bg-canvas-alt {
+    background-color: var(--color-canvas-alt);
+  }
+
+  .glass-panel {
+    background: var(--color-glass);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    border: 1px solid var(--color-border-glass);
+    box-shadow:
+      0 0 0 1px rgb(0 0 0 / 0.02),
+      0 4px 24px rgb(0 0 0 / 0.04);
+  }
+
+  .glass-nav {
+    background: rgb(255 255 255 / 0.8);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    border-bottom: 1px solid rgb(0 0 0 / 0.08);
+  }
+
+  .glass-card {
+    @apply glass-panel rounded-2xl;
+  }
+
+  .glass-dark {
+    background: rgb(29 29 31 / 0.72);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    border: 1px solid rgb(255 255 255 / 0.08);
+  }
+
+  .text-balance {
+    text-wrap: balance;
   }
 }

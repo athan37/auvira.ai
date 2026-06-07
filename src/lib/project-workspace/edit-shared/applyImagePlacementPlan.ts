@@ -169,7 +169,7 @@ export function applyImagePlacementToSiteConfig(
         ...existing,
         type: 'actions',
         actionItems,
-      };
+      } as (typeof config.sections)[number];
       return (
         replaceSiteConfigSectionsInSource(siteConfigSource, config.sections) ??
         rebuildSiteConfigFile(siteConfigSource, config)
@@ -183,10 +183,10 @@ export function applyImagePlacementToSiteConfig(
     config.sections[targetIdx] = {
       ...existing,
       type: 'gallery',
-      title: plan.title || existing.title || galleryTitle,
-      body: plan.body ?? existing.body ?? galleryBody,
+      title: String(plan.title ?? existing.title ?? galleryTitle),
+      body: String(plan.body ?? existing.body ?? galleryBody),
       items: mergedItems,
-    };
+    } as (typeof config.sections)[number];
     return (
       replaceSiteConfigSectionsInSource(siteConfigSource, config.sections) ??
       rebuildSiteConfigFile(siteConfigSource, config)
