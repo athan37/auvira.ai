@@ -41,18 +41,22 @@ export function MarketingTextLink({
   children,
   className,
   inverted = false,
+  promo = false,
 }: {
   href: string;
   children: React.ReactNode;
   className?: string;
   inverted?: boolean;
+  promo?: boolean;
 }) {
   const isAnchor = href.startsWith('#');
   const classes = cn(
     'text-[17px] font-normal transition-colors',
-    inverted
-      ? 'text-brand-400 hover:text-brand-300 hover:underline underline-offset-4'
-      : 'text-brand-600 hover:underline underline-offset-4',
+    promo
+      ? 'text-white/90 hover:text-rose-50 hover:underline underline-offset-4'
+      : inverted
+        ? 'text-white/90 hover:text-white hover:underline underline-offset-4'
+        : 'text-rose-700 hover:text-rose-600 hover:underline underline-offset-4',
     className
   );
 

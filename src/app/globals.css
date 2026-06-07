@@ -18,6 +18,20 @@
   --color-accent-muted: #e8f2ff;
   --color-glass: rgb(255 255 255 / 0.72);
   --color-border-glass: rgb(255 255 255 / 0.8);
+
+  /* Raspberry accent — landing / marketing only */
+  --rose-hot: #D24460;
+  --rose-raspberry: #C83E5F;
+  --rose-deep: #BD365E;
+  --rose-soft: #DD8399;
+  --rose-pale: #F1CDD7;
+  --rose-gradient: linear-gradient(135deg, #D24460 0%, #C83E5F 45%, #BD365E 100%);
+  --rose-glow: radial-gradient(circle at center, rgba(210, 68, 96, 0.22), transparent 60%);
+  --rose-border-highlight: rgba(210, 68, 96, 0.18);
+  --rose-shadow-glass: 0 20px 60px rgba(200, 62, 95, 0.12);
+  --rose-text: #BD365E;
+  --rose-text-hover: #C83E5F;
+  --rose-focus-ring: rgba(200, 62, 95, 0.35);
 }
 
 @layer base {
@@ -82,5 +96,99 @@
 
   .text-balance {
     text-wrap: balance;
+  }
+
+  .bg-rose-gradient {
+    background: var(--rose-gradient);
+  }
+
+  .bg-rose-glow {
+    background: var(--rose-glow);
+  }
+
+  .bg-rose-glow-soft {
+    background: radial-gradient(ellipse 70% 45% at 50% 0%, rgba(210, 68, 96, 0.08), transparent 55%);
+  }
+
+  .glass-card-rose {
+    background: rgb(255 255 255 / 0.1);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    border: 1px solid var(--rose-border-highlight);
+    box-shadow: var(--rose-shadow-glass);
+  }
+
+  .border-rose-highlight {
+    border-color: var(--rose-border-highlight);
+  }
+
+  .shadow-rose-glass {
+    box-shadow: var(--rose-shadow-glass);
+  }
+
+  .text-rose-accent {
+    color: var(--rose-text);
+  }
+
+  .bg-rose-atmosphere {
+    background:
+      radial-gradient(circle at 20% 20%, rgba(210, 68, 96, 0.22), transparent 34%),
+      radial-gradient(circle at 80% 10%, rgba(221, 131, 153, 0.18), transparent 32%),
+      radial-gradient(circle at 50% 80%, rgba(189, 54, 94, 0.16), transparent 38%);
+  }
+
+  .glass-rose-premium {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.08));
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.35),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.08),
+      0 24px 80px rgba(120, 20, 50, 0.24);
+    backdrop-filter: blur(28px) saturate(160%);
+    -webkit-backdrop-filter: blur(28px) saturate(160%);
+  }
+
+  .glass-specular-edge {
+    position: relative;
+  }
+
+  .glass-specular-edge::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.38), transparent 38%);
+    opacity: 0.55;
+  }
+
+  .rose-shine-overlay {
+    position: relative;
+  }
+
+  .rose-shine-overlay::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.12), transparent 45%);
+    opacity: 0.6;
+  }
+
+  .btn-rose-primary {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.35),
+      var(--rose-shadow-glass);
+    transition: transform 0.15s ease, filter 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .btn-rose-primary:hover {
+    filter: brightness(1.08);
+    transform: translateY(-1px);
+  }
+
+  .btn-rose-primary:active {
+    transform: translateY(0);
+    filter: brightness(1);
   }
 }

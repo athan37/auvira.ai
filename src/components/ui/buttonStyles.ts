@@ -1,13 +1,17 @@
 import { cn } from '@/lib/cn';
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'glass';
+type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'glass' | 'primaryRose' | 'secondaryRose';
 type Size = 'sm' | 'md' | 'lg';
 
 export const buttonVariants: Record<Variant, string> = {
   primary:
     'bg-brand-600 text-white hover:bg-brand-500 focus-visible:ring-brand-500/30 border border-transparent',
+  primaryRose:
+    'btn-rose-primary bg-rose-gradient text-white focus-visible:ring-rose-500/35 border border-white/20',
   secondary:
     'bg-transparent text-brand-600 hover:underline underline-offset-4 border border-transparent px-0',
+  secondaryRose:
+    'bg-transparent text-rose-700 hover:text-rose-600 hover:underline underline-offset-4 border border-transparent px-0',
   glass:
     'glass-panel text-[#1d1d1f] hover:bg-white/90 focus-visible:ring-brand-500/20 border border-white/60',
   ghost:

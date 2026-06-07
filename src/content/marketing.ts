@@ -41,7 +41,7 @@ export const FEATURE_SPOTLIGHTS = [
   },
   {
     id: 'preview',
-    theme: 'dark' as const,
+    theme: 'promo' as const,
     eyebrow: 'Preview',
     headline: 'See it instantly.',
     subline: 'Your draft loads in a live preview. Scroll, click, and decide if the direction feels right before you change a word.',

@@ -30,6 +30,18 @@ module.exports = {
           DEFAULT: '#d2d2d7',
           strong: '#86868b',
         },
+        rose: {
+          50: '#F1CDD7',
+          100: '#F1CDD7',
+          200: '#F1CDD7',
+          300: '#DD8399',
+          400: '#DD8399',
+          500: '#C83E5F',
+          600: '#D24460',
+          700: '#BD365E',
+          800: '#1C1C1F',
+          900: '#1C1C1F',
+        },
       },
       fontFamily: {
         sans: [
@@ -47,6 +59,7 @@ module.exports = {
         'card-hover': '0 0 0 1px rgb(0 0 0 / 0.06), 0 4px 12px rgb(0 0 0 / 0.06)',
         glass: '0 2px 16px rgb(0 0 0 / 0.06)',
         product: '0 8px 40px rgb(0 0 0 / 0.12)',
+        'rose-glass': '0 20px 60px rgba(200, 62, 95, 0.12)',
       },
       borderRadius: {
         DEFAULT: '8px',
@@ -58,6 +71,9 @@ module.exports = {
         'brand-gradient': 'linear-gradient(180deg, #f5f5f7 0%, #fbfbfd 100%)',
         'brand-cta': 'linear-gradient(180deg, #0077ed 0%, #0071e3 100%)',
         'dark-band': 'linear-gradient(180deg, #000000 0%, #1d1d1f 100%)',
+        'rose-gradient': 'linear-gradient(135deg, #D24460 0%, #C83E5F 45%, #BD365E 100%)',
+        'rose-glow': 'radial-gradient(circle at center, rgba(210,68,96,0.22), transparent 60%)',
+        'rose-glow-soft': 'radial-gradient(ellipse 70% 45% at 50% 0%, rgba(210,68,96,0.08), transparent 55%)',
       },
       transitionTimingFunction: {
         apple: 'cubic-bezier(0.25, 0.1, 0.25, 1)',

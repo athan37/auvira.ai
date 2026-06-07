@@ -97,3 +97,60 @@ Respect `prefers-reduced-motion`: no transforms, opacity-only or instant.
 - [ ] Focus rings use blue at 20% opacity
 - [ ] Mobile nav sheet works on landing
 - [ ] Reduced motion disables parallax/float
+
+## Raspberry accent (landing only)
+
+Parallel to blue `brand-*` — use `rose-*` **only** on the public landing page and marketing components.
+
+| Token | CSS variable / Tailwind | Value | Usage |
+|-------|-------------------------|-------|--------|
+| Rose hot | `--rose-hot` / `rose-600` | `#D24460` | Gradient start, dots |
+| Raspberry | `--rose-raspberry` / `rose-500` | `#C83E5F` | Gradient mid |
+| Deep raspberry | `--rose-deep` / `rose-700` | `#BD365E` | Links, text accent |
+| Soft rose | `--rose-soft` / `rose-300` | `#DD8399` | Rings, subtle highlights |
+| Pale rose | `--rose-pale` / `rose-50` | `#F1CDD7` | Nav active pill wash |
+
+### When to use rose vs brand
+
+| Context | Accent |
+|---------|--------|
+| Landing CTAs, hero glow, promo band | `rose-*` |
+| Dashboard, editor, sign-in, clone flows | `brand-*` (blue) |
+
+### Rose utilities (globals.css)
+
+- `.bg-rose-atmosphere` — unified multi-point rose light field (hero 35%, final CTA 20%, promo 100%)
+- `.glass-rose-premium` — deep translucent glass with inset highlights and rose shadow
+- `.glass-specular-edge` — diagonal specular sheen via `::before`
+- `.rose-shine-overlay` — subtle promo shine via `::after`
+- `.btn-rose-primary` — luminous gradient CTA with inset highlight
+- `.bg-rose-gradient` — primary CTA fill + promo section base
+- `.border-rose-highlight` / `.shadow-rose-glass` — card hover accents
+- `.text-rose-accent` — link text on light backgrounds
+
+### Premium material system (one layer)
+
+Rose is **one material**, not stacked decorations:
+
+| Zone | Layers |
+|------|--------|
+| Hero | Neutral canvas + `bg-rose-atmosphere` at ~35% opacity |
+| Promo | `bg-rose-gradient` + full atmosphere + shine + `glass-rose-premium` visual |
+| Final CTA | Neutral `#f5f5f7` + atmosphere at ~20% opacity |
+| CTAs | `btn-rose-primary` + `bg-rose-gradient` |
+
+Do **not** embed rose radials in `.bg-brand-canvas` — atmosphere layers only.
+
+### Contrast rules
+
+- White text **only** on `bg-rose-gradient` (buttons, promo section)
+- Body copy on light sections stays `#1d1d1f` / `#6e6e73`
+- `text-rose-700` links on `#fbfbfd` — OK for large/interactive text
+- Avoid body text on `rose-50` / pale rose backgrounds
+
+### Landing QA (raspberry)
+
+- [ ] Canvas reads neutral; raspberry visible on CTAs, glow, preview promo, hovers
+- [ ] Only **one** full gradient section (`#preview` promo)
+- [ ] App chrome still blue
+- [ ] Focus rings on rose CTAs use `ring-rose-500/35`

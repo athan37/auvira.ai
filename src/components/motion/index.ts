@@ -1,6 +1,7 @@
 export { FadeIn } from './FadeIn';
 export { ScrollReveal } from './ScrollReveal';
 export { StaggerChildren, StaggerItem } from './StaggerChildren';
+export { PromoGlassReveal, PromoAtmosphereFade } from './PromoGlassReveal';
 export {
   APPLE_EASE,
   ENTRANCE_DURATION,

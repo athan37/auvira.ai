@@ -1,7 +1,9 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import { cn } from '@/lib/cn';
 import { HERO } from '@/content/marketing';
+import { ROSE } from '@/content/marketingTheme';
 import { StaggerChildren, StaggerItem } from '@/components/motion';
 import { MarketingLink } from './MarketingLink';
 import { ProductMock } from './ProductMock';
@@ -10,6 +12,13 @@ import { ProductMock } from './ProductMock';
 export function LandingHero() {
   return (
     <section className="relative overflow-hidden pt-8 pb-16 lg:pt-16 lg:pb-24">
+      <div
+        className={cn(
+          'pointer-events-none absolute inset-x-0 top-0 -z-10 h-[32rem]',
+          ROSE.atmosphereHero
+        )}
+        aria-hidden
+      />
       <div className="mx-auto max-w-[980px] px-4 sm:px-6">
         <StaggerChildren className="flex flex-col items-center text-center">
           <StaggerItem>
@@ -24,8 +33,10 @@ export function LandingHero() {
           </StaggerItem>
           <StaggerItem>
             <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-              <MarketingLink href="/auth/signin">{HERO.primaryCta}</MarketingLink>
-              <MarketingLink href={HERO.secondaryHref} variant="secondary">
+              <MarketingLink href="/auth/signin" variant="primaryRose">
+                {HERO.primaryCta}
+              </MarketingLink>
+              <MarketingLink href={HERO.secondaryHref} variant="secondaryRose">
                 {HERO.secondaryCta}
               </MarketingLink>
             </div>
@@ -40,10 +51,22 @@ export function LandingHero() {
 }
 
 /** Final CTA band with hover scale on primary button. */
-export function LandingFinalCta({ headline, subline, cta }: { headline: string; subline: string; cta: string }) {
+export function LandingFinalCta({
+  headline,
+  subline,
+  cta,
+}: {
+  headline: string;
+  subline: string;
+  cta: string;
+}) {
   return (
-    <section className="bg-[#f5f5f7] py-20 lg:py-28">
-      <div className="mx-auto max-w-[980px] px-4 text-center sm:px-6">
+    <section className="relative overflow-hidden bg-[#f5f5f7] py-20 lg:py-28">
+      <div
+        className={cn('pointer-events-none absolute inset-0', ROSE.atmosphereFinal)}
+        aria-hidden
+      />
+      <div className="relative mx-auto max-w-[980px] px-4 text-center sm:px-6">
         <h2 className="text-3xl font-semibold tracking-[-0.03em] text-[#1d1d1f] sm:text-4xl lg:text-5xl">
           {headline}
         </h2>
@@ -51,7 +74,7 @@ export function LandingFinalCta({ headline, subline, cta }: { headline: string; 
           {subline}
         </p>
         <motion.div className="mt-8" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-          <MarketingLink href="/auth/signin" size="lg" className="inline-flex">
+          <MarketingLink href="/auth/signin" variant="primaryRose" size="lg" className="inline-flex">
             {cta}
           </MarketingLink>
         </motion.div>
