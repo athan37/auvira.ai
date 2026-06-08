@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   isImagePlacementRequest,
+  isImageReplaceRequest,
   wantsNewImageSection,
   MISSING_IMAGE_ATTACHMENT_MESSAGE,
 } from '../../src/lib/project-workspace/edit-shared/imagePlacementIntent';
@@ -48,6 +49,8 @@ const newAttachments: WorkspaceAssetAttachment[] = [
 describe('imagePlacementIntent', () => {
   it('detects image placement language', () => {
     expect(isImagePlacementRequest('add this image to the first section')).toBe(true);
+    expect(isImageReplaceRequest('change photo to this', true)).toBe(true);
+    expect(isImageReplaceRequest('add this image to the gallery', true)).toBe(false);
     expect(wantsNewImageSection('add these images to another section')).toBe(true);
     expect(wantsNewImageSection('add these images into a new section')).toBe(true);
     expect(isImagePlacementRequest('add some descriptions to these images')).toBe(false);

@@ -594,7 +594,13 @@ export function updateActionItemInSource(
   content: string,
   sectionIndex: number,
   itemIndex: number,
-  patch: Partial<{ name: string; description: string; valueLabel: string; ctaLabel: string }>
+  patch: Partial<{
+    name: string;
+    description: string;
+    valueLabel: string;
+    ctaLabel: string;
+    imageUrl: string;
+  }>
 ): string | null {
   if (sectionIndex < 0 || itemIndex < 0) return null;
 
@@ -655,7 +661,7 @@ export function updateActionItemFieldInSource(
   field: string,
   value: string
 ): string | null {
-  const allowed = new Set(['name', 'description', 'valueLabel', 'ctaLabel']);
+  const allowed = new Set(['name', 'description', 'valueLabel', 'ctaLabel', 'imageUrl']);
   if (!allowed.has(field) || !value.trim()) return null;
   return updateActionItemInSource(content, sectionIndex, itemIndex, { [field]: value });
 }

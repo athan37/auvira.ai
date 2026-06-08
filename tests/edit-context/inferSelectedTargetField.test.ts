@@ -61,6 +61,54 @@ function baseEditContext(message: string): EditContext {
 }
 
 describe('inferSelectedTargetField', () => {
+  it('infers pinned item imageUrl before UI title fieldPath', () => {
+    const testimonialsConfig = `export const siteConfig = {
+  businessName: "Acme",
+  sections: [
+    {
+      type: "testimonials",
+      title: "Customer Reviews",
+      items: [
+        { title: "Alice", imageUrl: "/uploads/a.png" },
+        { title: "Bob", imageUrl: "/uploads/b.png" },
+        { title: "Carol", imageUrl: "/uploads/c.png" }
+      ]
+    }
+  ]
+};`;
+    const pinnedCard = {
+      kind: 'section' as const,
+      sectionId: 'section_testimonials_0',
+      sectionIndex: 0,
+      sectionType: 'testimonials',
+      sectionTitle: 'Customer Reviews',
+      itemIndex: 2,
+      fieldPath: 'sections[0].items[2].title',
+      elementKind: 'heading',
+      elementLabel: 'Carol',
+    };
+    const catalog = buildSiteSectionCatalog(testimonialsConfig, '');
+    const target = {
+      kind: 'section' as const,
+      sectionIndex: 0,
+      sectionType: 'testimonials',
+      title: 'Customer Reviews',
+      confidence: 'high' as const,
+      candidates: [],
+      needsClarification: false,
+    };
+    const ctx = buildSelectedTargetContext({
+      selectedTarget: pinnedCard,
+      siteConfigContent: testimonialsConfig,
+      pageContent: '',
+      catalog,
+      target,
+    });
+    const inferred = inferSelectedTargetField('change photo to this', ctx ?? undefined);
+    expect(inferred?.fieldPath).toBe('sections[0].items[2].imageUrl');
+    expect(inferred?.reason).toMatch(/Pinned item image/i);
+  });
+
   it('infers title path and value for pinned "change the title to …"', () => {
     const ctx = buildSelectedTargetContext({
       selectedTarget,

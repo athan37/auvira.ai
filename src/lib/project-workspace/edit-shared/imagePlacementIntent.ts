@@ -46,3 +46,44 @@ export function wantsNewImageSection(message: string): boolean {
 
 export const MISSING_IMAGE_ATTACHMENT_MESSAGE =
   'Please attach the image(s) you want to use, then send your message again.';
+
+/**
+ * Owner wants to replace an existing image (often on a pinned card), not bulk-add to a gallery.
+ */
+export function isImageReplaceRequest(message: string, hasAttachment = false): boolean {
+  const lower = message.toLowerCase();
+  const replaceVerb = /\b(change|replace|swap|update|set)\b/i.test(lower);
+  const placementVerb = /\b(add|put|place|insert|attach|upload|show)\b/i.test(lower);
+  const imageNoun = IMAGE_NOUN.test(lower);
+
+  if (replaceVerb && imageNoun) return true;
+
+  if (hasAttachment && replaceVerb && /\b(to\s+this|with\s+this)\b/i.test(lower)) return true;
+
+  if (
+    hasAttachment &&
+    imageNoun &&
+    /\b(this|that)\b/i.test(lower) &&
+    !placementVerb
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * When a card is pinned, route a single attachment to that card instead of section-wide merge.
+ */
+export function shouldUsePinnedCardImageReplace(
+  message: string,
+  attachmentCount: number,
+  hasPinnedItem: boolean
+): boolean {
+  if (!hasPinnedItem || attachmentCount === 0) return false;
+  if (wantsNewImageSection(message)) return false;
+  if (isImageReplaceRequest(message, attachmentCount > 0)) return true;
+  // One image on a pinned card is almost always a card photo update, not bulk placement.
+  if (attachmentCount === 1) return true;
+  return false;
+}

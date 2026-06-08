@@ -1,6 +1,11 @@
 import { classifyEditWhat } from '@/lib/project-workspace/edit-context/classifyEditWhat';
 import type { EditWhatKind } from '@/lib/project-workspace/edit-shared/types';
-import { heroFieldPath, sectionFieldPath, sectionItemFieldPath } from './configFieldPaths';
+import {
+  actionItemFieldPath,
+  heroFieldPath,
+  sectionFieldPath,
+  sectionItemFieldPath,
+} from './configFieldPaths';
 import {
   extractReplacementValue,
   stripPinnedTargetSuffix,
@@ -111,9 +116,11 @@ function pickCtaPath(ctx: SelectedTargetContext): string | undefined {
 function pickImagePath(ctx: SelectedTargetContext): string | undefined {
   const idx = ctx.resolved.sectionIndex;
   if (idx == null) return undefined;
-  const itemIndex = ctx.element?.itemIndex ?? 0;
-  const imagePath = sectionItemFieldPath(idx, itemIndex, 'imageUrl');
-  if (ctx.editableFields.some((f) => f.fieldPath === imagePath)) return imagePath;
+  const itemIndex = ctx.element?.itemIndex;
+  if (itemIndex != null && itemIndex >= 0) {
+    const imagePath = sectionItemFieldPath(idx, itemIndex, 'imageUrl');
+    if (ctx.editableFields.some((f) => f.fieldPath === imagePath)) return imagePath;
+  }
   return ctx.editableFields.find((f) => f.fieldPath.endsWith('.imageUrl'))?.fieldPath;
 }
 
@@ -177,6 +184,31 @@ export function inferSelectedTargetField(
     }
   }
 
+  if (wantsImage(message)) {
+    const idx = ctx.resolved.sectionIndex;
+    if (idx != null && ctx.element?.itemIndex != null) {
+      const isActionCard =
+        ctx.resolved.sectionType === 'actions' ||
+        ctx.editableFields.some((f) =>
+          f.fieldPath.startsWith(`sections[${idx}].actionItems[${ctx.element!.itemIndex}]`)
+        );
+      const fieldPath = isActionCard
+        ? actionItemFieldPath(idx, ctx.element.itemIndex, 'imageUrl')
+        : sectionItemFieldPath(idx, ctx.element.itemIndex, 'imageUrl');
+      return {
+        fieldPath,
+        value,
+        confidence: 'high',
+        reason: isActionCard ? 'Pinned action card image field' : 'Pinned item image field',
+      };
+    }
+    const fieldPath = pickImagePath(ctx);
+    if (fieldPath) {
+      return { fieldPath, value, confidence: 'medium', reason: 'Image field inference' };
+    }
+    return null;
+  }
+
   if (ctx.element?.fieldPath) {
     return {
       fieldPath: ctx.element.fieldPath,
@@ -195,14 +227,6 @@ export function inferSelectedTargetField(
         reason: ctx.recommendedDefaultField.reason,
       };
     }
-  }
-
-  if (wantsImage(message)) {
-    const fieldPath = pickImagePath(ctx);
-    if (fieldPath) {
-      return { fieldPath, value, confidence: 'medium', reason: 'Image field inference' };
-    }
-    return null;
   }
 
   if (wantsSubtitle(message)) {

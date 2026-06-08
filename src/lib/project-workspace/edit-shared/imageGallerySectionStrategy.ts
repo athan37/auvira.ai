@@ -20,6 +20,12 @@ import { verifyEditApplied } from './verifyEditApplied';
 import { stampSiteConfigForGalleryPreviewReload } from './gallerySiteConfig';
 import { validateGalleryInSiteConfigSource } from './validateGallerySiteConfig';
 import { extractLastGalleryEditFromSiteConfig } from './imageEditIntent';
+import { shouldUsePinnedCardImageReplace } from './imagePlacementIntent';
+import {
+  applyPinnedItemImageReplaceToSource,
+  resolvePinnedItemImageTarget,
+  validatePinnedItemImageReplace,
+} from './pinnedItemImageReplace';
 import {
   describeSiteConfigParseFailure,
   parseSiteConfigSource,
@@ -80,6 +86,149 @@ export async function runImageGallerySectionStrategy(
       error: describeSiteConfigParseFailure(siteConfigContent),
       ownerMessage:
         'Your site configuration file could not be read. Please contact support or try a simpler edit.',
+    };
+  }
+
+  const pinnedItem = resolvePinnedItemImageTarget(options.selectedTarget, siteConfigContent);
+  if (
+    shouldUsePinnedCardImageReplace(
+      options.ownerMessage,
+      attachments.length,
+      Boolean(pinnedItem)
+    ) &&
+    pinnedItem
+  ) {
+    const imageUrl = attachments[0]?.publicUrl;
+    if (!imageUrl) {
+      return {
+        ok: false,
+        strategy: 'image_gallery',
+        error: 'Missing attachment publicUrl for pinned item image replace',
+        ownerMessage:
+          'Please attach the image you want to use, then send your message again.',
+      };
+    }
+
+    const updatedSiteConfig = applyPinnedItemImageReplaceToSource(
+      siteConfigContent,
+      pinnedItem.sectionIndex,
+      pinnedItem.itemIndex,
+      imageUrl,
+      pinnedItem.kind
+    );
+
+    const cardPath =
+      pinnedItem.kind === 'actionItem'
+        ? `actionItems[${pinnedItem.itemIndex}]`
+        : `items[${pinnedItem.itemIndex}]`;
+
+    if (!updatedSiteConfig) {
+      return {
+        ok: false,
+        strategy: 'image_gallery',
+        error: `Could not update ${cardPath} in section ${pinnedItem.sectionIndex}`,
+        ownerMessage:
+          'Images were uploaded but could not be placed on the selected card. Please try again.',
+      };
+    }
+
+    const beforeFiles: Record<string, string> = {
+      [siteConfigPath]: siteConfigContent,
+      [pagePath]: pageBefore,
+    };
+
+    const stampedConfig = stampSiteConfigForGalleryPreviewReload(updatedSiteConfig);
+    await writeRel(siteConfigPath, stampedConfig);
+
+    const afterWriteConfig = (await readRel(siteConfigPath)) ?? '';
+    const pinnedCheck = validatePinnedItemImageReplace(
+      afterWriteConfig,
+      pinnedItem.sectionIndex,
+      pinnedItem.itemIndex,
+      imageUrl,
+      pinnedItem.kind
+    );
+    if (!pinnedCheck.ok) {
+      return {
+        ok: false,
+        strategy: 'image_gallery',
+        error: pinnedCheck.reason,
+        ownerMessage:
+          'Images were uploaded but could not be linked to the selected card. Please try again.',
+      };
+    }
+
+    let pageAfter = pageBefore;
+    let renderPatch = applyUniversalImageRenderer(pageBefore, workspace.archetype);
+    if (renderPatch.patched && isValidTsxSource(renderPatch.content, 'page.tsx')) {
+      pageAfter = renderPatch.content;
+    }
+
+    const pageRendersGalleryImages = (page: string) =>
+      pageHasGalleryRenderer(page) ||
+      gallerySectionRendersItemImages(page) ||
+      genericSectionRendersItemImages(page) ||
+      /function ActionSection|case\s*['"]actions['"]/.test(page);
+
+    if (!pageRendersGalleryImages(pageAfter)) {
+      const structural = repairPageTsxStructure(pageAfter);
+      renderPatch = applyUniversalImageRenderer(structural.content, workspace.archetype);
+      if (renderPatch.patched && isValidTsxSource(renderPatch.content, 'page.tsx')) {
+        pageAfter = renderPatch.content;
+      }
+    }
+
+    if (!pageRendersGalleryImages(pageAfter)) {
+      return {
+        ok: false,
+        strategy: 'image_gallery',
+        error: `page does not render item images after pinned replace (archetype=${workspace.archetype})`,
+        ownerMessage:
+          "Your image was saved, but this site's page template still can't display it. Please try again after the latest deploy.",
+      };
+    }
+
+    const stamped = stampPageForGalleryPreviewReload(pageAfter);
+    await writeRel(pagePath, stamped);
+    pageAfter = stamped;
+
+    const afterSiteConfig = (await readRel(siteConfigPath)) ?? updatedSiteConfig;
+    const afterFiles: Record<string, string> = {
+      [siteConfigPath]: afterSiteConfig,
+      [pagePath]: pageAfter,
+    };
+
+    const verification = verifyEditApplied(options.ownerMessage, beforeFiles, afterFiles);
+    if (!verification.ok) {
+      return {
+        ok: false,
+        strategy: 'image_gallery',
+        error: verification.reason,
+        ownerMessage: "I couldn't safely apply that section. Please try rephrasing your request.",
+      };
+    }
+
+    const afterHashes = options.gateway
+      ? await options.gateway.computeHashes()
+      : await computeWorkspaceHashes(options.workspacePath);
+    const changedFiles = getChangedFilesFromHashes(beforeHashes, afterHashes);
+    if (changedFiles.length === 0) {
+      return null;
+    }
+
+    const sectionTitle =
+      options.selectedTarget?.sectionTitle ??
+      parseSiteConfigSource(afterSiteConfig)?.sections?.[pinnedItem.sectionIndex]?.title;
+    const summary = `Updated the photo on card ${pinnedItem.itemIndex + 1}${
+      sectionTitle ? ` in "${sectionTitle}"` : ''
+    }.`;
+
+    return {
+      ok: true,
+      strategy: 'image_gallery',
+      summary,
+      ownerMessage: summary,
+      changedFiles,
     };
   }
 
