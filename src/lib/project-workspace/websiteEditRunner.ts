@@ -32,6 +32,8 @@ export interface WebsiteEditResult {
   agentLatencyBreakdown?: Record<string, number>;
   plannerPath?: 'deterministic' | 'explorer' | 'llm' | 'clarification';
   clarificationAnchor?: import('./edit-shared/types').WebsiteEditAgentResult['clarificationAnchor'];
+  guidanceHints?: string[];
+  ambiguityReasons?: string[];
 }
 
 export interface WebsiteEditOptions {
@@ -130,5 +132,7 @@ export async function runWebsiteEdit(
     agentLatencyBreakdown: result.agentLatencyBreakdown,
     plannerPath: result.plannerPath,
     clarificationAnchor: result.clarificationAnchor,
+    guidanceHints: result.guidanceHints,
+    ambiguityReasons: result.ambiguityReasons,
   };
 }

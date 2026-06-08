@@ -7,12 +7,11 @@ export function heroClarificationReplaySiteSpec(): SyntheticSiteSpec {
     hero: {
       headline: 'Welcome to Our Business',
       subheadline: 'We help you grow',
-      primaryCta: 'Get Started',
     },
     sections: [
-      { type: 'services', title: 'Our Services', body: 'What we offer.' },
-      { type: 'about', title: 'About Us', body: 'Our story.' },
-      { type: 'contact', title: 'Contact Us', body: 'Reach out today.' },
+      { type: 'services', title: 'Our Services' },
+      { type: 'about', title: 'About Us' },
+      { type: 'contact', title: 'Contact Us' },
     ],
   };
 }

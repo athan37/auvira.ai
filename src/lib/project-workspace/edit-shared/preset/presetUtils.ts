@@ -155,7 +155,7 @@ function escapePresetStringValue(value: string, quote: "'" | '"'): string {
 
 /** Replace preset.heroBg with an explicit Tailwind background class (solid or gradient). */
 export function setPresetHeroBackground(presetJson: string, backgroundClass: string): string {
-  const re = /\bheroBg\s*:\s*(['"])(.*?)\1/s;
+  const re = /\bheroBg\s*:\s*(['"])([\s\S]*?)\1/;
   if (re.test(presetJson)) {
     return presetJson.replace(re, (_match, quote: string) => {
       const q = quote as "'" | '"';

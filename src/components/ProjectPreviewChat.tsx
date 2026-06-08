@@ -67,6 +67,9 @@ type ChatMessage = {
   errorJobId?: string;
   arize?: ProjectMessageArizeMetadata;
   observability?: ProjectMessageObservabilityMetadata;
+  outcome?: import('@/lib/chat/projectMessageMetadata').ProjectChatOutcome;
+  metadata?: import('@/lib/chat/projectMessageMetadata').ProjectMessageMetadata;
+  guidanceHints?: string[];
 };
 
 type ChatHistoryApiMessage = Omit<ChatMessage, 'id'> & {
