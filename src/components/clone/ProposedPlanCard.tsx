@@ -20,6 +20,8 @@ interface ProposedWebsitePlan {
   secondaryCTA?: string;
   positioningStatement?: string;
   sections?: Section[];
+  requiredMissingInfo?: string[];
+  riskWarnings?: string[];
 }
 
 interface SuggestedTemplate {
@@ -106,6 +108,24 @@ export default function ProposedPlanCard({ plan, suggestedTemplate, showRawPlan 
                 <SectionItem key={i} section={section} />
               ))}
             </div>
+          </div>
+        )}
+
+        {plan.requiredMissingInfo && plan.requiredMissingInfo.length > 0 && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 space-y-1">
+            <p className="text-xs font-semibold text-yellow-700">Missing information from crawl:</p>
+            {plan.requiredMissingInfo.map((item, i) => (
+              <p key={i} className="text-xs text-yellow-700">• {item}</p>
+            ))}
+          </div>
+        )}
+
+        {plan.riskWarnings && plan.riskWarnings.length > 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-1">
+            <p className="text-xs font-semibold text-amber-800">Plan warnings:</p>
+            {plan.riskWarnings.map((item, i) => (
+              <p key={i} className="text-xs text-amber-800">• {item}</p>
+            ))}
           </div>
         )}
 

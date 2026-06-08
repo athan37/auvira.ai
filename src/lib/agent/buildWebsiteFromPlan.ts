@@ -1,5 +1,6 @@
 import type {
   DesignBrief,
+  FactualSiteData,
   ScratchIntake,
   SiteSpec,
   WebsitePlan,
@@ -34,6 +35,8 @@ export interface BuildWebsiteFromPlanInput {
   categoryPresetId?: string;
   validateBuild?: boolean;
   logPrefix?: string;
+  /** Clone path: crawl ground truth for fidelity (e.g. testimonials from crawl). */
+  factualSiteData?: FactualSiteData;
 }
 
 export interface BuildWebsiteFromPlanResult {
@@ -113,7 +116,9 @@ export async function buildWebsiteFromPlan(
   }
 
   logStage(stageLogs, 'scratch_fidelity_validation_start', logPrefix);
-  const fidelityValidation = validateScratchFidelity(websitePlan, intake);
+  const fidelityValidation = validateScratchFidelity(websitePlan, intake, {
+    factualSiteData: input.factualSiteData,
+  });
   logStage(stageLogs, 'scratch_fidelity_validation_done', logPrefix, Date.now() - startTime);
 
   if (!fidelityValidation.ok) {

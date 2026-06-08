@@ -54,9 +54,36 @@ describe('validateScratchFidelity', () => {
 
   it('fails when plan adds testimonials not mentioned in intake', () => {
     const plan = planWithContact('', '');
-    plan.contentPlan!.sections = [{ type: 'testimonials', title: 'Reviews', contentNotes: 'Great' }];
+    plan.contentPlan!.sections = [{ type: 'testimonials', title: 'Reviews', purpose: 'Social proof', contentNotes: ['Great'] }];
     const result = validateScratchFidelity(plan, intake);
     expect(result.ok).toBe(false);
     expect(result.issues.some((i) => /testimonial/i.test(i))).toBe(true);
+  });
+
+  it('allows testimonials when crawl factual data includes them', () => {
+    const plan = planWithContact('', '');
+    plan.contentPlan!.sections = [{ type: 'testimonials', title: 'Reviews', purpose: 'Social proof', contentNotes: ['Great'] }];
+    const intakeWithCrawlNotes = { ...intake, notes: '1 testimonial(s) extracted from source site' };
+    const result = validateScratchFidelity(plan, intakeWithCrawlNotes, {
+      factualSiteData: {
+        businessName: 'Loop Co',
+        alternateNames: [],
+        industry: 'Consulting',
+        practiceAreasOrServices: [],
+        people: [],
+        locations: [],
+        phoneNumbers: [],
+        emails: [],
+        serviceAreas: [],
+        testimonials: [{ quote: 'Great work', sourceText: 'review' }],
+        ctas: [],
+        paymentLinks: [],
+        socialLinks: [],
+        sourceFacts: [],
+        missingCriticalFields: [],
+        confidence: { businessIdentity: 0.8, services: 0.8, contactInfo: 0.5, overall: 0.7 },
+      },
+    });
+    expect(result.ok).toBe(true);
   });
 });

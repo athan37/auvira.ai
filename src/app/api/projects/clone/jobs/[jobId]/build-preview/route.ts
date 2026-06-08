@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api/projectAccess';
 import { CloneJob, PREVIEW_STEPS, BUILD_SUMMARY_ITEMS, type IBuildSummaryItem } from '@/lib/db/models/CloneJob';
-import { getLLMClient } from '@/lib/llm/llmClient';
-import { buildGenerateSiteSpecPrompt } from '@/lib/agent/prompts';
-import { generateDesignBriefAgent, getDefaultDesignBrief } from '@/lib/agent/generateDesignBriefAgent';
-import { generateCloneWebsiteFiles, resolveCloneTemplateSelection } from '@/lib/clone/cloneTemplateSelection';
-import { validateGeneratedSite } from '@/lib/builder/validateGeneratedSite';
+import { buildWebsiteFromPlan } from '@/lib/agent/buildWebsiteFromPlan';
 import { waitForPreviewReady } from '@/lib/preview/waitForPreviewReady';
+import { resolveCloneIntake } from '@/lib/clone/resolveCloneIntake';
+import { normalizeProposedPlan } from '@/lib/clone/normalizeProposedPlan';
+import type { BusinessProfile, FactualSiteData } from '@/lib/agent/schemas';
 import { spawn, ChildProcess } from 'child_process';
 import { existsSync, mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
@@ -14,7 +13,6 @@ import mongoose from 'mongoose';
 import { getNpmPath } from '@/lib/runtime/nodeRuntime';
 import { isVercelServerless } from '@/lib/runtime/isVercelServerless';
 import { isCloneSandboxPreviewEnabled } from '@/lib/runtime/isCloneSandboxPreviewEnabled';
-import { hasCriticalFidelityFailures } from '@/lib/agent/validateContentFidelity';
 import { ensureClonePreviewProject } from '@/lib/clone/persistClonePreview';
 import {
   countCloneObservabilityTurns,
@@ -94,8 +92,7 @@ function generateUniqueProjectName(baseName: string): string {
 }
 
 function allocatePort(): number {
-  const base = 3001 + Math.floor(Math.random() * 1000);
-  return base;
+  return 3001 + Math.floor(Math.random() * 1000);
 }
 
 type AutoHandoffResponseFields =
@@ -206,18 +203,7 @@ export async function POST(
     }, { status: 400 });
   }
 
-  if (job.contentFidelity && hasCriticalFidelityFailures(job.contentFidelity)) {
-    const critical = job.contentFidelity.criticalIssues ?? job.contentFidelity.issues ?? [];
-    return NextResponse.json({
-      ok: false,
-      error: `Content fidelity check failed: ${critical.join('; ')}`,
-      stage: 'content_fidelity_failed',
-      contentFidelity: job.contentFidelity,
-    }, { status: 400 });
-  }
-
   const jobId = job._id;
-  const llmClient = getLLMClient();
   const { scratchPath } = await import('@/lib/runtime/scratchDir');
   const workspacePath = scratchPath('generated-sites', params.jobId);
 
@@ -235,79 +221,78 @@ export async function POST(
   await initBuildSummary(jobId);
 
   try {
-    // Step 1: prepare_structure — generate site spec
+    const factualSiteData = job.factualSiteData as FactualSiteData;
+    const businessProfile = job.businessProfile as BusinessProfile;
+    const intake = resolveCloneIntake(factualSiteData, businessProfile);
+
+    const websitePlan = normalizeProposedPlan(
+      job.proposedWebsitePlan,
+      factualSiteData.businessName || businessProfile.businessName,
+      factualSiteData.industry || businessProfile.industry
+    );
+
+    if (!websitePlan) {
+      return NextResponse.json({
+        ok: false,
+        error: 'No proposed website plan available to build.',
+        stage: 'missing_plan',
+      }, { status: 400 });
+    }
+
     await markPreviewStepRunning(jobId, 'prepare_structure');
     await markSummaryRunning(jobId, 'hero');
     await markSummaryRunning(jobId, 'sections');
     await CloneJob.updateOne({ _id: jobId }, { $set: { currentStageLabel: 'Preparing website structure...', progressPercent: 15 } });
 
-    let siteSpec: any;
-    if (job.proposedWebsitePlan && Object.keys(job.proposedWebsitePlan).length > 0) {
-      siteSpec = job.proposedWebsitePlan;
-    } else {
-      const specResult = await llmClient.generateJSON<any>({
-        system: "You are a website modernization agent. Return only JSON matching the schema.",
-        prompt: buildGenerateSiteSpecPrompt(
-          job.businessProfile as Record<string, unknown>,
-          job.factualSiteData as Record<string, unknown>,
-          ''
-        ),
-        schema: {} as any,
-      });
-      siteSpec = specResult.data;
-    }
-    await markPreviewStepDone(jobId, 'prepare_structure');
-
-    // Hero summary
-    const heroSection = siteSpec?.sections?.find((s: any) => s.type === 'hero');
-    const heroHeadline = heroSection?.headline || siteSpec?.siteTitle || '';
-    const heroSummary = heroHeadline ? `Created hero: "${heroHeadline}"` : 'Homepage hero created';
-    await markSummaryDone(jobId, 'hero', heroSummary, heroHeadline ? { title: heroHeadline } : undefined);
-
-    // Sections summary
-    const sectionsList = siteSpec?.sections || [];
-    const sectionsSummary = `Created ${sectionsList.length} website sections`;
-    await markSummaryDone(jobId, 'sections', sectionsSummary, {
-      count: sectionsList.length,
-      examples: sectionsList.slice(0, 3).map((s: any) => s.title || s.type),
-    });
-
-    // Step 2: create_homepage — design brief + generate homepage
     await markPreviewStepRunning(jobId, 'create_homepage');
     await CloneJob.updateOne({ _id: jobId }, { $set: { currentStageLabel: 'Creating homepage...', progressPercent: 30 } });
 
-    let designBrief;
-    try {
-      designBrief = await generateDesignBriefAgent(
-        job.businessProfile as Record<string, unknown>,
-        siteSpec as Record<string, unknown>,
-        job.sourceUrl
-      );
-    } catch {
-      const bp = job.businessProfile as any;
-      designBrief = getDefaultDesignBrief(
-        bp.industry?.toLowerCase().includes('legal') ? 'legal' :
-        bp.industry?.toLowerCase().includes('health') ? 'healthcare' :
-        bp.industry?.toLowerCase().includes('restaurant') ? 'restaurant' :
-        bp.industry?.toLowerCase().includes('plumb') || bp.industry?.toLowerCase().includes('hvac') ? 'home-services' : 'general-service'
-      );
+    const planBuildResult = await buildWebsiteFromPlan({
+      websitePlan,
+      intake,
+      projectName: job.projectName || websitePlan.businessName || 'generated-site',
+      layoutStarterId: job.suggestedTemplate?.layoutStarterId,
+      categoryPresetId: job.suggestedTemplate?.category,
+      validateBuild: true,
+      factualSiteData,
+      logPrefix: 'CLONE-BUILD-PREVIEW',
+    });
+
+    if (!planBuildResult.ok || !planBuildResult.generated || !planBuildResult.siteSpec) {
+      const errMsg = planBuildResult.error || 'Build from plan failed';
+      await setBuildSummaryStatus(jobId, 'failed');
+      await CloneJob.updateOne({ _id: jobId }, {
+        $set: {
+          status: 'failed',
+          currentStageLabel: 'Preview build failed',
+          error: errMsg,
+          'preview.status': 'failed',
+          'preview.error': errMsg,
+        },
+      });
+      return NextResponse.json({ ok: false, error: errMsg, stage: planBuildResult.stage || 'build_failed' }, { status: 500 });
     }
 
-    const uniqueName = generateUniqueProjectName(job.projectName || (job.businessProfile as any)?.businessName || 'generated-site');
-    const templateSelection = resolveCloneTemplateSelection(job.suggestedTemplate);
-    const generated = generateCloneWebsiteFiles(
-      siteSpec as unknown as import('@/lib/agent/schemas').SiteSpec,
-      uniqueName,
-      designBrief,
-      job.suggestedTemplate
-    );
+    const siteSpec = planBuildResult.siteSpec;
+    const generated = planBuildResult.generated;
+    const uniqueName = planBuildResult.uniqueName || generateUniqueProjectName(job.projectName || websitePlan.businessName);
+
+    await markPreviewStepDone(jobId, 'prepare_structure');
     await markPreviewStepDone(jobId, 'create_homepage');
 
-    // Services summary
-    const servicesSection = siteSpec?.sections?.find((s: any) => s.type === 'services');
+    const heroHeadline = websitePlan.contentPlan?.hero?.headline || siteSpec.siteTitle || '';
+    const heroSummary = heroHeadline ? `Created hero: "${heroHeadline}"` : 'Homepage hero created';
+    await markSummaryDone(jobId, 'hero', heroSummary, heroHeadline ? { title: heroHeadline } : undefined);
+
+    const sectionsList = siteSpec.sections || [];
+    await markSummaryDone(jobId, 'sections', `Created ${sectionsList.length} website sections`, {
+      count: sectionsList.length,
+      examples: sectionsList.slice(0, 3).map((s) => s.title || s.type),
+    });
+
+    const servicesSection = siteSpec.sections?.find((s) => s.type === 'services');
     const servicesItems = servicesSection?.items || [];
-    const bp = job.businessProfile as any;
-    const allServices = bp?.services || [];
+    const allServices = factualSiteData.practiceAreasOrServices || businessProfile.services || [];
     const servicesSummary = servicesItems.length > 0
       ? `Added ${servicesItems.length} services`
       : allServices.length > 0
@@ -318,21 +303,17 @@ export async function POST(
       examples: (servicesItems.length > 0 ? servicesItems : allServices).slice(0, 3),
     });
 
-    // Contact summary
-    const contactSection = siteSpec?.sections?.find((s: any) => s.type === 'contact');
+    const contactSection = siteSpec.sections?.find((s) => s.type === 'contact');
     const contactItems = contactSection?.items || [];
-    const hasContactInfo = (bp?.phone || bp?.email || bp?.location) && contactSection;
-    const contactSummary = hasContactInfo
+    const hasContactInfo = (intake.phone || intake.email || intake.address) && contactSection;
+    await markSummaryDone(jobId, 'contact', hasContactInfo
       ? 'Included available contact details'
-      : 'Contact section created; some details can be added later';
-    await markSummaryDone(jobId, 'contact', contactSummary, {
+      : 'Contact section created; some details can be added later', {
       examples: contactItems.slice(0, 3),
     });
 
-    // Style — start then done after
     await markSummaryRunning(jobId, 'style');
 
-    // Steps 3-6: add_services, add_about, add_contact, apply_style
     for (const step of ['add_services', 'add_about', 'add_contact', 'apply_style'] as const) {
       await markPreviewStepRunning(jobId, step);
       await CloneJob.updateOne({ _id: jobId }, {
@@ -345,17 +326,18 @@ export async function POST(
       await markPreviewStepDone(jobId, step);
     }
 
-    // Style summary
-    await markSummaryDone(jobId, 'style', `Applied ${templateSelection.category} / ${templateSelection.variant} style`);
+    const template = planBuildResult.template;
+    await markSummaryDone(jobId, 'style', template
+      ? `Applied ${template.category} / ${template.variant} style`
+      : 'Applied site style');
 
-    // Step 7: quality_check — validate
     await markPreviewStepRunning(jobId, 'quality_check');
     await markSummaryRunning(jobId, 'quality');
     await CloneJob.updateOne({ _id: jobId }, { $set: { currentStageLabel: 'Checking website quality...', progressPercent: 60 } });
 
-    const buildResult = await validateGeneratedSite({ files: generated.files, projectName: uniqueName });
-    if (!buildResult.ok) {
-      const errMsg = 'Build gate failed: ' + buildResult.errors.join('; ');
+    const gateResult = planBuildResult.generatedSiteValidation;
+    if (!gateResult?.ok) {
+      const errMsg = 'Build gate failed: ' + (gateResult?.errors?.join('; ') || 'unknown');
       await recordCloneObservabilityTurn({
         jobId: params.jobId,
         createdProjectId: job.createdProjectId,
@@ -368,10 +350,10 @@ export async function POST(
         outcome: 'failed',
         buildGatePass: false,
         siteConfigParsed: {
-          businessName: (job.businessProfile as { businessName?: string })?.businessName,
-          sections: (siteSpec as { sections?: Array<{ type?: string; title?: string }> })?.sections,
+          businessName: websitePlan.businessName,
+          sections: siteSpec.sections,
         },
-        latencyMs: buildResult.durationMs,
+        latencyMs: gateResult?.durationMs,
       });
       await markPreviewStepFailed(jobId, 'quality_check', errMsg);
       throw new Error(errMsg);
@@ -379,23 +361,23 @@ export async function POST(
     await CloneJob.updateOne({ _id: jobId }, {
       $set: {
         generatedSiteValidation: {
-          ok: buildResult.ok,
-          logs: buildResult.logs,
-          errors: buildResult.errors,
-          durationMs: buildResult.durationMs,
-          buildGateSkipped: buildResult.buildGateSkipped ?? false,
+          ok: gateResult.ok,
+          logs: gateResult.logs,
+          errors: gateResult.errors,
+          durationMs: gateResult.durationMs,
+          buildGateSkipped: false,
         },
         buildValidation: {
-          ok: buildResult.ok,
-          logs: buildResult.logs,
-          errors: buildResult.errors,
-          durationMs: buildResult.durationMs,
-          buildGateSkipped: buildResult.buildGateSkipped ?? false,
+          ok: gateResult.ok,
+          logs: gateResult.logs,
+          errors: gateResult.errors,
+          durationMs: gateResult.durationMs,
+          buildGateSkipped: false,
         },
       },
     });
     await markPreviewStepDone(jobId, 'quality_check');
-    await markSummaryDone(jobId, 'quality', buildResult.ok ? 'Website passed quality checks' : 'Quality checks failed');
+    await markSummaryDone(jobId, 'quality', gateResult.ok ? 'Website passed quality checks' : 'Quality checks failed');
 
     // Step 8: start_preview — write files and start dev server (local only)
     await markPreviewStepRunning(jobId, 'start_preview');
@@ -407,16 +389,15 @@ export async function POST(
       rmSync(workspacePath, { recursive: true, force: true });
     }
     mkdirSync(workspacePath, { recursive: true });
-    writeFilesToDisk(buildResult.files ?? generated.files, workspacePath);
+    writeFilesToDisk(generated.files, workspacePath);
 
-    // Track files in technicalBuild
     await CloneJob.updateOne({ _id: jobId }, {
       $set: {
         technicalBuild: {
           workspacePath,
-          files: (buildResult.files ?? generated.files).map(f => ({ path: f.filePath, status: 'done' as const })),
-          validationLogs: buildResult.logs,
-          buildGateSkipped: buildResult.buildGateSkipped ?? false,
+          files: generated.files.map(f => ({ path: f.filePath, status: 'done' as const })),
+          validationLogs: gateResult.logs,
+          buildGateSkipped: false,
         },
       },
     });
@@ -428,7 +409,7 @@ export async function POST(
       if (isCloneSandboxPreviewEnabled()) {
         try {
           const { bootstrapCloneJobSandbox } = await import('@/lib/sandbox/bootstrapCloneJobSandbox');
-          const sandboxResult = await bootstrapCloneJobSandbox(params.jobId, buildResult.files ?? generated.files);
+          const sandboxResult = await bootstrapCloneJobSandbox(params.jobId, generated.files);
           previewUrl = sandboxResult.previewUrl;
           sandboxNote = 'Ephemeral sandbox preview';
         } catch (sandboxError) {
@@ -478,10 +459,10 @@ export async function POST(
         outcome: 'success',
         buildGatePass: true,
         siteConfigParsed: {
-          businessName: (job.businessProfile as { businessName?: string })?.businessName,
-          sections: (siteSpec as { sections?: Array<{ type?: string; title?: string }> })?.sections,
+          businessName: websitePlan.businessName,
+          sections: siteSpec.sections,
         },
-        latencyMs: buildResult.durationMs,
+        latencyMs: gateResult?.durationMs,
       });
 
       return NextResponse.json({
@@ -490,7 +471,7 @@ export async function POST(
         status: 'preview_ready',
         projectId: 'projectId' in handoff ? handoff.projectId : undefined,
         preview: { status: 'ready', url: previewUrl, hostedPreview: Boolean(previewUrl) },
-        buildGateSkipped: buildResult.buildGateSkipped ?? false,
+        buildGateSkipped: false,
         ...handoff,
       });
     }
@@ -600,10 +581,10 @@ export async function POST(
       outcome: 'success',
       buildGatePass: true,
       siteConfigParsed: {
-        businessName: (job.businessProfile as { businessName?: string })?.businessName,
-        sections: (siteSpec as { sections?: Array<{ type?: string; title?: string }> })?.sections,
+        businessName: websitePlan.businessName,
+        sections: siteSpec.sections,
       },
-      latencyMs: buildResult.durationMs,
+      latencyMs: gateResult?.durationMs,
     });
 
     return NextResponse.json({

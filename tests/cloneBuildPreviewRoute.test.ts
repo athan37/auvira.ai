@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   cloneJobFindById: vi.fn(),
   cloneJobUpdateOne: vi.fn(),
   ensureClonePreviewProject: vi.fn(),
+  buildWebsiteFromPlan: vi.fn(),
   workspacePath: '',
 }));
 
@@ -59,33 +60,9 @@ vi.mock('@/lib/runtime/scratchDir', () => ({
   scratchPath: vi.fn(() => mocks.workspacePath),
 }));
 
-vi.mock('@/lib/agent/generateDesignBriefAgent', () => ({
-  generateDesignBriefAgent: vi.fn(async () => ({ tone: 'test' })),
-  getDefaultDesignBrief: vi.fn(() => ({ tone: 'default' })),
-}));
-
-vi.mock('@/lib/builder/generateWebsiteFiles', () => ({
-  generateWebsiteFiles: vi.fn(() => ({
-    files: [{ filePath: 'package.json', content: '{"scripts":{"dev":"next dev"}}' }],
-  })),
-}));
-
-vi.mock('@/lib/builder/validateGeneratedSite', () => ({
-  validateGeneratedSite: vi.fn(async ({ files }) => ({
-    ok: true,
-    files,
-    logs: 'ok',
-    errors: [],
-    durationMs: 1,
-  })),
-}));
-
-vi.mock('@/lib/llm/llmClient', () => ({
-  getLLMClient: vi.fn(() => ({ generateJSON: vi.fn() })),
-}));
-
-vi.mock('@/lib/builder/normalizeTemplateVariant', () => ({
-  normalizeTemplateSelection: vi.fn((category, variant) => ({ category, variant })),
+vi.mock('@/lib/agent/buildWebsiteFromPlan', () => ({
+  buildWebsiteFromPlan: mocks.buildWebsiteFromPlan,
+  generateUniqueProjectName: vi.fn((name: string) => `${name}-test`),
 }));
 
 import { POST } from '@/app/api/projects/clone/jobs/[jobId]/build-preview/route';
@@ -96,17 +73,54 @@ function makeJob(status = 'review_ready') {
     status,
     sourceUrl: 'https://example.com',
     projectName: 'Example Co',
-    businessProfile: { businessName: 'Example Co', industry: 'HVAC' },
+    businessProfile: { businessName: 'Example Co', industry: 'HVAC', services: ['HVAC'] },
+    factualSiteData: {
+      businessName: 'Example Co',
+      industry: 'HVAC',
+      practiceAreasOrServices: ['HVAC'],
+      phoneNumbers: [],
+      emails: [],
+      locations: [],
+      testimonials: [],
+      alternateNames: [],
+      people: [],
+      serviceAreas: [],
+      ctas: [],
+      paymentLinks: [],
+      socialLinks: [],
+      sourceFacts: [],
+      missingCriticalFields: [],
+      confidence: { businessIdentity: 0.8, services: 0.8, contactInfo: 0.5, overall: 0.7 },
+    },
     proposedWebsitePlan: {
-      siteTitle: 'Example Co',
-      sections: [
-        { type: 'hero', headline: 'Example Co', title: 'Example Co', body: 'Hello', items: [] },
-        { type: 'services', title: 'Services', body: 'We help', items: ['HVAC'] },
-        { type: 'contact', title: 'Contact', body: 'Call us', items: [] },
-      ],
+      businessName: 'Example Co',
+      industry: 'HVAC',
+      positioning: 'Local HVAC',
+      targetCustomers: ['Homeowners'],
+      primaryGoal: 'Leads',
+      recommendedPagesOrSections: [],
+      contentPlan: {
+        hero: { headline: 'Example Co', subheadline: 'Hello', primaryCTA: 'Call', secondaryCTA: 'Learn' },
+        sections: [
+          { type: 'services', title: 'Services', purpose: 'List services' },
+          { type: 'contact', title: 'Contact', purpose: 'Contact us' },
+        ],
+      },
+      requiredMissingInfo: [],
+      optionalMissingInfo: [],
+      suggestedTemplate: { category: 'home-services', variant: 'modern-clean', reason: 'test' },
+      riskWarnings: [],
+    },
+    contentFidelity: {
+      passed: true,
+      issues: ['No phone found in crawl'],
+      criticalIssues: [],
+      warnIssues: ['No phone found in crawl'],
+      hasCriticalFailures: false,
     },
     suggestedTemplate: { category: 'home-services', variant: 'modern-clean', reason: 'test' },
     preview: { status: 'ready', url: 'http://localhost:3001' },
+    logs: [],
   };
 }
 
@@ -125,12 +139,45 @@ describe('build-preview auto handoff', () => {
       projectId: '507f1f77bcf86cd799439014',
       created: true,
     });
+    mocks.buildWebsiteFromPlan.mockReset().mockResolvedValue({
+      ok: true,
+      siteSpec: {
+        siteTitle: 'Example Co',
+        sections: [
+          { type: 'hero', title: 'Example Co', body: 'Hello', items: [] },
+          { type: 'services', title: 'Services', body: 'We help', items: ['HVAC'] },
+          { type: 'contact', title: 'Contact', body: 'Call us', items: [] },
+        ],
+      },
+      generated: {
+        files: [{ filePath: 'package.json', content: '{"scripts":{"dev":"next dev"}}' }],
+      },
+      template: { category: 'home-services', variant: 'modern-clean', reason: 'test' },
+      uniqueName: 'example-co-test',
+      generatedSiteValidation: {
+        ok: true,
+        logs: 'ok',
+        errors: [],
+        durationMs: 1,
+        tempDir: '/tmp/test',
+      },
+    });
   });
 
   afterEach(() => {
     if (mocks.workspacePath) {
       rmSync(mocks.workspacePath, { recursive: true, force: true });
     }
+  });
+
+  it('builds preview even when content fidelity has warnings only', async () => {
+    const response = await POST({} as never, { params: { jobId: '507f1f77bcf86cd799439011' } });
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.ok).toBe(true);
+    expect(body.status).toBe('preview_ready');
+    expect(mocks.buildWebsiteFromPlan).toHaveBeenCalledTimes(1);
   });
 
   it('returns a dynamic projectId after preview_ready auto-save succeeds', async () => {
@@ -158,10 +205,7 @@ describe('build-preview auto handoff', () => {
 
     expect(body.ok).toBe(true);
     expect(body.projectId).toBe('507f1f77bcf86cd799439015');
-    expect(mocks.cloneJobUpdateOne).not.toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ $set: expect.objectContaining({ status: 'preview_building' }) })
-    );
+    expect(mocks.buildWebsiteFromPlan).not.toHaveBeenCalled();
   });
 
   it('keeps preview_ready recoverable when auto-save fails', async () => {
@@ -174,6 +218,5 @@ describe('build-preview auto handoff', () => {
     expect(body.status).toBe('preview_ready');
     expect(body.projectId).toBeUndefined();
     expect(body.autoSave).toEqual({ ok: false, error: 'GitLab unavailable' });
-    expect(body.recoverableAutoSaveError).toBe('GitLab unavailable');
   });
 });

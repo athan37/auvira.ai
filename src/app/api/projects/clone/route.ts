@@ -4,25 +4,24 @@ import { WebsiteProject } from '@/models/WebsiteProject';
 import { ProjectAction } from '@/models/ProjectAction';
 import { crawlWebsite } from '@/lib/crawler/crawlWebsite';
 import { getLLMClient } from '@/lib/llm/llmClient';
-import { businessProfileSchema, siteSpecSchema, type BusinessProfile, type SiteSpec, type DesignBrief, type FactualSiteData } from '@/lib/agent/schemas';
-import { buildExtractProfilePrompt, buildGenerateSiteSpecPrompt } from '@/lib/agent/prompts';
+import { businessProfileSchema, type BusinessProfile, type FactualSiteData } from '@/lib/agent/schemas';
+import { buildExtractProfilePrompt } from '@/lib/agent/prompts';
 import { extractFactualSiteDataAgent } from '@/lib/agent/extractFactualSiteDataAgent';
-import { validateContentFidelity } from '@/lib/agent/validateContentFidelity';
-import { generateDesignBriefAgent, getDefaultDesignBrief } from '@/lib/agent/generateDesignBriefAgent';
-import { generateWebsiteFiles } from '@/lib/builder/generateWebsiteFiles';
+import { proposeWebsitePlanFromCrawlAgent } from '@/lib/agent/proposeWebsitePlanFromCrawlAgent';
+import { validateClonePlanWarnings } from '@/lib/agent/validateClonePlanWarnings';
+import { buildWebsiteFromPlan } from '@/lib/agent/buildWebsiteFromPlan';
+import { resolveCloneIntake } from '@/lib/clone/resolveCloneIntake';
+import { buildCloneCrawlPromptInput, buildCrawlSummaryForPlan } from '@/lib/clone/buildCloneCrawlPromptInput';
 import { validateGeneratedFiles } from '@/lib/builder/validateGeneratedFiles';
-import { validateGeneratedSite } from '@/lib/builder/validateGeneratedSite';
 import { selectTemplateAgent } from '@/lib/agent/selectTemplateAgent';
 import { createGitLabProject } from '@/lib/gitlab/createProject';
 import { commitFilesToGitLab } from '@/lib/gitlab/commitFiles';
 import { createVercelProject } from '@/lib/vercel/createVercelProject';
-import type { BusinessSignals } from '@/lib/crawler/types';
+import type { CrawledSite } from '@/lib/crawler/types';
 import { createProjectRun, logProjectStep, withProjectStep, safeError } from '@/lib/project-logs/projectLogger';
 import mongoose from 'mongoose';
 
 export const runtime = 'nodejs';
-
-const MAX_TOTAL_TEXT_LENGTH = 12000;
 
 interface StageLog {
   stage: string;
@@ -42,79 +41,14 @@ function logStage(stage: string, duration_ms?: number): StageLog {
   return entry;
 }
 
-function buildLimitedPromptInput(crawlResult: Awaited<ReturnType<typeof crawlWebsite>>): {
-  pageTitles: string[];
-  pageTexts: string[];
-  totalLength: number;
-  warning?: string;
-} {
-  const { pages, globalSignals, siteSummary } = crawlResult;
-
-  const pageEntries: { url: string; title: string; headings: string[]; text: string; signals: BusinessSignals }[] = pages.map(page => ({
-    url: page.url,
-    title: page.title,
-    headings: [...page.h1, ...page.h2, ...page.h3].filter(Boolean),
-    text: page.visibleText,
-    signals: page.businessSignals,
-  }));
-
-  const priorityKeywords = ['service', 'about', 'contact', 'pricing', 'menu', 'faq', 'team'];
-  const sorted = [...pageEntries].sort((a, b) => {
-    const aHigh = priorityKeywords.some(k => a.url.toLowerCase().includes(k));
-    const bHigh = priorityKeywords.some(k => b.url.toLowerCase().includes(k));
-    if (aHigh && !bHigh) return -1;
-    if (!aHigh && bHigh) return 1;
-    if (a.url === crawlResult.normalizedSourceUrl) return -1;
-    if (b.url === crawlResult.normalizedSourceUrl) return 1;
-    return 0;
-  });
-
-  const signalsSummary = [
-    `Site: ${crawlResult.normalizedSourceUrl}`,
-    `Domain: ${crawlResult.domain}`,
-    `Pages crawled: ${siteSummary.pageCount}`,
-    '',
-    `Business name candidates: ${globalSignals.businessNameCandidates.join(', ') || 'not detected'}`,
-    `Phone numbers found: ${globalSignals.phoneNumbers.join(', ') || 'not detected'}`,
-    `Emails found: ${globalSignals.emails.join(', ') || 'not detected'}`,
-    `Addresses found: ${globalSignals.addresses.length > 0 ? globalSignals.addresses.slice(0, 3).join(' | ') : 'not detected'}`,
-    `Social links: ${globalSignals.socialLinks.length > 0 ? globalSignals.socialLinks.slice(0, 5).join(', ') : 'none detected'}`,
-    `Booking links: ${globalSignals.bookingLinks.length > 0 ? globalSignals.bookingLinks.slice(0, 3).join(', ') : 'none detected'}`,
-    `Service keywords: ${globalSignals.serviceKeywords.slice(0, 15).join(', ') || 'not detected'}`,
-    `CTA phrases: ${globalSignals.ctaCandidates.slice(0, 10).join(', ') || 'not detected'}`,
-  ].join('\n');
-
-  const pageTexts: string[] = [];
-  const pageTitles: string[] = [];
-
-  for (const entry of sorted) {
-    const header = `[${entry.url}] ${entry.title || '(no title)'}`;
-    const headingStr = entry.headings.length > 0 ? `\nHeadings: ${entry.headings.join(' > ')}` : '';
-    const signalStr = entry.signals.phoneNumbers.length > 0 || entry.signals.emails.length > 0
-      ? `\nContact on this page: ${entry.signals.phoneNumbers.join(', ')} ${entry.signals.emails.join(', ')}`
-      : '';
-    const text = header + headingStr + signalStr + '\n\n' + entry.text.slice(0, 3000);
-    pageTexts.push(text);
-    pageTitles.push(entry.title || entry.url);
-  }
-
-  const combined = signalsSummary + '\n\n' + pageTexts.join('\n\n');
-  const totalLength = combined.length;
-
-  if (totalLength <= MAX_TOTAL_TEXT_LENGTH) {
-    return { pageTitles, pageTexts: [signalsSummary, ...pageTexts], totalLength };
-  }
-
-  const signalsLen = signalsSummary.length;
-  const remaining = MAX_TOTAL_TEXT_LENGTH - signalsLen - 100;
-  const perPageLimit = Math.floor(remaining / pageTexts.length);
-  const truncatedTexts = pageTexts.map(t => t.slice(0, perPageLimit));
-
+function buildLimitedPromptInput(crawlResult: CrawledSite) {
+  const input = buildCloneCrawlPromptInput(crawlResult);
   return {
-    pageTitles,
-    pageTexts: [signalsSummary, ...truncatedTexts],
-    totalLength: MAX_TOTAL_TEXT_LENGTH,
-    warning: `Crawler found limited content. (${totalLength} chars, truncated to ${MAX_TOTAL_TEXT_LENGTH})`,
+    pageTitles: input.pageTitles,
+    pageTexts: input.pageTexts,
+    totalLength: input.totalLength,
+    warning: input.warning,
+    signalsSummary: input.signalsSummary,
   };
 }
 
@@ -229,7 +163,13 @@ export async function POST(request: NextRequest) {
     try {
       const profileResult = await llmClient.generateJSON<BusinessProfile>({
         system: "You are a website migration analyst. Extract factual business information from crawled website text. Return only structured JSON matching the schema. If a field is missing, use an empty string or empty array. Do not invent phone/email/location if missing.",
-        prompt: buildExtractProfilePrompt(crawlResult.normalizedSourceUrl, limitedInput.pageTitles, limitedInput.pageTexts, instruction),
+        prompt: buildExtractProfilePrompt(
+          crawlResult.normalizedSourceUrl,
+          limitedInput.pageTitles,
+          limitedInput.pageTexts,
+          instruction,
+          limitedInput.signalsSummary
+        ),
         schema: businessProfileSchema,
       });
       businessProfile = profileResult.data;
@@ -247,103 +187,109 @@ export async function POST(request: NextRequest) {
     }
     stageLogs.push(logStage('business_profile_done', Date.now() - startTime));
 
-    stageLogs.push(logStage('site_spec_start'));
+    stageLogs.push(logStage('website_plan_start'));
 
-    let siteSpec: SiteSpec;
+    let websitePlan;
+    let planWarnings;
     try {
-      const specResult = await llmClient.generateJSON<SiteSpec>({
-        system: "You are a website modernization agent. You may improve structure, clarity, visual hierarchy, and CTA wording, but you MUST preserve factual accuracy. Use only factualData as source of truth. Return only JSON matching the schema.",
-        prompt: buildGenerateSiteSpecPrompt(
-          businessProfile as unknown as Record<string, unknown>,
-          factualData as unknown as Record<string, unknown>,
-          instruction
-        ),
-        schema: siteSpecSchema,
-      });
-      siteSpec = specResult.data;
-    } catch (error) {
-      stageLogs.push(logStage('site_spec_failed'));
-      return NextResponse.json({
-        ok: false,
-        error: `LLM site spec generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        stage: 'spec_generation_failed',
-        stageLogs,
-        duration_ms: Date.now() - startTime,
+      const planResult = await proposeWebsitePlanFromCrawlAgent({
+        factualSiteData: factualData,
         businessProfile,
-        factualData: factualData,
-        crawlerWarning: limitedInput.warning,
-        crawlWarnings: crawlResult.warnings,
-      }, { status: 500 });
-    }
-    stageLogs.push(logStage('site_spec_done', Date.now() - startTime));
-
-    stageLogs.push(logStage('content_fidelity_check_start'));
-    const fidelityResult = validateContentFidelity(siteSpec, factualData);
-    stageLogs.push(logStage('content_fidelity_check_done', Date.now() - startTime));
-
-    if (!fidelityResult.passed) {
-      stageLogs.push(logStage('content_fidelity_failed'));
+        crawlSummary: buildCrawlSummaryForPlan(crawlResult),
+        revisionInstruction: instruction,
+      });
+      websitePlan = planResult.data;
+      planWarnings = validateClonePlanWarnings(websitePlan, factualData);
+    } catch (error) {
+      stageLogs.push(logStage('website_plan_failed'));
       return NextResponse.json({
         ok: false,
-        error: `Content fidelity check failed: ${fidelityResult.issues.join('; ')}`,
-        stage: 'content_fidelity_failed',
+        error: `LLM website plan generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        stage: 'plan_generation_failed',
         stageLogs,
         duration_ms: Date.now() - startTime,
         businessProfile,
         factualData,
-        siteSpec,
-        contentFidelity: fidelityResult,
         crawlerWarning: limitedInput.warning,
         crawlWarnings: crawlResult.warnings,
       }, { status: 500 });
     }
+    stageLogs.push(logStage('website_plan_done', Date.now() - startTime));
 
-    stageLogs.push(logStage('design_brief_start'));
+    const fidelityResult = {
+      passed: true,
+      issues: [...planWarnings.warnings, ...planWarnings.suggestions],
+      criticalIssues: [] as string[],
+      warnIssues: planWarnings.warnings,
+      hasCriticalFailures: false,
+    };
+    stageLogs.push(logStage('clone_plan_warnings_done', Date.now() - startTime));
 
-    let designBrief: DesignBrief;
-    try {
-      designBrief = await generateDesignBriefAgent(
-        businessProfile as unknown as Record<string, unknown>,
-        siteSpec as unknown as Record<string, unknown>,
-        crawlResult.normalizedSourceUrl
-      );
-    } catch (error) {
-      stageLogs.push(logStage('design_brief_failed'));
-      designBrief = getDefaultDesignBrief(
-        businessProfile.industry.toLowerCase().includes('legal') ? 'legal' :
-        businessProfile.industry.toLowerCase().includes('health') ? 'healthcare' :
-        businessProfile.industry.toLowerCase().includes('restaurant') ? 'restaurant' :
-        businessProfile.industry.toLowerCase().includes('plumb') || businessProfile.industry.toLowerCase().includes('hvac') ? 'home-services' : 'general-service'
-      );
-      console.error(`[PROJECTS/CLONE] Design brief generation failed, using default: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-    stageLogs.push(logStage('design_brief_done', Date.now() - startTime));
-
+    const intake = resolveCloneIntake(factualData, businessProfile);
     const template = selectTemplateAgent(businessProfile);
-
     const name = projectName || businessProfile.businessName || 'generated-website';
-    const uniqueName = generateUniqueProjectName(name);
 
-    stageLogs.push(logStage('build_files_start'));
+    stageLogs.push(logStage('build_from_plan_start'));
 
+    let siteSpec;
     let generated;
+    let uniqueName;
+    let buildValidation: { ok: boolean; tempDir: string; logs: string; errors: string[]; durationMs: number } | null = null;
+
     try {
-      generated = generateWebsiteFiles(siteSpec, uniqueName, designBrief, template);
+      const planBuild = await buildWebsiteFromPlan({
+        websitePlan,
+        intake,
+        projectName: name,
+        categoryPresetId: template.category,
+        validateBuild,
+        factualSiteData: factualData,
+        logPrefix: 'LEGACY-CLONE',
+      });
+
+      if (!planBuild.ok || !planBuild.generated || !planBuild.siteSpec) {
+        stageLogs.push(logStage('build_from_plan_failed'));
+        return NextResponse.json({
+          ok: false,
+          error: planBuild.error || 'Build from plan failed',
+          stage: planBuild.stage || 'build_from_plan_failed',
+          stageLogs,
+          duration_ms: Date.now() - startTime,
+          businessProfile,
+          websitePlan,
+          contentFidelity: fidelityResult,
+          crawlerWarning: limitedInput.warning,
+          crawlWarnings: crawlResult.warnings,
+        }, { status: 500 });
+      }
+
+      siteSpec = planBuild.siteSpec;
+      generated = planBuild.generated;
+      uniqueName = planBuild.uniqueName || generateUniqueProjectName(name);
+      if (planBuild.generatedSiteValidation) {
+        buildValidation = {
+          ok: planBuild.generatedSiteValidation.ok,
+          tempDir: planBuild.generatedSiteValidation.tempDir,
+          logs: planBuild.generatedSiteValidation.logs,
+          errors: planBuild.generatedSiteValidation.errors,
+          durationMs: planBuild.generatedSiteValidation.durationMs,
+        };
+      }
     } catch (error) {
-      stageLogs.push(logStage('build_files_failed'));
+      stageLogs.push(logStage('build_from_plan_failed'));
       return NextResponse.json({
         ok: false,
-        error: `File generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        stage: 'build_files_failed',
+        error: `Build from plan failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        stage: 'build_from_plan_failed',
         stageLogs,
         duration_ms: Date.now() - startTime,
         businessProfile,
-        siteSpec,
+        websitePlan,
         crawlerWarning: limitedInput.warning,
         crawlWarnings: crawlResult.warnings,
       }, { status: 500 });
     }
-    stageLogs.push(logStage('build_files_done', Date.now() - startTime));
+    stageLogs.push(logStage('build_from_plan_done', Date.now() - startTime));
 
     stageLogs.push(logStage('validate_files_start'));
 
@@ -366,39 +312,22 @@ export async function POST(request: NextRequest) {
     }
     stageLogs.push(logStage('validate_files_done', Date.now() - startTime));
 
-    let buildValidation: { ok: boolean; tempDir: string; logs: string; errors: string[]; durationMs: number } | null = null;
-
+    if (validateBuild && buildValidation && !buildValidation.ok) {
+      stageLogs.push(logStage('build_gate_failed'));
+      return NextResponse.json({
+        ok: false,
+        error: `Generated site build validation failed: ${buildValidation.errors.join('; ')}`,
+        stage: 'generated_site_validation_failed',
+        stageLogs,
+        duration_ms: Date.now() - startTime,
+        businessProfile,
+        siteSpec,
+        generatedSiteValidation: buildValidation,
+        crawlerWarning: limitedInput.warning,
+        crawlWarnings: crawlResult.warnings,
+      }, { status: 500 });
+    }
     if (validateBuild) {
-      stageLogs.push(logStage('build_gate_start'));
-
-      const buildResult = await validateGeneratedSite({
-        files: generated.files,
-        projectName: uniqueName,
-      });
-
-      buildValidation = {
-        ok: buildResult.ok,
-        tempDir: buildResult.tempDir,
-        logs: buildResult.logs,
-        errors: buildResult.errors,
-        durationMs: buildResult.durationMs,
-      };
-
-      if (!buildResult.ok) {
-        stageLogs.push(logStage('build_gate_failed'));
-        return NextResponse.json({
-          ok: false,
-          error: `Generated site build validation failed: ${buildResult.errors.join('; ')}`,
-          stage: 'generated_site_validation_failed',
-          stageLogs,
-          duration_ms: Date.now() - startTime,
-          businessProfile,
-          siteSpec,
-          generatedSiteValidation: buildValidation,
-          crawlerWarning: limitedInput.warning,
-          crawlWarnings: crawlResult.warnings,
-        }, { status: 500 });
-      }
       stageLogs.push(logStage('build_gate_done', Date.now() - startTime));
     }
 
@@ -570,7 +499,7 @@ export async function POST(request: NextRequest) {
       businessProfile,
       factualData,
       siteSpec,
-      designBrief,
+      websitePlan,
       generatedSummary: generated.summary,
       contentFidelity: fidelityResult,
       generatedSiteValidation: buildValidation,

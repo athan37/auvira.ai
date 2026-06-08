@@ -1,11 +1,22 @@
 import { getLLMClient } from '@/lib/llm/llmClient';
-import { websitePlanSchema, type ScratchIntake, type WebsitePlan } from './schemas';
+import {
+  websitePlanSchema,
+  type BusinessProfile,
+  type FactualSiteData,
+  type ScratchIntake,
+  type WebsitePlan,
+} from './schemas';
 
 function buildReviseWebsitePlanPrompt(
   intake: ScratchIntake,
   currentPlan: WebsitePlan,
-  revisionInstruction: string
+  revisionInstruction: string,
+  crawlContext?: { factualSiteData?: FactualSiteData; businessProfile?: BusinessProfile }
 ): string {
+  const crawlBlock = crawlContext?.factualSiteData
+    ? `\nCRAWL GROUND TRUTH (do not invent beyond these facts):\n${JSON.stringify(crawlContext.factualSiteData, null, 2)}\n`
+    : '';
+
   return `You are a senior website strategist revising an existing website plan based on owner feedback.
 
 RULES:
@@ -25,7 +36,7 @@ ORIGINAL INTAKE:
 - Email: ${intake.email || 'Not provided'}
 - Notes: ${intake.notes || 'None'}
 - Desired Style: ${intake.desiredStyle || 'Not provided'}
-
+${crawlBlock}
 CURRENT PLAN (JSON):
 ${JSON.stringify(currentPlan, null, 2)}
 
@@ -35,11 +46,17 @@ ${revisionInstruction}
 Return ONLY valid JSON matching the website plan schema.`;
 }
 
-/** Revise an existing scratch WebsitePlan from natural-language owner feedback. */
+export interface ReviseWebsitePlanOptions {
+  factualSiteData?: FactualSiteData;
+  businessProfile?: BusinessProfile;
+}
+
+/** Revise an existing WebsitePlan from natural-language owner feedback. */
 export async function reviseWebsitePlanAgent(
   intake: ScratchIntake,
   currentPlan: WebsitePlan,
-  revisionInstruction: string
+  revisionInstruction: string,
+  crawlContext?: ReviseWebsitePlanOptions
 ): Promise<{ data: WebsitePlan; stageLogs: Array<{ stage: string; timestamp: string; duration_ms?: number }> }> {
   const startTime = Date.now();
   const stageLogs: Array<{ stage: string; timestamp: string; duration_ms?: number }> = [];
@@ -47,7 +64,7 @@ export async function reviseWebsitePlanAgent(
   stageLogs.push({ stage: 'plan_revision_start', timestamp: new Date().toISOString() });
 
   const llmClient = getLLMClient();
-  const prompt = buildReviseWebsitePlanPrompt(intake, currentPlan, revisionInstruction);
+  const prompt = buildReviseWebsitePlanPrompt(intake, currentPlan, revisionInstruction, crawlContext);
 
   const result = await llmClient.generateJSON({
     system:

@@ -96,10 +96,10 @@ export default function ReviewChecklistCard({
         )}
 
         {criticalFidelity.length > 0 && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-            <p className="text-xs font-semibold text-red-700">Critical content fidelity issues — build blocked:</p>
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+            <p className="text-xs font-semibold text-amber-800">Content review notes (does not block build):</p>
             {criticalFidelity.map((issue, i) => (
-              <p key={i} className="text-xs text-red-700">• {issue}</p>
+              <p key={i} className="text-xs text-amber-800">• {issue}</p>
             ))}
           </div>
         )}
@@ -121,7 +121,7 @@ export default function ReviewChecklistCard({
 
         {contentFidelity?.passed && contentFidelity.issues.length > 0 && warnFidelity.length > 0 && (
           <div className="flex items-center gap-2">
-            <Badge tone="success">No critical fidelity issues — you may build with warnings above</Badge>
+            <Badge tone="success">You may build — review warnings above before deploying</Badge>
           </div>
         )}
 

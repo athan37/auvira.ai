@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api/projectAccess';
 import { CloneJob } from '@/lib/db/models/CloneJob';
-import { getLLMClient } from '@/lib/llm/llmClient';
-import { buildGenerateSiteSpecPrompt } from '@/lib/agent/prompts';
-import { generateDesignBriefAgent, getDefaultDesignBrief } from '@/lib/agent/generateDesignBriefAgent';
+import { reviseWebsitePlanAgent } from '@/lib/agent/reviseWebsitePlanAgent';
+import { validateClonePlanWarnings } from '@/lib/agent/validateClonePlanWarnings';
+import type { BusinessProfile, FactualSiteData, WebsitePlan } from '@/lib/agent/schemas';
+import { resolveCloneIntake } from '@/lib/clone/resolveCloneIntake';
+import { normalizeProposedPlan } from '@/lib/clone/normalizeProposedPlan';
+import { applyScratchTemplateSelectionToPlan } from '@/lib/scratch/applyScratchTemplateSelectionToPlan';
 import { selectTemplateAgent } from '@/lib/agent/selectTemplateAgent';
-import { validateContentFidelity } from '@/lib/agent/validateContentFidelity';
-import type { FactualSiteData } from '@/lib/agent/schemas';
 import {
   countCloneObservabilityTurns,
   recordCloneObservabilityTurn,
@@ -57,56 +58,39 @@ export async function POST(
     return NextResponse.json({ ok: false, error: 'No revision instruction provided' }, { status: 400 });
   }
 
-  const llmClient = getLLMClient();
-
   try {
-    // Build an extended prompt that includes the original spec + revision instruction
-    const specResult = await llmClient.generateJSON<any>({
-      system: "You are a website modernization agent. You may improve structure, clarity, visual hierarchy, and CTA wording based on the revision instruction, but you MUST preserve factual accuracy. Use only factualData as source of truth. Return only JSON matching the schema.",
-      prompt: buildGenerateSiteSpecPrompt(
-        job.businessProfile as Record<string, unknown>,
-        job.factualSiteData as Record<string, unknown>,
-        revisionInstruction
-      ),
-      schema: {},
-    });
+    const factualSiteData = job.factualSiteData as FactualSiteData;
+    const businessProfile = job.businessProfile as BusinessProfile;
+    const intake = resolveCloneIntake(factualSiteData, businessProfile);
 
-    job.proposedWebsitePlan = specResult.data;
-
-    const fidelityResult = validateContentFidelity(
-      specResult.data,
-      job.factualSiteData as FactualSiteData
+    const currentPlan = normalizeProposedPlan(
+      job.proposedWebsitePlan,
+      factualSiteData.businessName || businessProfile.businessName,
+      factualSiteData.industry || businessProfile.industry
     );
-    job.contentFidelity = {
-      passed: fidelityResult.passed,
-      issues: fidelityResult.issues,
-      criticalIssues: fidelityResult.criticalIssues,
-      warnIssues: fidelityResult.warnIssues,
-      hasCriticalFailures: fidelityResult.hasCriticalFailures,
-    };
 
-    // Regenerate design brief based on revised spec
-    let designBrief;
-    try {
-      designBrief = await generateDesignBriefAgent(
-        job.businessProfile as Record<string, unknown>,
-        specResult.data as Record<string, unknown>,
-        job.sourceUrl
-      );
-    } catch {
-      const bp = job.businessProfile as any;
-      designBrief = getDefaultDesignBrief(
-        bp.industry?.toLowerCase().includes('legal') ? 'legal' :
-        bp.industry?.toLowerCase().includes('health') ? 'healthcare' :
-        bp.industry?.toLowerCase().includes('restaurant') ? 'restaurant' :
-        bp.industry?.toLowerCase().includes('plumb') || bp.industry?.toLowerCase().includes('hvac') ? 'home-services' : 'general-service'
-      );
+    if (!currentPlan) {
+      return NextResponse.json({ ok: false, error: 'No proposed plan to revise' }, { status: 400 });
     }
 
-    // Keep owner theme if they chose one; otherwise refresh AI suggestion
+    const reviseResult = await reviseWebsitePlanAgent(
+      intake,
+      currentPlan,
+      revisionInstruction,
+      { factualSiteData, businessProfile }
+    );
+
+    let websitePlan = reviseResult.data;
+
     const { isOwnerChosenTemplate } = await import('@/lib/builder/ownerTemplateSelection');
-    if (!isOwnerChosenTemplate(job.suggestedTemplate?.reason) || !job.suggestedTemplate?.variant) {
-      const template = selectTemplateAgent(job.businessProfile as any);
+    if (isOwnerChosenTemplate(job.suggestedTemplate?.reason) && job.suggestedTemplate?.variant) {
+      websitePlan = applyScratchTemplateSelectionToPlan(websitePlan, {
+        layoutStarterId: job.suggestedTemplate.layoutStarterId,
+        templateCategory: job.suggestedTemplate.category,
+        templateVariant: job.suggestedTemplate.variant,
+      });
+    } else {
+      const template = selectTemplateAgent(businessProfile);
       job.suggestedTemplate = {
         category: template.category,
         variant: template.variant,
@@ -114,6 +98,16 @@ export async function POST(
         layoutStarterId: job.suggestedTemplate?.layoutStarterId,
       };
     }
+
+    const planWarnings = validateClonePlanWarnings(websitePlan, factualSiteData);
+    job.proposedWebsitePlan = websitePlan as WebsitePlan;
+    job.contentFidelity = {
+      passed: true,
+      issues: [...planWarnings.warnings, ...planWarnings.suggestions],
+      criticalIssues: [],
+      warnIssues: planWarnings.warnings,
+      hasCriticalFailures: false,
+    };
 
     await CloneJob.updateOne(
       { _id: job._id },
@@ -142,14 +136,14 @@ export async function POST(
       turnId: `${job._id.toString()}-revise-${reviseCount}`,
       turnIndex: countCloneObservabilityTurns(job.logs) + 1,
       userMessage: revisionInstruction.trim(),
-      reply: fidelityResult.passed
-        ? 'Plan revised; content fidelity passed.'
-        : `Plan revised; fidelity issues: ${fidelityResult.criticalIssues.join(', ') || fidelityResult.issues.slice(0, 3).join('; ')}`,
-      outcome: fidelityResult.passed ? 'success' : 'failed',
-      verifyPass: fidelityResult.passed,
+      reply: planWarnings.warnings.length
+        ? `Plan revised; review warnings: ${planWarnings.warnings.slice(0, 3).join('; ')}`
+        : 'Plan revised.',
+      outcome: 'success',
+      verifyPass: true,
       siteConfigParsed: {
-        businessName: (job.businessProfile as { businessName?: string })?.businessName,
-        sections: (specResult.data as { sections?: Array<{ type?: string; title?: string }> })?.sections,
+        businessName: websitePlan.businessName,
+        sections: websitePlan.contentPlan?.sections,
       },
     });
 

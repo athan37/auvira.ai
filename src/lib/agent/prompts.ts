@@ -202,6 +202,63 @@ function detectIndustryTemplate(industry: string): string {
   return 'default';
 }
 
+import type { BusinessProfile, FactualSiteData } from './schemas';
+
+export function buildProposeWebsitePlanFromCrawlPrompt(input: {
+  factualSiteData: FactualSiteData;
+  businessProfile: BusinessProfile;
+  crawlSummary?: string;
+  revisionInstruction?: string;
+}): string {
+  const { factualSiteData, businessProfile, crawlSummary, revisionInstruction } = input;
+
+  return `You are a senior website strategist for small businesses. Create a practical website plan to modernize an existing site using ONLY crawled facts as ground truth.
+
+RULES:
+- Do not invent fake phone numbers, emails, addresses, testimonials, awards, certifications, years of experience, or guarantees.
+- Services/testimonials/contact must come from factualSiteData or businessProfile — never fabricate.
+- If contact info is missing from crawl, add it to "requiredMissingInfo" — do NOT fabricate it.
+- Include testimonials in contentPlan only when factualSiteData.testimonials has entries.
+- Only include services from practiceAreasOrServices or businessProfile.services.
+- Populate requiredMissingInfo / riskWarnings when crawl is thin or confidence is low.
+- You may improve positioning, section structure, and CTA wording.
+
+BUSINESS PROFILE (derived from crawl):
+${JSON.stringify(businessProfile, null, 2)}
+
+FACTUAL SITE DATA (ground truth from crawl — use this as source of truth):
+${JSON.stringify(factualSiteData, null, 2)}
+
+${crawlSummary ? `CRAWL SUMMARY:\n${crawlSummary}\n` : ''}
+${revisionInstruction ? `REVISION INSTRUCTION:\n${revisionInstruction}\n` : ''}
+
+OUTPUT:
+Return ONLY valid JSON matching the website plan schema:
+{
+  "businessName": string,
+  "industry": string,
+  "positioning": string,
+  "targetCustomers": string[],
+  "primaryGoal": string,
+  "recommendedPagesOrSections": [{ name, type, priority, purpose }],
+  "contentPlan": {
+    "hero": { headline, subheadline, primaryCTA, secondaryCTA },
+    "sections": [{ type, title, purpose, contentNotes }]
+  },
+  "requiredMissingInfo": string[],
+  "optionalMissingInfo": string[],
+  "suggestedTemplate": { category, variant, reason },
+  "riskWarnings": string[]
+}
+
+Map industry to BOTH category AND variant in suggestedTemplate:
+- law/attorney/legal → category: "legal", variant: "premium-professional"
+- medical/health/doctor/clinic → category: "healthcare", variant: "healthcare-calm"
+- cleaning/plumbing/hvac/roof/electric/contractor → category: "home-services", variant: "local-service-pro"
+- restaurant/food/café → category: "restaurant", variant: "restaurant-warm"
+- other → category: "general-service", variant: "modern-clean"`;
+}
+
 export function buildGenerateSiteSpecPrompt(
   businessProfile: Record<string, unknown>,
   factualSiteData: Record<string, unknown>,

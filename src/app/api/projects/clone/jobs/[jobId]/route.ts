@@ -34,7 +34,9 @@ function computeExtractedFactsSummary(factualSiteData: any, businessProfile: any
   };
 }
 
-function computeReviewChecklist(extractedFacts: ReturnType<typeof computeExtractedFactsSummary>, proposedWebsitePlan: any) {
+import { isWebsitePlanShape } from '@/lib/clone/normalizeProposedPlan';
+
+function computeReviewChecklist(extractedFacts: ReturnType<typeof computeExtractedFactsSummary>, proposedWebsitePlan: unknown) {
   const requiredWarnings: string[] = [];
   const optionalWarnings: string[] = [];
 
@@ -49,8 +51,21 @@ function computeReviewChecklist(extractedFacts: ReturnType<typeof computeExtract
     optionalWarnings.push('No services found on crawled pages.');
   }
 
-  const plan = proposedWebsitePlan as any;
-  if (plan && plan.sections?.length === 0) {
+  let sectionCount = 0;
+  if (proposedWebsitePlan && typeof proposedWebsitePlan === 'object') {
+    const plan = proposedWebsitePlan as Record<string, unknown>;
+    if (isWebsitePlanShape(plan)) {
+      sectionCount = (plan.contentPlan as { sections?: unknown[] })?.sections?.length ?? 0;
+      const missing = plan.requiredMissingInfo as string[] | undefined;
+      if (missing?.length) {
+        optionalWarnings.push(...missing.map((m) => `Plan notes missing: ${m}`));
+      }
+    } else {
+      sectionCount = (plan.sections as unknown[] | undefined)?.length ?? 0;
+    }
+  }
+
+  if (sectionCount === 0) {
     optionalWarnings.push('Proposed website has no sections.');
   }
 
@@ -58,7 +73,7 @@ function computeReviewChecklist(extractedFacts: ReturnType<typeof computeExtract
     businessNameFound: !!extractedFacts?.businessName,
     contactInfoFound: !!(extractedFacts?.phone || extractedFacts?.email),
     servicesFound: !!(extractedFacts?.services && extractedFacts.services.length > 0),
-    sectionsFound: !!(plan && plan.sections?.length > 0),
+    sectionsFound: sectionCount > 0,
     requiredWarnings,
     optionalWarnings,
   };

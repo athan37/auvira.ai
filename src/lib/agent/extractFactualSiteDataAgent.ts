@@ -1,6 +1,8 @@
 import { getLLMClient } from '@/lib/llm/llmClient';
 import { factualSiteDataSchema, type FactualSiteData } from './schemas';
 import type { CrawledSite } from '@/lib/crawler/types';
+import { buildCloneCrawlPromptInput } from '@/lib/clone/buildCloneCrawlPromptInput';
+import { getCloneCrawlPromptLimits } from '@/lib/clone/crawlPromptLimits';
 
 interface StageLog {
   stage: string;
@@ -64,42 +66,10 @@ export async function extractFactualSiteDataAgent(
 
   logStage(stageLogs, 'factual_extraction_start');
 
-  // Build limited prompt input
-  const pageTitles: string[] = [];
-  const pageTexts: string[] = [];
-
-  // Sort pages: homepage first, then service/contact/about pages
-  const priorityKeywords = ['service', 'about', 'contact', 'pricing', 'menu', 'faq', 'team', 'attorney', 'lawyer'];
-  const sorted = [...crawlResult.pages].sort((a, b) => {
-    const aHigh = priorityKeywords.some(k => a.url.toLowerCase().includes(k));
-    const bHigh = priorityKeywords.some(k => b.url.toLowerCase().includes(k));
-    if (aHigh && !bHigh) return -1;
-    if (!aHigh && bHigh) return 1;
-    if (a.url === crawlResult.normalizedSourceUrl) return -1;
-    if (b.url === crawlResult.normalizedSourceUrl) return 1;
-    return 0;
-  });
-
-  // Limit total content
-  const MAX_TOTAL_CHARS = 15000;
-  let totalLength = 0;
-
-  for (const page of sorted) {
-    const headings = [...page.h1, ...page.h2, ...page.h3].filter(Boolean);
-    const text = page.visibleText.slice(0, 2000); // Limit per page
-    const header = `[${page.url}] ${page.title || '(no title)'}`;
-    const headingStr = headings.length > 0 ? `\nHeadings: ${headings.join(' > ')}` : '';
-    const signalStr = page.businessSignals.phoneNumbers.length > 0 || page.businessSignals.emails.length > 0
-      ? `\nContact: ${page.businessSignals.phoneNumbers.join(', ')} ${page.businessSignals.emails.join(', ')}`
-      : '';
-
-    const pageContent = header + headingStr + signalStr + '\n\n' + text;
-    pageTitles.push(page.title || page.url);
-    pageTexts.push(pageContent);
-    totalLength += pageContent.length;
-
-    if (totalLength > MAX_TOTAL_CHARS) break;
-  }
+  const limits = getCloneCrawlPromptLimits();
+  const promptInput = buildCloneCrawlPromptInput(crawlResult, limits.maxFactualChars);
+  const pageTitles = promptInput.pageTitles;
+  const pageTexts = promptInput.pageTexts;
 
   logStage(stageLogs, 'factual_extraction_prompt_built', Date.now() - startTime);
 

@@ -3,7 +3,8 @@
 import { useSession } from 'next-auth/react';
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState, useCallback } from 'react';
-import { hasCriticalFidelityFailures } from '@/lib/agent/validateContentFidelity';
+import { websitePlanToReviewCard } from '@/lib/clone/planReviewAdapter';
+import { isWebsitePlanShape } from '@/lib/clone/normalizeProposedPlan';
 import ExtractedFactsCard from '@/components/clone/ExtractedFactsCard';
 import CrawlProgressCard from '@/components/clone/CrawlProgressCard';
 import ProposedPlanCard from '@/components/clone/ProposedPlanCard';
@@ -531,7 +532,11 @@ export default function CloneJobPage() {
             {/* Proposed plan */}
             {job.proposedWebsitePlan && (
               <ProposedPlanCard
-                plan={job.proposedWebsitePlan}
+                plan={
+                  isWebsitePlanShape(job.proposedWebsitePlan)
+                    ? websitePlanToReviewCard(job.proposedWebsitePlan)
+                    : job.proposedWebsitePlan
+                }
                 suggestedTemplate={job.suggestedTemplate}
               />
             )}
@@ -572,12 +577,6 @@ export default function CloneJobPage() {
               const blocking: string[] = [];
               if (!checklist.businessNameFound) {
                 blocking.push('Business name not found. Without it we cannot generate an accurate site.');
-              }
-              const hasCriticalFidelity = job.contentFidelity
-                ? hasCriticalFidelityFailures(job.contentFidelity)
-                : false;
-              if (hasCriticalFidelity) {
-                blocking.push('Critical content fidelity issues must be resolved before building preview.');
               }
               const hasBlocking = blocking.length > 0;
               const hasWarnings = checklist.requiredWarnings.length > 0 || checklist.optionalWarnings.length > 0;
@@ -654,9 +653,7 @@ export default function CloneJobPage() {
 
             {/* Review ready — approval buttons */}
             {isReviewReady && job.reviewChecklist && (() => {
-              const hasBlocking =
-                !job.reviewChecklist.businessNameFound ||
-                (job.contentFidelity ? hasCriticalFidelityFailures(job.contentFidelity) : false);
+              const hasBlocking = !job.reviewChecklist.businessNameFound;
               return (
               <div className={cn('bg-white rounded-2xl border overflow-hidden', BORDER.hairline)}>
                 <div className="px-4 py-3 border-t-4 border-rose-500">

@@ -2,6 +2,7 @@ import { normalizeUrl, isSameDomain, isInternalPath } from './normalizeUrl';
 import { extractPageMetadata, scoreLink } from './extractMetadata';
 import type { CrawledSite, CrawledPage, CrawlOptions, GlobalSignals } from './types';
 import type { Browser } from 'puppeteer';
+import { getCloneCrawlPromptLimits } from '@/lib/clone/crawlPromptLimits';
 
 export type CrawlProgressEvent =
   | { type: 'page_discovered'; url: string }
@@ -10,13 +11,18 @@ export type CrawlProgressEvent =
   | { type: 'page_failed'; url: string; error: string }
   | { type: 'stage'; stage: string; message: string };
 
-const DEFAULT_OPTIONS: CrawlOptions = {
-  maxPages: 10,
-  maxConcurrency: 3,
-  timeoutMs: 10000,
-  maxCharsPerPage: 8000,
-  deepFetch: true,
-};
+function defaultCrawlOptions(): CrawlOptions {
+  const limits = getCloneCrawlPromptLimits();
+  return {
+    maxPages: limits.maxPages,
+    maxConcurrency: 3,
+    timeoutMs: 10000,
+    maxCharsPerPage: limits.maxCharsPerPage,
+    deepFetch: true,
+  };
+}
+
+const DEFAULT_OPTIONS: CrawlOptions = defaultCrawlOptions();
 
 const SOCIAL_DOMAINS = [
   'facebook.com', 'instagram.com', 'linkedin.com', 'x.com',

@@ -3,12 +3,14 @@ import { requireAuth } from '@/lib/api/projectAccess';
 import { CloneJob, type ICrawlPage } from '@/lib/db/models/CloneJob';
 import { crawlWebsite, type CrawlProgressEvent } from '@/lib/crawler/crawlWebsite';
 import { getLLMClient } from '@/lib/llm/llmClient';
-import { businessProfileSchema, siteSpecSchema, type BusinessProfile, type SiteSpec, type FactualSiteData } from '@/lib/agent/schemas';
-import { buildExtractProfilePrompt, extractBusinessProfilePrompt, buildGenerateSiteSpecPrompt } from '@/lib/agent/prompts';
+import { businessProfileSchema, type BusinessProfile, type FactualSiteData } from '@/lib/agent/schemas';
+import { buildExtractProfilePrompt, extractBusinessProfilePrompt } from '@/lib/agent/prompts';
 import { extractFactualSiteDataAgent } from '@/lib/agent/extractFactualSiteDataAgent';
-import { validateContentFidelity } from '@/lib/agent/validateContentFidelity';
-import { generateDesignBriefAgent, getDefaultDesignBrief } from '@/lib/agent/generateDesignBriefAgent';
+import { proposeWebsitePlanFromCrawlAgent } from '@/lib/agent/proposeWebsitePlanFromCrawlAgent';
+import { validateClonePlanWarnings } from '@/lib/agent/validateClonePlanWarnings';
 import { selectTemplateAgent } from '@/lib/agent/selectTemplateAgent';
+import { buildCloneCrawlPromptInput, buildCrawlSummaryForPlan } from '@/lib/clone/buildCloneCrawlPromptInput';
+import { applyScratchTemplateSelectionToPlan } from '@/lib/scratch/applyScratchTemplateSelectionToPlan';
 import {
   countCloneObservabilityTurns,
   recordCloneObservabilityTurn,
@@ -44,13 +46,11 @@ export async function POST(
     );
   }
 
-  // If already past queued, just return current state
   if (job.status !== 'queued') {
     return NextResponse.json({ ok: true, jobId: job._id.toString(), status: job.status, currentStageLabel: job.currentStageLabel, progressPercent: job.progressPercent });
   }
 
   try {
-    // ── PHASE 1: CRAWLING ──────────────────────────────────────────────
     job.status = 'crawling';
     job.currentStageLabel = 'Crawling website pages...';
     job.progressPercent = 5;
@@ -102,7 +102,6 @@ export async function POST(
     );
   }
 
-  // Update progress periodically
   const crawlPages = await CloneJob.findById(job._id).select('crawlPages');
   const done = crawlPages?.crawlPages.filter((p: ICrawlPage) => p.status === 'done').length ?? 0;
   const progressPercent = Math.min(45, 5 + done * 4);
@@ -117,7 +116,6 @@ export async function POST(
     job.progressPercent = 45;
     await job.save();
 
-    // ── PHASE 2: EXTRACTION ────────────────────────────────────────────
     job.status = 'extracting';
     job.currentStageLabel = 'Extracting business facts...';
     await job.save();
@@ -128,8 +126,7 @@ export async function POST(
     job.factualSiteData = factualResult.data as any;
     log(job, 'extracting', 'Factual data extracted');
 
-    // Build limited prompt input for profile extraction
-    const limitedInput = buildLimitedPromptInput(crawlResult);
+    const limitedInput = buildCloneCrawlPromptInput(crawlResult);
     const llmClient = getLLMClient();
 
     log(job, 'extracting', 'Starting business profile extraction');
@@ -147,43 +144,43 @@ export async function POST(
     job.businessProfile = profileResult.data as any;
     log(job, 'extracting', 'Business profile extracted');
 
-    // ── PHASE 3: PLANNING ──────────────────────────────────────────────
     job.status = 'planning';
     job.currentStageLabel = 'Preparing proposed website plan...';
     job.progressPercent = 65;
     await job.save();
 
-    log(job, 'planning', 'Generating proposed website plan');
+    log(job, 'planning', 'Generating proposed website plan from crawl');
 
-    const specResult = await llmClient.generateJSON<SiteSpec>({
-      system: "You are a website modernization agent. You may improve structure, clarity, visual hierarchy, and CTA wording, but you MUST preserve factual accuracy. Use only factualData as source of truth. Return only JSON matching the schema.",
-      prompt: buildGenerateSiteSpecPrompt(
-        job.businessProfile as Record<string, unknown>,
-        job.factualSiteData as Record<string, unknown>,
-        ''
-      ),
-      schema: siteSpecSchema,
+    const crawlSummary = buildCrawlSummaryForPlan(crawlResult);
+    const planResult = await proposeWebsitePlanFromCrawlAgent({
+      factualSiteData: job.factualSiteData as FactualSiteData,
+      businessProfile: job.businessProfile as BusinessProfile,
+      crawlSummary,
     });
-    const proposedSiteSpec = specResult.data;
-    job.proposedWebsitePlan = proposedSiteSpec as any;
-    log(job, 'planning', 'Proposed site spec generated');
 
-    // Content fidelity check
-    const fidelityResult = validateContentFidelity(proposedSiteSpec, job.factualSiteData as FactualSiteData);
+    let websitePlan = planResult.data;
+    const planWarnings = validateClonePlanWarnings(websitePlan, job.factualSiteData as FactualSiteData);
+    job.proposedWebsitePlan = websitePlan as any;
+    log(job, 'planning', `Proposed website plan generated (${planWarnings.warnings.length} review warnings)`);
+
     job.contentFidelity = {
-      passed: fidelityResult.passed,
-      issues: fidelityResult.issues,
-      criticalIssues: fidelityResult.criticalIssues,
-      warnIssues: fidelityResult.warnIssues,
-      hasCriticalFailures: fidelityResult.hasCriticalFailures,
+      passed: true,
+      issues: [...planWarnings.warnings, ...planWarnings.suggestions],
+      criticalIssues: [],
+      warnIssues: planWarnings.warnings,
+      hasCriticalFailures: false,
     };
-    log(job, 'planning', `Content fidelity: ${fidelityResult.passed ? 'passed' : 'critical issues: ' + fidelityResult.criticalIssues.join(', ')}`);
 
-    // Template: keep owner color/layout from clone start or review; otherwise AI suggestion
     const { isOwnerChosenTemplate } = await import('@/lib/builder/ownerTemplateSelection');
     const ownerLayoutStarterId = job.suggestedTemplate?.layoutStarterId;
     if (isOwnerChosenTemplate(job.suggestedTemplate?.reason) && job.suggestedTemplate?.variant) {
       log(job, 'planning', `Using owner theme: ${job.suggestedTemplate.category} / ${job.suggestedTemplate.variant}`);
+      websitePlan = applyScratchTemplateSelectionToPlan(websitePlan, {
+        layoutStarterId: ownerLayoutStarterId,
+        templateCategory: job.suggestedTemplate.category,
+        templateVariant: job.suggestedTemplate.variant,
+      });
+      job.proposedWebsitePlan = websitePlan as any;
       if (ownerLayoutStarterId) {
         job.suggestedTemplate = {
           ...job.suggestedTemplate,
@@ -213,22 +210,22 @@ export async function POST(
       turnId: `${job._id.toString()}-process`,
       turnIndex: countCloneObservabilityTurns(job.logs) + 1,
       userMessage: `Generate site plan from ${job.sourceUrl}`,
-      reply: fidelityResult.passed
-        ? 'Proposed site plan generated; content fidelity passed.'
-        : `Proposed site plan generated; fidelity issues: ${fidelityResult.criticalIssues.join(', ') || fidelityResult.issues.slice(0, 3).join('; ')}`,
-      outcome: fidelityResult.passed ? 'success' : 'failed',
-      verifyPass: fidelityResult.passed,
+      reply: planWarnings.warnings.length
+        ? `Proposed website plan generated; review warnings: ${planWarnings.warnings.slice(0, 3).join('; ')}`
+        : 'Proposed website plan generated.',
+      outcome: 'success',
+      verifyPass: true,
       siteConfigParsed: {
-        businessName: (job.businessProfile as { businessName?: string })?.businessName,
-        sections: (proposedSiteSpec as { sections?: Array<{ type?: string; title?: string }> })?.sections,
+        businessName: websitePlan.businessName,
+        sections: websitePlan.contentPlan?.sections,
       },
       phaseEvents: [
-        { name: 'site_spec_llm', durationMs: 0, outcome: 'success' },
+        { name: 'website_plan_llm', durationMs: 0, outcome: 'success' },
         {
-          name: 'content_fidelity',
+          name: 'clone_plan_warnings',
           durationMs: 0,
-          outcome: fidelityResult.passed ? 'passed' : 'failed',
-          metadata: { criticalCount: fidelityResult.criticalIssues.length },
+          outcome: 'passed',
+          metadata: { warningCount: planWarnings.warnings.length },
         },
       ],
     });
@@ -263,82 +260,4 @@ export async function POST(
       stage: 'job_failed',
     }, { status: 500 });
   }
-}
-
-function buildLimitedPromptInput(crawlResult: any): {
-  pageTitles: string[];
-  pageTexts: string[];
-  totalLength: number;
-  warning?: string;
-  signalsSummary: string;
-} {
-  const MAX_TOTAL_TEXT_LENGTH = 12000;
-  const { pages, globalSignals, siteSummary } = crawlResult;
-
-  const pageEntries = pages.map((page: any) => ({
-    url: page.url,
-    title: page.title,
-    headings: [...(page.h1 || []), ...(page.h2 || []), ...(page.h3 || [])].filter(Boolean),
-    text: page.visibleText,
-    signals: page.businessSignals,
-  }));
-
-  const priorityKeywords = ['service', 'about', 'contact', 'pricing', 'menu', 'faq', 'team'];
-  const sorted = [...pageEntries].sort((a: any, b: any) => {
-    const aHigh = priorityKeywords.some((k: string) => a.url.toLowerCase().includes(k));
-    const bHigh = priorityKeywords.some((k: string) => b.url.toLowerCase().includes(k));
-    if (aHigh && !bHigh) return -1;
-    if (!aHigh && bHigh) return 1;
-    if (a.url === crawlResult.normalizedSourceUrl) return -1;
-    if (b.url === crawlResult.normalizedSourceUrl) return 1;
-    return 0;
-  });
-
-  const signalsSummary = [
-    `Site: ${crawlResult.normalizedSourceUrl}`,
-    `Domain: ${crawlResult.domain}`,
-    `Pages crawled: ${siteSummary.pageCount}`,
-    '',
-    `Business name candidates: ${globalSignals.businessNameCandidates.join(', ') || 'not detected'}`,
-    `Phone numbers found: ${globalSignals.phoneNumbers.join(', ') || 'not detected'}`,
-    `Emails found: ${globalSignals.emails.join(', ') || 'not detected'}`,
-    `Addresses found: ${globalSignals.addresses.length > 0 ? globalSignals.addresses.slice(0, 3).join(' | ') : 'not detected'}`,
-    `Social links: ${globalSignals.socialLinks.length > 0 ? globalSignals.socialLinks.slice(0, 5).join(', ') : 'none detected'}`,
-    `Service keywords: ${globalSignals.serviceKeywords.slice(0, 15).join(', ') || 'not detected'}`,
-    `CTA phrases: ${globalSignals.ctaCandidates.slice(0, 10).join(', ') || 'not detected'}`,
-  ].join('\n');
-
-  const pageTexts: string[] = [];
-  const pageTitles: string[] = [];
-
-  for (const entry of sorted) {
-    const header = `[${entry.url}] ${entry.title || '(no title)'}`;
-    const headingStr = entry.headings.length > 0 ? `\nHeadings: ${entry.headings.join(' > ')}` : '';
-    const signalStr = entry.signals.phoneNumbers.length > 0 || entry.signals.emails.length > 0
-      ? `\nContact on this page: ${entry.signals.phoneNumbers.join(', ')} ${entry.signals.emails.join(', ')}`
-      : '';
-    const text = header + headingStr + signalStr + '\n\n' + entry.text.slice(0, 3000);
-    pageTexts.push(text);
-    pageTitles.push(entry.title || entry.url);
-  }
-
-  const combined = signalsSummary + '\n\n' + pageTexts.join('\n\n');
-  const totalLength = combined.length;
-
-  if (totalLength <= MAX_TOTAL_TEXT_LENGTH) {
-    return { pageTitles, pageTexts: [signalsSummary, ...pageTexts], totalLength, signalsSummary };
-  }
-
-  const signalsLen = signalsSummary.length;
-  const remaining = MAX_TOTAL_TEXT_LENGTH - signalsLen - 100;
-  const perPageLimit = Math.floor(remaining / pageTexts.length);
-  const truncatedTexts = pageTexts.map((t: string) => t.slice(0, perPageLimit));
-
-  return {
-    pageTitles,
-    pageTexts: [signalsSummary, ...truncatedTexts],
-    totalLength: MAX_TOTAL_TEXT_LENGTH,
-    warning: `Content truncated to ${MAX_TOTAL_TEXT_LENGTH} chars`,
-    signalsSummary,
-  };
 }
