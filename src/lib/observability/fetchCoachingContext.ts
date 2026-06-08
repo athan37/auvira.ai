@@ -8,7 +8,8 @@ function asStringArray(value: unknown): string[] {
   return value.filter((item): item is string => typeof item === 'string');
 }
 
-function parseCoachingContext(raw: Record<string, unknown>): ObservabilityCoachingContext {
+/** Parse Site Monitor GET /context payload into typed coaching context. */
+export function parseCoachingContext(raw: Record<string, unknown>): ObservabilityCoachingContext {
   return {
     coachingHints: asStringArray(raw.coaching_hints),
     constraints:

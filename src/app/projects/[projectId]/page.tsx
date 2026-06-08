@@ -20,6 +20,7 @@ import { Toast } from '@/components/ui/Toast';
 import { ACCENT, SURFACE, TEXT } from '@/content/productTheme';
 import { projectSupportsV3Edits } from '@/lib/project-workspace/requireGitLabProject';
 import { SectionDragGhost } from '@/components/project/SectionDragGhost';
+import { ProjectWorkspaceTabs } from '@/components/project/ProjectWorkspaceTabs';
 import { formatPreviewTargetLabel } from '@/lib/preview/previewTargetChipLabels';
 import {
   selectedSectionFromPayload,
@@ -524,6 +525,9 @@ export default function ProjectPage() {
         </div>
       }
     >
+      <div className="px-3 lg:px-4 pt-3">
+        <ProjectWorkspaceTabs projectId={projectId} />
+      </div>
       {scratchWarning && (
         <div className="px-3 lg:px-4 pt-3">
           <Alert variant="warning">{scratchWarning}</Alert>

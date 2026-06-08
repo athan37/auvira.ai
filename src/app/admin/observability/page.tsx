@@ -115,7 +115,7 @@ export default function AdminObservabilityPage() {
                     <tr key={`${row.projectId}-${row.messageAt}`} className="border-t border-neutral-100">
                       <td className="px-3 py-2 font-mono text-xs">
                         <Link
-                          href={`/projects/${row.projectId}`}
+                          href={`/projects/${row.projectId}/observability`}
                           className="text-blue-600 hover:underline"
                         >
                           {row.projectId.slice(-8)}

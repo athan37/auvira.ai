@@ -96,12 +96,33 @@ Filter spans named `builder.turn` in [Phoenix Cloud](https://app.phoenix.arize.c
 ## Admin / debug UI
 
 - **Chat:** assistant messages show an **N hints applied** badge when hints were injected into the planner; click the badge to open a panel with each hint (click outside or press Escape to close). Set `NEXT_PUBLIC_OBSERVABILITY_DEBUG=1` for grade badges and Phoenix trace links ([`ObservabilityTraceChip`](../src/components/project/ObservabilityTraceChip.tsx)).
-- **Admin page:** [`/admin/observability`](../src/app/admin/observability/page.tsx) — recent turn scores via `GET /api/admin/observability`.
+- **Admin page:** [`/admin/observability`](../src/app/admin/observability/page.tsx) — recent turn scores across all projects via `GET /api/admin/observability`.
+- **Per-project page:** [`/projects/{projectId}/observability`](../src/app/projects/[projectId]/observability/page.tsx) — project owners see live Site Monitor `GET /context` (coaching hints, recurring issues, quality snapshot) plus turn history from chat metadata.
+
+### Per-project API
+
+```
+GET /api/projects/{projectId}/observability?days=7&probeMessage=optional
+```
+
+Auth: project owner only (`getOwnerProject`). Response:
+
+| Field | Description |
+|-------|-------------|
+| `summary` | Synced/failed counts, avg score, grade/outcome counts, coaching applied |
+| `turns[]` | Per-assistant-turn rows (grade, hints, changed files, trace id) |
+| `liveContext.raw` | Raw Site Monitor context payload |
+| `liveContext.parsed` | Typed coaching hints, constraints, quality snapshot |
+| `monitorEnabled` | False when `OBSERVABILITY_ENABLED=0` or no API key — Mongo history still loads |
+
+Optional `probeMessage` re-fetches context with `latest_user_message` (same as curl probe). Never exposes `OBSERVABILITY_API_KEY` to the client.
 
 ## Code entry points
 
 | Path | Role |
 |------|------|
+| [`src/lib/metrics/aggregateObservabilityMetrics.ts`](../src/lib/metrics/aggregateObservabilityMetrics.ts) | Admin + per-project turn aggregation |
+| [`src/app/api/projects/[projectId]/observability/route.ts`](../src/app/api/projects/[projectId]/observability/route.ts) | Per-project observability API |
 | [`src/lib/observability/`](../src/lib/observability/) | Client, redaction, turn recording, builder_type normalization |
 | [`src/lib/observability/recordCloneTurn.ts`](../src/lib/observability/recordCloneTurn.ts) | Clone wizard turn recording |
 | [`src/app/api/projects/[projectId]/code-agent/edit/stream/route.ts`](../src/app/api/projects/[projectId]/code-agent/edit/stream/route.ts) | Editor hooks + agent sub-span payload |
