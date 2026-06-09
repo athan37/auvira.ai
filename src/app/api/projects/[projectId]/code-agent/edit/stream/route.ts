@@ -66,14 +66,19 @@ import { ProjectEditJob } from '@/models/ProjectEditJob';
 import {
   ensureObservabilityRegistration,
   fetchCoachingContext,
+  fetchObservabilityIntent,
   isObservabilityCoachingEnabled,
   isObservabilityEnabled,
   loadSiteConfigForObservability,
   recordEditTurn,
 } from '@/lib/observability';
+import { enrichObservabilityMetadataForChat } from '@/lib/observability/formatEditContextSummary';
+import type { ImplicitReferenceRecord } from '@/lib/project-workspace/edit-context/implicitReferenceTypes';
+import type { ProjectMessageObservabilityMetadata } from '@/lib/chat/projectMessageMetadata';
 import type {
   ObservabilityCoachingContext,
   ObservabilityEditOutcome,
+  ObservabilityProjectIntent,
   ObservabilityTurnMetadata,
 } from '@/lib/observability/types';
 import { promises as fs } from 'fs';
@@ -212,6 +217,7 @@ export async function POST(
       const editTimer = new EditStepTimer();
       let conversationHistory: { role: 'user' | 'assistant'; content: string }[] = [];
       let coachingContext: ObservabilityCoachingContext | null = null;
+      let projectIntent: ObservabilityProjectIntent | null = null;
       let turnIndex = 0;
       let lastAgentLatencyBreakdown: Record<string, number> | undefined;
       let lastPlannerPath: 'deterministic' | 'explorer' | 'llm' | 'clarification' | undefined;
@@ -221,6 +227,16 @@ export async function POST(
         selectedTarget?.elementLabel ??
         selectedTarget?.targetChain?.find((node) => node.role === 'section')?.label ??
         null;
+
+      function observabilityMetadataForChat(
+        base: ObservabilityTurnMetadata | null | undefined,
+        resolvedReferences?: ImplicitReferenceRecord[] | null
+      ): ProjectMessageObservabilityMetadata | undefined {
+        return enrichObservabilityMetadataForChat(base?.observability, {
+          projectIntent,
+          resolvedReferences,
+        });
+      }
 
       async function recordObservabilityTurnForEdit(args: {
         outcome: ObservabilityEditOutcome;
@@ -335,7 +351,7 @@ export async function POST(
               slowestMs: editTimer.slowest()?.durationMs,
             },
             arize: observabilityMeta?.arize ?? { syncStatus: 'pending' },
-            observability: observabilityMeta?.observability,
+            observability: observabilityMetadataForChat(observabilityMeta),
           },
         }).catch(() => {});
 
@@ -482,12 +498,23 @@ export async function POST(
             projectId,
             title: project.name || 'Untitled project',
           });
-          coachingContext = await fetchCoachingContext({ projectId, userMessage: message });
+          const [fetchedContext, fetchedIntent] = await Promise.all([
+            fetchCoachingContext({ projectId, userMessage: message }),
+            fetchObservabilityIntent(projectId),
+          ]);
+          coachingContext = fetchedContext;
+          projectIntent = fetchedIntent;
           await appendEditJobLog(jobId, 'observability_context', 'Fetched monitor context', {
             hintCount: coachingContext?.coachingHints.length ?? 0,
             source: coachingContext?.source ?? 'none',
             recurringIssues: coachingContext?.recurringIssues ?? [],
             coachingInjected: isObservabilityCoachingEnabled(),
+          });
+          await appendEditJobLog(jobId, 'observability_intent', 'Fetched monitor intent', {
+            turnCount: projectIntent?.turn_count ?? 0,
+            keywordCount: projectIntent?.keywords.length ?? 0,
+            intentCount: projectIntent?.intents.length ?? 0,
+            resolverUsed: Boolean(projectIntent || coachingContext),
           });
         }
 
@@ -506,7 +533,8 @@ export async function POST(
             editJobId: jobId,
             infraStatus: project.infraStatus,
             infraVersion: project.infraVersion,
-            coachingContext: isObservabilityCoachingEnabled() ? coachingContext : undefined,
+            coachingContext: coachingContext ?? undefined,
+            projectIntent: projectIntent ?? undefined,
           },
           (stepEvent) => {
             emit('step', {
@@ -585,7 +613,10 @@ export async function POST(
                   slowestMs: editTimer.slowest()?.durationMs,
                 },
                 arize: observabilityMeta?.arize ?? { syncStatus: 'pending' },
-                observability: observabilityMeta?.observability,
+                observability: observabilityMetadataForChat(
+                  observabilityMeta,
+                  agentResult.resolvedReferences
+                ),
               },
             }).catch(() => {});
             emit('done', {
@@ -601,7 +632,10 @@ export async function POST(
                 ambiguityReasons: agentResult.ambiguityReasons,
                 errorStage: 'needs_clarification',
                 arize: observabilityMeta?.arize ?? { syncStatus: 'pending' },
-                observability: observabilityMeta?.observability,
+                observability: observabilityMetadataForChat(
+                  observabilityMeta,
+                  agentResult.resolvedReferences
+                ),
               },
             });
             closeStream();
@@ -1247,7 +1281,10 @@ export async function POST(
             lastGalleryEdit: agentResult.lastGalleryEdit,
             editFocusStack: agentResult.editFocusStack,
             arize: observabilityMeta?.arize ?? { syncStatus: 'pending' },
-            observability: observabilityMeta?.observability,
+            observability: observabilityMetadataForChat(
+              observabilityMeta,
+              agentResult.resolvedReferences
+            ),
           },
         });
 
@@ -1274,7 +1311,10 @@ export async function POST(
               slowestMs: slowest?.durationMs,
             },
             arize: observabilityMeta?.arize ?? { syncStatus: 'pending' },
-            observability: observabilityMeta?.observability,
+            observability: observabilityMetadataForChat(
+              observabilityMeta,
+              agentResult.resolvedReferences
+            ),
           },
         });
       } catch (error) {

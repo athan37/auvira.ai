@@ -12,6 +12,14 @@ export interface ObservabilityCoachingContext {
   source: string;
 }
 
+/** Site Monitor GET /intent — recurring project vocabulary (optional planner/resolver evidence). */
+export interface ObservabilityProjectIntent {
+  keywords: string[];
+  intents: Array<{ label: string; count: number }>;
+  turn_count: number;
+  updated_at: string | null;
+}
+
 export interface ObservabilityTurnPhase {
   name: string;
   durationMs: number;

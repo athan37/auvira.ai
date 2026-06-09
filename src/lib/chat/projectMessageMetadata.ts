@@ -30,12 +30,28 @@ export interface ProjectMessageArizeMetadata {
   overallScore?: number;
 }
 
+export interface ProjectMessageVocabulary {
+  keywords: string[];
+  intents: Array<{ label: string; count: number }>;
+  turnCount: number;
+}
+
+export interface ProjectMessageResolvedReference {
+  phrase: string;
+  resolvedValue: string;
+  source: string;
+}
+
 export interface ProjectMessageObservabilityMetadata {
   experimentVariant?: string;
   coachingHintCount?: number;
   coachingApplied?: boolean;
   /** Hint text injected into the planner when coaching was applied (shown in chat hints panel). */
   coachingHints?: string[];
+  /** Site Monitor /intent vocabulary used as optional planner/resolver context. */
+  projectVocabulary?: ProjectMessageVocabulary;
+  /** Implicit phrases resolved to concrete values before planning. */
+  resolvedReferences?: ProjectMessageResolvedReference[];
   flowType?: 'edit' | 'clone' | 'generate';
 }
 

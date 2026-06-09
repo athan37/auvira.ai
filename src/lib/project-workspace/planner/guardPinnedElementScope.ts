@@ -1,5 +1,6 @@
 import type { EditPlan } from './editPlan.schema';
 import type { EditContext } from '@/lib/project-workspace/edit-context/types';
+import { messageExplicitlyRequestsContactField } from '@/lib/project-workspace/edit-context/configTextEditUtils';
 import { fieldPathFromPlanStep } from '@/lib/project-workspace/edit-context/resolveConfigTextEdit';
 import { mergedStepParams } from './editStepParams.schema';
 import type { PlanEditResult } from './planEdit';
@@ -49,6 +50,9 @@ export function guardPinnedElementScope(
     );
     const fieldPath = fieldPathFromPlanStep(step.skill, merged, editContext.effectiveMessage);
     if (fieldPath && !allowed.has(fieldPath)) {
+      if (messageExplicitlyRequestsContactField(editContext.effectiveMessage, fieldPath)) {
+        continue;
+      }
       const pinned = ctx.allowedFieldPaths[0]!;
       return {
         ok: true,

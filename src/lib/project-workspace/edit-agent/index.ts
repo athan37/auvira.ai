@@ -1,5 +1,8 @@
 import { buildEditContext } from '@/lib/project-workspace/edit-context/buildEditContext';
 import { clarificationAnchorFromTarget } from '@/lib/project-workspace/edit-context/clarificationAnchor';
+import {
+  resolveImplicitReferences,
+} from '@/lib/project-workspace/edit-context/implicitReferenceResolver';
 import { planEdit } from '@/lib/project-workspace/planner/planEdit';
 import { routeAttachmentEdits } from '@/lib/project-workspace/edit-shared/attachmentRouter';
 import { computeWorkspaceHashes } from '@/lib/project-workspace/workspaceEditShared';
@@ -74,14 +77,47 @@ export async function runWebsiteEditAgent(
     };
   }
 
+  const editContext = contextResult.context;
+  const implicitResolution = await resolveImplicitReferences({
+    ownerMessage: options.ownerMessage,
+    editContext,
+    coachingContext: options.coachingContext,
+    projectIntent: options.projectIntent,
+    recentHistory: options.conversationHistory,
+  });
+
+  if (implicitResolution.needsClarification && implicitResolution.clarificationMessage) {
+    return {
+      ok: false,
+      needsClarification: true,
+      error: implicitResolution.clarificationMessage,
+      ownerMessage: implicitResolution.clarificationMessage,
+      suggestedReplies: implicitResolution.suggestedReplies,
+      strategy: 'section_config',
+      tier: 'L3',
+      confidence: 'low',
+      clarificationAnchor: clarificationAnchorFromTarget(editContext.target),
+      resolvedReferences: implicitResolution.references,
+      agentLatencyBreakdown: phaseTimer.toLatencyBreakdown(),
+    };
+  }
+
+  if (implicitResolution.resolvedMessage) {
+    editContext.effectiveMessage = implicitResolution.resolvedMessage;
+  }
+  if (implicitResolution.references.length > 0) {
+    editContext.resolvedReferences = implicitResolution.references;
+  }
+
   emitStep(onStep, 'v3_plan', 'Planning the edit', 'active');
 
   phaseTimer.start('agent_plan');
   const planResult = await planEdit({
-    editContext: contextResult.context,
+    editContext,
     userPrompt: options.ownerMessage,
     hasAttachments: (options.attachments?.length ?? 0) > 0,
     coachingContext: options.coachingContext,
+    projectIntent: options.projectIntent,
   });
   phaseTimer.finish('agent_plan');
 
@@ -105,7 +141,7 @@ export async function runWebsiteEditAgent(
   phaseTimer.start('agent_execute');
   const result = await executePlan(
     planResult.plan,
-    contextResult.context,
+    editContext,
     options,
     beforeHashes
   );
@@ -121,6 +157,7 @@ export async function runWebsiteEditAgent(
   return {
     ...result,
     plannerPath: planResult.plannerPath,
+    resolvedReferences: editContext.resolvedReferences ?? implicitResolution.references,
     agentLatencyBreakdown: phaseTimer.toLatencyBreakdown(),
   };
 }

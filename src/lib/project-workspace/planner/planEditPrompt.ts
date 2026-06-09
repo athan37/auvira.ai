@@ -13,8 +13,16 @@ import { formatSelectedTargetForMessage } from '@/lib/project-workspace/edit-con
 import {
   formatSelectedTargetContextBlock,
 } from '@/lib/project-workspace/edit-context/selectedTargetContext';
-import type { ObservabilityCoachingContext } from '@/lib/observability/types';
+import type {
+  ObservabilityCoachingContext,
+  ObservabilityProjectIntent,
+} from '@/lib/observability/types';
+import type { ImplicitReferenceRecord } from '@/lib/project-workspace/edit-context/implicitReferenceTypes';
+import { formatReferenceSourceLabel } from '@/lib/project-workspace/edit-context/implicitReferenceResolver';
 import { EDIT_SKILL_NAMES } from './editPlan.schema';
+
+const MAX_VOCAB_KEYWORDS = 10;
+const MAX_VOCAB_INTENTS = 5;
 
 const PLANNER_SYSTEM = `You are Website Edit Agent planner for small business sites (siteConfig.ts + section-loop page.tsx).
 
@@ -39,6 +47,56 @@ Rules:
 - If ambiguous or missing value, set needsClarification true, steps [], clarificationQuestion, suggestedReplies (2+).
 - Do not invent business facts.`;
 
+function dedupeShortStrings(values: string[], max: number): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const value of values) {
+    const trimmed = value.trim();
+    if (!trimmed || trimmed.length > 80) continue;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(trimmed);
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+/** Small project vocabulary block from Site Monitor /intent (optional). */
+export function formatProjectVocabularyBlock(
+  intent?: ObservabilityProjectIntent | null
+): string | null {
+  if (!intent || intent.turn_count === 0) return null;
+  const keywords = dedupeShortStrings(intent.keywords, MAX_VOCAB_KEYWORDS);
+  const intents = intent.intents
+    .filter((entry) => entry.label.trim().length > 0)
+    .slice(0, MAX_VOCAB_INTENTS)
+    .map((entry) => `${entry.label} (${entry.count})`);
+  if (keywords.length === 0 && intents.length === 0) return null;
+  const lines = ['', '## Project vocabulary'];
+  if (keywords.length > 0) {
+    lines.push(`Recurring topics: ${keywords.join(', ')}`);
+  }
+  if (intents.length > 0) {
+    lines.push(`Common edit types: ${intents.join(', ')}`);
+  }
+  return lines.join('\n');
+}
+
+/** Resolved implicit references for planner (only entries with concrete values). */
+export function formatResolvedReferencesBlock(
+  references?: ImplicitReferenceRecord[] | null
+): string | null {
+  if (!references?.length) return null;
+  const resolved = references.filter((r) => r.resolvedValue?.trim());
+  if (resolved.length === 0) return null;
+  const lines = resolved.map(
+    (r) =>
+      `- "${r.phrase}" → "${r.resolvedValue}" (source: ${formatReferenceSourceLabel(r.source)})`
+  );
+  return ['', '## Resolved user references', ...lines].join('\n');
+}
+
 function formatCoachingBlock(coaching: ObservabilityCoachingContext): string {
   const hints =
     coaching.coachingHints.length > 0
@@ -59,12 +117,19 @@ function formatCoachingBlock(coaching: ObservabilityCoachingContext): string {
 }
 
 export function buildPlanEditSystemPrompt(
-  coaching?: ObservabilityCoachingContext | null
+  coaching?: ObservabilityCoachingContext | null,
+  projectIntent?: ObservabilityProjectIntent | null,
+  resolvedReferences?: ImplicitReferenceRecord[] | null
 ): string {
-  if (!coaching || coaching.coachingHints.length === 0) {
-    return PLANNER_SYSTEM;
+  const blocks = [PLANNER_SYSTEM];
+  const vocabulary = formatProjectVocabularyBlock(projectIntent);
+  if (vocabulary) blocks.push(vocabulary);
+  const resolved = formatResolvedReferencesBlock(resolvedReferences);
+  if (resolved) blocks.push(resolved);
+  if (coaching && coaching.coachingHints.length > 0) {
+    blocks.push(formatCoachingBlock(coaching));
   }
-  return `${PLANNER_SYSTEM}${formatCoachingBlock(coaching)}`;
+  return blocks.join('');
 }
 
 export function buildPlanEditUserPrompt(editContext: EditContext, userPrompt: string): string {
@@ -160,5 +225,5 @@ Context snippets:
 ${snippetBlock}
 
 User request:
-${userPrompt.trim()}`;
+${(editContext.effectiveMessage || userPrompt).trim()}`;
 }

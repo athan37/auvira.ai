@@ -17,11 +17,15 @@ import {
 import { guardUnsupportedPlanSkills } from './validatePlanSkills';
 import { guardEditPlanSemantics } from './validateEditPlanSemantics';
 import { applyPinnedElementScopeGuard } from './guardPinnedElementScope';
+import { canonicalizePlanConfigFieldPaths } from './canonicalizePlanConfigFieldPaths';
 import { normalizeMisroutedCopyPlan } from '@/lib/project-workspace/edit-agent/planFromConfigTextEdit';
 import { tryExplorerPlan } from '@/lib/project-workspace/edit-agent/tryExplorerPlan';
 import { isUnifiedCopyEditEnabled } from '@/lib/project-workspace/edit-context/unifiedCopyEditFlag';
 import { isObservabilityCoachingEnabled } from '@/lib/observability/config';
-import type { ObservabilityCoachingContext } from '@/lib/observability/types';
+import type {
+  ObservabilityCoachingContext,
+  ObservabilityProjectIntent,
+} from '@/lib/observability/types';
 
 const PLAN_MAX_TOKENS = parseInt(process.env.WEBSITE_EDIT_MAX_TOKENS || '4096', 10);
 
@@ -31,6 +35,7 @@ export interface PlanEditInput {
   deterministicOnly?: boolean;
   hasAttachments?: boolean;
   coachingContext?: ObservabilityCoachingContext | null;
+  projectIntent?: ObservabilityProjectIntent | null;
 }
 
 /** @deprecated Prefer editContext — builds minimal context from siteModel for legacy tests. */
@@ -84,7 +89,13 @@ export async function planEdit(input: PlanEditInputUnion): Promise<PlanEditResul
         : guarded;
       return {
         ok: true,
-        plan: guardEditPlanSemantics(applyPinnedElementScopeGuard(normalized, editContext), editContext),
+        plan: guardEditPlanSemantics(
+          canonicalizePlanConfigFieldPaths(
+            applyPinnedElementScopeGuard(normalized, editContext),
+            editContext
+          ),
+          editContext
+        ),
         plannerPath: 'deterministic',
       };
     }
@@ -100,7 +111,13 @@ export async function planEdit(input: PlanEditInputUnion): Promise<PlanEditResul
         : guarded;
       return {
         ok: true,
-        plan: guardEditPlanSemantics(applyPinnedElementScopeGuard(normalized, editContext), editContext),
+        plan: guardEditPlanSemantics(
+          canonicalizePlanConfigFieldPaths(
+            applyPinnedElementScopeGuard(normalized, editContext),
+            editContext
+          ),
+          editContext
+        ),
         plannerPath: 'explorer',
       };
     }
@@ -151,13 +168,18 @@ export async function planEdit(input: PlanEditInputUnion): Promise<PlanEditResul
   }
 
   const llm = getLLMClient();
+  const coachingEnabled = !isLegacyInput(input) && isObservabilityCoachingEnabled();
   const coachingForPrompt =
-    !isLegacyInput(input) &&
-    isObservabilityCoachingEnabled() &&
-    input.coachingContext
-      ? input.coachingContext
-      : null;
-  const system = buildPlanEditSystemPrompt(coachingForPrompt);
+    coachingEnabled && input.coachingContext ? input.coachingContext : null;
+  const intentForPrompt =
+    coachingEnabled && !isLegacyInput(input) ? (input.projectIntent ?? null) : null;
+  const resolvedForPrompt =
+    coachingEnabled ? (editContext.resolvedReferences ?? null) : null;
+  const system = buildPlanEditSystemPrompt(
+    coachingForPrompt,
+    intentForPrompt,
+    resolvedForPrompt
+  );
   const basePrompt = buildPlanEditUserPrompt(editContext, userPrompt);
 
   let lastError = 'Planner returned invalid plan';
@@ -189,7 +211,13 @@ export async function planEdit(input: PlanEditInputUnion): Promise<PlanEditResul
         : guarded;
       return {
         ok: true,
-        plan: guardEditPlanSemantics(applyPinnedElementScopeGuard(normalized, editContext), editContext),
+        plan: guardEditPlanSemantics(
+          canonicalizePlanConfigFieldPaths(
+            applyPinnedElementScopeGuard(normalized, editContext),
+            editContext
+          ),
+          editContext
+        ),
         plannerPath: 'llm',
       };
     }

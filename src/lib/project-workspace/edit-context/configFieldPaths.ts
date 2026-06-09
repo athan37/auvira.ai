@@ -2,6 +2,8 @@
  * Allowlisted siteConfig field paths for safe selected-target edits.
  */
 
+import type { EditContext } from './types';
+
 export interface ParsedConfigFieldPath {
   fieldPath: string;
   scope: 'hero' | 'businessName' | 'contact' | 'section' | 'sectionItem' | 'actionItem';
@@ -142,6 +144,59 @@ export function actionItemFieldPath(
 
 export function heroFieldPath(field: string): string {
   return `hero.${field}`;
+}
+
+const SECTION_SCALAR_FIELDS = new Set(['title', 'subtitle', 'body']);
+const HERO_SCALAR_FIELDS = new Set([
+  'headline',
+  'subheadline',
+  'tagline',
+  'primaryCta',
+  'secondaryCta',
+]);
+
+/**
+ * Expand bare field names (e.g. `subtitle`) into canonical allowlisted paths using edit context.
+ */
+export function canonicalizeConfigFieldPath(
+  fieldPath: string,
+  editContext: EditContext,
+  sectionIndexOverride?: number
+): string | null {
+  const trimmed = fieldPath.trim();
+  if (!trimmed) return null;
+  if (parseConfigFieldPath(trimmed)) return trimmed;
+
+  const sectionIndex =
+    sectionIndexOverride ??
+    editContext.target.sectionIndex ??
+    editContext.selectedTargetContext?.resolved.sectionIndex;
+
+  if (SECTION_SCALAR_FIELDS.has(trimmed) && sectionIndex != null) {
+    return sectionFieldPath(sectionIndex, trimmed);
+  }
+
+  if (
+    HERO_SCALAR_FIELDS.has(trimmed) &&
+    (editContext.target.kind === 'hero' || sectionIndex == null)
+  ) {
+    return heroFieldPath(trimmed);
+  }
+
+  if (trimmed === 'businessName') return 'businessName';
+
+  const ctx = editContext.selectedTargetContext;
+  if (ctx?.element?.fieldPath?.endsWith(`.${trimmed}`)) {
+    return ctx.element.fieldPath;
+  }
+  if (ctx?.recommendedDefaultField?.fieldPath?.endsWith(`.${trimmed}`)) {
+    return ctx.recommendedDefaultField.fieldPath;
+  }
+  if (ctx?.allowedFieldPaths?.length === 1) {
+    return ctx.allowedFieldPaths[0]!;
+  }
+
+  return null;
 }
 
 /** Build canonical contact.extraLines[n] path. */

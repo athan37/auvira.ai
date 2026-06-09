@@ -1,5 +1,6 @@
 import type { EditPlan } from './editPlan.schema';
 import type { EditContext } from '@/lib/project-workspace/edit-context/types';
+import { parseConfigFieldPath } from '@/lib/project-workspace/edit-context/configFieldPaths';
 import { skillToDomainTool } from '@/lib/project-workspace/tools/domain/registry';
 import {
   mergedStepParams,
@@ -62,6 +63,16 @@ export function validateEditPlanSemantics(
     const parsed = schema.safeParse(merged);
     if (!parsed.success) {
       issues.push(`${step.skill}: ${formatZodIssues(parsed.error.issues)}`);
+    }
+
+    if (step.skill === 'update_config_field') {
+      const fieldPath = String(merged.fieldPath ?? '').trim();
+      const value = String(merged.value ?? '').trim();
+      if (!fieldPath || !value) {
+        issues.push('update_config_field requires canonical fieldPath and value');
+      } else if (!parseConfigFieldPath(fieldPath)) {
+        issues.push(`update_config_field fieldPath is not allowlisted: ${fieldPath}`);
+      }
     }
   }
 

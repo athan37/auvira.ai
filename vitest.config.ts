@@ -35,6 +35,7 @@ export default defineConfig({
           '**/node_modules/**',
           '**/.git/**',
           '**/*.llm.test.ts',
+          '**/*.live.test.ts',
           ...llmIntegrationFiles,
           ...(runObservabilityIntegration ? [] : observabilityIntegrationFiles),
         ],

@@ -80,6 +80,15 @@ export async function createObservabilityConversation(input: {
   });
 }
 
+export async function fetchObservabilityIntentRaw(
+  projectId: string
+): Promise<Record<string, unknown> | null> {
+  return observabilityFetch(
+    `/projects/${encodeURIComponent(projectId)}/intent`,
+    { method: 'GET' }
+  );
+}
+
 export async function fetchObservabilityContextRaw(input: {
   projectId: string;
   conversationId: string;

@@ -34,6 +34,7 @@ export interface WebsiteEditResult {
   clarificationAnchor?: import('./edit-shared/types').WebsiteEditAgentResult['clarificationAnchor'];
   guidanceHints?: string[];
   ambiguityReasons?: string[];
+  resolvedReferences?: import('@/lib/project-workspace/edit-context/implicitReferenceTypes').ImplicitReferenceRecord[];
 }
 
 export interface WebsiteEditOptions {
@@ -51,6 +52,7 @@ export interface WebsiteEditOptions {
   infraStatus?: 'pending' | 'ready' | 'failed' | string;
   infraVersion?: number;
   coachingContext?: import('@/lib/observability/types').ObservabilityCoachingContext | null;
+  projectIntent?: import('@/lib/observability/types').ObservabilityProjectIntent | null;
 }
 
 /**
@@ -98,6 +100,7 @@ export async function runWebsiteEdit(
     selectedTarget: options.selectedTarget,
     infraBaselineReady,
     coachingContext: options.coachingContext,
+    projectIntent: options.projectIntent,
   };
   const result = await runWebsiteEditAgent(agentOptions, onStep);
 
@@ -134,5 +137,6 @@ export async function runWebsiteEdit(
     clarificationAnchor: result.clarificationAnchor,
     guidanceHints: result.guidanceHints,
     ambiguityReasons: result.ambiguityReasons,
+    resolvedReferences: result.resolvedReferences,
   };
 }

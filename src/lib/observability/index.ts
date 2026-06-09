@@ -11,6 +11,7 @@ export type {
   ObservabilityCoachingContext,
   ObservabilityEditOutcome,
   ObservabilityFlowType,
+  ObservabilityProjectIntent,
   ObservabilityTurnMetadata,
   ObservabilityTurnPhase,
   RecordTurnPayload,
@@ -39,6 +40,7 @@ export type {
 export { AgentPhaseTimer, mergeLatencyBreakdown } from './agentPhaseTimer';
 export { ensureObservabilityRegistration } from './ensureRegistration';
 export { fetchCoachingContext } from './fetchCoachingContext';
+export { fetchObservabilityIntent, parseObservabilityProjectIntent } from './fetchObservabilityIntent';
 export { mapTurnPayload } from './mapTurnPayload';
 export type { MapTurnPayloadInput } from './mapTurnPayload';
 export { recordEditTurn, recordObservabilityTurn } from './recordObservabilityTurn';

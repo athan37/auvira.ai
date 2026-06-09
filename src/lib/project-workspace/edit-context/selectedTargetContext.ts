@@ -319,6 +319,15 @@ function pickRecommendedDefaultField(
       return { fieldPath: headline.fieldPath, reason: 'Default hero headline field' };
     }
   }
+  if (target.kind === 'section' && target.sectionType === 'contact') {
+    const subtitle = fields.find((f) => f.fieldPath.endsWith('.subtitle'));
+    if (subtitle) {
+      return {
+        fieldPath: subtitle.fieldPath,
+        reason: 'Default contact inner card heading field',
+      };
+    }
+  }
   const titleField = fields.find((f) => f.fieldPath.endsWith('.title'));
   if (titleField) {
     return { fieldPath: titleField.fieldPath, reason: 'Default section title field' };

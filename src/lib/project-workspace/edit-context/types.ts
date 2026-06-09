@@ -7,6 +7,7 @@ import type { SiteSectionCatalog } from '@/lib/project-workspace/edit-shared/sit
 import type { WorkspaceMode } from '@/lib/project-workspace/edit-shared/types';
 import type { SiteModel } from '@/lib/project-workspace/site-model/types';
 import type { SelectedTargetContext } from './selectedTargetContext';
+import type { ImplicitReferenceRecord } from './implicitReferenceTypes';
 
 export type EditIntentKind =
   | 'copy'
@@ -130,6 +131,8 @@ export interface EditContext {
   editFocusStack?: EditFocusStack;
   selectedTarget?: SelectedTargetInput;
   selectedTargetContext?: SelectedTargetContext;
+  /** Filled by implicit reference resolver when vague phrases are resolved to concrete values. */
+  resolvedReferences?: ImplicitReferenceRecord[];
 }
 
 export interface BuildEditContextInput {

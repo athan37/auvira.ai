@@ -11,8 +11,50 @@
 ## Pipeline
 
 ```
-buildEditContext → resolveEditTarget → assessEditAmbiguity → planEdit → executePlan → domain tools → verify → summarize
+buildEditContext → resolveEditTarget → assessEditAmbiguity → resolveImplicitReferences → planEdit → executePlan → domain tools → verify → summarize
 ```
+
+## Implicit Reference Resolver
+
+Module: [`implicitReferenceResolver.ts`](../src/lib/project-workspace/edit-context/implicitReferenceResolver.ts)
+
+Resolves **vague value references** in the owner message (not section targets) using optional evidence from Site Monitor `/context`, `/intent`, and recent chat history, plus a guarded LLM fallback.
+
+| Resolves | Does not replace |
+|----------|------------------|
+| "my favorite color", "brand color", "usual CTA", "same as hero" (style token) | `selectedTarget` / target resolver |
+| Missing color/copy/CTA when evidence exists | Deterministic routing (`buildDeterministicPlan`, explorer) |
+| | Ambiguity gate (`assessEditAmbiguity`) |
+| | Post-edit verification |
+
+**Order:** runs only after `buildEditContext` succeeds (target + ambiguity gate passed). If the resolver returns `needsClarification`, planning never runs.
+
+**Rules:**
+
+- Explicit values in the message always win (e.g. "make the first section **red**" ignores project favorite color).
+- Deterministic evidence search runs before LLM.
+- LLM accepts only `confidence: high` with evidence; otherwise ask-back.
+- Monitor unavailable → resolver uses chat history / site config only; edits never fail because of Monitor.
+
+**Examples:**
+
+| Message | Evidence | Outcome |
+|---------|----------|---------|
+| Pinned section + "background my favorite color" | History/intent mentions blue | Resolve `blue`, annotate `effectiveMessage` |
+| Same, no evidence | — | Clarify: "What color should I use?" |
+| "make the first section red" | intent has favorite blue | Use **red** (explicit) |
+| Pinned CTA + "our usual CTA" | Prior turn set "Book Now" | Resolve CTA text |
+| "same style as hero" | Hero `presentation.backgroundClass` exists | Resolve style token; else clarify |
+
+Planner prompt blocks (when `OBSERVABILITY_COACHING_ENABLED=1`):
+
+1. `## Project vocabulary` — capped keywords/intents from `/intent`
+2. `## Resolved user references` — only phrases with concrete `resolvedValue`
+3. `## Coaching from prior edits` — existing coaching block
+
+Distinct from [`intentClarifier.ts`](../src/lib/project-workspace/edit-agent/intentClarifier.ts) (explorer field-path pick among section surfaces).
+
+Tests: `tests/edit-context/implicitReferenceResolver.test.ts`, `tests/edit-agent/implicitReferencePipeline.test.ts`.
 
 ## Ambiguity gate (`assessEditAmbiguity`)
 
@@ -33,6 +75,7 @@ Single pre-plan gate in `src/lib/project-workspace/edit-context/assessEditAmbigu
 | Any edit with hints | **Hints** click panel — local `guidanceHints` + planner coaching when present |
 | Success + coaching applied | **N hints** badge with coaching text from Site Monitor |
 | Clarification / failure | **Hints** badge with ambiguity-gate tips (+ coaching section if both exist) |
+| Vocabulary / resolved refs | Same **Hints** panel — sections **Project vocabulary** (`/intent`) and **Resolved references** when present on the assistant message `metadata.observability` |
 
 Site Monitor coaching is persisted on assistant messages and shown in the hints panel (not hidden on success). Debug: `NEXT_PUBLIC_OBSERVABILITY_DEBUG=1` for Phoenix trace links.
 

@@ -20,15 +20,45 @@ function traceHref(externalId: string): string {
   return PHOENIX_APP_URL;
 }
 
+function ContextSection({
+  title,
+  lines,
+  className,
+}: {
+  title: string;
+  lines: string[];
+  className?: string;
+}) {
+  if (lines.length === 0) return null;
+  return (
+    <div className={className}>
+      <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
+        {title}
+      </p>
+      <ul className="space-y-1.5">
+        {lines.map((line, index) => (
+          <li key={`${title}-${index}-${line.slice(0, 24)}`} className="select-text text-neutral-600">
+            {line}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function HintPanel({
   label,
   hints,
   monitorHints,
+  projectVocabulary,
+  resolvedReferences,
   panelTitle,
 }: {
   label: string;
   hints: string[];
   monitorHints?: string[];
+  projectVocabulary?: string[];
+  resolvedReferences?: string[];
   panelTitle: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -56,7 +86,11 @@ function HintPanel({
     };
   }, [open]);
 
-  const hasPanelContent = hints.length > 0 || (monitorHints?.length ?? 0) > 0;
+  const hasPanelContent =
+    hints.length > 0 ||
+    (monitorHints?.length ?? 0) > 0 ||
+    (projectVocabulary?.length ?? 0) > 0 ||
+    (resolvedReferences?.length ?? 0) > 0;
 
   if (!hasPanelContent) {
     return (
@@ -105,18 +139,35 @@ function HintPanel({
             </>
           ) : null}
           {monitorHints && monitorHints.length > 0 ? (
-            <div className={hints.length > 0 ? 'mt-2 border-t border-violet-50 pt-2' : undefined}>
-              <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-neutral-500">
-                From recent edits
-              </p>
-              <ul className="space-y-1.5">
-                {monitorHints.map((hint, index) => (
-                  <li key={`m-${index}-${hint.slice(0, 24)}`} className="select-text text-neutral-600">
-                    {hint}
-                  </li>
-                ))}
-              </ul>
-            </div>
+            <ContextSection
+              title="From recent edits"
+              lines={monitorHints}
+              className={hints.length > 0 ? 'mt-2 border-t border-violet-50 pt-2' : undefined}
+            />
+          ) : null}
+          {projectVocabulary && projectVocabulary.length > 0 ? (
+            <ContextSection
+              title="Project vocabulary"
+              lines={projectVocabulary}
+              className={
+                hints.length > 0 || (monitorHints?.length ?? 0) > 0
+                  ? 'mt-2 border-t border-violet-50 pt-2'
+                  : undefined
+              }
+            />
+          ) : null}
+          {resolvedReferences && resolvedReferences.length > 0 ? (
+            <ContextSection
+              title="Resolved references"
+              lines={resolvedReferences}
+              className={
+                hints.length > 0 ||
+                (monitorHints?.length ?? 0) > 0 ||
+                (projectVocabulary?.length ?? 0) > 0
+                  ? 'mt-2 border-t border-violet-50 pt-2'
+                  : undefined
+              }
+            />
           ) : null}
         </div>
       ) : null}
@@ -155,6 +206,8 @@ export default function ObservabilityTraceChip({
           label={messageHints.label}
           hints={messageHints.hints}
           monitorHints={messageHints.monitorHints}
+          projectVocabulary={messageHints.projectVocabulary}
+          resolvedReferences={messageHints.resolvedReferences}
           panelTitle={messageHints.hints.length === 1 ? 'Hint' : 'Hints'}
         />
       ) : null}

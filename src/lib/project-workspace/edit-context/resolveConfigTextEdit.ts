@@ -1,8 +1,12 @@
 import { classifyEditWhat } from '@/lib/project-workspace/edit-context/classifyEditWhat';
 import type { EditWhatKind } from '@/lib/project-workspace/edit-shared/types';
+import { sectionFieldPath } from './configFieldPaths';
 import {
+  extractBareCopyValue,
   extractFindReplacePair,
   extractReplacementValue,
+  extractTypedPhoneValue,
+  messageExplicitlyRequestsContactField,
   messageTokens,
   stripPinnedTargetSuffix,
 } from './configTextEditUtils';
@@ -115,21 +119,21 @@ function resolveFindReplaceMode(
 /** Mode C: explicit field keywords → contact.* / hero.* / businessName. */
 function resolveTypedFieldMode(message: string): ConfigTextEditApply | { kind: 'none' } {
   const normalized = normalizeMessage(message);
-  const value = extractReplacementValue(message);
-  if (!value) return { kind: 'none' };
 
-  if (/\bphone\b|\bnumber\b/i.test(normalized)) {
-    const phone = normalized.match(/\b(?:phone|number)\b[^0-9(+]*([(+][\d\s().-]{7,}|\d[\d\s().-]{6,})/i);
-    const phoneValue = phone?.[1]?.trim() ?? value;
+  const typedPhone = extractTypedPhoneValue(message);
+  if (typedPhone) {
     return {
       kind: 'apply',
       fieldPath: 'contact.phone',
-      value: phoneValue,
+      value: typedPhone,
       mode: 'typed_field',
       confidence: 'high',
       reason: 'Typed phone field edit',
     };
   }
+
+  const value = extractReplacementValue(message);
+  if (!value) return { kind: 'none' };
 
   if (/\bemail\b/i.test(normalized)) {
     const email = normalized.match(/\b[\w.+-]+@[\w.-]+\.\w+\b/);
@@ -257,6 +261,45 @@ function buildAmbiguousFieldClarification(
   };
 }
 
+/** Pinned section + plain pasted copy (no "change … to …") → default field. */
+function resolveBarePinnedSectionCopy(
+  bareValue: string,
+  pinnedSectionIndex: number,
+  ctx: SelectedTargetContext | null | undefined,
+  candidates: AllowlistedFieldEntry[],
+  message: string
+): ConfigTextEditApply | null {
+  const sectionType = ctx?.resolved.sectionType ?? candidates[0]?.sectionType;
+  const mentionsContactField = /\b(phone|number|email|address)\b/i.test(normalizeMessage(message));
+
+  if (sectionType === 'contact' && !mentionsContactField) {
+    const subtitlePath = sectionFieldPath(pinnedSectionIndex, 'subtitle');
+    if (candidates.some((e) => e.fieldPath === subtitlePath)) {
+      return {
+        kind: 'apply',
+        fieldPath: subtitlePath,
+        value: bareValue,
+        mode: 'set_field',
+        confidence: 'high',
+        reason: 'Pinned contact section bare copy → inner card heading',
+      };
+    }
+  }
+
+  if (ctx?.recommendedDefaultField?.fieldPath) {
+    return {
+      kind: 'apply',
+      fieldPath: ctx.recommendedDefaultField.fieldPath,
+      value: bareValue,
+      mode: 'set_field',
+      confidence: 'medium',
+      reason: ctx.recommendedDefaultField.reason,
+    };
+  }
+
+  return null;
+}
+
 /** Mode A: pinned section + implicit target + replacement value. */
 function resolveElementPhraseApply(
   message: string,
@@ -293,13 +336,17 @@ function resolveSetFieldMode(
   entries: AllowlistedFieldEntry[],
   input: ResolveConfigTextEditInput
 ): ConfigTextEditResult {
-  const what = input.what ?? classifyEditWhat(message);
-  if (what !== 'copy') return { kind: 'none' };
-
-  const value = extractReplacementValue(message);
-  if (!value) return { kind: 'none' };
-
   const ctx = input.selectedTargetContext;
+  const hasPin =
+    input.pinnedSectionIndex != null ||
+    Boolean(ctx?.element?.fieldPath) ||
+    Boolean(ctx?.pinnedElementOnly);
+  const bareValue = extractBareCopyValue(message, hasPin);
+  const what = input.what ?? classifyEditWhat(message);
+  if (what !== 'copy' && !bareValue) return { kind: 'none' };
+
+  const value = extractReplacementValue(message) ?? bareValue;
+  if (!value) return { kind: 'none' };
   const pinnedSectionIndex = input.pinnedSectionIndex ?? ctx?.resolved.sectionIndex;
 
   // Explicit element phrase ("get in touch btn", "contact information title of the card")
@@ -337,17 +384,28 @@ function resolveSetFieldMode(
     };
   }
 
+  let candidates = entries;
+  if (pinnedSectionIndex != null) {
+    candidates = filterFieldsToSection(entries, pinnedSectionIndex);
+  }
+
+  if (bareValue && pinnedSectionIndex != null && candidates.length > 0) {
+    const bareApply = resolveBarePinnedSectionCopy(
+      bareValue,
+      pinnedSectionIndex,
+      ctx,
+      candidates,
+      message
+    );
+    if (bareApply) return bareApply;
+  }
+
   const normalized = normalizeMessage(message);
   const mentionsContactField = /\b(phone|number|email|address)\b/i.test(normalized);
   const mentionsContactPanel = /\bcontact\s+information\b|\bcontact\s+info\b/i.test(normalized);
   const mentionsContactCard = /\bcard\b|\bpanel\b|\binner\b/i.test(normalized);
 
   if (mentionsContactField) return { kind: 'none' };
-
-  let candidates = entries;
-  if (pinnedSectionIndex != null) {
-    candidates = filterFieldsToSection(entries, pinnedSectionIndex);
-  }
 
   if (candidates.length === 0) return { kind: 'none' };
 

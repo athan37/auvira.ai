@@ -25,12 +25,52 @@ export function extractReplacementValue(message: string): string | null {
   return null;
 }
 
+/**
+ * When a preview target is pinned, treat a short plain message as the new copy value
+ * (e.g. "We'd love to hear from you" with no "change … to …" phrasing).
+ */
+export function extractBareCopyValue(message: string, hasPinnedTarget: boolean): string | null {
+  if (!hasPinnedTarget) return null;
+  if (extractReplacementValue(message) || extractFindReplacePair(message)) return null;
+
+  const normalized = stripPinnedTargetSuffix(message).trim();
+  if (!normalized || normalized.length > 200) return null;
+  if (/^(change|update|set|make|edit|remove|delete|add)\b/i.test(normalized)) return null;
+  if (/^(please|can you|could you)\b/i.test(normalized)) return null;
+  if (/\b(duplicate|clone|reorder)\b/i.test(normalized)) return null;
+  if (/\b(delete|remove)\s+(?:this\s+)?(?:card|item|row)\b/i.test(normalized)) return null;
+
+  return normalized;
+}
+
 /** Parse `"old" to "new"` find/replace pair from message. */
 export function extractFindReplacePair(message: string): { find: string; replace: string } | null {
   const normalized = stripPinnedTargetSuffix(message);
   const match = normalized.match(/["']([^"']+)["']\s+to\s+["']([^"']+)["']/i);
   if (!match?.[1] || !match[2]) return null;
   return { find: match[1].trim(), replace: match[2].trim() };
+}
+
+/** Extract phone digits from "add/set phone number …" without "change … to …" phrasing. */
+export function extractTypedPhoneValue(message: string): string | null {
+  const normalized = stripPinnedTargetSuffix(message);
+  if (!/\bphone\b|\bnumber\b/i.test(normalized)) return null;
+  const phone = normalized.match(
+    /\b(?:phone|number)\b[^0-9(+]*([(+][\d\s().-]{7,}|\d[\d\s().-]{6,})/i
+  );
+  return phone?.[1]?.trim() ?? null;
+}
+
+/** True when the owner explicitly names a global contact field in the message. */
+export function messageExplicitlyRequestsContactField(
+  message: string,
+  fieldPath: string
+): boolean {
+  const normalized = stripPinnedTargetSuffix(message);
+  if (fieldPath === 'contact.phone') return /\bphone\b|\bnumber\b/i.test(normalized);
+  if (fieldPath === 'contact.email') return /\bemail\b/i.test(normalized);
+  if (fieldPath === 'contact.address') return /\baddress\b/i.test(normalized);
+  return false;
 }
 
 /** Tokenize message for label overlap scoring. */

@@ -134,10 +134,99 @@ describe('resolveConfigTextEdit', () => {
     }
   });
 
+  it('Mode C resolves add-my-phone-number phrasing on pinned contact inner card', () => {
+    const config = `export const siteConfig = {
+      businessName: "Demo Co",
+      contact: {},
+      sections: [
+        {
+          type: "contact",
+          title: "Contact Us",
+          body: "Reach out."
+        }
+      ]
+    };`;
+    const pinnedSubtitle = {
+      ...contactSelectedTarget,
+      sectionTitle: 'Contact Us',
+      fieldPath: 'sections[0].subtitle',
+      elementKind: 'heading',
+      elementLabel: 'Contact Information',
+      pinScope: 'element' as const,
+      targetChain: [
+        { role: 'section' as const, kind: 'contact', label: 'Contact Us' },
+        { role: 'container' as const, kind: 'inner_card', label: 'Contact card' },
+        {
+          role: 'element' as const,
+          kind: 'heading',
+          label: 'Contact Information',
+          fieldPath: 'sections[0].subtitle',
+        },
+      ],
+    };
+    const selectedTargetContext = buildSelectedTargetContext({
+      selectedTarget: pinnedSubtitle,
+      siteConfigContent: config,
+      pageContent: '',
+      catalog: buildSiteSectionCatalog(config, ''),
+      target: {
+        kind: 'section' as const,
+        sectionIndex: 0,
+        sectionType: 'contact',
+        title: 'Contact Us',
+        confidence: 'high' as const,
+        candidates: [],
+        needsClarification: false,
+      },
+    });
+    const result = resolveConfigTextEdit({
+      message: 'add my phone number 1234 1234123 123',
+      siteConfigContent: config,
+      pinnedSectionIndex: 0,
+      selectedTargetContext: selectedTargetContext ?? undefined,
+    });
+    expect(result.kind).toBe('apply');
+    if (result.kind === 'apply') {
+      expect(result.fieldPath).toBe('contact.phone');
+      expect(result.value).toBe('1234 1234123 123');
+    }
+  });
+
+  it('Mode A accepts bare pinned copy without change-to phrasing', () => {
+    const ctx = buildSelectedTargetContext({
+      selectedTarget: contactSelectedTarget,
+      siteConfigContent: contactSiteConfig,
+      pageContent: '',
+      catalog: buildSiteSectionCatalog(contactSiteConfig, ''),
+      target: contactEditContext('').target,
+    });
+    const result = resolveConfigTextEdit({
+      message: "We'd love to hear from you",
+      siteConfigContent: contactSiteConfig,
+      pinnedSectionIndex: 0,
+      selectedTargetContext: ctx ?? undefined,
+    });
+    expect(result.kind).toBe('apply');
+    if (result.kind === 'apply') {
+      expect(result.fieldPath).toBe('sections[0].subtitle');
+      expect(result.value).toBe("We'd love to hear from you");
+    }
+  });
+
   it('enumerateAllowlistedFields indexes contact and section fields', () => {
     const entries = enumerateAllowlistedFields(contactSiteConfig);
     expect(entries.some((e) => e.fieldPath === 'contact.email')).toBe(true);
     expect(entries.some((e) => e.fieldPath === 'sections[0].body')).toBe(true);
+  });
+
+  it('buildDeterministicPlan applies bare pinned contact copy to subtitle', () => {
+    const plan = buildDeterministicPlan(contactEditContext("We'd love to hear from you"));
+    expect(plan?.needsClarification).toBe(false);
+    expect(plan?.steps[0]?.skill).toBe('update_config_field');
+    expect(plan?.steps[0]?.params).toMatchObject({
+      fieldPath: 'sections[0].subtitle',
+      value: "We'd love to hear from you",
+    });
   });
 
   it('buildDeterministicPlan uses update_config_field via unified resolver', () => {

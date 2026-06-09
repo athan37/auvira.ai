@@ -56,9 +56,21 @@ Sub-phase data (`phase_events`, `planner_path`) is serialized into the Monitor `
 
 1. `createEditJob` → compute `turn_index`
 2. `ensureObservabilityRegistration` (project + `{projectId}-editor` conversation)
-3. `GET /context` → coaching hints (logged; injected only if coaching flag on)
+3. Parallel `GET /context` + `GET /intent` (soft-fail; logged to edit job)
 4. Local edit agent runs (`runWebsiteEdit`) with agent sub-phase timing
 5. `POST /turns` with redacted payload → store `metadata.arize.externalId` (trace_id)
+
+### Phase B: `/intent` and implicit reference resolution
+
+`GET /api/v1/projects/{project_id}/intent` returns project vocabulary (`keywords`, `intents`, `turn_count`). la-mue uses it as **optional evidence** for the [Implicit Reference Resolver](./EDIT_AGENT.md#implicit-reference-resolver) and (when coaching is on) a small `## Project vocabulary` block in the planner prompt.
+
+| Flag | Fetch `/context` + `/intent` | Planner vocabulary + coaching | Resolver evidence |
+|------|------------------------------|-------------------------------|-------------------|
+| `OBSERVABILITY_ENABLED=0` | No | No | Chat history / site config only |
+| Enabled, `OBSERVABILITY_COACHING_ENABLED=0` | Yes | No | Yes (deterministic + optional LLM) |
+| Both on | Yes | Yes | Yes |
+
+**Not a routing or safety gate.** `/intent` does not pick section targets, bypass the ambiguity gate, or replace verification. Prompt caps: max 10 keywords, max 5 intent labels. Skip vocabulary injection when `turn_count === 0` or lists are empty.
 
 ## Identity mapping
 

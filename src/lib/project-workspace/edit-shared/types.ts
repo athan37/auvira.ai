@@ -197,6 +197,8 @@ export interface WebsiteEditAgentOptions {
   infraBaselineReady?: boolean;
   /** Site Monitor coaching hints (injected when OBSERVABILITY_COACHING_ENABLED=1). */
   coachingContext?: import('@/lib/observability/types').ObservabilityCoachingContext | null;
+  /** Site Monitor project vocabulary (optional resolver/planner evidence). */
+  projectIntent?: import('@/lib/observability/types').ObservabilityProjectIntent | null;
 }
 
 export interface WebsiteEditAgentResult {
@@ -233,4 +235,6 @@ export interface WebsiteEditAgentResult {
   /** User-facing tips when clarification or zero-change block occurs. */
   guidanceHints?: string[];
   ambiguityReasons?: string[];
+  /** Implicit phrases resolved (or attempted) before planning. */
+  resolvedReferences?: import('@/lib/project-workspace/edit-context/implicitReferenceTypes').ImplicitReferenceRecord[];
 }
