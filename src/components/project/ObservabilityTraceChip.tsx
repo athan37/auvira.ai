@@ -5,7 +5,10 @@ import type {
   ProjectMessageArizeMetadata,
   ProjectMessageObservabilityMetadata,
 } from '@/lib/chat/projectMessageMetadata';
-import { getMessageHintsView } from '@/lib/observability/formatCoachingSummary';
+import {
+  getProjectMemoryView,
+  getTipsView,
+} from '@/lib/observability/formatCoachingSummary';
 
 const DEBUG_ENABLED = process.env.NEXT_PUBLIC_OBSERVABILITY_DEBUG === '1';
 const PHOENIX_APP_URL =
@@ -46,20 +49,18 @@ function ContextSection({
   );
 }
 
-function HintPanel({
+function TracePopoverChip({
   label,
-  hints,
-  monitorHints,
-  projectVocabulary,
-  resolvedReferences,
   panelTitle,
+  lines,
+  monitorHints,
+  tone,
 }: {
   label: string;
-  hints: string[];
-  monitorHints?: string[];
-  projectVocabulary?: string[];
-  resolvedReferences?: string[];
   panelTitle: string;
+  lines: string[];
+  monitorHints?: string[];
+  tone: 'sky' | 'violet';
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLSpanElement>(null);
@@ -86,15 +87,34 @@ function HintPanel({
     };
   }, [open]);
 
-  const hasPanelContent =
-    hints.length > 0 ||
-    (monitorHints?.length ?? 0) > 0 ||
-    (projectVocabulary?.length ?? 0) > 0 ||
-    (resolvedReferences?.length ?? 0) > 0;
+  const toneClasses =
+    tone === 'sky'
+      ? {
+          badge: 'bg-sky-50 text-sky-800 ring-sky-100',
+          badgeOpen: 'bg-sky-100 ring-sky-200',
+          badgeHover: 'hover:bg-sky-100',
+          border: 'border-sky-100',
+          heading: 'text-sky-700',
+          divider: 'border-sky-50',
+          accent: 'text-sky-600',
+        }
+      : {
+          badge: 'bg-violet-50 text-violet-800 ring-violet-100',
+          badgeOpen: 'bg-violet-100 ring-violet-200',
+          badgeHover: 'hover:bg-violet-100',
+          border: 'border-violet-100',
+          heading: 'text-violet-700',
+          divider: 'border-violet-50',
+          accent: 'text-violet-600',
+        };
+
+  const hasPanelContent = lines.length > 0 || (monitorHints?.length ?? 0) > 0;
 
   if (!hasPanelContent) {
     return (
-      <span className="rounded-full bg-violet-50 px-2 py-0.5 font-medium text-violet-800 ring-1 ring-violet-100">
+      <span
+        className={`rounded-full px-2 py-0.5 font-medium ring-1 ${toneClasses.badge}`}
+      >
         {label}
       </span>
     );
@@ -107,8 +127,10 @@ function HintPanel({
         aria-expanded={open}
         aria-haspopup="dialog"
         onClick={() => setOpen((value) => !value)}
-        className={`rounded-full px-2 py-0.5 font-medium text-violet-800 ring-1 ring-violet-100 transition-colors ${
-          open ? 'bg-violet-100 ring-violet-200' : 'bg-violet-50 hover:bg-violet-100'
+        className={`rounded-full px-2 py-0.5 font-medium ring-1 transition-colors ${toneClasses.badge} ${
+          open
+            ? `${toneClasses.badgeOpen}`
+            : `${toneClasses.badgeHover}`
         }`}
       >
         {label}
@@ -117,22 +139,24 @@ function HintPanel({
         <div
           role="dialog"
           aria-label={panelTitle}
-          className="absolute bottom-full left-0 z-20 mb-1.5 w-72 max-w-[min(18rem,calc(100vw-2rem))] select-text rounded-lg border border-violet-100 bg-white p-2.5 text-left text-[11px] leading-snug text-neutral-700 shadow-lg"
+          className={`absolute bottom-full left-0 z-20 mb-1.5 w-72 max-w-[min(18rem,calc(100vw-2rem))] select-text rounded-lg border ${toneClasses.border} bg-white p-2.5 text-left text-[11px] leading-snug text-neutral-700 shadow-lg`}
         >
-          {hints.length > 0 ? (
+          {lines.length > 0 ? (
             <>
-              <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-violet-700">
+              <p
+                className={`mb-1.5 text-[10px] font-semibold uppercase tracking-wide ${toneClasses.heading}`}
+              >
                 {panelTitle}
               </p>
               <ul className="space-y-1.5">
-                {hints.map((hint, index) => (
-                  <li key={`${index}-${hint.slice(0, 24)}`} className="flex gap-1.5">
-                    {hints.length > 1 ? (
-                      <span className="mt-0.5 shrink-0 font-medium text-violet-600">
+                {lines.map((line, index) => (
+                  <li key={`${index}-${line.slice(0, 24)}`} className="flex gap-1.5">
+                    {lines.length > 1 ? (
+                      <span className={`mt-0.5 shrink-0 font-medium ${toneClasses.accent}`}>
                         {index + 1}.
                       </span>
                     ) : null}
-                    <span className="select-text">{hint}</span>
+                    <span className="select-text">{line}</span>
                   </li>
                 ))}
               </ul>
@@ -142,30 +166,8 @@ function HintPanel({
             <ContextSection
               title="From recent edits"
               lines={monitorHints}
-              className={hints.length > 0 ? 'mt-2 border-t border-violet-50 pt-2' : undefined}
-            />
-          ) : null}
-          {projectVocabulary && projectVocabulary.length > 0 ? (
-            <ContextSection
-              title="Project vocabulary"
-              lines={projectVocabulary}
               className={
-                hints.length > 0 || (monitorHints?.length ?? 0) > 0
-                  ? 'mt-2 border-t border-violet-50 pt-2'
-                  : undefined
-              }
-            />
-          ) : null}
-          {resolvedReferences && resolvedReferences.length > 0 ? (
-            <ContextSection
-              title="Resolved references"
-              lines={resolvedReferences}
-              className={
-                hints.length > 0 ||
-                (monitorHints?.length ?? 0) > 0 ||
-                (projectVocabulary?.length ?? 0) > 0
-                  ? 'mt-2 border-t border-violet-50 pt-2'
-                  : undefined
+                lines.length > 0 ? `mt-2 border-t ${toneClasses.divider} pt-2` : undefined
               }
             />
           ) : null}
@@ -175,10 +177,11 @@ function HintPanel({
   );
 }
 
-/** Hints badge + optional debug trace footer on assistant messages. */
+/** Project Memory + Tips badges and optional debug trace footer on assistant messages. */
 export default function ObservabilityTraceChip({
   arize,
   observability,
+  outcome,
   guidanceHints,
 }: {
   arize?: ProjectMessageArizeMetadata;
@@ -186,13 +189,14 @@ export default function ObservabilityTraceChip({
   outcome?: string;
   guidanceHints?: string[];
 }) {
-  const messageHints = getMessageHintsView(guidanceHints, observability);
+  const projectMemory = getProjectMemoryView(outcome, observability);
+  const tips = getTipsView(outcome, guidanceHints, observability);
   const showDebug =
     DEBUG_ENABLED &&
     arize &&
     !(arize.syncStatus === 'pending' && !arize.externalId && !arize.grade);
 
-  if (!messageHints && !showDebug) return null;
+  if (!projectMemory && !tips && !showDebug) return null;
 
   const scoreLabel =
     arize?.grade != null && arize.overallScore != null
@@ -200,36 +204,54 @@ export default function ObservabilityTraceChip({
       : arize?.grade ?? (arize?.syncStatus === 'failed' ? 'sync failed' : null);
 
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-black/5 pt-2 text-[11px] text-neutral-500">
-      {messageHints ? (
-        <HintPanel
-          label={messageHints.label}
-          hints={messageHints.hints}
-          monitorHints={messageHints.monitorHints}
-          projectVocabulary={messageHints.projectVocabulary}
-          resolvedReferences={messageHints.resolvedReferences}
-          panelTitle={messageHints.hints.length === 1 ? 'Hint' : 'Hints'}
-        />
+    <div className="mt-2 flex flex-col gap-1.5 border-t border-black/5 pt-2 text-[11px] text-neutral-500">
+      {projectMemory ? (
+        <div className="space-y-1">
+          {projectMemory.lines.map((line) => (
+            <p key={line} className="select-text text-neutral-600">
+              {line}
+            </p>
+          ))}
+        </div>
       ) : null}
-      {showDebug && scoreLabel ? (
-        <span className="rounded-full bg-neutral-100 px-2 py-0.5 font-medium text-neutral-700">
-          {scoreLabel}
-        </span>
-      ) : null}
-      {showDebug && arize?.externalId ? (
-        <a
-          href={traceHref(arize.externalId)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="font-mono underline-offset-2 hover:underline"
-          title={arize.externalId}
-        >
-          View trace
-        </a>
-      ) : null}
-      {showDebug && arize?.syncStatus === 'failed' && !arize.externalId ? (
-        <span className="text-amber-700">Observability sync failed</span>
-      ) : null}
+      <div className="flex flex-wrap items-center gap-2">
+        {projectMemory ? (
+          <TracePopoverChip
+            label={projectMemory.label}
+            panelTitle="Project Memory"
+            lines={projectMemory.panelLines}
+            tone="sky"
+          />
+        ) : null}
+        {tips ? (
+          <TracePopoverChip
+            label={tips.label}
+            panelTitle={tips.hints.length === 1 ? 'Tip' : 'Tips'}
+            lines={tips.hints}
+            monitorHints={tips.monitorHints}
+            tone="violet"
+          />
+        ) : null}
+        {showDebug && scoreLabel ? (
+          <span className="rounded-full bg-neutral-100 px-2 py-0.5 font-medium text-neutral-700">
+            {scoreLabel}
+          </span>
+        ) : null}
+        {showDebug && arize?.externalId ? (
+          <a
+            href={traceHref(arize.externalId)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-mono underline-offset-2 hover:underline"
+            title={arize.externalId}
+          >
+            View trace
+          </a>
+        ) : null}
+        {showDebug && arize?.syncStatus === 'failed' && !arize.externalId ? (
+          <span className="text-amber-700">Observability sync failed</span>
+        ) : null}
+      </div>
     </div>
   );
 }

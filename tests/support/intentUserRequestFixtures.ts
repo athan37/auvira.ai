@@ -1,4 +1,7 @@
-import type { ProjectMessageObservabilityMetadata } from '@/lib/chat/projectMessageMetadata';
+import type {
+  ProjectChatOutcome,
+  ProjectMessageObservabilityMetadata,
+} from '@/lib/chat/projectMessageMetadata';
 import type { ObservabilityCoachingContext, ObservabilityProjectIntent } from '@/lib/observability/types';
 import { enrichObservabilityMetadataForChat } from '@/lib/observability/formatEditContextSummary';
 import type { ImplicitReferenceRecord } from '@/lib/project-workspace/edit-context/implicitReferenceTypes';
@@ -102,15 +105,16 @@ export function intentFlowEditContext(overrides: Partial<EditContext> = {}): Edi
 }
 
 /**
- * Mirror edit stream route: merge turn observability + intent/resolver into chat metadata.
+ * Mirror edit stream route: merge turn observability + applied memory into chat metadata.
  */
 export function chatObservabilityFromEditTurn(input: {
   turnObservability?: ProjectMessageObservabilityMetadata | null;
   projectIntent?: ObservabilityProjectIntent | null;
   resolvedReferences?: ImplicitReferenceRecord[] | null;
+  outcome?: ProjectChatOutcome;
 }): ProjectMessageObservabilityMetadata | undefined {
   return enrichObservabilityMetadataForChat(input.turnObservability ?? undefined, {
-    projectIntent: input.projectIntent,
+    outcome: input.outcome,
     resolvedReferences: input.resolvedReferences,
   });
 }

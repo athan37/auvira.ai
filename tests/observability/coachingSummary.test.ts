@@ -4,44 +4,56 @@ import {
   getCoachingSummaryView,
   getGuidanceTipsView,
   getMessageHintsView,
+  getProjectMemoryView,
+  getTipsView,
 } from '@/lib/observability/formatCoachingSummary';
 
 describe('formatCoachingSummary', () => {
-  it('shows applied label with hint count on success turns', () => {
+  it('returns null on success turns even when coaching was applied', () => {
     expect(
-      formatCoachingSummary({
-        coachingApplied: true,
-        coachingHintCount: 2,
-        experimentVariant: 'coached',
-        coachingHints: ['Keep hero copy concise.', 'Verify build gate before replying.'],
-      })
-    ).toBe('2 hints');
+      formatCoachingSummary(
+        {
+          coachingApplied: true,
+          coachingHintCount: 2,
+          experimentVariant: 'coached',
+          coachingHints: ['Keep hero copy concise.', 'Verify build gate before replying.'],
+        },
+        { outcome: 'success' }
+      )
+    ).toBeNull();
   });
 
-  it('shows singular hint label', () => {
+  it('shows tips label on clarification turns with coaching', () => {
     expect(
-      formatCoachingSummary({
-        coachingApplied: true,
-        coachingHintCount: 1,
-        experimentVariant: 'coached',
-        coachingHints: ['Prior turn failed build gate.'],
-      })
-    ).toBe('1 hint');
+      formatCoachingSummary(
+        {
+          coachingApplied: true,
+          coachingHintCount: 1,
+          experimentVariant: 'coached',
+          coachingHints: ['Prior turn failed build gate.'],
+        },
+        { outcome: 'clarification' }
+      )
+    ).toBe('1 tip');
   });
 
-  it('notes hints available but not applied when coaching disabled', () => {
+  it('notes tips available but not applied when coaching disabled on failure', () => {
     expect(
-      formatCoachingSummary({
-        coachingApplied: false,
-        coachingHintCount: 3,
-        experimentVariant: 'control',
-        coachingHints: ['Hint A', 'Hint B', 'Hint C'],
-      })
-    ).toBe('3 hints available (not applied)');
+      formatCoachingSummary(
+        {
+          coachingApplied: false,
+          coachingHintCount: 3,
+          experimentVariant: 'control',
+          coachingHints: ['Hint A', 'Hint B', 'Hint C'],
+        },
+        { outcome: 'failure' }
+      )
+    ).toBe('3 tips available (not applied)');
   });
 
-  it('merges guidance hints with coaching hints', () => {
-    const view = getMessageHintsView(
+  it('merges guidance hints with coaching hints on clarification', () => {
+    const view = getTipsView(
+      'clarification',
       ['Pin a section from the preview.'],
       {
         coachingApplied: true,
@@ -49,7 +61,7 @@ describe('formatCoachingSummary', () => {
         coachingHints: ['Honor selectedTarget.'],
       }
     );
-    expect(view?.label).toBe('2 hints');
+    expect(view?.label).toBe('2 tips');
     expect(view?.hints).toEqual(['Pin a section from the preview.']);
     expect(view?.monitorHints).toEqual(['Honor selectedTarget.']);
   });
@@ -59,17 +71,48 @@ describe('formatCoachingSummary', () => {
       'Pin a section from the preview.',
       'Include the exact new value.',
     ]);
-    expect(view?.label).toBe('2 hints');
+    expect(view?.label).toBe('2 tips');
     expect(view?.hints).toHaveLength(2);
   });
 
-  it('exposes hint text for click panels', () => {
-    const view = getCoachingSummaryView({
-      coachingApplied: true,
-      coachingHintCount: 2,
-      coachingHints: ['Hint A', 'Hint B'],
-    });
-    expect(view?.label).toBe('2 hints');
+  it('exposes tip text for click panels on failure', () => {
+    const view = getCoachingSummaryView(
+      {
+        coachingApplied: true,
+        coachingHintCount: 2,
+        coachingHints: ['Hint A', 'Hint B'],
+      },
+      { outcome: 'failure' }
+    );
+    expect(view?.label).toBe('2 tips');
     expect(view?.hints).toEqual(['Hint A', 'Hint B']);
+  });
+
+  it('getProjectMemoryView returns null on success without applied memory', () => {
+    expect(
+      getProjectMemoryView('success', {
+        coachingApplied: true,
+        coachingHintCount: 2,
+        coachingHints: ['Hint A'],
+      })
+    ).toBeNull();
+  });
+
+  it('getTipsView returns null on success', () => {
+    expect(
+      getTipsView('success', ['Pin a section.'], {
+        coachingApplied: true,
+        coachingHints: ['Honor target.'],
+      })
+    ).toBeNull();
+  });
+
+  it('getMessageHintsView delegates to getTipsView', () => {
+    const view = getMessageHintsView(
+      ['Pin a section from the preview.'],
+      { coachingApplied: true, coachingHints: ['Honor target.'] },
+      'clarification'
+    );
+    expect(view?.label).toBe('2 tips');
   });
 });

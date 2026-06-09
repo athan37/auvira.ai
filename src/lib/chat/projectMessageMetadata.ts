@@ -50,8 +50,10 @@ export interface ProjectMessageObservabilityMetadata {
   coachingHints?: string[];
   /** Site Monitor /intent vocabulary used as optional planner/resolver context. */
   projectVocabulary?: ProjectMessageVocabulary;
-  /** Implicit phrases resolved to concrete values before planning. */
+  /** @deprecated Legacy chat field — use appliedProjectMemory on new messages. */
   resolvedReferences?: ProjectMessageResolvedReference[];
+  /** Resolved phrases applied on a successful edit (user-facing: Project Memory). */
+  appliedProjectMemory?: ProjectMessageResolvedReference[];
   flowType?: 'edit' | 'clone' | 'generate';
 }
 

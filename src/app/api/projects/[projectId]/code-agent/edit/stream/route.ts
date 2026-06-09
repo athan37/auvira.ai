@@ -74,7 +74,7 @@ import {
 } from '@/lib/observability';
 import { enrichObservabilityMetadataForChat } from '@/lib/observability/formatEditContextSummary';
 import type { ImplicitReferenceRecord } from '@/lib/project-workspace/edit-context/implicitReferenceTypes';
-import type { ProjectMessageObservabilityMetadata } from '@/lib/chat/projectMessageMetadata';
+import type { ProjectMessageObservabilityMetadata, ProjectChatOutcome } from '@/lib/chat/projectMessageMetadata';
 import type {
   ObservabilityCoachingContext,
   ObservabilityEditOutcome,
@@ -230,10 +230,11 @@ export async function POST(
 
       function observabilityMetadataForChat(
         base: ObservabilityTurnMetadata | null | undefined,
-        resolvedReferences?: ImplicitReferenceRecord[] | null
+        resolvedReferences?: ImplicitReferenceRecord[] | null,
+        outcome?: ProjectChatOutcome
       ): ProjectMessageObservabilityMetadata | undefined {
         return enrichObservabilityMetadataForChat(base?.observability, {
-          projectIntent,
+          outcome,
           resolvedReferences,
         });
       }
@@ -351,7 +352,7 @@ export async function POST(
               slowestMs: editTimer.slowest()?.durationMs,
             },
             arize: observabilityMeta?.arize ?? { syncStatus: 'pending' },
-            observability: observabilityMetadataForChat(observabilityMeta),
+            observability: observabilityMetadataForChat(observabilityMeta, undefined, 'failure'),
           },
         }).catch(() => {});
 
@@ -615,7 +616,8 @@ export async function POST(
                 arize: observabilityMeta?.arize ?? { syncStatus: 'pending' },
                 observability: observabilityMetadataForChat(
                   observabilityMeta,
-                  agentResult.resolvedReferences
+                  agentResult.resolvedReferences,
+                  'clarification'
                 ),
               },
             }).catch(() => {});
@@ -634,7 +636,8 @@ export async function POST(
                 arize: observabilityMeta?.arize ?? { syncStatus: 'pending' },
                 observability: observabilityMetadataForChat(
                   observabilityMeta,
-                  agentResult.resolvedReferences
+                  agentResult.resolvedReferences,
+                  'clarification'
                 ),
               },
             });
@@ -1283,7 +1286,8 @@ export async function POST(
             arize: observabilityMeta?.arize ?? { syncStatus: 'pending' },
             observability: observabilityMetadataForChat(
               observabilityMeta,
-              agentResult.resolvedReferences
+              agentResult.resolvedReferences,
+              'success'
             ),
           },
         });
@@ -1313,7 +1317,8 @@ export async function POST(
             arize: observabilityMeta?.arize ?? { syncStatus: 'pending' },
             observability: observabilityMetadataForChat(
               observabilityMeta,
-              agentResult.resolvedReferences
+              agentResult.resolvedReferences,
+              'success'
             ),
           },
         });

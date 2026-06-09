@@ -68,16 +68,17 @@ Single pre-plan gate in `src/lib/project-workspace/edit-context/assessEditAmbigu
 
 `planEdit` skips the LLM when deterministic/explorer paths miss and target confidence is low — returns a clarification plan instead.
 
-### Tips vs coaching (UI)
+### Context vs Tips (UI)
 
-| Turn | Badge |
-|------|-------|
-| Any edit with hints | **Hints** click panel — local `guidanceHints` + planner coaching when present |
-| Success + coaching applied | **N hints** badge with coaching text from Site Monitor |
-| Clarification / failure | **Hints** badge with ambiguity-gate tips (+ coaching section if both exist) |
-| Vocabulary / resolved refs | Same **Hints** panel — sections **Project vocabulary** (`/intent`) and **Resolved references** when present on the assistant message `metadata.observability` |
+| Surface | When | Content |
+|---------|------|---------|
+| **Project Memory (Context)** | `outcome === 'success'` and applied refs exist | Inline: `Used project context: {phrase} → {value}`; sky **Context** chip for details |
+| **Tips** | `outcome === 'clarification'` or `'failure'` and guidance/coaching exists | Ambiguity guidance + coaching; never on success |
+| **Hidden in chat** | Always | Raw `/intent` keywords, "N hints applied", legacy vocabulary panels |
 
-Site Monitor coaching is persisted on assistant messages and shown in the hints panel (not hidden on success). Debug: `NEXT_PUBLIC_OBSERVABILITY_DEBUG=1` for Phoenix trace links.
+Site Monitor `/intent` still powers the planner and resolver internally. Chat shows **applied project memory only** on successful edits — not raw vocabulary.
+
+Debug: `NEXT_PUBLIC_OBSERVABILITY_DEBUG=1` for Phoenix trace links.
 
 Metadata: `guidanceHints`, `ambiguityReasons` on assistant messages (`projectMessageMetadata.ts`).
 

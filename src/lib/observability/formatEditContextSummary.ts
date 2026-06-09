@@ -1,8 +1,10 @@
 import type {
+  ProjectChatOutcome,
   ProjectMessageObservabilityMetadata,
   ProjectMessageResolvedReference,
   ProjectMessageVocabulary,
 } from '@/lib/chat/projectMessageMetadata';
+import { hasResolvedReferenceValues } from '@/lib/project-workspace/edit-context/implicitReferenceResolver';
 import type { ImplicitReferenceRecord } from '@/lib/project-workspace/edit-context/implicitReferenceTypes';
 import type { ObservabilityProjectIntent } from './types';
 
@@ -27,7 +29,7 @@ function dedupeShort(values: string[], max: number): string[] {
 function sourceLabel(source: ImplicitReferenceRecord['source']): string {
   switch (source) {
     case 'project_intent':
-      return 'project vocabulary';
+      return 'Project Memory';
     case 'coaching_context':
       return 'coaching context';
     case 'chat_history':
@@ -74,6 +76,16 @@ export function buildResolvedReferencesForChat(
   return rows.length > 0 ? rows : undefined;
 }
 
+/** Resolved refs persisted on chat only when a successful edit applied them. */
+export function buildAppliedProjectMemoryForChat(
+  references: ImplicitReferenceRecord[] | null | undefined,
+  outcome: ProjectChatOutcome | undefined
+): ProjectMessageResolvedReference[] | undefined {
+  if (outcome !== 'success') return undefined;
+  if (!references?.length || !hasResolvedReferenceValues(references)) return undefined;
+  return buildResolvedReferencesForChat(references);
+}
+
 export function formatVocabularyPanelLines(
   vocabulary?: ProjectMessageVocabulary | null
 ): string[] {
@@ -101,21 +113,42 @@ export function formatResolvedReferencePanelLines(
   );
 }
 
-/** Merge planner/resolver context into observability metadata for chat storage. */
+/** User-facing inline + panel lines for applied project memory (no raw keywords). */
+export function formatUsedProjectContextLines(
+  references?: ProjectMessageResolvedReference[] | null
+): string[] {
+  if (!references?.length) return [];
+  const arrow = (ref: ProjectMessageResolvedReference) =>
+    `"${ref.phrase}" → "${ref.resolvedValue}"`;
+  if (references.length === 1) {
+    return [`Used project context: ${arrow(references[0])}`];
+  }
+  return references.map((ref) => `Used project context: ${arrow(ref)}`);
+}
+
+export function formatProjectMemoryPanelLines(
+  references?: ProjectMessageResolvedReference[] | null
+): string[] {
+  if (!references?.length) return [];
+  return references.map((ref) => `"${ref.phrase}" → "${ref.resolvedValue}"`);
+}
+
+/** Merge resolver context into observability metadata for chat storage. */
 export function enrichObservabilityMetadataForChat(
   base: ProjectMessageObservabilityMetadata | undefined,
   input: {
-    projectIntent?: ObservabilityProjectIntent | null;
+    outcome?: ProjectChatOutcome;
     resolvedReferences?: ImplicitReferenceRecord[] | null;
   }
 ): ProjectMessageObservabilityMetadata | undefined {
-  const vocabulary = buildProjectVocabularyForChat(input.projectIntent);
-  const resolved = buildResolvedReferencesForChat(input.resolvedReferences);
-  if (!base && !vocabulary && !resolved) return undefined;
+  const appliedProjectMemory = buildAppliedProjectMemoryForChat(
+    input.resolvedReferences,
+    input.outcome
+  );
+  if (!base && !appliedProjectMemory) return undefined;
   return {
     ...base,
-    ...(vocabulary ? { projectVocabulary: vocabulary } : {}),
-    ...(resolved ? { resolvedReferences: resolved } : {}),
+    ...(appliedProjectMemory ? { appliedProjectMemory } : {}),
   };
 }
 
@@ -123,8 +156,5 @@ export function countEditContextPanelItems(
   observability?: ProjectMessageObservabilityMetadata | null
 ): number {
   if (!observability) return 0;
-  return (
-    formatVocabularyPanelLines(observability.projectVocabulary).length +
-    (observability.resolvedReferences?.length ?? 0)
-  );
+  return observability.appliedProjectMemory?.length ?? 0;
 }

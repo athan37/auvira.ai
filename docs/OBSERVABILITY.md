@@ -107,7 +107,7 @@ Filter spans named `builder.turn` in [Phoenix Cloud](https://app.phoenix.arize.c
 
 ## Admin / debug UI
 
-- **Chat:** assistant messages show an **N hints applied** badge when hints were injected into the planner; click the badge to open a panel with each hint (click outside or press Escape to close). Set `NEXT_PUBLIC_OBSERVABILITY_DEBUG=1` for grade badges and Phoenix trace links ([`ObservabilityTraceChip`](../src/components/project/ObservabilityTraceChip.tsx)).
+- **Chat:** successful edits with applied project memory show an inline **Used project context** line and a sky **Context** chip; clarification/failure turns show a violet **Tips** chip when guidance or coaching exists (click to expand; Escape or click outside to close). Coaching "hints applied" badges are not shown on success. Set `NEXT_PUBLIC_OBSERVABILITY_DEBUG=1` for grade badges and Phoenix trace links ([`ObservabilityTraceChip`](../src/components/project/ObservabilityTraceChip.tsx)).
 - **Admin page:** [`/admin/observability`](../src/app/admin/observability/page.tsx) — recent turn scores across all projects via `GET /api/admin/observability`.
 - **Per-project page:** [`/projects/{projectId}/observability`](../src/app/projects/[projectId]/observability/page.tsx) — project owners see live Site Monitor `GET /context` (coaching hints, recurring issues, quality snapshot) plus turn history from chat metadata.
 
