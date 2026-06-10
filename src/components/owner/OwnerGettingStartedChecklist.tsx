@@ -115,7 +115,7 @@ export function OwnerGettingStartedChecklist({ context, className, variant = 'ca
   }
 
   return (
-    <Card variant="glass" className={cn('p-4', className)}>
+    <Card variant="bright" className={cn('p-4', className)}>
       <div className="flex items-start justify-between gap-2">
         <div>
           <h2 className={cn('text-sm font-semibold', TEXT.primary)}>{title}</h2>

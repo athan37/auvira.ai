@@ -1,11 +1,12 @@
 import { cn } from '@/lib/cn';
 import { CONTROL } from '@/content/productTheme';
 
-type CardVariant = 'default' | 'glass' | 'solid';
+type CardVariant = 'default' | 'glass' | 'bright' | 'solid';
 
 const variantClasses: Record<CardVariant, string> = {
   default: 'glass-card shadow-card',
   glass: 'glass-card shadow-card',
+  bright: 'glass-card-bright shadow-card',
   solid: 'rounded-2xl border border-[#d2d2d7]/80 bg-white shadow-card',
 };
 

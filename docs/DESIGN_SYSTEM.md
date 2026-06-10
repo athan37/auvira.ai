@@ -50,7 +50,7 @@ Use `CANVAS.mesh` / `SURFACE.canvas` from `@/content/productTheme` — do not ha
 |------|------------|
 | Product (dashboard, editor, clone, scratch) | Mesh canvas |
 | Landing hero | Mesh + optional rose atmosphere overlay |
-| Cards / inputs | `glass-card` / `glass-input` (translucent, not solid white) |
+| Cards / inputs | `glass-card` / `glass-input` (translucent); dashboard lists use `glass-card-bright` |
 
 ## Typography
 
@@ -74,7 +74,7 @@ Font stack: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", 
 | Primary rose | `.btn-rose-primary` | Rare brand moments |
 | Secondary | `.btn-blue-outline` | Outline pills |
 | Secondary link | `secondaryLink` | Inline underline CTAs |
-| Glass | `.btn-glass` | Attach, mic, tertiary actions |
+| Glass | `.btn-glass` | Attach, mic, tertiary actions — flat white, no backdrop blur |
 | Ghost | minimal + `hover:bg-black/[0.04]` | Toolbar icons |
 | Danger | `.btn-danger` | Destructive actions |
 
@@ -82,7 +82,7 @@ Font stack: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", 
 
 **Sizes:** `sm` h-8, `md` h-10, `lg` h-11 (all `rounded-full`).
 
-**Shadows:** Use `--rose-shadow-cta` on buttons; reserve `--rose-shadow-glass` for cards/promo only.
+**Shadows:** Use CTA shadows on primary buttons; keep secondary/glass button shadows restrained and non-specular. Reserve `--rose-shadow-glass` for cards/promo only.
 
 **Small controls:** `.chip-rose` (prompt pills, tags), `.btn-icon` (chevrons, icon buttons).
 
@@ -93,7 +93,8 @@ Use `Button` from `@/components/ui/Button` or `MarketingLink` on public pages.
 ```css
 .glass-panel     — frosted white 22%, saturate(150%) blur(14px)
 .glass-nav       — sticky header, white 28%
-.glass-card      — glass-panel + rounded-2xl
+.glass-card      — glass-panel + rounded-2xl (editor density)
+.glass-card-bright — dashboard/list cards, white 84%, blue-tinted rim, 18px radius
 .glass-input     — form fields, white 35%
 .glass-elevated  — toasts/modals, white 55%
 .glass-dark      — dark frosted overlay

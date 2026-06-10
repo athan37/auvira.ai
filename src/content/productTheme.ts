@@ -19,6 +19,8 @@ export const SURFACE = {
   alt: CANVAS.alt,
   panel: 'glass-panel',
   card: 'glass-card',
+  /** Dashboard / list surfaces — brighter glass (~84% white) with blue rim. */
+  cardBright: 'glass-card-bright rounded-2xl',
   input: 'glass-input',
   elevated: 'glass-elevated',
 } as const;

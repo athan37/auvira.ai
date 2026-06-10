@@ -271,6 +271,19 @@
     @apply glass-panel rounded-2xl;
   }
 
+  /** Dashboard / list cards — brighter than default glass (84% white) with blue-tinted rim. */
+  .glass-card-bright {
+    background: rgb(255 255 255 / 0.84);
+    backdrop-filter: saturate(135%) blur(10px);
+    -webkit-backdrop-filter: saturate(135%) blur(10px);
+    border: 1px solid color-mix(in srgb, var(--cta-blue) 24%, rgb(255 255 255 / 0.78));
+    border-radius: 18px;
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.96),
+      0 1px 0 color-mix(in srgb, var(--cta-blue) 8%, transparent),
+      0 2px 12px rgb(0 0 0 / 0.035);
+  }
+
   .glass-input {
     background: var(--color-glass-input);
     backdrop-filter: saturate(150%) blur(12px);
@@ -381,50 +394,35 @@
     position: relative;
     overflow: hidden;
     background: var(--cta-gradient);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.35),
-      var(--cta-shadow);
+    box-shadow: var(--cta-shadow);
     transition: transform 0.15s ease, box-shadow 0.15s ease;
   }
 
   .btn-blue-primary::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    pointer-events: none;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), transparent 55%);
+    content: none;
   }
 
   .btn-blue-primary:hover {
     transform: translateY(-1px);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.4),
-      var(--cta-shadow-hover);
+    box-shadow: var(--cta-shadow-hover);
   }
 
   .btn-blue-primary:active {
     transform: translateY(0);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.25),
-      var(--cta-shadow);
+    box-shadow: var(--cta-shadow);
   }
 
   .btn-blue-outline {
     background: var(--cta-outline-fill);
     border: 1px solid rgba(59, 130, 246, 0.35);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.6),
-      0 1px 2px rgba(0, 0, 0, 0.04);
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.025);
     transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
   }
 
   .btn-blue-outline:hover {
-    background: rgba(219, 234, 254, 0.65);
-    transform: translateY(-1px);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.75),
-      0 2px 8px rgba(59, 130, 246, 0.12);
+    background: rgba(219, 234, 254, 0.72);
+    transform: translateY(-0.5px);
+    box-shadow: 0 1px 4px rgba(59, 130, 246, 0.1);
   }
 
   .btn-blue-outline:active {
@@ -435,50 +433,35 @@
     position: relative;
     overflow: hidden;
     background: var(--rose-gradient-cta);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.35),
-      var(--rose-shadow-cta);
+    box-shadow: var(--rose-shadow-cta);
     transition: transform 0.15s ease, box-shadow 0.15s ease;
   }
 
   .btn-rose-primary::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    pointer-events: none;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), transparent 55%);
+    content: none;
   }
 
   .btn-rose-primary:hover {
     transform: translateY(-1px);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.4),
-      var(--rose-shadow-cta-hover);
+    box-shadow: var(--rose-shadow-cta-hover);
   }
 
   .btn-rose-primary:active {
     transform: translateY(0);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.25),
-      var(--rose-shadow-cta);
+    box-shadow: var(--rose-shadow-cta);
   }
 
   .btn-rose-outline {
     background: var(--rose-outline-fill);
     border: 1px solid rgba(210, 68, 96, 0.35);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.6),
-      0 1px 2px rgba(0, 0, 0, 0.04);
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.025);
     transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
   }
 
   .btn-rose-outline:hover {
-    background: rgba(241, 205, 215, 0.55);
-    transform: translateY(-1px);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.75),
-      0 2px 8px rgba(200, 62, 95, 0.12);
+    background: rgba(241, 205, 215, 0.62);
+    transform: translateY(-0.5px);
+    box-shadow: 0 1px 4px rgba(200, 62, 95, 0.1);
   }
 
   .btn-rose-outline:active {
@@ -486,22 +469,18 @@
   }
 
   .btn-glass {
-    background: var(--color-glass-input);
-    backdrop-filter: saturate(150%) blur(12px);
-    -webkit-backdrop-filter: saturate(150%) blur(12px);
-    border: 1px solid var(--color-border-glass);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.65),
-      0 2px 16px rgb(0 0 0 / 0.06);
+    background: rgb(255 255 255 / 0.82);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border: 1px solid rgb(210 210 215 / 0.8);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.035);
     transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
   }
 
   .btn-glass:hover {
-    background: rgb(255 255 255 / 0.45);
-    transform: translateY(-1px);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.8),
-      0 4px 20px rgb(0 0 0 / 0.08);
+    background: rgb(255 255 255 / 0.94);
+    transform: translateY(-0.5px);
+    box-shadow: 0 1px 4px rgb(0 0 0 / 0.045);
   }
 
   .btn-glass:active {
@@ -852,6 +831,7 @@
     .glass-panel,
     .glass-nav,
     .glass-card,
+    .glass-card-bright,
     .glass-input,
     .glass-elevated,
     .btn-glass,

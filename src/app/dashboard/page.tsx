@@ -48,7 +48,7 @@ function ProjectCard({ project }: { project: Project }) {
   const vercelTriggerFailed = project.deploymentStatus === 'trigger_failed';
 
   return (
-    <Card variant="glass" className="p-5 hover:shadow-glass transition-all h-full flex flex-col">
+    <Card variant="bright" className="p-5 hover:shadow-glass transition-all h-full flex flex-col">
       <Link href={`/projects/${project.id}`} className="flex-1 block">
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="min-w-0">
@@ -93,7 +93,7 @@ function ProjectCard({ project }: { project: Project }) {
 
 function ActiveCloneJobCard({ job }: { job: ActiveCloneJob }) {
   return (
-    <Card variant="glass" className="p-4 border-blue-200/40">
+    <Card variant="bright" className="p-4 border-blue-200/40">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-[#1d1d1f] truncate">
@@ -191,7 +191,7 @@ function DashboardContent() {
       )}
 
       {projects.length === 0 ? (
-        <Card variant="glass">
+        <Card variant="bright">
           <EmptyState
             title="No websites yet"
             description="Describe your business or paste an existing URL — First Site builds the draft for you."

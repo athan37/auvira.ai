@@ -14,6 +14,7 @@ describe('design system contract', () => {
   it('exposes mesh canvas and glass surface tokens', () => {
     expect(CANVAS.mesh).toBe('bg-mesh-canvas');
     expect(SURFACE.card).toBe('glass-card');
+    expect(SURFACE.cardBright).toBe('glass-card-bright rounded-2xl');
     expect(SURFACE.input).toBe('glass-input');
     expect(ACCENT.primary).toContain('btn-blue-primary');
     expect(ACCENT.tabActive).toContain('border-blue-500');
@@ -168,5 +169,29 @@ describe('design system contract', () => {
       'utf8'
     );
     expect(introSection).not.toContain('accent.glow');
+  });
+
+  it('defines brighter dashboard glass and applies it on dashboard page', () => {
+    const globals = fs.readFileSync(
+      path.join(process.cwd(), 'src/app/globals.css'),
+      'utf8'
+    );
+    const dashboard = fs.readFileSync(
+      path.join(process.cwd(), 'src/app/dashboard/page.tsx'),
+      'utf8'
+    );
+    const card = fs.readFileSync(
+      path.join(process.cwd(), 'src/components/ui/Card.tsx'),
+      'utf8'
+    );
+
+    expect(globals).toContain('.glass-card-bright');
+    expect(globals).toContain('rgb(255 255 255 / 0.84)');
+    expect(globals).toContain('var(--cta-blue) 24%');
+    expect(globals).toContain('border-radius: 18px');
+    expect(globals).toMatch(/prefers-reduced-transparency[\s\S]*\.glass-card-bright/);
+    expect(card).toContain("bright: 'glass-card-bright");
+    expect(dashboard).toContain('variant="bright"');
+    expect(dashboard).not.toContain('variant="glass"');
   });
 });
