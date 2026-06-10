@@ -5,11 +5,11 @@ import { runWebsiteEditAgent } from '@/lib/project-workspace/edit-agent';
 import { createSyntheticWorkspace, readSyntheticFile } from '../support/syntheticSiteWorkspace';
 import type { ConversationTurn } from '@/lib/project-workspace/edit-shared/types';
 
-vi.mock('@/lib/llm/llmClient', () => ({
+vi.mock('@/lib/project-workspace/planner/llmClient', () => ({
   getLLMClient: vi.fn(),
 }));
 
-import { getLLMClient } from '@/lib/llm/llmClient';
+import { getLLMClient } from '@/lib/project-workspace/planner/llmClient';
 import {
   conversationAfterGalleryPlacement,
   conversationAfterSingleImagePlacement,

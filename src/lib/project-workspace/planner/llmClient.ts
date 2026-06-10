@@ -1,2 +1,6 @@
-export { getLLMClient } from '@/lib/llm/llmClient';
-export type { GenerateJSONInput, GenerateJSONResult, LLMProvider } from '@/lib/llm/llmClient';
+export {
+  getWebsiteEditLLMClient as getLLMClient,
+  type GenerateJSONInput,
+  type GenerateJSONResult,
+  type LLMProvider,
+} from '@/lib/llm/llmClient';

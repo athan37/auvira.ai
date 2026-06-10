@@ -8,7 +8,6 @@ import {
 import type {
   ObservabilityCoachingContext,
   ObservabilityProjectIntent,
-  ObservabilityProjectMemory,
 } from '@/lib/observability/types';
 import { getLLMClient } from '@/lib/project-workspace/planner/llmClient';
 import type { ConversationTurn } from '@/lib/project-workspace/edit-shared/editAmbiguity';
@@ -23,7 +22,6 @@ import {
   extractExplicitQuotedValue,
   hasExplicitValueForKind,
 } from './implicitReferencePhrases';
-import { rankProjectMemorySlots } from './projectMemoryRanker';
 import type {
   ImplicitReferenceKind,
   ImplicitReferenceRecord,
@@ -51,7 +49,6 @@ export interface ResolveImplicitReferencesInput {
   editContext: EditContext;
   coachingContext?: ObservabilityCoachingContext | null;
   projectIntent?: ObservabilityProjectIntent | null;
-  projectMemory?: ObservabilityProjectMemory | null;
   recentHistory?: ConversationTurn[];
 }
 
@@ -207,7 +204,6 @@ function gatherPhraseBoundFavoriteColorEvidence(
     searchFavoriteColorFromHistoryMetadata(history),
     searchFavoriteColorFromClarificationThread(history),
     searchFavoriteColorExplicitInChat(history),
-    searchMemoryEvidence(detected, input).slice(0, 1),
   ];
 
   for (const candidates of sources) {
@@ -280,17 +276,6 @@ function pickSingleCandidate(candidates: EvidenceCandidate[]): EvidenceCandidate
     return candidates.find((c) => c.value.toLowerCase() === unique[0]!.toLowerCase()) ?? candidates[0]!;
   }
   return null;
-}
-
-function searchMemoryEvidence(
-  detected: ExtractedImplicitRef,
-  input: ResolveImplicitReferencesInput
-): EvidenceCandidate[] {
-  return rankProjectMemorySlots(input.projectMemory, detected, input.editContext).map((entry) => ({
-    value: entry.value,
-    source: entry.source,
-    reason: entry.reason,
-  }));
 }
 
 function searchDeterministicEvidence(
@@ -412,17 +397,6 @@ async function resolveWithLlm(
     ? JSON.stringify({ intent: input.projectIntent.sentence.trim() })
     : '{}';
 
-  const memoryBlock = input.projectMemory
-    ? JSON.stringify({
-        slots: input.projectMemory.slots.slice(0, 12).map((slot) => ({
-          kind: slot.kind,
-          scope: slot.scope,
-          value: slot.value,
-          aliases: slot.phrase_aliases.slice(0, 3),
-        })),
-      })
-    : '{}';
-
   const coachingBlock = input.coachingContext
     ? JSON.stringify({
         hints: input.coachingContext.coachingHints.slice(0, 8),
@@ -433,7 +407,7 @@ async function resolveWithLlm(
   const system = `You resolve implicit references in website edit requests.
 Rules:
 - Do not invent preferences or guess favorite colors from generic keywords.
-- Only resolve when evidence exists in project memory, vocabulary, coaching, or chat history.
+- Only resolve when evidence exists in project intent, coaching, or chat history.
 - Do not pick section targets.
 - Do not override explicit user values in the message.
 - If uncertain, set canResolve false and provide clarificationQuestion.`;
@@ -442,10 +416,7 @@ Rules:
 Implicit phrase to resolve: "${phrase}"
 Expected kind: ${kind}
 
-Project memory:
-${memoryBlock}
-
-Project vocabulary:
+Project intent:
 ${intentBlock}
 
 Coaching:
@@ -507,7 +478,6 @@ function hasEvidenceContext(input: ResolveImplicitReferencesInput): boolean {
   const history = input.recentHistory ?? input.editContext.conversationHistory ?? [];
   return Boolean(
     hasUsableIntentSentence(input.projectIntent?.sentence) ||
-      input.projectMemory?.slots.length ||
       input.coachingContext ||
       history.length > 0
   );
@@ -519,7 +489,6 @@ function mayUseLlmResolver(input: ResolveImplicitReferencesInput): boolean {
     isObservabilityCoachingEnabled() ||
     Boolean(
       hasUsableIntentSentence(input.projectIntent?.sentence) ||
-        input.projectMemory ||
         input.coachingContext
     )
   );
@@ -529,9 +498,7 @@ function gatherEvidence(
   detected: ExtractedImplicitRef,
   input: ResolveImplicitReferencesInput
 ): EvidenceCandidate[] {
-  const memory = searchMemoryEvidence(detected, input);
-  const legacy = searchDeterministicEvidence(detected.kind, input);
-  return [...memory, ...legacy];
+  return searchDeterministicEvidence(detected.kind, input);
 }
 
 function findPendingImplicitRefFromHistory(

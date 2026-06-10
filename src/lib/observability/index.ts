@@ -53,11 +53,6 @@ export {
   hasUsableIntentSentence,
   intentSentenceIsUnresolved,
 } from './intentSentence';
-export {
-  fetchObservabilityMemory,
-  parseObservabilityProjectMemory,
-} from './fetchObservabilityMemory';
-export { emitProjectMemorySlots } from './emitProjectMemorySlots';
 export { mapTurnPayload } from './mapTurnPayload';
 export type { MapTurnPayloadInput } from './mapTurnPayload';
 export { recordEditTurn, recordObservabilityTurn } from './recordObservabilityTurn';

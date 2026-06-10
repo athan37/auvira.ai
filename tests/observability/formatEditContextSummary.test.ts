@@ -10,7 +10,7 @@ import {
   formatIntentFeedPanelLines,
   formatUsedProjectContextLines,
 } from '@/lib/observability/formatEditContextSummary';
-import { getIntentFeedView, getMonitorContextView, getProjectMemoryView, getTipsView } from '@/lib/observability/formatCoachingSummary';
+import { getIntentFeedView } from '@/lib/observability/formatCoachingSummary';
 
 describe('formatEditContextSummary', () => {
   it('skips intent feed when sentence is empty', () => {
@@ -68,7 +68,7 @@ describe('formatEditContextSummary', () => {
     expect(buildAppliedProjectMemoryForChat(refs, 'failure')).toBeUndefined();
   });
 
-  it('attaches vocabulary and monitor context when feeds are provided', () => {
+  it('attaches intent feed only when project intent is provided', () => {
     const meta = enrichObservabilityMetadataForChat(
       { coachingApplied: false, experimentVariant: 'control' },
       {
@@ -97,10 +97,8 @@ describe('formatEditContextSummary', () => {
       }
     );
     expect(meta?.intentFeed?.sentence).toContain('blue');
-    expect(meta?.monitorContext?.coachingHints[0]).toContain('palette');
-    expect(meta?.resolvedReferences).toBeUndefined();
-    expect(meta?.appliedProjectMemory).toHaveLength(1);
-    expect(getMonitorContextView(meta)?.label).toMatch(/^\/context/);
+    expect(meta?.monitorContext).toBeUndefined();
+    expect(meta?.appliedProjectMemory).toBeUndefined();
     expect(getIntentFeedView(meta)?.label).toMatch(/^\/intent/);
   });
 
@@ -125,26 +123,6 @@ describe('formatEditContextSummary', () => {
         'Quality: B · score 0.70',
       ])
     );
-  });
-
-  it('shows applied memory in project memory view, not tips', () => {
-    const meta = enrichObservabilityMetadataForChat(undefined, {
-      outcome: 'success',
-      resolvedReferences: [
-        {
-          phrase: 'my favorite color',
-          resolvedValue: 'blue',
-          resolvedKind: 'color',
-          source: 'project_intent',
-          confidence: 'high',
-          reason: 'keyword',
-        },
-      ],
-    });
-    const memory = getProjectMemoryView('success', meta);
-    expect(memory?.lines[0]).toContain('Used project context');
-    expect(memory?.lines[0]).toContain('my favorite color');
-    expect(getTipsView('success', [], meta)).toBeNull();
   });
 
   it('formats inline used project context lines', () => {

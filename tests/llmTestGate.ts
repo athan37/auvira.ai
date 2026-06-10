@@ -1,4 +1,5 @@
 import { beforeAll, describe, vi } from 'vitest';
+import { createLlmClient } from '@/lib/llm/llmClient';
 
 /** Per-test timeout for live LLM calls (planner + E2E). */
 export const LLM_TEST_TIMEOUT_MS = 120_000;
@@ -11,16 +12,44 @@ export const LLM_TEST_RETRY = Math.max(
 
 vi.setConfig({ testTimeout: LLM_TEST_TIMEOUT_MS });
 
+function activeEditLlmProvider(): string {
+  return (process.env.WEBSITE_EDIT_LLM_PROVIDER || 'gemini').trim().toLowerCase();
+}
+
+function hasGeminiApiKey(): boolean {
+  return Boolean((process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY)?.trim());
+}
+
+function hasMinimaxApiKey(): boolean {
+  return Boolean(process.env.MINIMAX_API_KEY?.trim());
+}
+
 /**
  * Live LLM tests load credentials from .env via `node --env-file=.env` on npm scripts.
- * Suites are never skipped when the key is present — they fail fast if it is missing.
+ * Edit suites use WEBSITE_EDIT_LLM_PROVIDER (default gemini); clone routes use LLM_PROVIDER.
  */
 export function hasLlmApiKey(): boolean {
-  return Boolean(process.env.MINIMAX_API_KEY?.trim());
+  const provider = activeEditLlmProvider();
+  if (provider === 'gemini' || provider === 'google') {
+    return hasGeminiApiKey();
+  }
+  if (provider === 'minimax-proxy') {
+    return true;
+  }
+  return hasMinimaxApiKey();
 }
 
 export function requireLlmApiKey(): void {
   if (hasLlmApiKey()) return;
+
+  const provider = activeEditLlmProvider();
+  if (provider === 'gemini' || provider === 'google') {
+    throw new Error(
+      'Live LLM tests require GEMINI_API_KEY (or GOOGLE_API_KEY) when WEBSITE_EDIT_LLM_PROVIDER=gemini. ' +
+        'Run: npm run test:llm (loads .env automatically).'
+    );
+  }
+
   throw new Error(
     'Live LLM tests require MINIMAX_API_KEY in the project .env file. ' +
       'Run: npm run test:llm (loads .env automatically).'
@@ -60,4 +89,9 @@ export function describeRunLlmIntegration(name: string, fn: () => void): void {
     return;
   }
   llmDescribe(name, fn);
+}
+
+/** Smoke helper for scripts — returns configured edit LLM client. */
+export function getEditLlmClientForTests() {
+  return createLlmClient(activeEditLlmProvider());
 }

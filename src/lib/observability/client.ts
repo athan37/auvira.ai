@@ -100,28 +100,6 @@ export async function fetchObservabilityIntentRaw(input: {
   );
 }
 
-export async function fetchObservabilityMemoryRaw(
-  projectId: string
-): Promise<Record<string, unknown> | null> {
-  return observabilityFetch(
-    `/projects/${encodeURIComponent(projectId)}/memory`,
-    { method: 'GET' }
-  );
-}
-
-export async function postObservabilityMemory(input: {
-  projectId: string;
-  payload: import('./types').UpsertProjectMemoryPayload;
-}): Promise<Record<string, unknown> | null> {
-  return observabilityFetch(
-    `/projects/${encodeURIComponent(input.projectId)}/memory`,
-    {
-      method: 'POST',
-      body: JSON.stringify(input.payload),
-    }
-  );
-}
-
 export async function fetchObservabilityContextRaw(input: {
   projectId: string;
   conversationId: string;

@@ -38,7 +38,7 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Test (unit only; live LLM requires MINIMAX_API_KEY — run npm run test:llm locally)
+      - name: Test (unit only; live LLM is manual — npm run test:llm when explicitly requested)
         run: npm run test
 
       - name: Contract tests

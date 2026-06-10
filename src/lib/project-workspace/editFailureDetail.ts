@@ -33,7 +33,7 @@ export interface EditFailureReport {
 
 const REDACT_PATTERNS = [
   /(gitlab|oauth2|x-api-key|authorization|bearer|password|token)([=:\s]+)[^\s&]+/gi,
-  /(GITLAB_TOKEN|MINIMAX_API_KEY|VERCEL_[A-Z_]+)=[^\s]+/gi,
+  /(GITLAB_TOKEN|MINIMAX_API_KEY|GEMINI_API_KEY|GOOGLE_API_KEY|VERCEL_[A-Z_]+)=[^\s]+/gi,
 ];
 
 function redactSecrets(text: string): string {

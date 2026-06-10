@@ -54,7 +54,6 @@ export interface WebsiteEditOptions {
   infraVersion?: number;
   coachingContext?: import('@/lib/observability/types').ObservabilityCoachingContext | null;
   projectIntent?: import('@/lib/observability/types').ObservabilityProjectIntent | null;
-  projectMemory?: import('@/lib/observability/types').ObservabilityProjectMemory | null;
 }
 
 /**
@@ -103,7 +102,6 @@ export async function runWebsiteEdit(
     infraBaselineReady,
     coachingContext: options.coachingContext,
     projectIntent: options.projectIntent,
-    projectMemory: options.projectMemory,
     editJobId: options.editJobId,
   };
   const result = await runWebsiteEditAgent(agentOptions, onStep);

@@ -70,7 +70,6 @@ import {
   ensureObservabilityRegistration,
   fetchCoachingContext,
   fetchObservabilityIntent,
-  fetchObservabilityMemory,
   isObservabilityCoachingEnabled,
   isObservabilityEnabled,
   loadSiteConfigForObservability,
@@ -91,7 +90,6 @@ import type {
   ObservabilityCoachingContext,
   ObservabilityEditOutcome,
   ObservabilityProjectIntent,
-  ObservabilityProjectMemory,
   ObservabilityTurnMetadata,
 } from '@/lib/observability/types';
 import { promises as fs } from 'fs';
@@ -228,10 +226,9 @@ export async function POST(
       let isSandbox = false;
       let beforeHashes: Record<string, string> = {};
       const editTimer = new EditStepTimer();
-      let conversationHistory: { role: 'user' | 'assistant'; content: string }[] = [];
+      let conversationHistory: import('@/lib/project-workspace/edit-shared/types').ConversationTurn[] = [];
       let coachingContext: ObservabilityCoachingContext | null = null;
       let projectIntent: ObservabilityProjectIntent | null = null;
-      let projectMemory: ObservabilityProjectMemory | null = null;
       let turnIndex = 0;
       let lastAgentLatencyBreakdown: Record<string, number> | undefined;
       let lastPlannerPath: 'deterministic' | 'explorer' | 'llm' | 'clarification' | undefined;
@@ -276,7 +273,6 @@ export async function POST(
         preGateBlocked?: boolean;
         clarificationAnchor?: ClarificationAnchor;
         resolvedReferences?: ImplicitReferenceRecord[] | null;
-        projectMemorySlotsWritten?: number;
         idempotentSuccess?: boolean;
         isRefinementTurn?: boolean;
         previousChangedFileCount?: number | null;
@@ -284,7 +280,6 @@ export async function POST(
         if (!isObservabilityEnabled() || !jobId) return null;
         const plannerPath = args.plannerPath ?? lastPlannerPath;
         const resolvedRefs = serializeResolvedReferencesForMonitor(args.resolvedReferences);
-        const resolvedCount = args.resolvedReferences?.filter((ref) => ref.resolvedValue?.trim()).length ?? 0;
         try {
           return await recordEditTurn({
             projectId,
@@ -320,9 +315,6 @@ export async function POST(
                 plannerPath,
               }),
             resolvedReferences: resolvedRefs,
-            projectMemoryApplied: resolvedCount > 0,
-            projectMemoryPhraseCount: args.resolvedReferences?.length ?? 0,
-            projectMemorySlotsWritten: args.projectMemorySlotsWritten ?? 0,
             idempotentSuccess: args.idempotentSuccess ?? false,
             isRefinementTurn: args.isRefinementTurn ?? false,
             previousChangedFileCount: args.previousChangedFileCount ?? null,
@@ -491,7 +483,7 @@ export async function POST(
           content: message,
           attachments,
           clientMessageId: typeof clientMessageId === 'string' ? clientMessageId : undefined,
-          selectedTarget,
+          selectedTarget: selectedTarget ?? undefined,
         });
         conversationHistory = trimCurrentUserTurn(
           await buildConversationHistory({
@@ -581,14 +573,13 @@ export async function POST(
             projectId,
             title: project.name || 'Untitled project',
           });
-          const [fetchedContext, fetchedIntent, fetchedMemory] = await Promise.all([
+          const [fetchedContext, fetchedIntent] = await Promise.all([
             fetchCoachingContext({ projectId, userMessage: message }),
             fetchObservabilityIntent({
               projectId,
               userMessage: message,
               selectedTarget,
             }),
-            fetchObservabilityMemory(projectId),
           ]);
           coachingContext = fetchedContext ?? {
             coachingHints: [],
@@ -598,7 +589,6 @@ export async function POST(
             source: 'unavailable',
           };
           projectIntent = fetchedIntent;
-          projectMemory = fetchedMemory;
           await appendEditJobLog(jobId, 'observability_context', 'Fetched monitor context', {
             hintCount: coachingContext?.coachingHints.length ?? 0,
             source: coachingContext?.source ?? 'none',
@@ -608,8 +598,7 @@ export async function POST(
           await appendEditJobLog(jobId, 'observability_intent', 'Fetched monitor intent', {
             intentSentence: projectIntent?.sentence?.slice(0, 200) ?? null,
             hasIntentSentence: Boolean(projectIntent?.sentence?.trim()),
-            memorySlotCount: projectMemory?.slots.length ?? 0,
-            resolverUsed: Boolean(projectIntent || projectMemory || coachingContext),
+            resolverUsed: Boolean(projectIntent || coachingContext),
           });
         }
 
@@ -624,13 +613,12 @@ export async function POST(
             conversationHistory,
             lastGalleryEdit: lastGalleryEdit ?? undefined,
             editFocusStack,
-            selectedTarget,
+            selectedTarget: selectedTarget ?? undefined,
             editJobId: jobId,
             infraStatus: project.infraStatus,
             infraVersion: project.infraVersion,
             coachingContext: coachingContext ?? undefined,
             projectIntent: projectIntent ?? undefined,
-            projectMemory: projectMemory ?? undefined,
           },
           (stepEvent) => {
             emit('step', {
@@ -1373,7 +1361,6 @@ export async function POST(
           siteConfigParsed,
           plannerPath: agentResult.plannerPath,
           resolvedReferences: agentResult.resolvedReferences,
-          projectMemorySlotsWritten: agentResult.projectMemorySlotsWritten ?? 0,
           idempotentSuccess: changedPaths.length === 0,
         });
         await appendAssistantMessage({

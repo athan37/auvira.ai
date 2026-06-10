@@ -13,11 +13,11 @@ import {
   seedSingleImageGallerySection,
 } from '../support/multiTurnEditFocusScenario';
 
-vi.mock('@/lib/llm/llmClient', () => ({
+vi.mock('@/lib/project-workspace/planner/llmClient', () => ({
   getLLMClient: vi.fn(),
 }));
 
-import { getLLMClient } from '@/lib/llm/llmClient';
+import { getLLMClient } from '@/lib/project-workspace/planner/llmClient';
 
 describe('multi-turn edit focus (deterministic)', () => {
   beforeEach(() => {

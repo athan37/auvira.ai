@@ -116,6 +116,8 @@ export interface ProjectMessageMetadata {
   clarificationAnchor?: ClarificationAnchor;
   /** Unresolved implicit phrase awaiting a follow-up value (e.g. color after "What color?"). */
   pendingImplicitRef?: PendingImplicitRef;
+  /** @deprecated Legacy — resolved refs on assistant turns before intent-only chat metadata. */
+  resolvedReferences?: ProjectMessageResolvedReference[];
   /** Local tips shown on clarification / failure / zero-change turns. */
   guidanceHints?: string[];
   ambiguityReasons?: string[];

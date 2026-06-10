@@ -13,8 +13,7 @@ import {
 import { resolveImplicitReferences } from '@/lib/project-workspace/edit-context/implicitReferenceResolver';
 import { buildEditContext } from '@/lib/project-workspace/edit-context/buildEditContext';
 import { runWebsiteEditAgent } from '@/lib/project-workspace/edit-agent';
-import { fetchObservabilityIntent, fetchObservabilityMemory } from '@/lib/observability';
-import { upsertLocalProjectMemorySlots } from '@/lib/observability/localProjectMemory';
+import { fetchObservabilityIntent } from '@/lib/observability';
 import type { ConversationTurn } from '@/lib/project-workspace/edit-shared/types';
 import { createSyntheticWorkspace } from '../tests/support/syntheticSiteWorkspace';
 import { scratchPath } from '@/lib/runtime/scratchDir';
@@ -78,7 +77,6 @@ async function runStep(
   history: ConversationTurn[],
   workspacePath: string,
   intent: Awaited<ReturnType<typeof fetchObservabilityIntent>>,
-  memory: Awaited<ReturnType<typeof fetchObservabilityMemory>>,
   runAgent: boolean,
   pinContact?: boolean
 ): Promise<StepResult> {
@@ -103,7 +101,6 @@ async function runStep(
     ownerMessage: userMessage,
     editContext: ctx.context,
     projectIntent: intent,
-    projectMemory: memory,
     recentHistory: history,
   });
 
@@ -130,7 +127,6 @@ async function runStep(
       infraBaselineReady: true,
       selectedTarget,
       projectIntent: intent,
-      projectMemory: memory,
     });
     result.agent = {
       ok: agent.ok,
@@ -154,9 +150,7 @@ async function main(): Promise<void> {
     projectId,
     userMessage: 'change background to my favorite color',
   });
-  const memory = await fetchObservabilityMemory(projectId);
   console.log('intent sentence:', intent?.sentence?.slice(0, 120) ?? 'n/a');
-  console.log('memory slots:', memory?.slots?.length ?? 0);
 
   const workspacePath = await createSyntheticWorkspace({
     site: {
@@ -189,7 +183,6 @@ async function main(): Promise<void> {
       history,
       workspacePath,
       intent,
-      memory,
       runAgent,
       pinContact
     );
@@ -217,29 +210,6 @@ async function main(): Promise<void> {
       },
     });
 
-    if (
-      r.implicit.references?.length &&
-      !r.implicit.needsClarification &&
-      process.env.SKIP_MONGO_MEMORY !== '1'
-    ) {
-      try {
-        await upsertLocalProjectMemorySlots({
-          projectId,
-          slots: [
-            {
-              kind: 'color',
-              phrase_aliases: ['my favorite color', 'my favourite color'],
-              resolved_value: 'green',
-              scope: {},
-              confidence: 'high',
-              source: 'chat_history',
-            },
-          ],
-        });
-      } catch (err) {
-        console.warn('[probe] local memory upsert skipped:', (err as Error).message);
-      }
-    }
   }
 
   console.log('\n=== Expectations ===');

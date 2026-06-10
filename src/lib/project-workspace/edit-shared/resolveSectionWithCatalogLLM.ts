@@ -1,4 +1,4 @@
-import { getLLMClient } from '@/lib/llm/llmClient';
+import { getLLMClient } from '@/lib/project-workspace/planner/llmClient';
 import {
   formatSectionCatalogForClarifier,
   type SiteSectionCatalog,

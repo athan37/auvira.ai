@@ -8,18 +8,6 @@ import {
   resolveImplicitReferences,
 } from '@/lib/project-workspace/edit-context/implicitReferenceResolver';
 import { collectImplicitPhrases } from '@/lib/project-workspace/edit-context/extractImplicitReferences';
-import {
-  deriveMemorySlotsFromResolvedReferences,
-  deriveProjectMemorySlots,
-} from '@/lib/project-workspace/edit-context/projectMemoryWriter';
-import { emitProjectMemorySlots } from '@/lib/observability/emitProjectMemorySlots';
-import { upsertLocalProjectMemorySlots } from '@/lib/observability/localProjectMemory';
-import {
-  GLOBALS_CSS,
-  PAGE_TSX,
-  readWorkspaceRel,
-  SITE_CONFIG,
-} from '@/lib/project-workspace/edit-shared/strategyContext';
 import { planEdit } from '@/lib/project-workspace/planner/planEdit';
 import { routeAttachmentEdits } from '@/lib/project-workspace/edit-shared/attachmentRouter';
 import { computeWorkspaceHashes } from '@/lib/project-workspace/workspaceEditShared';
@@ -93,7 +81,6 @@ export async function runWebsiteEditAgent(
     editContext,
     coachingContext: options.coachingContext,
     projectIntent: options.projectIntent,
-    projectMemory: options.projectMemory,
     recentHistory: options.conversationHistory,
   });
 
@@ -173,7 +160,6 @@ export async function runWebsiteEditAgent(
     hasAttachments: (options.attachments?.length ?? 0) > 0,
     coachingContext: options.coachingContext,
     projectIntent: options.projectIntent,
-    projectMemory: options.projectMemory,
   });
   phaseTimer.finish('agent_plan');
 
@@ -194,12 +180,6 @@ export async function runWebsiteEditAgent(
   emitStep(onStep, 'v3_plan', 'Planning the edit', 'completed');
   emitStep(onStep, 'v3_execute', 'Applying the edit', 'active');
 
-  const memoryBeforeFiles: Record<string, string> = {};
-  for (const rel of [SITE_CONFIG, PAGE_TSX, GLOBALS_CSS]) {
-    const content = await readWorkspaceRel(options, rel).catch(() => null);
-    if (content !== null) memoryBeforeFiles[rel] = content;
-  }
-
   phaseTimer.start('agent_execute');
   const result = await executePlan(
     planResult.plan,
@@ -215,49 +195,6 @@ export async function runWebsiteEditAgent(
     'Applying the edit',
     result.ok ? 'completed' : 'failed'
   );
-
-  if (result.ok && planResult.plan && options.projectId) {
-    const afterFiles: Record<string, string> = {};
-    for (const rel of [SITE_CONFIG, PAGE_TSX, GLOBALS_CSS]) {
-      const after = await readWorkspaceRel(options, rel).catch(() => null);
-      if (after !== null) afterFiles[rel] = after;
-    }
-    const turnId = options.editJobId ?? 'unknown';
-    const memorySlots = [
-      ...deriveProjectMemorySlots({
-        plan: planResult.plan,
-        editContext,
-        ownerMessage: options.ownerMessage,
-        turnId,
-        beforeFiles: memoryBeforeFiles,
-        afterFiles,
-      }),
-      ...deriveMemorySlotsFromResolvedReferences({
-        references: editContext.resolvedReferences ?? implicitResolution.references,
-        editContext,
-        ownerMessage: options.ownerMessage,
-        turnId,
-      }),
-    ];
-    const seen = new Set<string>();
-    const uniqueSlots = memorySlots.filter((slot) => {
-      const key = `${slot.kind}:${JSON.stringify(slot.scope)}:${typeof slot.value === 'string' ? slot.value : JSON.stringify(slot.value)}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-    if (uniqueSlots.length > 0) {
-      void emitProjectMemorySlots({ projectId: options.projectId, slots: uniqueSlots });
-      void upsertLocalProjectMemorySlots({ projectId: options.projectId, slots: uniqueSlots });
-    }
-    return {
-      ...result,
-      plannerPath: planResult.plannerPath,
-      resolvedReferences: editContext.resolvedReferences ?? implicitResolution.references,
-      projectMemorySlotsWritten: uniqueSlots.length,
-      agentLatencyBreakdown: phaseTimer.toLatencyBreakdown(),
-    };
-  }
 
   return {
     ...result,

@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import path from 'node:path';
+
 /** Production Site Monitor when OBSERVABILITY_API_URL is unset. */
 export const DEFAULT_OBSERVABILITY_API_URL =
   'https://la-mue-site-monitor-production.up.railway.app';
@@ -19,10 +22,6 @@ function isCoachingExplicitlyDisabled(): boolean {
 export function readBundledObservabilityApiKey(): string | undefined {
   if (cachedBundledApiKey !== null) return cachedBundledApiKey;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const fs = require('node:fs') as typeof import('node:fs');
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const path = require('node:path') as typeof import('node:path');
     const filePath = path.join(process.cwd(), BUNDLED_OBSERVABILITY_ENV_PATH);
     const content = fs.readFileSync(filePath, 'utf8');
     const match = content.match(/^OBSERVABILITY_API_KEY=(.+)$/m);

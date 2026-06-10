@@ -12,7 +12,8 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "node --env-file=.env ./node_modules/vitest/vitest.mjs run",
-    "test:all": "npm run test && npm run test:llm && npm run test:llm:contracts",
+    "test:all": "npm run test && npm run test:contracts",
+    "test:all:llm": "npm run test:all && npm run test:llm && npm run test:llm:contracts",
     "test:integration": "node --env-file=.env ./node_modules/vitest/vitest.mjs run tests/integration/edit-agent/sectionStylePreviewSync.integration.test.ts",
     "test:llm": "VITEST_LLM_SUITE=1 node --env-file=.env ./node_modules/vitest/vitest.mjs run tests/integration/edit-agent/sectionStylePreviewSync.integration.test.ts tests/integration/edit-agent/chatHistoryEdit.llm.test.ts tests/integration/edit-agent/galleryDescriptionSequential.llm.test.ts tests/integration/edit-agent/galleryDescriptionAmbiguous.llm.test.ts tests/integration/edit-agent/galleryDescriptionAmbiguousHard.llm.test.ts tests/integration/edit-agent/multiTurnEditFocus.llm.test.ts tests/integration/edit-agent/sectionCatalogHard.llm.test.ts tests/integration/edit-agent/sectionGradientBackground.llm.test.ts tests/integration/edit-agent/innerElementStyle.llm.test.ts tests/integration/edit-agent/contactInformationCardBackground.llm.test.ts tests/integration/edit-agent/selectedTarget.llm.test.ts tests/integration/edit-agent/heroClarificationMultiTurn.llm.test.ts tests/integration/edit-agent/serviceProMagicHeroGradient.replay.test.ts tests/edit-agent/smoke.llm.test.ts tests/edit-agent/hard.llm.test.ts tests/edit-agent/sectionTitleTrap.llm.test.ts tests/edit-agent/copyEdit.llm.test.ts tests/edit-agent/structuralEdit.llm.test.ts tests/edit-agent/plannerGuards.llm.test.ts tests/edit-agent/reportAccuracy.llm.test.ts",
     "test:hero-clarification": "npm test -- tests/edit-agent/heroClarificationMultiTurn.test.ts tests/edit-agent/heroClarificationPlanGuard.test.ts tests/edit-agent/resolveEditTargetHeroQuote.test.ts tests/chat/conversationContextForEdit.test.ts tests/integration/edit-agent/serviceProMagicHeroGradient.replay.test.ts && VITEST_LLM_SUITE=1 node --env-file=.env ./node_modules/vitest/vitest.mjs run tests/integration/edit-agent/heroClarificationMultiTurn.llm.test.ts tests/integration/edit-agent/serviceProMagicHeroGradient.replay.test.ts",
@@ -40,6 +41,7 @@
     "test:observability:clone": "node --env-file=.env ./node_modules/vitest/vitest.mjs run tests/observability/builderTypeCompat.test.ts tests/observability/conversationId.test.ts tests/observability/mapGenerationTurnPayload.test.ts tests/observability/agentPhaseTimer.test.ts tests/observability/phoenixTraceUrl.test.ts tests/observability/coachingSummary.test.ts",
     "test:observability:live": "RUN_OBSERVABILITY_INTEGRATION_TESTS=true node --env-file=.env ./node_modules/vitest/vitest.mjs run tests/observability/liveMonitor.observability.integration.test.ts tests/observability/accuracyComparison.observability.integration.test.ts",
     "test:observability:accuracy:llm": "VITEST_LLM_SUITE=1 node --env-file=.env ./node_modules/vitest/vitest.mjs run tests/observability/observabilityAccuracy.llm.test.ts tests/observability/observabilityAccuracyHard.llm.test.ts",
+    "test:gemini": "node --env-file=.env -e \"require('child_process').execSync('npx --yes tsx scripts/test-gemini-quick.ts', {stdio:'inherit'})\"",
     "clean": "rm -rf .next",
     "build:clean": "npm run clean && npm run build",
     "dev:wait": "sh scripts/wait-for-dev.sh"

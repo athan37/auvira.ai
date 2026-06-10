@@ -55,23 +55,19 @@ Sub-phase data (`phase_events`, `planner_path`) is serialized into the Monitor `
 4. Local edit agent runs (`runWebsiteEdit`) with agent sub-phase timing
 5. `POST /turns` with redacted payload → store `metadata.arize.externalId` (trace_id)
 
-### Phase B: `/intent`, `/memory`, and implicit reference resolution
+### Phase B: `/intent` and implicit reference resolution
 
-`GET /api/v1/projects/{project_id}/intent` returns project vocabulary (`keywords`, `intents`, `turn_count`).  
-`GET /api/v1/projects/{project_id}/memory` returns **structured memory slots** (`kind`, `phrase_aliases`, `value`, `scope`, `provenance`).  
-`POST /api/v1/projects/{project_id}/memory` upserts slots after successful edits (soft-fail).
+`POST /api/v1/projects/{project_id}/intent` returns a single **intent sentence** for the current user message (and optional pinned target).
 
-la-mue uses both as optional evidence for the [Implicit Reference Resolver](./EDIT_AGENT.md#implicit-reference-resolver) and (when coaching is on) planner blocks `## Project vocabulary` and `## Project memory`.
+la-mue uses the sentence as optional evidence for the [Implicit Reference Resolver](./EDIT_AGENT.md#implicit-reference-resolver) and (when coaching is on) planner block `## Project intent`. Chat UI shows only the intent sentence on assistant messages.
 
-| Flag | Fetch `/context` + `/intent` + `/memory` | Planner vocabulary + memory + coaching | Resolver evidence |
-|------|------------------------------------------|----------------------------------------|-------------------|
+| Flag | Fetch `/context` + `/intent` | Planner intent + coaching | Resolver evidence |
+|------|------------------------------|---------------------------|-------------------|
 | `OBSERVABILITY_ENABLED=0` | No | No | Chat history / site config only |
-| Enabled, `OBSERVABILITY_COACHING_ENABLED=0` | Yes | No | Yes (memory rank + optional LLM) |
+| Enabled, `OBSERVABILITY_COACHING_ENABLED=0` | Yes | No | Yes (intent + optional LLM) |
 | Both on | Yes | Yes | Yes |
 
-**Not a routing or safety gate.** `/intent` and `/memory` do not pick section targets, bypass the ambiguity gate, or replace verification. Prompt caps: max 10 keywords, max 5 intent labels, max 8 memory slots (scoped to target first). Skip vocabulary injection when `turn_count === 0` or lists are empty.
-
-Turn payloads may include `plan.project_memory_applied`, `plan.project_memory_phrase_count`, and `plan.project_memory_slots_written` when memory is applied or written on a turn.
+**Not a routing or safety gate.** `/intent` does not pick section targets, bypass the ambiguity gate, or replace verification.
 
 ## Identity mapping
 

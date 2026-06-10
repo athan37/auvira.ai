@@ -1,4 +1,4 @@
-import { getLLMClient } from '@/lib/llm/llmClient';
+import { getLLMClient } from '@/lib/project-workspace/planner/llmClient';
 import type { WorkspaceAssetAttachment } from '../workspaceAssetTypes';
 import type { SelectedTargetInput } from './selectedTargetTypes';
 import {

@@ -867,7 +867,8 @@ export function ProjectPreviewChat({
               }
               if (Array.isArray(result.guidanceHints)) {
                 streamGuidanceHints = result.guidanceHints.filter(
-                  (hint): hint is string => typeof hint === 'string' && hint.trim().length > 0
+                  (hint: unknown): hint is string =>
+                    typeof hint === 'string' && hint.trim().length > 0
                 );
               }
             }

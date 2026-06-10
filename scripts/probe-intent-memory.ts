@@ -1,8 +1,8 @@
 /**
- * Probe Site Monitor GET /intent + /memory and resolver — run:
+ * Probe Site Monitor POST /intent and resolver — run:
  *   node --env-file=.env -e "require('child_process').execSync('npx --yes tsx scripts/probe-intent-memory.ts [projectId]', {stdio:'inherit'})"
  */
-import { fetchObservabilityIntent, fetchObservabilityMemory, isObservabilityEnabled, observabilityApiKey } from '../src/lib/observability';
+import { fetchObservabilityIntent, isObservabilityEnabled, observabilityApiKey } from '../src/lib/observability';
 import { resolveImplicitReferences } from '../src/lib/project-workspace/edit-context/implicitReferenceResolver';
 import { intentFlowEditContext } from '../tests/support/intentUserRequestFixtures';
 
@@ -23,17 +23,13 @@ async function main() {
       sectionTitle: 'Contact Us',
     },
   });
-  const memory = await fetchObservabilityMemory(projectId);
   console.log('\n=== POST /intent ===');
   console.log(JSON.stringify(intent, null, 2));
-  console.log('\n=== GET /memory ===');
-  console.log(JSON.stringify(memory, null, 2));
 
   const resolution = await resolveImplicitReferences({
     ownerMessage,
     editContext: intentFlowEditContext({ ownerMessage, effectiveMessage: ownerMessage }),
     projectIntent: intent,
-    projectMemory: memory,
   });
   console.log('\n=== Resolver (favorite color, no history) ===');
   console.log(JSON.stringify(resolution, null, 2));
@@ -42,7 +38,6 @@ async function main() {
     ownerMessage,
     editContext: intentFlowEditContext({ ownerMessage, effectiveMessage: ownerMessage }),
     projectIntent: intent,
-    projectMemory: memory,
     recentHistory: [
       { role: 'user', content: 'change background my favorite color' },
       { role: 'assistant', content: 'What color should I use?' },

@@ -140,7 +140,11 @@ export interface WorkspaceProfile {
   maxIterations: number;
 }
 
-export type ConversationTurn = { role: 'user' | 'assistant'; content: string };
+export type ConversationTurn = {
+  role: 'user' | 'assistant';
+  content: string;
+  metadata?: Record<string, unknown>;
+};
 
 export interface LastGalleryEdit {
   sectionIndex: number;
@@ -197,11 +201,9 @@ export interface WebsiteEditAgentOptions {
   infraBaselineReady?: boolean;
   /** Site Monitor coaching hints (injected when OBSERVABILITY_COACHING_ENABLED=1). */
   coachingContext?: import('@/lib/observability/types').ObservabilityCoachingContext | null;
-  /** Site Monitor project vocabulary (optional resolver/planner evidence). */
+  /** Site Monitor project intent sentence (POST /intent). */
   projectIntent?: import('@/lib/observability/types').ObservabilityProjectIntent | null;
-  /** Site Monitor structured project memory (GET /memory). */
-  projectMemory?: import('@/lib/observability/types').ObservabilityProjectMemory | null;
-  /** Edit job id for memory provenance and Monitor turns. */
+  /** Edit job id for Monitor turns. */
   editJobId?: string;
 }
 
@@ -243,6 +245,4 @@ export interface WebsiteEditAgentResult {
   resolvedReferences?: import('@/lib/project-workspace/edit-context/implicitReferenceTypes').ImplicitReferenceRecord[];
   /** Unresolved implicit phrase when returning color/value clarification. */
   pendingImplicitRef?: import('@/lib/chat/projectMessageMetadata').PendingImplicitRef;
-  /** Structured memory slots written after a successful edit. */
-  projectMemorySlotsWritten?: number;
 }

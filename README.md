@@ -176,14 +176,17 @@ Names from [`.env.example`](.env.example) — set values locally; do not commit 
 
 | Variable | Purpose |
 |----------|---------|
-| `LLM_PROVIDER` | `minimax` (default), `minimax-proxy`, or `gemini` |
-| `MINIMAX_API_KEY` | MiniMax API key (required for LLM tests and default generation) |
+| `LLM_PROVIDER` | Clone/scratch: `minimax` (default), `minimax-proxy`, or `gemini` |
+| `WEBSITE_EDIT_LLM_PROVIDER` | Website edit agent (default `gemini`) |
+| `GEMINI_API_KEY` | Google Gemini API key for edit agent (`GOOGLE_API_KEY` alias) |
+| `GEMINI_API_URL` | Gemini API base (default `https://generativelanguage.googleapis.com/v1beta`) |
+| `GEMINI_MODEL` | Gemini model id (default `gemini-flash-latest`) |
+| `MINIMAX_API_KEY` | MiniMax API key (clone/scratch when `LLM_PROVIDER=minimax`) |
 | `MINIMAX_API_URL` | MiniMax messages endpoint |
 | `MINIMAX_MODEL` | Model id (e.g. `MiniMax-M2.7-highspeed`) |
 | `MINIMAX_IMAGE_KEY` | Optional image API (not used by edit agent) |
 | `MINIMAX_IMAGE_API_URL` | Optional image API URL |
 | `MINIMAX_PROXY_URL` | Local proxy when `LLM_PROVIDER=minimax-proxy` |
-| `WEBSITE_EDIT_LLM_PROVIDER` | Optional: `gemini` for agent tool loop only |
 | `WEBSITE_EDIT_MAX_TOKENS` | Optional token cap for edits |
 | `MONGODB_URI` | MongoDB connection string |
 | `GOOGLE_CLIENT_ID` | Google OAuth client id |
@@ -227,7 +230,8 @@ Names from [`.env.example`](.env.example) — set values locally; do not commit 
 | `typecheck` | `tsc --noEmit` |
 | `test` | Vitest unit suite (excludes `*.llm.test.ts` and gated integration files) |
 | `test:watch` | Vitest watch mode |
-| `test:all` | **Final gate:** `test` → `test:llm` → `test:llm:contracts` |
+| `test:all` | **Final gate:** `test` + `test:contracts` (no live LLM) |
+| `test:all:llm` | Opt-in: `test:all` + full LLM + contract smoke (run only when you ask) |
 | `test:contracts` | Fast deterministic section-color / builder contracts (~1s) |
 | `test:edit-agent` | Edit-agent unit tests |
 | `test:section-color` | Section color + sandbox validation tests |
@@ -245,7 +249,7 @@ Names from [`.env.example`](.env.example) — set values locally; do not commit 
 | `test:diff-local` | Local diff API script |
 | `test:build-gate-local` | Local build gate script |
 
-LLM scripts load `.env` via `node --env-file=.env` and require `MINIMAX_API_KEY`.
+LLM scripts load `.env` via `node --env-file=.env`. Edit tests need `GEMINI_API_KEY` (default edit provider); clone routes need `MINIMAX_API_KEY` when `LLM_PROVIDER=minimax`.
 
 ---
 
@@ -256,9 +260,10 @@ LLM scripts load `.env` via `node --env-file=.env` and require `MINIMAX_API_KEY`
 | Fast deterministic | `npm run test:contracts` | Section color pipeline, wiring (~1s) |
 | Full unit (no LLM) | `npm test` | CI default (~5–15s) |
 | LLM smoke | `npm run test:llm:contracts` | 3 synthetic section-color cases |
-| Live LLM integration | `npm run test:llm` | **Before merge** on edit-agent / planner changes |
+| Live LLM integration | `npm run test:llm` | **Only when you explicitly request** (API cost) |
 | LLM edit-errors | `npm run test:llm:edit-errors` | Copy, structural, planner guardrails |
-| **Final gate** | `npm run test:all` | Unit + full LLM + LLM contracts |
+| **Final gate** | `npm run test:all` | Unit + contracts (no LLM) |
+| **LLM gate (opt-in)** | `npm run test:all:llm` | Unit + contracts + full LLM |
 
 **CI** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)): `typecheck` → `test` → `test:contracts` → `build` — no live LLM (no secrets in GitHub).
 
@@ -359,7 +364,7 @@ Legacy/smoke routes (no auth in some setups): `/api/agent/rebuild`, `/api/agent/
 ## Contributing
 
 - Prefer synthetic contract tests (`tests/support/syntheticSiteWorkspace.ts`) over site-specific fixtures except frozen regressions
-- Do not merge edit-agent / planner / routing changes without `npm run test:all` passing locally with `MINIMAX_API_KEY`
+- Default merge gate: `npm run test:all` (no LLM). Run `npm run test:all:llm` only when you want live LLM verification.
 - Production deploys from `main`; PR branches get Vercel preview URLs when enabled
 
 For AI agents and detailed edit-agent conventions, see **[`AGENTS.md`](AGENTS.md)**.

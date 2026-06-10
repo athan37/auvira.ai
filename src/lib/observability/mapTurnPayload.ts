@@ -40,9 +40,6 @@ export interface MapTurnPayloadInput {
   agentLatencyBreakdown?: Record<string, number>;
   plannerPath?: 'deterministic' | 'explorer' | 'llm' | 'clarification';
   latencyMs?: number;
-  projectMemoryApplied?: boolean;
-  projectMemoryPhraseCount?: number;
-  projectMemorySlotsWritten?: number;
   classifiedIntent?: string | null;
   selectedTarget?: Record<string, unknown> | null;
   targetResolved?: Record<string, unknown> | null;
@@ -66,13 +63,6 @@ function buildPlanMetadata(input: MapTurnPayloadInput, flowType: ObservabilityFl
   const plan: Record<string, unknown> = { flow_type: flowType };
   if (input.clonePhase) plan.clone_phase = input.clonePhase;
   if (input.plannerPath) plan.planner_path = input.plannerPath;
-  if (input.projectMemoryApplied != null) plan.project_memory_applied = input.projectMemoryApplied;
-  if (input.projectMemoryPhraseCount != null) {
-    plan.project_memory_phrase_count = input.projectMemoryPhraseCount;
-  }
-  if (input.projectMemorySlotsWritten != null) {
-    plan.project_memory_slots_written = input.projectMemorySlotsWritten;
-  }
   if (input.phaseEvents?.length) {
     plan.phase_events = input.phaseEvents.map((event) => ({
       name: event.name,

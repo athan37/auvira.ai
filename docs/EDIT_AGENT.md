@@ -27,7 +27,7 @@ Resolves **vague value references** in the owner message (not section targets) u
 | Missing color/copy/CTA when evidence exists | Ambiguity gate (`assessEditAmbiguity`) |
 | | Post-edit verification |
 
-**Pipeline:** [`extractImplicitReferences.ts`](../src/lib/project-workspace/edit-context/extractImplicitReferences.ts) (LLM + regex) → [`projectMemoryRanker.ts`](../src/lib/project-workspace/edit-context/projectMemoryRanker.ts) → [`implicitReferenceResolver.ts`](../src/lib/project-workspace/edit-context/implicitReferenceResolver.ts). Successful edits write slots via [`projectMemoryWriter.ts`](../src/lib/project-workspace/edit-context/projectMemoryWriter.ts) → `POST /memory`.
+**Pipeline:** [`extractImplicitReferences.ts`](../src/lib/project-workspace/edit-context/extractImplicitReferences.ts) (LLM + regex) → [`implicitReferenceResolver.ts`](../src/lib/project-workspace/edit-context/implicitReferenceResolver.ts). Monitor `POST /intent` supplies the authoritative sentence; resolver uses intent + coaching + chat history.
 
 **Order:** runs only after `buildEditContext` succeeds (target + ambiguity gate passed). If the resolver returns `needsClarification`, planning never runs.
 
@@ -58,7 +58,7 @@ Planner prompt blocks (when `OBSERVABILITY_COACHING_ENABLED=1`):
 
 Distinct from [`intentClarifier.ts`](../src/lib/project-workspace/edit-agent/intentClarifier.ts) (explorer field-path pick among section surfaces).
 
-Tests: `tests/edit-context/implicitReferenceResolver.test.ts`, `tests/edit-context/projectMemoryResolver.test.ts`, `tests/edit-context/extractImplicitReferences.test.ts`, `tests/edit-agent/implicitReferencePipeline.test.ts`.
+Tests: `tests/edit-context/implicitReferenceResolver.test.ts`, `tests/edit-context/extractImplicitReferences.test.ts`, `tests/edit-agent/implicitReferencePipeline.test.ts`.
 
 ## Ambiguity gate (`assessEditAmbiguity`)
 

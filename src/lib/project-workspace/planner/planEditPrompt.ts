@@ -16,15 +16,9 @@ import {
 import type {
   ObservabilityCoachingContext,
   ObservabilityProjectIntent,
-  ObservabilityProjectMemory,
-  ProjectMemorySlot,
 } from '@/lib/observability/types';
 import type { ImplicitReferenceRecord } from '@/lib/project-workspace/edit-context/implicitReferenceTypes';
 import { formatReferenceSourceLabel } from '@/lib/project-workspace/edit-context/implicitReferenceResolver';
-import {
-  formatMemorySlotForDisplay,
-  selectMemorySlotsForPlanner,
-} from '@/lib/project-workspace/edit-context/projectMemoryRanker';
 import { EDIT_SKILL_NAMES } from './editPlan.schema';
 
 const MAX_VOCAB_KEYWORDS = 10;
@@ -117,36 +111,15 @@ function formatCoachingBlock(coaching: ObservabilityCoachingContext): string {
   ].join('\n');
 }
 
-/** Scoped project memory block for planner (Monitor GET /memory). */
-export function formatProjectMemoryBlock(
-  memory?: ObservabilityProjectMemory | null,
-  editContext?: EditContext
-): string | null {
-  if (!memory?.slots.length) return null;
-  const slots = editContext
-    ? selectMemorySlotsForPlanner(memory, editContext, 8)
-    : memory.slots.slice(0, 8);
-  if (slots.length === 0) return null;
-  const lines = slots.map((slot: ProjectMemorySlot) => {
-    const aliases =
-      slot.phrase_aliases.length > 0 ? ` (aliases: ${slot.phrase_aliases.slice(0, 3).join(', ')})` : '';
-    return `- [${slot.kind}/${slot.scope.type}] ${formatMemorySlotForDisplay(slot)}${aliases}`;
-  });
-  return ['', '## Project memory', ...lines].join('\n');
-}
-
 export function buildPlanEditSystemPrompt(
   coaching?: ObservabilityCoachingContext | null,
   projectIntent?: ObservabilityProjectIntent | null,
   resolvedReferences?: ImplicitReferenceRecord[] | null,
-  projectMemory?: ObservabilityProjectMemory | null,
   editContext?: EditContext
 ): string {
   const blocks = [PLANNER_SYSTEM];
   const intentBlock = formatProjectIntentBlock(projectIntent);
   if (intentBlock) blocks.push(intentBlock);
-  const memoryBlock = formatProjectMemoryBlock(projectMemory, editContext);
-  if (memoryBlock) blocks.push(memoryBlock);
   const resolved = formatResolvedReferencesBlock(resolvedReferences);
   if (resolved) blocks.push(resolved);
   if (coaching && coaching.coachingHints.length > 0) {

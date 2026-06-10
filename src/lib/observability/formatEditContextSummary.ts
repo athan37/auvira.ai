@@ -204,7 +204,7 @@ export function formatProjectMemoryPanelLines(
   return references.map((ref) => `"${ref.phrase}" → "${ref.resolvedValue}"`);
 }
 
-/** Merge resolver context into observability metadata for chat storage. */
+/** Merge intent snapshot into observability metadata for chat storage. */
 export function enrichObservabilityMetadataForChat(
   base: ProjectMessageObservabilityMetadata | undefined,
   input: {
@@ -214,18 +214,11 @@ export function enrichObservabilityMetadataForChat(
     coachingContext?: ObservabilityCoachingContext | null;
   }
 ): ProjectMessageObservabilityMetadata | undefined {
-  const appliedProjectMemory = buildAppliedProjectMemoryForChat(
-    input.resolvedReferences,
-    input.outcome
-  );
   const intentFeed = buildIntentFeedForChat(input.projectIntent);
-  const monitorContext = buildMonitorContextForChat(input.coachingContext);
-  if (!base && !appliedProjectMemory && !intentFeed && !monitorContext) return undefined;
+  if (!base && !intentFeed) return undefined;
   return {
     ...base,
-    ...(appliedProjectMemory ? { appliedProjectMemory } : {}),
     ...(intentFeed ? { intentFeed, projectVocabulary: intentFeed } : {}),
-    ...(monitorContext ? { monitorContext } : {}),
   };
 }
 
@@ -234,9 +227,5 @@ export function countEditContextPanelItems(
 ): number {
   if (!observability) return 0;
   const feed = resolveIntentFeed(observability);
-  const intentLines = feed ? formatIntentFeedPanelLines(feed).length : 0;
-  const contextLines = observability.monitorContext
-    ? formatMonitorContextPanelLines(observability.monitorContext).length
-    : 0;
-  return (observability.appliedProjectMemory?.length ?? 0) + intentLines + contextLines;
+  return feed ? formatIntentFeedPanelLines(feed).length : 0;
 }

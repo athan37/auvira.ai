@@ -25,7 +25,6 @@ import { isObservabilityCoachingEnabled } from '@/lib/observability/config';
 import type {
   ObservabilityCoachingContext,
   ObservabilityProjectIntent,
-  ObservabilityProjectMemory,
 } from '@/lib/observability/types';
 
 const PLAN_MAX_TOKENS = parseInt(process.env.WEBSITE_EDIT_MAX_TOKENS || '4096', 10);
@@ -37,7 +36,6 @@ export interface PlanEditInput {
   hasAttachments?: boolean;
   coachingContext?: ObservabilityCoachingContext | null;
   projectIntent?: ObservabilityProjectIntent | null;
-  projectMemory?: ObservabilityProjectMemory | null;
 }
 
 /** @deprecated Prefer editContext — builds minimal context from siteModel for legacy tests. */
@@ -181,7 +179,6 @@ export async function planEdit(input: PlanEditInputUnion): Promise<PlanEditResul
     coachingForPrompt,
     intentForPrompt,
     resolvedForPrompt,
-    !isLegacyInput(input) ? (input.projectMemory ?? null) : null,
     editContext
   );
   const basePrompt = buildPlanEditUserPrompt(editContext, userPrompt);

@@ -29,8 +29,11 @@ export function serializeSelectedTargetForMonitor(
   if (target.elementLabel) out.element_label = target.elementLabel;
   if (target.surfaceId) out.surface_id = target.surfaceId;
   if (target.pinScope) out.pin_scope = target.pinScope;
-  if (target.previewThumbnail?.kind) {
-    out.preview_thumbnail = { kind: target.previewThumbnail.kind, has_preview: true };
+  if (target.previewThumbnail?.captureKind) {
+    out.preview_thumbnail = {
+      kind: target.previewThumbnail.captureKind,
+      has_preview: true,
+    };
   }
   if (target.targetChain?.length) {
     out.target_chain = target.targetChain.map((node) => ({

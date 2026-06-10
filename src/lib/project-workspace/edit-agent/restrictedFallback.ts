@@ -60,7 +60,7 @@ export async function runRestrictedCustomCodeEdit(
   ];
 
   for (let i = 0; i < maxFallbackIterations(); i++) {
-    const { getLLMClient } = await import('@/lib/llm/llmClient');
+    const { getLLMClient } = await import('@/lib/project-workspace/planner/llmClient');
     const llm = getLLMClient();
     const result = await llm.generateJSON<{ thought?: string; action?: { tool: string; args: Record<string, unknown> } }>({
       system: profile.systemPrompt,

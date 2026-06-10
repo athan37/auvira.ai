@@ -6,11 +6,11 @@ import { runRestrictedCustomCodeEdit } from '@/lib/project-workspace/edit-agent/
 import type { EditContext } from '@/lib/project-workspace/edit-context/types';
 import type { SiteSectionCatalog } from '@/lib/project-workspace/edit-shared/siteSectionCatalog';
 
-vi.mock('@/lib/llm/llmClient', () => ({
+vi.mock('@/lib/project-workspace/planner/llmClient', () => ({
   getLLMClient: vi.fn(),
 }));
 
-import { getLLMClient } from '@/lib/llm/llmClient';
+import { getLLMClient } from '@/lib/project-workspace/planner/llmClient';
 
 function mockEditContext(workspacePath: string): EditContext {
   return {

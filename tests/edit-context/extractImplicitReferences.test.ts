@@ -1,10 +1,10 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-vi.mock('@/lib/llm/llmClient', () => ({
+vi.mock('@/lib/project-workspace/planner/llmClient', () => ({
   getLLMClient: vi.fn(),
 }));
 
-import { getLLMClient } from '@/lib/llm/llmClient';
+import { getLLMClient } from '@/lib/project-workspace/planner/llmClient';
 import {
   collectImplicitPhrases,
   extractImplicitReferencesFromMessage,

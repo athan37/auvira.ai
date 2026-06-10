@@ -115,7 +115,9 @@ function resolvedReferencesFromMessageMetadata(
   if (meta?.resolvedReferences?.length) {
     return meta.resolvedReferences;
   }
-  const legacyObs = meta?.observability as { resolvedReferences?: typeof meta.resolvedReferences } | undefined;
+  const legacyObs = meta?.observability as
+    | { resolvedReferences?: ProjectMessageMetadata['resolvedReferences'] }
+    | undefined;
   if (legacyObs?.resolvedReferences?.length) {
     return legacyObs.resolvedReferences;
   }
