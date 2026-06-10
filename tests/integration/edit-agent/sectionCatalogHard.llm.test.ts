@@ -137,7 +137,7 @@ describeRunLlmIntegration('section catalog hard scenarios (LLM integration)', ()
         catalog
       );
 
-      expect(pick, 'LLM picker returned null — check MINIMAX_API_KEY and SECTION_TARGET_LLM').not.toBeNull();
+      expect(pick, 'LLM picker returned null — check GEMINI_API_KEY and SECTION_TARGET_LLM').not.toBeNull();
       expect(pick!.sectionIndex).toBe(2);
       expect(['high', 'medium']).toContain(pick!.confidence);
     },

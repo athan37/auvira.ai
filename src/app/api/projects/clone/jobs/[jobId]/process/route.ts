@@ -3,6 +3,7 @@ import { requireAuth } from '@/lib/api/projectAccess';
 import { CloneJob, type ICrawlPage } from '@/lib/db/models/CloneJob';
 import { crawlWebsite, type CrawlProgressEvent } from '@/lib/crawler/crawlWebsite';
 import { getLLMClient } from '@/lib/llm/llmClient';
+import { requireGenerateJsonResult } from '@/lib/llm/requireGenerateJsonResult';
 import { businessProfileSchema, type BusinessProfile, type FactualSiteData } from '@/lib/agent/schemas';
 import { buildExtractProfilePrompt, extractBusinessProfilePrompt } from '@/lib/agent/prompts';
 import { extractFactualSiteDataAgent } from '@/lib/agent/extractFactualSiteDataAgent';
@@ -141,7 +142,7 @@ export async function POST(
       ),
       schema: businessProfileSchema,
     });
-    job.businessProfile = profileResult.data as any;
+    job.businessProfile = requireGenerateJsonResult(profileResult, 'Business profile extraction') as any;
     log(job, 'extracting', 'Business profile extracted');
 
     job.status = 'planning';

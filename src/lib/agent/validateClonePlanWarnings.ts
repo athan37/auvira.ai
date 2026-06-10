@@ -36,11 +36,15 @@ export function validateClonePlanWarnings(
     suggestions.push('Confirm the business name before deploying.');
   }
 
-  if (factualSiteData.phoneNumbers.length === 0 && factualSiteData.emails.length === 0) {
+  const phoneNumbers = factualSiteData.phoneNumbers ?? [];
+  const emails = factualSiteData.emails ?? [];
+  const practiceAreasOrServices = factualSiteData.practiceAreasOrServices ?? [];
+
+  if (phoneNumbers.length === 0 && emails.length === 0) {
     warnings.push('No phone or email found in crawl — contact section may be incomplete.');
   }
 
-  if (factualSiteData.practiceAreasOrServices.length === 0) {
+  if (practiceAreasOrServices.length === 0) {
     warnings.push('No services/practice areas extracted — plan may rely on inferred structure.');
   }
 

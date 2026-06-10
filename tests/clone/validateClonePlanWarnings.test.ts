@@ -61,6 +61,14 @@ describe('validateClonePlanWarnings', () => {
     expect(result.warnings.some((w) => /testimonial/i.test(w))).toBe(true);
   });
 
+  it('tolerates missing factual array fields', () => {
+    const partialFactual = {
+      businessName: '',
+    } as FactualSiteData;
+    const result = validateClonePlanWarnings(basePlan, partialFactual);
+    expect(result.warnings.length).toBeGreaterThan(0);
+  });
+
   it('warns on thin crawl / missing contact', () => {
     const sparseFactual: FactualSiteData = {
       ...factual,

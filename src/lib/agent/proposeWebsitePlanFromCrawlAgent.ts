@@ -1,5 +1,6 @@
 import type { BusinessProfile, FactualSiteData, WebsitePlan } from './schemas';
 import { getLLMClient } from '@/lib/llm/llmClient';
+import { requireGenerateJsonResult } from '@/lib/llm/requireGenerateJsonResult';
 import { websitePlanSchema } from './schemas';
 import { buildProposeWebsitePlanFromCrawlPrompt } from './prompts';
 
@@ -41,7 +42,10 @@ export async function proposeWebsitePlanFromCrawlAgent(
       duration_ms: Date.now() - startTime,
     });
 
-    return { data: result.data as WebsitePlan, stageLogs };
+    return {
+      data: requireGenerateJsonResult(result, 'Website plan generation') as WebsitePlan,
+      stageLogs,
+    };
   } catch (error) {
     stageLogs.push({
       stage: 'crawl_plan_proposal_failed',

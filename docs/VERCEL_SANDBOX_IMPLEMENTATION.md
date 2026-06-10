@@ -73,7 +73,7 @@ SDK: `Sandbox.getOrCreate`, `sandbox.runCommand`, `sandbox.writeFiles`, `sandbox
 | `SITE_AGENT_SANDBOX_TIMEOUT` | No | Default `30m` |
 | `SITE_AGENT_SANDBOX_ENABLED` | No | Default `1` when `VERCEL=1`; set `0` to fall back to live URL mode |
 | `GITLAB_TOKEN` | Yes | Clone via HTTPS: `https://oauth2:TOKEN@gitlab.com/...` |
-| Existing `GITLAB_*`, `MONGODB_URI`, `MINIMAX_*` | Yes | Unchanged |
+| Existing `GITLAB_*`, `MONGODB_URI`, `GEMINI_*` | Yes | Unchanged |
 
 ### Feature flag
 
@@ -369,7 +369,7 @@ Verify exact API against installed `@vercel/sandbox` version README — adjust t
 1. Sandbox auth on Vercel deployments: OIDC vs `VERCEL_SANDBOX_TOKEN` — use Vercel-recommended approach for production.
 2. Exact workdir path inside sandbox for `writeFiles` / relative paths.
 3. Whether iframe can load `sandbox.domain()` directly or needs CSP / `X-Frame-Options` handling — test and add headers override on dev server if needed (`next.config.js` in **customer** repo template if required).
-4. `MINIMAX` latency + 300s `maxDuration` on `edit/stream` — monitor.
+4. Gemini latency + 300s `maxDuration` on `edit/stream` — monitor.
 
 ---
 

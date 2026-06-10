@@ -8,8 +8,7 @@ Instructions for AI agents and contributors working in this repo.
 
 1. Copy [`.env.example`](.env.example) to **`.env`** (used by `npm run test:*` via `node --env-file=.env`) and/or **`.env.local`** (used by Next.js dev).
 2. Fill in at minimum:
-   - **`GEMINI_API_KEY`** — for opt-in live LLM tests (`npm run test:llm*` when you request them)
-   - **`MINIMAX_API_KEY`** — clone/scratch when `LLM_PROVIDER=minimax`
+   - **`GEMINI_API_KEY`** (or `GOOGLE_API_KEY`) — required for clone, scratch, edit agent, and opt-in live LLM tests (`npm run test:llm*` when you request them)
    - **`MONGODB_URI`**, **`AUTH_SECRET`** / **`NEXTAUTH_SECRET`** — required for `next build` and auth-related paths
    - GitLab / Google OAuth / Vercel tokens as needed for the workflow you are testing
 

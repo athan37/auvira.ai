@@ -4,6 +4,7 @@ import { WebsiteProject } from '@/models/WebsiteProject';
 import { ProjectAction } from '@/models/ProjectAction';
 import { crawlWebsite } from '@/lib/crawler/crawlWebsite';
 import { getLLMClient } from '@/lib/llm/llmClient';
+import { requireGenerateJsonResult } from '@/lib/llm/requireGenerateJsonResult';
 import { businessProfileSchema, type BusinessProfile, type FactualSiteData } from '@/lib/agent/schemas';
 import { buildExtractProfilePrompt } from '@/lib/agent/prompts';
 import { extractFactualSiteDataAgent } from '@/lib/agent/extractFactualSiteDataAgent';
@@ -172,7 +173,7 @@ export async function POST(request: NextRequest) {
         ),
         schema: businessProfileSchema,
       });
-      businessProfile = profileResult.data;
+      businessProfile = requireGenerateJsonResult(profileResult, 'Business profile extraction');
     } catch (error) {
       stageLogs.push(logStage('business_profile_failed'));
       return NextResponse.json({

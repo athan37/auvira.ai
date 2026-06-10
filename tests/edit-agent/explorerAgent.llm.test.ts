@@ -1,7 +1,7 @@
 /**
  * Live LLM: explorer + intent clarifier on ambiguous pinned contact copy.
  *
- * Run: npm run test:llm (requires MINIMAX_API_KEY)
+ * Run: npm run test:llm (requires GEMINI_API_KEY)
  */
 import { afterEach, expect, it } from 'vitest';
 import { describeRunLlmIntegration, LLM_TEST_TIMEOUT_MS } from '../llmTestGate';

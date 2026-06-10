@@ -1,4 +1,4 @@
-/** JSON schema for structured agent actions (MiniMax JSON output). */
+/** JSON schema for structured agent actions (Gemini JSON output). */
 
 export const OWNER_ACTION_SCHEMA = {
   type: 'object',

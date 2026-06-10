@@ -110,7 +110,7 @@ Owners can **drag a section from the preview iframe onto chat** to pin a `select
 | Data | MongoDB (Mongoose) — users, projects, chat, catalog, site health |
 | Code storage | GitLab (generated customer sites) |
 | Hosting | Vercel (this app + customer sites) |
-| LLM | MiniMax (default), optional Gemini for tool loop, optional local proxy |
+| LLM | Google Gemini (clone, scratch, edit agent, planning) |
 | Preview (prod) | `@vercel/sandbox` |
 | Tests | Vitest |
 
@@ -122,7 +122,7 @@ Owners can **drag a section from the preview iframe onto chat** to pin a `select
 - **MongoDB** — local or Atlas (`MONGODB_URI`)
 - **Google OAuth** app — for sign-in
 - **GitLab** personal access token + group ID — repo creation for generated sites
-- **MiniMax API key** — generation, planning, and edit agent (required for LLM tests)
+- **Gemini API key** (`GEMINI_API_KEY`) — generation, planning, and edit agent (required for LLM tests)
 - **Optional:** `SITE_AGENT_VERCEL_TOKEN` — deploy **customer** sites via Vercel API (not required to host this app on Vercel)
 - **Optional:** `rg` (ripgrep) on PATH — complex edit-agent tool loop
 
@@ -176,17 +176,10 @@ Names from [`.env.example`](.env.example) — set values locally; do not commit 
 
 | Variable | Purpose |
 |----------|---------|
-| `LLM_PROVIDER` | Clone/scratch: `minimax` (default), `minimax-proxy`, or `gemini` |
-| `WEBSITE_EDIT_LLM_PROVIDER` | Website edit agent (default `gemini`) |
-| `GEMINI_API_KEY` | Google Gemini API key for edit agent (`GOOGLE_API_KEY` alias) |
+| `LLM_PROVIDER` | LLM provider (default `gemini`; alias `google`) |
+| `GEMINI_API_KEY` | Google Gemini API key (`GOOGLE_API_KEY` alias) |
 | `GEMINI_API_URL` | Gemini API base (default `https://generativelanguage.googleapis.com/v1beta`) |
 | `GEMINI_MODEL` | Gemini model id (default `gemini-flash-latest`) |
-| `MINIMAX_API_KEY` | MiniMax API key (clone/scratch when `LLM_PROVIDER=minimax`) |
-| `MINIMAX_API_URL` | MiniMax messages endpoint |
-| `MINIMAX_MODEL` | Model id (e.g. `MiniMax-M2.7-highspeed`) |
-| `MINIMAX_IMAGE_KEY` | Optional image API (not used by edit agent) |
-| `MINIMAX_IMAGE_API_URL` | Optional image API URL |
-| `MINIMAX_PROXY_URL` | Local proxy when `LLM_PROVIDER=minimax-proxy` |
 | `WEBSITE_EDIT_MAX_TOKENS` | Optional token cap for edits |
 | `MONGODB_URI` | MongoDB connection string |
 | `GOOGLE_CLIENT_ID` | Google OAuth client id |
@@ -249,7 +242,7 @@ Names from [`.env.example`](.env.example) — set values locally; do not commit 
 | `test:diff-local` | Local diff API script |
 | `test:build-gate-local` | Local build gate script |
 
-LLM scripts load `.env` via `node --env-file=.env`. Edit tests need `GEMINI_API_KEY` (default edit provider); clone routes need `MINIMAX_API_KEY` when `LLM_PROVIDER=minimax`.
+LLM scripts load `.env` via `node --env-file=.env`. Live LLM tests need `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) with `LLM_PROVIDER=gemini`.
 
 ---
 
@@ -321,7 +314,7 @@ For agent workflow details, test harness paths, and preview drag-to-chat trouble
 
 1. Connect the GitHub repo to [Vercel](https://vercel.com)
 2. **Production branch:** `main`
-3. Set environment variables (Production + Preview): at minimum `MONGODB_URI`, `AUTH_SECRET`, Google OAuth, GitLab, MiniMax; optional `SITE_AGENT_VERCEL_TOKEN` for customer deploys
+3. Set environment variables (Production + Preview): at minimum `MONGODB_URI`, `AUTH_SECRET`, Google OAuth, GitLab, `GEMINI_API_KEY`; optional `SITE_AGENT_VERCEL_TOKEN` for customer deploys
 4. On Vercel, `NEXTAUTH_URL` / `NEXT_PUBLIC_APP_URL` are usually auto-derived (`VERCEL=1`, `next.config.js`)
 5. Add production URL to Google OAuth redirect URIs: `https://<your-domain>/api/auth/callback/google`
 

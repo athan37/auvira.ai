@@ -1,5 +1,7 @@
 import { getLLMClient } from '@/lib/llm/llmClient';
+import { requireGenerateJsonResult } from '@/lib/llm/requireGenerateJsonResult';
 import { factualSiteDataSchema, type FactualSiteData } from './schemas';
+import { normalizeFactualSiteData } from './normalizeFactualSiteData';
 import type { CrawledSite } from '@/lib/crawler/types';
 import { buildCloneCrawlPromptInput } from '@/lib/clone/buildCloneCrawlPromptInput';
 import { getCloneCrawlPromptLimits } from '@/lib/clone/crawlPromptLimits';
@@ -82,10 +84,14 @@ export async function extractFactualSiteDataAgent(
       schema: factualSiteDataSchema,
     });
 
+    const data = normalizeFactualSiteData(
+      requireGenerateJsonResult(result, 'Factual data extraction')
+    );
+
     logStage(stageLogs, 'factual_extraction_done', Date.now() - startTime);
 
     return {
-      data: result.data,
+      data,
       stageLogs,
     };
   } catch (error) {
