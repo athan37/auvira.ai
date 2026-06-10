@@ -31,8 +31,7 @@ export const HERO_PROMPTS = [
 
 export const FEATURE_SPOTLIGHTS = [
   {
-    id: 'describe',
-    theme: 'light' as const,
+    id: 'describe' as const,
     eyebrow: 'Describe',
     headline: 'Say it once.',
     subline: 'Paste your existing URL or describe your business in a sentence. First Site extracts what matters and builds from there.',
@@ -40,8 +39,7 @@ export const FEATURE_SPOTLIGHTS = [
     ctaHref: '/auth/signin',
   },
   {
-    id: 'preview',
-    theme: 'promo' as const,
+    id: 'preview' as const,
     eyebrow: 'Preview',
     headline: 'See it instantly.',
     subline: 'Your draft loads in a live preview. Scroll, click, and decide if the direction feels right before you change a word.',
@@ -49,8 +47,7 @@ export const FEATURE_SPOTLIGHTS = [
     ctaHref: '/auth/signin',
   },
   {
-    id: 'edit',
-    theme: 'light' as const,
+    id: 'edit' as const,
     eyebrow: 'Edit',
     headline: 'Refine in chat.',
     subline: 'Drag any section into chat and describe the change. First Site updates the preview — no HTML, no settings maze.',
@@ -58,8 +55,7 @@ export const FEATURE_SPOTLIGHTS = [
     ctaHref: '#edit',
   },
   {
-    id: 'publish',
-    theme: 'dark' as const,
+    id: 'publish' as const,
     eyebrow: 'Publish',
     headline: 'Go live with confidence.',
     subline: 'Built-in checks run before every publish. Your live status only appears when the deployed site is actually ready.',

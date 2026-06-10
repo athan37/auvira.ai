@@ -2,9 +2,17 @@
 
 import { useEffect, useState } from 'react';
 import { HERO_PROMPTS } from '@/content/marketing';
+import { SURFACE } from '@/content/productTheme';
+import { cn } from '@/lib/cn';
 
 /** Typewriter prompt demo for the landing hero. */
-export function PromptDemo() {
+export function PromptDemo({
+  dotClassName = 'bg-rose-600',
+  cursorClassName = 'bg-rose-600',
+}: {
+  dotClassName?: string;
+  cursorClassName?: string;
+}) {
   const [promptIndex, setPromptIndex] = useState(0);
   const [charIndex, setCharIndex] = useState(0);
   const [deleting, setDeleting] = useState(false);
@@ -37,15 +45,25 @@ export function PromptDemo() {
   const visible = current.slice(0, charIndex);
 
   return (
-    <div className="rounded-2xl border border-[#d2d2d7]/60 bg-white/80 p-5 shadow-glass backdrop-blur-sm transition-all hover:border-rose-highlight hover:shadow-rose-glass">
+    <div
+      className={cn(
+        SURFACE.card,
+        'p-5 transition-all hover:border-rose-highlight hover:shadow-rose-glass'
+      )}
+    >
       <div className="flex items-center gap-2 border-b border-[#d2d2d7]/60 pb-3">
-        <span className="h-2 w-2 rounded-full bg-rose-600" aria-hidden />
+        <span className={cn('h-2 w-2 rounded-full', dotClassName)} aria-hidden />
         <span className="text-xs font-medium text-[#86868b]">Your prompt</span>
       </div>
-      <div className="mt-4 min-h-[5rem] rounded-xl bg-[#f5f5f7] px-4 py-3">
+      <div className={cn(SURFACE.input, 'mt-4 min-h-[5rem] rounded-xl px-4 py-3')}>
         <p className="text-[15px] leading-relaxed text-[#1d1d1f]">
           &ldquo;{visible}
-          <span className="ml-0.5 inline-block h-[1.1em] w-0.5 animate-pulse bg-rose-600 align-middle" />
+          <span
+            className={cn(
+              'ml-0.5 inline-block h-[1.1em] w-0.5 animate-pulse align-middle',
+              cursorClassName
+            )}
+          />
           &rdquo;
         </p>
       </div>

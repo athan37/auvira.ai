@@ -80,7 +80,7 @@ export function MobileNav({ activeSection }: { activeSection: string | null }) {
             transition={{ duration: 0.25, ease: APPLE_EASE }}
           >
             <div className="flex h-16 items-center justify-between px-4">
-              <Link href="/" onClick={() => setOpen(false)}>
+              <Link href="/intro" onClick={() => setOpen(false)}>
                 <BrandLogo />
               </Link>
               <button
@@ -154,7 +154,7 @@ export function MarketingHeader() {
           scrolled ? 'h-12' : 'h-16'
         )}
       >
-        <Link href="/" aria-label="First Site home">
+        <Link href="/intro" aria-label="First Site home">
           <BrandLogo />
         </Link>
         <nav className="hidden items-center gap-2 text-xs font-normal text-[#1d1d1f] sm:flex">

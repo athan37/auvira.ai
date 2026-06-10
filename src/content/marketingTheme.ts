@@ -32,3 +32,54 @@ export const MESH = {
   atmosphere:
     'pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_55%_45%_at_8%_18%,rgba(184,216,245,0.4),transparent_68%),radial-gradient(ellipse_50%_42%_at_92%_28%,rgba(216,200,245,0.35),transparent_65%)]',
 } as const;
+
+/** Intro / landing — transparent sections on page-level fixed mesh + rose accents. */
+export const INTRO = {
+  section: 'intro-section',
+  pageMesh: 'bg-mesh-canvas',
+  promoAccent: 'intro-promo-accent',
+} as const;
+
+export type IntroAccentId = 'hero' | 'describe' | 'preview' | 'edit' | 'publish' | 'final';
+
+/** Per-section rose accent palette — background stays shared mesh; accents differ. */
+export const INTRO_ACCENTS: Record<
+  IntroAccentId,
+  {
+    eyebrow: string;
+    glow: string;
+    stripe?: string;
+    dot?: string;
+    cursor?: string;
+    checkmark?: string;
+  }
+> = {
+  hero: {
+    eyebrow: 'text-rose-400',
+    glow: 'intro-rose-glow-tr intro-rose-glow-soft',
+  },
+  describe: {
+    eyebrow: 'text-rose-500',
+    glow: 'intro-rose-glow-bl',
+    dot: 'bg-rose-500',
+    cursor: 'bg-rose-500',
+  },
+  preview: {
+    eyebrow: 'text-rose-600',
+    glow: 'intro-rose-glow-tr',
+    stripe: INTRO.promoAccent,
+  },
+  edit: {
+    eyebrow: 'text-rose-700',
+    glow: 'intro-rose-glow-br',
+  },
+  publish: {
+    eyebrow: 'text-rose-800',
+    glow: 'intro-rose-glow-bl intro-rose-glow-deep',
+    checkmark: 'bg-rose-700',
+  },
+  final: {
+    eyebrow: 'text-rose-600',
+    glow: 'intro-rose-glow-center',
+  },
+} as const;

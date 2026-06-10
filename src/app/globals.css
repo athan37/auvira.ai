@@ -113,6 +113,7 @@
   --mesh-blob-blush: radial-gradient(ellipse 55% 48% at 35% 88%, color-mix(in srgb, var(--mesh-blush) 58%, transparent), transparent 68%);
   --mesh-alt-gradient-base: linear-gradient(180deg, #eef2fb 0%, #e8ecf8 100%);
   --mesh-alt-blob: radial-gradient(ellipse 70% 50% at 50% 0%, rgb(255 255 255 / 0.5), transparent 55%);
+
 }
 
 @layer base {
@@ -146,6 +147,13 @@
   .bg-mesh-alt {
     background-color: var(--mesh-base);
     background-image: var(--mesh-alt-blob), var(--mesh-alt-gradient-base);
+    background-attachment: fixed;
+  }
+
+  /** Intro sections — no background; single fixed mesh backdrop on the page. */
+  .intro-section {
+    position: relative;
+    background: transparent;
   }
 
   .bg-mesh-freeze {
@@ -154,6 +162,76 @@
       var(--mesh-blob-lavender),
       var(--mesh-blob-sky),
       var(--mesh-gradient-base);
+  }
+
+  .intro-promo-accent {
+    border-left: 3px solid var(--rose-hot);
+    padding-left: 1rem;
+  }
+
+  .intro-dark-glass {
+    background: rgb(29 29 31 / 0.72);
+    backdrop-filter: saturate(150%) blur(20px);
+    -webkit-backdrop-filter: saturate(150%) blur(20px);
+    border: 1px solid rgb(255 255 255 / 0.1);
+    box-shadow: 0 2px 16px rgb(0 0 0 / 0.08);
+  }
+
+  .intro-rose-glow-tr,
+  .intro-rose-glow-bl,
+  .intro-rose-glow-br,
+  .intro-rose-glow-center {
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+  }
+
+  .intro-rose-glow-tr {
+    background: radial-gradient(
+      ellipse 45% 40% at 88% 12%,
+      color-mix(in srgb, var(--rose-hot) 12%, transparent),
+      transparent 65%
+    );
+  }
+
+  .intro-rose-glow-tr.intro-rose-glow-soft {
+    background: radial-gradient(
+      ellipse 45% 40% at 88% 12%,
+      color-mix(in srgb, var(--rose-soft) 10%, transparent),
+      transparent 65%
+    );
+  }
+
+  .intro-rose-glow-bl {
+    background: radial-gradient(
+      ellipse 50% 42% at 10% 88%,
+      color-mix(in srgb, var(--rose-hot) 11%, transparent),
+      transparent 68%
+    );
+  }
+
+  .intro-rose-glow-bl.intro-rose-glow-deep {
+    background: radial-gradient(
+      ellipse 50% 42% at 10% 88%,
+      color-mix(in srgb, var(--rose-deep) 10%, transparent),
+      transparent 68%
+    );
+  }
+
+  .intro-rose-glow-br {
+    background: radial-gradient(
+      ellipse 48% 40% at 92% 82%,
+      color-mix(in srgb, var(--rose-deep) 11%, transparent),
+      transparent 66%
+    );
+  }
+
+  .intro-rose-glow-center {
+    background: radial-gradient(
+      ellipse 55% 45% at 50% 55%,
+      color-mix(in srgb, var(--rose-hot) 9%, transparent),
+      transparent 70%
+    );
   }
 
   /** Opaque loader overlay — defined in CSS so Tailwind purge cannot drop it. */
@@ -777,11 +855,17 @@
     .glass-input,
     .glass-elevated,
     .btn-glass,
-    .chat-bubble-assistant {
+    .chat-bubble-assistant,
+    .intro-dark-glass {
       backdrop-filter: none;
       -webkit-backdrop-filter: none;
       background: rgb(255 255 255 / 0.96);
       border-color: var(--color-border);
+    }
+
+    .intro-dark-glass {
+      background: rgb(29 29 31 / 0.96);
+      color: #f5f5f7;
     }
 
     .glass-nav {

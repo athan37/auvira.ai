@@ -251,33 +251,48 @@ Use `Toast` from `@/components/ui/Toast` — glass-dark pill, bottom center.
 - `.glass-specular-edge` — diagonal specular sheen via `::before`
 - `.rose-shine-overlay` — subtle promo shine via `::after`
 - `.btn-rose-primary` — luminous gradient CTA with inset highlight
-- `.bg-rose-gradient` — primary CTA fill + promo section base
+- `.bg-rose-gradient` — legacy rose CTA fill (deprecated for section backgrounds)
 - `.border-rose-highlight` / `.shadow-rose-glass` — card hover accents
 - `.text-rose-accent` — link text on light backgrounds
 
-### Premium material system (one layer)
+### Intro / landing (unified mesh + rose accents)
 
-Rose is **one material**, not stacked decorations:
+The `/intro` page uses **one** fixed `bg-mesh-canvas` backdrop (`INTRO.pageMesh` on a `fixed inset-0` layer). Every `IntroSection` is fully transparent — no per-section backgrounds or full-bleed glow overlays (those clip at section edges). Rose differentiation is inline only: eyebrow text color, stripes, dots, mock rings, checkmarks via `INTRO_ACCENTS`.
 
-| Zone | Layers |
-|------|--------|
-| Hero | Neutral canvas + `bg-rose-atmosphere` at ~35% opacity |
-| Promo | `bg-rose-gradient` + full atmosphere + shine + `glass-rose-premium` visual |
-| Final CTA | Neutral `#f5f5f7` + atmosphere at ~20% opacity |
-| CTAs | `btn-rose-primary` + `bg-rose-gradient` |
+Visual rhythm comes from `INTRO_ACCENTS` in `marketingTheme.ts` (eyebrow shade + positioned rose glow):
 
-Do **not** embed rose radials in `.bg-brand-canvas` — atmosphere layers only.
+| Section | Eyebrow | Glow | Extra accent |
+|---------|---------|------|----------------|
+| hero | `rose-400` | `intro-rose-glow-tr` soft | — |
+| describe | `rose-500` | `intro-rose-glow-bl` | PromptDemo dot |
+| preview | `rose-600` | `intro-rose-glow-tr` | left stripe + mock ring |
+| edit | `rose-700` | `intro-rose-glow-br` | — |
+| publish | `rose-800` | `intro-rose-glow-bl` deep | checklist badges |
+| final | `rose-600` | `intro-rose-glow-center` | — |
+
+**Rules:**
+
+1. **Never** put `bg-rose-gradient`, `bg-mesh-alt`, or mesh atmosphere on `<section>` roots.
+2. **One rose accent treatment per section** — eyebrow color + one glow position; small UI touches (stripe, dot, ring) where listed.
+3. Body copy stays `#1d1d1f` / `#6e6e73` on all intro sections.
+4. Primary CTAs stay **blue** (`btn-blue-primary`); rose on nav pills, pins, checkmarks, hovers.
+
+CSS utilities: `.intro-rose-glow-tr`, `-bl`, `-br`, `-center`, `.intro-promo-accent` in `globals.css`.
 
 ### Contrast rules
 
-- White text **only** on `bg-rose-gradient` (buttons, promo section)
-- Body copy on light sections stays `#1d1d1f` / `#6e6e73`
+- White text **only** on user chat bubbles and dark UI chrome
+- Body copy on intro sections stays `#1d1d1f` / `#6e6e73`
 - `text-rose-700` links on `#fbfbfd` — OK for large/interactive text
 - Avoid body text on `rose-50` / pale rose backgrounds
 
 ### Landing QA (raspberry)
 
-- [ ] Canvas reads neutral; raspberry visible on CTAs, glow, preview promo, hovers
-- [ ] Only **one** full gradient section (`#preview` promo)
-- [ ] App chrome uses rose CTAs and focus rings
-- [ ] Focus rings on rose CTAs use `ring-rose-500/35`
+- [ ] Scroll full page: **no horizontal seam** between sections
+- [ ] Rose accent shifts subtly per section (eyebrow + glow position)
+- [ ] Preview: rose stripe + mock ring only — no full glass band slab
+- [ ] Publish: light glass checklist on mesh — no dark card
+- [ ] Hero + final CTA match dashboard mesh tone
+- [ ] Raspberry visible on accents only (eyebrows, pins, mock ring, checkmarks)
+- [ ] App chrome uses blue CTAs; rose on nav pills and targeting accents
+- [ ] `prefers-reduced-transparency` disables glass blur on intro panels

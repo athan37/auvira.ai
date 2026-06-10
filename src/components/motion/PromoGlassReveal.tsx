@@ -41,7 +41,7 @@ export function PromoAtmosphereFade({ className, ...props }: PromoAtmosphereFade
 
   return (
     <motion.div
-      className={cn('pointer-events-none absolute inset-0 bg-rose-atmosphere', className)}
+      className={cn('pointer-events-none absolute inset-0', className)}
       initial={{ opacity: reduced ? 1 : 0 }}
       whileInView={{ opacity: 1 }}
       viewport={SCROLL_VIEWPORT}

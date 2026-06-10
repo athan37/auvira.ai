@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { cn } from '@/lib/cn';
 import { buttonClassName, type ButtonSize, type ButtonVariant } from '@/components/ui/buttonStyles';
+import { BLUE } from '@/content/marketingTheme';
 
 /** Apple-style marketing link button. */
 export function MarketingLink({
@@ -53,7 +54,7 @@ export function MarketingTextLink({
   const classes = cn(
     'text-[17px] font-normal transition-colors',
     promo
-      ? 'text-white/90 hover:text-rose-50 hover:underline underline-offset-4'
+      ? cn(BLUE.link, 'hover:text-rose-600')
       : inverted
         ? 'text-white/90 hover:text-white hover:underline underline-offset-4'
         : 'text-blue-600 hover:text-blue-500 hover:underline underline-offset-4',

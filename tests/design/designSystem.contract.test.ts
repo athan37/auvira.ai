@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buttonVariants } from '@/components/ui/buttonStyles';
 import { ACCENT, CANVAS, LOADING, SURFACE } from '@/content/productTheme';
-import { BLUE } from '@/content/marketingTheme';
+import { BLUE, INTRO, INTRO_ACCENTS } from '@/content/marketingTheme';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -106,5 +106,67 @@ describe('design system contract', () => {
 
     expect(dots).toContain('LOADING.dots');
     expect(dots).toContain('LOADING.dotsLg');
+  });
+
+  it('exposes intro landing accent tokens for all sections', () => {
+    expect(INTRO.section).toBe('intro-section');
+    expect(INTRO.pageMesh).toBe('bg-mesh-canvas');
+    expect(INTRO.promoAccent).toBe('intro-promo-accent');
+    for (const id of ['hero', 'describe', 'preview', 'edit', 'publish', 'final'] as const) {
+      expect(INTRO_ACCENTS[id].eyebrow).toMatch(/^text-rose-/);
+      expect(INTRO_ACCENTS[id].glow).toMatch(/^intro-rose-glow-/);
+    }
+    expect(INTRO_ACCENTS.preview.stripe).toBe('intro-promo-accent');
+    expect(INTRO_ACCENTS.publish.checkmark).toBe('bg-rose-700');
+  });
+
+  it('defines intro rose glow utilities in globals.css', () => {
+    const globals = fs.readFileSync(
+      path.join(process.cwd(), 'src/app/globals.css'),
+      'utf8'
+    );
+    expect(globals).toContain('.intro-promo-accent');
+    expect(globals).toContain('.intro-section');
+    expect(globals).toContain('.bg-mesh-canvas');
+    expect(globals).not.toContain('.bg-mesh-intro-a');
+    expect(globals).toContain('.intro-rose-glow-tr');
+    expect(globals).toContain('.intro-rose-glow-bl');
+    expect(globals).toContain('.intro-rose-glow-br');
+    expect(globals).toContain('.intro-rose-glow-center');
+    expect(globals).not.toContain('.intro-section-feather');
+    expect(globals).not.toContain('.intro-rose-corner');
+  });
+
+  it('uses unified intro section shell without theme forks', () => {
+    const spotlight = fs.readFileSync(
+      path.join(process.cwd(), 'src/components/marketing/FeatureSpotlight.tsx'),
+      'utf8'
+    );
+    const introPage = fs.readFileSync(
+      path.join(process.cwd(), 'src/app/intro/page.tsx'),
+      'utf8'
+    );
+    const hero = fs.readFileSync(
+      path.join(process.cwd(), 'src/components/marketing/LandingHero.tsx'),
+      'utf8'
+    );
+
+    expect(spotlight).toContain('IntroSection');
+    expect(spotlight).toContain('INTRO_ACCENTS');
+    expect(spotlight).not.toContain('isPromo');
+    expect(spotlight).not.toContain('isDark');
+    expect(spotlight).not.toContain('intro-dark-glass');
+    expect(spotlight).not.toContain('bg-mesh-alt');
+    expect(spotlight).not.toMatch(/<section[\s\S]*ROSE\.gradient/);
+    expect(hero).toContain('IntroSection');
+    expect(hero).not.toContain('INTRO.atmosphere');
+    expect(introPage).toContain('INTRO.pageMesh');
+    expect(introPage).toContain('fixed inset-0');
+    expect(introPage).not.toContain('meshFlip');
+    const introSection = fs.readFileSync(
+      path.join(process.cwd(), 'src/components/marketing/IntroSection.tsx'),
+      'utf8'
+    );
+    expect(introSection).not.toContain('accent.glow');
   });
 });
