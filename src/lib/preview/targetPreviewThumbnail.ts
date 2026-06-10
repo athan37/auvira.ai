@@ -29,10 +29,12 @@ export const SECTION_PREVIEW_THUMB_MAX = {
   pill: { width: 88, height: 56 },
 } as const;
 
-export const DRAG_GHOST_CARD_WIDTH = 260;
-export const DRAG_GHOST_CARD_PADDING_X = 20;
-export const DRAG_GHOST_META_BLOCK_HEIGHT = 56;
-export const DRAG_GHOST_HEADER_HEIGHT = 22;
+/** Compact drag chip — matches chat pill thumbnail + label row. */
+export const DRAG_GHOST_PILL_PADDING_X = 16;
+export const DRAG_GHOST_PILL_PADDING_Y = 8;
+export const DRAG_GHOST_PILL_GAP = 8;
+export const DRAG_GHOST_PILL_LABEL_MAX_WIDTH = 148;
+export const DRAG_GHOST_PILL_MAX_WIDTH = 248;
 export const TARGET_PREVIEW_THUMB_PADDING = 8;
 /** Device pixel ratio for sharper canvas captures (display size unchanged). */
 export const TARGET_PREVIEW_THUMB_DPR = 2;
@@ -348,7 +350,7 @@ export function resolvePreviewThumbDisplaySize(
   };
 }
 
-/** Estimate drag ghost card height from thumb + label block. */
+/** Estimate compact drag ghost size (pill thumb + breadcrumb label). */
 export function computeDragGhostDimensions(
   target: PreviewThumbDimensionTarget,
   options?: {
@@ -358,27 +360,31 @@ export function computeDragGhostDimensions(
     showBreadcrumb?: boolean;
   }
 ): { ghostWidth: number; ghostHeight: number; thumbHeight: number } {
-  const innerWidth = DRAG_GHOST_CARD_WIDTH - DRAG_GHOST_CARD_PADDING_X;
   const source = resolvePreviewThumbSourceDimensions(target, {
     width: options?.captureWidth,
     height: options?.captureHeight,
   });
-  const thumb = resolvePreviewThumbDisplaySize('drag', source.width, source.height, {
-    fullWidth: true,
-    containerWidth: innerWidth,
+  const thumb = resolvePreviewThumbDisplaySize('pill', source.width, source.height, {
     elementKind: target.elementKind,
     pinScope: target.pinScope,
     kind: target.kind,
+    captureKind: target.previewThumbnail?.captureKind,
   });
   const showPreview = options?.showPreview !== false;
-  const previewBlock = showPreview ? thumb.height + 8 : 0;
-  const breadcrumbExtra = options?.showBreadcrumb ? 16 : 0;
-  const ghostHeight =
-    DRAG_GHOST_HEADER_HEIGHT + previewBlock + DRAG_GHOST_META_BLOCK_HEIGHT + breadcrumbExtra;
+  const thumbWidth = showPreview ? thumb.width : 0;
+  const thumbHeight = showPreview ? thumb.height : 0;
+  const ghostHeight = Math.max(thumbHeight, 18) + DRAG_GHOST_PILL_PADDING_Y;
+  const labelWidth = options?.showBreadcrumb === false ? 0 : DRAG_GHOST_PILL_LABEL_MAX_WIDTH;
+  const ghostWidth = Math.min(
+    DRAG_GHOST_PILL_MAX_WIDTH,
+    DRAG_GHOST_PILL_PADDING_X +
+      thumbWidth +
+      (showPreview && labelWidth > 0 ? DRAG_GHOST_PILL_GAP + labelWidth : labelWidth)
+  );
   return {
-    ghostWidth: DRAG_GHOST_CARD_WIDTH,
+    ghostWidth: Math.max(ghostWidth, thumbWidth + DRAG_GHOST_PILL_PADDING_X),
     ghostHeight,
-    thumbHeight: thumb.height,
+    thumbHeight,
   };
 }
 

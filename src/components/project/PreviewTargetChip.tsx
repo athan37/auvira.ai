@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/cn';
 import { BORDER, CONTROL, TEXT } from '@/content/productTheme';
-import { PreviewTargetCardLayout } from '@/components/project/PreviewTargetCardLayout';
 import {
   formatPreviewTargetBreadcrumb,
   formatPreviewTargetChipText,
@@ -17,12 +16,9 @@ import {
 import type { SelectedTargetInput } from '@/lib/project-workspace/edit-shared/selectedTargetTypes';
 import { PreviewTargetThumbnail } from '@/components/project/PreviewTargetThumbnail';
 import {
-  inferPreviewScaleProfile,
-  resolvePreviewThumbSourceDimensions,
   targetPreviewDisplayUrl,
   targetPreviewFallbackLabel,
 } from '@/lib/preview/targetPreviewThumbnail';
-import { leafContainerKind, resolveTargetChain } from '@/lib/preview/targetChain';
 
 interface Props {
   target: SelectedTargetInput;
@@ -57,31 +53,95 @@ function ClearPinButton({ label, onClear }: { label: string; onClear: () => void
   );
 }
 
-function TargetCardHeader({ onClear, label }: { onClear: () => void; label: string }) {
-  return (
-    <div className="flex items-center justify-between gap-2">
-      <span className={cn('text-[10px] font-semibold uppercase tracking-wider', TEXT.muted)}>
-        Edit target
-      </span>
-      <ClearPinButton label={label} onClear={onClear} />
-    </div>
-  );
-}
-
-function pinnedCardSurfaceClass(options: {
+function targetPillSurfaceClass(options: {
   interactive: boolean;
   active: boolean;
   pulsing: boolean;
+  fullWidth?: boolean;
   className?: string;
 }): string {
   return cn(
-    'target-pin-card w-full overflow-hidden transition-colors',
+    'items-center gap-2 rounded-xl px-2 py-1 text-xs transition-colors',
+    options.fullWidth ? 'flex w-full min-w-0' : 'inline-flex max-w-full',
+    CONTROL.chip,
+    TEXT.primary,
     options.interactive &&
       (options.active
-        ? 'cursor-pointer ring-2 ring-rose-400/40 ring-offset-1'
-        : cn('cursor-pointer hover:shadow', BORDER.hairline, 'hover:border-[#d2d2d7]')),
+        ? 'cursor-pointer ring-2 ring-rose-400/50 ring-offset-1'
+        : 'cursor-pointer hover:bg-rose-50/60'),
     options.pulsing && 'ring-2 ring-rose-400/50 ring-offset-1',
     options.className
+  );
+}
+
+/** Compact pill row — same thumbnail size as chat history (`variant="pill"`). */
+function TargetPillRow({
+  target,
+  chipVariant,
+  interactive,
+  active,
+  pulsing,
+  fullWidth = false,
+  onHoverStart,
+  onHoverEnd,
+  onActivate,
+  refocusInput,
+  className,
+}: {
+  target: SelectedTargetInput;
+  chipVariant: PreviewTargetChipVariant;
+  interactive: boolean;
+  active: boolean;
+  pulsing: boolean;
+  fullWidth?: boolean;
+  onHoverStart?: () => void;
+  onHoverEnd?: () => void;
+  onActivate?: () => void;
+  refocusInput?: () => void;
+  className?: string;
+}) {
+  const label = formatPreviewTargetLabel(target);
+  const breadcrumb = formatPreviewTargetBreadcrumb(target);
+  const chipText = formatPreviewTargetChipText(target, chipVariant);
+  const canActivate = interactive && Boolean(onActivate);
+  const showTargetPreview = Boolean(
+    target.previewThumbnail?.previewUrl ||
+      target.previewThumbnailDataUrl ||
+      targetPreviewFallbackLabel(target)
+  );
+
+  const activate = () => {
+    activatePreviewTargetChip({ onActivate, refocusInput });
+  };
+
+  return (
+    <div
+      data-section-chat-label
+      className={targetPillSurfaceClass({
+        interactive,
+        active,
+        pulsing,
+        fullWidth,
+        className,
+      })}
+      title={interactive ? `Show ${label} in preview` : chipText}
+      aria-label={canActivate ? `${chipText}. Show in preview.` : chipText}
+      role={canActivate ? 'button' : undefined}
+      tabIndex={canActivate ? 0 : undefined}
+      onMouseEnter={interactive ? onHoverStart : undefined}
+      onMouseLeave={interactive ? onHoverEnd : undefined}
+      onClick={canActivate ? activate : undefined}
+      onKeyDown={
+        canActivate
+          ? (event) => handlePreviewTargetChipKeyDown(event, onActivate, refocusInput)
+          : undefined
+      }
+    >
+      {showTargetPreview ? (
+        <PreviewTargetThumbnail target={target} variant="pill" />
+      ) : null}
+      <span className="min-w-0 flex-1 break-words whitespace-normal font-medium">{breadcrumb}</span>
+    </div>
   );
 }
 
@@ -109,65 +169,31 @@ function PinnedTargetCard({
   className?: string;
 }) {
   const label = formatPreviewTargetLabel(target);
-  const chipText = formatPreviewTargetChipText(target, 'pinned');
-  const canActivate = interactive && Boolean(onActivate);
-  const source = resolvePreviewThumbSourceDimensions(target);
-  const previewLeafContainerKind = leafContainerKind(resolveTargetChain(target));
-  const isSectionPreview =
-    target.kind === 'hero' ||
-    inferPreviewScaleProfile(
-      source.width,
-      source.height,
-      target.pinScope,
-      target.elementKind,
-      target.kind,
-      previewLeafContainerKind
-    ) === 'section';
-
-  const activate = () => {
-    activatePreviewTargetChip({ onActivate, refocusInput });
-  };
-
-  const body = (
-    <PreviewTargetCardLayout
-      target={target}
-      variant="pinned"
-      showHint
-      edgeToEdgePreview={isSectionPreview}
-      className={isSectionPreview ? 'pt-0' : 'pt-2'}
-    />
-  );
-
-  const bodyPaddingClass = cn('pb-3', isSectionPreview ? '' : 'px-3');
 
   return (
-    <div
-      data-section-chat-label
-      className={cn('mb-2', pinnedCardSurfaceClass({ interactive, active, pulsing, className }))}
-    >
-      <div className="px-3 pt-2">
-        <TargetCardHeader onClear={onClear} label={label} />
+    <div className={cn('mb-2 space-y-1', className)}>
+      <div className="flex items-center justify-between gap-2 px-0.5">
+        <span className={cn('text-[10px] font-semibold uppercase tracking-wider', TEXT.muted)}>
+          Edit target
+        </span>
+        <ClearPinButton label={label} onClear={onClear} />
       </div>
-      {canActivate ? (
-        <button
-          type="button"
-          className={cn('block w-full text-left', bodyPaddingClass)}
-          title={`Show ${label} in preview`}
-          aria-label={`${chipText}. Show in preview.`}
-          onMouseEnter={onHoverStart}
-          onMouseLeave={onHoverEnd}
-          onClick={activate}
-          onKeyDown={(event) =>
-            handlePreviewTargetChipKeyDown(event, onActivate, refocusInput)
-          }
-        >
-          {body}
-        </button>
-      ) : (
-        <div className={bodyPaddingClass} aria-live="polite">
-          {body}
-        </div>
-      )}
+      <TargetPillRow
+        target={target}
+        chipVariant="pinned"
+        interactive={interactive}
+        active={active}
+        pulsing={pulsing}
+        fullWidth
+        onHoverStart={onHoverStart}
+        onHoverEnd={onHoverEnd}
+        onActivate={onActivate}
+        refocusInput={refocusInput}
+        className={cn(
+          'target-pin-card min-w-0',
+          interactive && !active && cn(BORDER.hairline, 'hover:border-[#d2d2d7]')
+        )}
+      />
     </div>
   );
 }
@@ -193,52 +219,19 @@ function UsedTargetPill({
   refocusInput?: () => void;
   className?: string;
 }) {
-  const label = formatPreviewTargetLabel(target);
-  const breadcrumb = formatPreviewTargetBreadcrumb(target);
-  const chipText = formatPreviewTargetChipText(target, 'used');
-  const canActivate = interactive && Boolean(onActivate);
-  const showTargetPreview = Boolean(
-    target.previewThumbnail?.previewUrl ||
-      target.previewThumbnailDataUrl ||
-      targetPreviewFallbackLabel(target)
-  );
-
-  const activate = () => {
-    activatePreviewTargetChip({ onActivate, refocusInput });
-  };
-
   return (
-    <div
-      data-section-chat-label
-      className={cn(
-        'inline-flex max-w-full items-center gap-2 rounded-xl px-2 py-1 text-xs transition-colors',
-        CONTROL.chip,
-        TEXT.primary,
-        interactive &&
-          (active
-            ? 'cursor-pointer ring-2 ring-rose-400/50 ring-offset-1'
-            : 'cursor-pointer hover:bg-rose-50/60'),
-        pulsing && 'ring-2 ring-rose-400/50 ring-offset-1',
-        className
-      )}
-      title={interactive ? `Show ${label} in preview` : chipText}
-      aria-label={canActivate ? `${chipText}. Show in preview.` : chipText}
-      role={canActivate ? 'button' : undefined}
-      tabIndex={canActivate ? 0 : undefined}
-      onMouseEnter={interactive ? onHoverStart : undefined}
-      onMouseLeave={interactive ? onHoverEnd : undefined}
-      onClick={canActivate ? activate : undefined}
-      onKeyDown={
-        canActivate
-          ? (event) => handlePreviewTargetChipKeyDown(event, onActivate, refocusInput)
-          : undefined
-      }
-    >
-      {showTargetPreview ? (
-        <PreviewTargetThumbnail target={target} variant="pill" />
-      ) : null}
-      <span className="min-w-0 break-words whitespace-normal font-medium">{breadcrumb}</span>
-    </div>
+    <TargetPillRow
+      target={target}
+      chipVariant="used"
+      interactive={interactive}
+      active={active}
+      pulsing={pulsing}
+      onHoverStart={onHoverStart}
+      onHoverEnd={onHoverEnd}
+      onActivate={onActivate}
+      refocusInput={refocusInput}
+      className={className}
+    />
   );
 }
 

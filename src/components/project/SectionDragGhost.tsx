@@ -1,16 +1,17 @@
 'use client';
 
+import { cn } from '@/lib/cn';
 import type { SelectedSectionPayload } from '@/lib/preview/sectionSelectionProtocol';
 import { clampDragGhostPosition } from '@/lib/preview/clampDragGhostPosition';
-import { PreviewTargetCardLayout } from '@/components/project/PreviewTargetCardLayout';
+import { formatPreviewTargetBreadcrumb } from '@/lib/preview/previewTargetChipLabels';
 import {
   computeDragGhostDimensions,
-  DRAG_GHOST_CARD_WIDTH,
   targetPreviewDisplayUrl,
   targetPreviewFallbackLabel,
 } from '@/lib/preview/targetPreviewThumbnail';
-import { shouldShowTargetBreadcrumb } from '@/lib/preview/previewTargetChipLabels';
 import { normalizeSelectedTarget } from '@/lib/project-workspace/edit-shared/selectedTargetTypes';
+import { PreviewTargetThumbnail } from '@/components/project/PreviewTargetThumbnail';
+import { BORDER, CONTROL, TEXT } from '@/content/productTheme';
 
 interface Props {
   payload: SelectedSectionPayload;
@@ -58,12 +59,12 @@ export function SectionDragGhost({
   const showPreview = Boolean(
     previewDataUrl || targetPreviewDisplayUrl(target) || targetPreviewFallbackLabel(target)
   );
-  const showBreadcrumb = shouldShowTargetBreadcrumb(target);
-  const { ghostHeight } = computeDragGhostDimensions(target, {
+  const breadcrumb = formatPreviewTargetBreadcrumb(target);
+  const { ghostWidth, ghostHeight } = computeDragGhostDimensions(target, {
     captureWidth: previewWidth,
     captureHeight: previewHeight,
     showPreview,
-    showBreadcrumb,
+    showBreadcrumb: Boolean(breadcrumb),
   });
 
   const position = clampDragGhostPosition({
@@ -71,33 +72,38 @@ export function SectionDragGhost({
     pointerY: y,
     grabOffsetX,
     grabOffsetY,
-    ghostWidth: DRAG_GHOST_CARD_WIDTH,
+    ghostWidth,
     ghostHeight,
   });
 
   return (
     <div
-      className="fixed z-[100] pointer-events-none overflow-hidden rounded-xl border border-l-[3px] border-l-rose-500 bg-white py-2 shadow-xl transition-transform duration-150 ease-out border-[#d2d2d7]/80"
+      className={cn(
+        'fixed z-[100] pointer-events-none inline-flex max-w-full items-center gap-2 rounded-xl border border-l-[3px] border-l-rose-500 px-2 py-1 shadow-xl transition-transform duration-150 ease-out',
+        BORDER.hairline,
+        CONTROL.chip,
+        'bg-white'
+      )}
       style={{
         left: position.left,
         top: position.top,
-        width: DRAG_GHOST_CARD_WIDTH,
+        maxWidth: ghostWidth,
         transform: 'translate3d(0,0,0)',
       }}
       aria-hidden
     >
-      <div className="px-2.5 text-[10px] font-semibold uppercase tracking-wider text-[#6e6e73] mb-1.5">
-        Edit target
-      </div>
-      <PreviewTargetCardLayout
-        target={target}
-        variant="drag"
-        progressive
-        align="center"
-        edgeToEdgePreview
-        captureWidth={previewWidth}
-        captureHeight={previewHeight}
-      />
+      {showPreview ? (
+        <PreviewTargetThumbnail
+          target={target}
+          variant="pill"
+          progressive
+          captureWidth={previewWidth}
+          captureHeight={previewHeight}
+        />
+      ) : null}
+      <span className={cn('min-w-0 break-words whitespace-normal text-xs font-medium', TEXT.primary)}>
+        {breadcrumb}
+      </span>
     </div>
   );
 }

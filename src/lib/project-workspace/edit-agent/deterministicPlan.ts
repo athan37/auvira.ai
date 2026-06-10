@@ -223,7 +223,11 @@ function planHeroBackgroundStyle(editContext: EditContext): EditPlan | null {
     steps: [
       {
         skill: 'update_theme',
-        params: { scope: 'hero' },
+        params: {
+          scope: 'hero',
+          backgroundColor: color ?? undefined,
+          backgroundClass: bgClass ?? undefined,
+        },
       },
     ],
   };

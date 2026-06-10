@@ -21,13 +21,14 @@ describe('serializeTurnContext', () => {
       sectionTitle: 'Contact Us',
       elementLabel: 'Contact Information',
       fieldPath: 'sections[2].title',
-      previewThumbnail: { kind: 'element', previewUrl: 'https://cdn.example.com/thumb.png' },
+      elementKind: 'contact_field',
+      previewThumbnail: { captureKind: 'raster', previewUrl: 'https://cdn.example.com/thumb.png' },
       targetChain: [{ role: 'section', label: 'Contact Us' }],
     });
     expect(payload?.section_index).toBe(2);
     expect(payload?.element_label).toBe('Contact Information');
     expect(payload).not.toHaveProperty('previewThumbnail');
-    expect(payload?.preview_thumbnail).toEqual({ kind: 'element', has_preview: true });
+    expect(payload?.preview_thumbnail).toEqual({ kind: 'raster', has_preview: true });
   });
 
   it('serializes target resolved from clarification anchor', () => {

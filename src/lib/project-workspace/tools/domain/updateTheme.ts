@@ -1,6 +1,32 @@
+import { extractSectionBackgroundClassFromMessage } from '@/lib/builder/sectionPresentation';
 import { runStrategyById } from '@/lib/project-workspace/edit-shared/strategyRegistry';
+import { extractBackgroundColorFromMessage } from '@/lib/project-workspace/edit-shared/preset/presetUtils';
 import { computeWorkspaceHashes } from '@/lib/project-workspace/workspaceEditShared';
 import type { DomainToolContext, DomainToolResult } from './types';
+
+/** Theme strategy message — uses resolved effectiveMessage so implicit refs (e.g. favorite color) apply. */
+function buildThemeOwnerMessage(
+  ctx: DomainToolContext,
+  params: Record<string, unknown>,
+  scope: string
+): string {
+  const base =
+    ctx.editContext.effectiveMessage?.trim() || ctx.agentOptions.ownerMessage;
+
+  const paramColor = typeof params.color === 'string' ? params.color.trim() : '';
+  const paramBgClass =
+    typeof params.backgroundClass === 'string' ? params.backgroundClass.trim() : '';
+
+  let message = base;
+  if (paramColor && !extractBackgroundColorFromMessage(message)) {
+    message = `${message} ${paramColor}`;
+  }
+  if (paramBgClass && !extractSectionBackgroundClassFromMessage(message)) {
+    message = `${message} ${paramBgClass}`;
+  }
+
+  return scope === 'hero' ? `hero background ${message}` : message;
+}
 
 /**
  * Update site-wide or hero theme via existing preset_theme strategy.
@@ -10,10 +36,7 @@ export async function updateThemeTool(
   params: Record<string, unknown>
 ): Promise<DomainToolResult> {
   const scope = typeof params.scope === 'string' ? params.scope.trim() : '';
-  const ownerMessage =
-    scope === 'hero'
-      ? `hero background ${ctx.agentOptions.ownerMessage}`
-      : ctx.agentOptions.ownerMessage;
+  const ownerMessage = buildThemeOwnerMessage(ctx, params, scope);
 
   const beforeHashes = ctx.agentOptions.gateway
     ? await ctx.agentOptions.gateway.computeHashes()

@@ -29,10 +29,15 @@ export function serializeSelectedTargetForMonitor(
   if (target.elementLabel) out.element_label = target.elementLabel;
   if (target.surfaceId) out.surface_id = target.surfaceId;
   if (target.pinScope) out.pin_scope = target.pinScope;
-  if (target.previewThumbnail?.captureKind) {
+  const hasPreview = Boolean(
+    target.previewThumbnail?.previewUrl ||
+      target.previewThumbnail?.publicUrl ||
+      target.previewThumbnailDataUrl
+  );
+  if (hasPreview || target.previewThumbnail?.captureKind) {
     out.preview_thumbnail = {
-      kind: target.previewThumbnail.captureKind,
-      has_preview: true,
+      kind: target.previewThumbnail?.captureKind ?? target.elementKind ?? 'preview',
+      has_preview: hasPreview || Boolean(target.previewThumbnail?.captureKind),
     };
   }
   if (target.targetChain?.length) {

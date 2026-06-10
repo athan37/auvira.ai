@@ -69,7 +69,7 @@ export interface DomainToolParams {
     description?: string;
   };
   add_section?: { type?: string; title: string; body?: string };
-  update_theme?: { scope?: string; color?: string };
+  update_theme?: { scope?: string; color?: string; backgroundClass?: string; backgroundColor?: string };
   replace_image?: { path?: string; url?: string };
   verify_source_invariants?: { checks?: unknown[] };
   summarize_actual_changes?: Record<string, never>;

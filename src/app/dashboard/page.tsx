@@ -120,18 +120,16 @@ function ActiveCloneJobCard({ job }: { job: ActiveCloneJob }) {
 
 function DashboardContent() {
   const { status } = useSession();
-  const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeJobs, setActiveJobs] = useState<ActiveCloneJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (status === 'unauthenticated') router.push('/auth/signin');
-  }, [status, router]);
-
-  useEffect(() => {
-    if (status !== 'authenticated') return;
+    if (status !== 'authenticated') {
+      setLoading(status === 'loading');
+      return;
+    }
     Promise.all([
       fetch('/api/projects').then((r) => r.json()),
       fetch('/api/projects/clone/jobs/active').then((r) => r.json()),
@@ -148,7 +146,7 @@ function DashboardContent() {
       });
   }, [status]);
 
-  if (DEV_PREVIEW_LOADING || loading) {
+  if (DEV_PREVIEW_LOADING || loading || status !== 'authenticated') {
     return <LoadingShell message="Loading dashboard…" />;
   }
 
@@ -222,9 +220,18 @@ function DashboardContent() {
 
 export default function DashboardPage() {
   const { status } = useSession();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (status === 'unauthenticated') router.replace('/auth/signin');
+  }, [status, router]);
 
   if (DEV_PREVIEW_LOADING || status === 'loading') {
     return <LoadingShell message="Loading dashboard…" />;
+  }
+
+  if (status === 'unauthenticated') {
+    return <LoadingShell message="Redirecting to sign in…" />;
   }
 
   return (
