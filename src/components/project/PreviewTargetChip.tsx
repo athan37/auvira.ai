@@ -14,7 +14,7 @@ import {
   handlePreviewTargetChipKeyDown,
 } from '@/lib/preview/previewTargetChipInteractions';
 import type { SelectedTargetInput } from '@/lib/project-workspace/edit-shared/selectedTargetTypes';
-import { PreviewTargetThumbnail } from '@/components/project/PreviewTargetThumbnail';
+import { PreviewTargetPillThumb } from '@/components/project/PreviewTargetPillThumb';
 import {
   targetPreviewDisplayUrl,
   targetPreviewFallbackLabel,
@@ -138,9 +138,13 @@ function TargetPillRow({
       }
     >
       {showTargetPreview ? (
-        <PreviewTargetThumbnail target={target} variant="pill" />
+        <PreviewTargetPillThumb
+          target={target}
+          captureWidth={target.previewCaptureWidth}
+          captureHeight={target.previewCaptureHeight}
+        />
       ) : null}
-      <span className="min-w-0 flex-1 break-words whitespace-normal font-medium">{breadcrumb}</span>
+      <span className="min-w-0 flex-1 truncate font-medium">{breadcrumb}</span>
     </div>
   );
 }

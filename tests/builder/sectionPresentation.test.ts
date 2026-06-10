@@ -11,6 +11,8 @@ import {
   normalizeGradientBackgroundClass,
   resolveSectionBackground,
   resolveSectionCardClass,
+  colorNameToCardClass,
+  normalizeCardPresentationClass,
 } from '@/lib/builder/sectionPresentation';
 import {
   buildDefaultGradientBackgroundClass,
@@ -61,6 +63,22 @@ describe('sectionPresentation', () => {
     };
     expect(resolveSectionBackground(section, preset)).toBe('bg-yellow-200');
     expect(resolveSectionCardClass(section, preset)).toBe('border');
+  });
+
+  it('maps color names to visible solid card backgrounds', () => {
+    expect(colorNameToCardClass('red')).toBe('bg-red-600');
+    expect(colorNameToCardClass('bg-red-600')).toBe('bg-red-600');
+    expect(colorNameToCardClass('border-red-300 bg-red-50')).toBe(
+      'border-red-300 bg-red-50'
+    );
+  });
+
+  it('normalizeCardPresentationClass preserves multi-class card shells', () => {
+    expect(
+      normalizeCardPresentationClass('border-red-300 bg-red-50', 'change background to red')
+    ).toBe('border-red-300 bg-red-50');
+    expect(normalizeCardPresentationClass('bg-red-600')).toBe('bg-red-600');
+    expect(normalizeCardPresentationClass('border-red-300 bg-red-50')).not.toBe('bg-gray-600');
   });
 
   it('uses presentation.cardClass when set', () => {

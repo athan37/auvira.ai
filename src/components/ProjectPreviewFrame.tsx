@@ -48,9 +48,13 @@ export interface PreviewReadyState {
 
 interface Props {
   projectId: string;
-  codeWorkspaceVersion?: number;
-  /** Bumped by parent after a successful edit to force iframe reload (Next dev HMR can miss some CSS). */
+  /** Bumped with previewWorkspaceVersion after edit — sole driver of post-edit iframe remount. */
   previewRefreshKey?: number;
+  /** Workspace version pinned until previewRefreshKey bumps (avoids reload on fetchProject alone). */
+  previewWorkspaceVersion?: number;
+  /** Hides interim HMR flicker until the single post-edit reload finishes. */
+  previewFrozen?: boolean;
+  onPreviewReloadSettled?: () => void;
   /** When true, defer iframe remount until edit completes and dev server settles. */
   editInProgress?: boolean;
   onReadyChange?: (state: PreviewReadyState) => void;
@@ -58,6 +62,9 @@ interface Props {
   hoverSectionId?: string | null;
   focusSectionId?: string | null;
   focusSectionNonce?: number;
+  /** Scroll to section once after the post-edit iframe reload (not on every interim load). */
+  postEditFocusSectionId?: string | null;
+  postEditFocusNonce?: number;
   onSelectedSectionChange?: (section: SelectedSection | null) => void;
   onSectionDragStart?: (payload: SiteSectionContextPayload, screenX: number, screenY: number) => void;
   onSectionPointerDown?: (payload: SiteSectionContextPayload, screenX: number, screenY: number) => void;
@@ -105,17 +112,59 @@ function stageProgress(stage: string): number {
   return Math.round(((idx + 1) / (STAGE_ORDER.length - 1)) * 90);
 }
 
+/** Shared full-pane loader for workspace bootstrap and post-edit preview freeze. */
+function PreviewPaneLoadingOverlay({
+  title,
+  subtitle,
+  progressPercent,
+  stageLabel,
+  indeterminate = false,
+}: {
+  title: string;
+  subtitle?: string;
+  progressPercent?: number;
+  stageLabel?: string;
+  indeterminate?: boolean;
+}) {
+  return (
+    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white px-6">
+      <Loading size="lg" className="mb-4" />
+      <p className={cn('text-sm font-medium mb-1', TEXT.primary)}>{title}</p>
+      {subtitle ? (
+        <p className={cn('text-xs mb-4 text-center max-w-sm', TEXT.muted)}>{subtitle}</p>
+      ) : null}
+      <div className="w-full max-w-xs h-1.5 bg-[#d2d2d7]/80 rounded-full overflow-hidden">
+        {indeterminate ? (
+          <div className="h-full w-2/5 rounded-full bg-rose-600 motion-safe:animate-pulse" />
+        ) : (
+          <div
+            className="h-full bg-rose-600 transition-all duration-500 ease-out"
+            style={{ width: `${progressPercent ?? 0}%` }}
+          />
+        )}
+      </div>
+      {stageLabel ? (
+        <p className={cn('text-xs mt-2 capitalize', TEXT.tertiary)}>{stageLabel}</p>
+      ) : null}
+    </div>
+  );
+}
+
 /** Owner preview: bootstraps GitLab workspace + dev server, then proxies via preview API. */
 export function ProjectPreviewFrame({
   projectId,
-  codeWorkspaceVersion = 1,
   previewRefreshKey = 0,
+  previewWorkspaceVersion = 1,
+  previewFrozen = false,
+  onPreviewReloadSettled,
   editInProgress = false,
   onReadyChange,
   selectedSection = null,
   hoverSectionId = null,
   focusSectionId = null,
   focusSectionNonce = 0,
+  postEditFocusSectionId = null,
+  postEditFocusNonce = 0,
   onSelectedSectionChange,
   onSectionDragStart,
   onSectionPointerDown,
@@ -134,13 +183,15 @@ export function ProjectPreviewFrame({
   const [livePreviewUrl, setLivePreviewUrl] = useState<string | null>(null);
   const [iframeLoading, setIframeLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [mountedVersion, setMountedVersion] = useState(codeWorkspaceVersion);
   const chunkRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const chunkRetryCountRef = useRef(0);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const lastHighlightRef = useRef<{ id: string | null; hover: boolean }>({ id: null, hover: false });
+  const savedScrollRef = useRef<{ x: number; y: number } | null>(null);
+  const pendingPostEditFocusRef = useRef<string | null>(null);
 
   const selectionAvailable = previewMode !== 'live';
+  const iframeRemountKey = `${projectId}-${previewWorkspaceVersion}-${refreshKey}-${previewRefreshKey}`;
 
   const postToIframe = useCallback((message: ParentToIframeSectionMessage) => {
     const win = iframeRef.current?.contentWindow;
@@ -192,12 +243,47 @@ export function ProjectPreviewFrame({
   }, [selectedSection, onSelectedSectionChange, postToIframe]);
 
   useEffect(() => {
-    if (editInProgress) return;
-    const timer = setTimeout(() => {
-      setMountedVersion(codeWorkspaceVersion);
-    }, PREVIEW_IFRAME_SETTLE_MS);
-    return () => clearTimeout(timer);
-  }, [codeWorkspaceVersion, editInProgress]);
+    if (!postEditFocusSectionId || postEditFocusNonce <= 0) return;
+    pendingPostEditFocusRef.current = postEditFocusSectionId;
+  }, [postEditFocusSectionId, postEditFocusNonce]);
+
+  useEffect(() => {
+    return () => {
+      try {
+        const win = iframeRef.current?.contentWindow;
+        if (!win) return;
+        savedScrollRef.current = { x: win.scrollX, y: win.scrollY };
+      } catch {
+        /* iframe detached */
+      }
+    };
+  }, [iframeRemountKey]);
+
+  const applyViewportAfterIframeLoad = useCallback(() => {
+    if (!selectionAvailable) return;
+
+    const run = (fn: () => void) => {
+      window.setTimeout(fn, 50);
+    };
+
+    const pendingFocus = pendingPostEditFocusRef.current;
+    if (pendingFocus) {
+      pendingPostEditFocusRef.current = null;
+      run(() => postToIframe(buildSiteSectionFocusMessage(pendingFocus)));
+      return;
+    }
+
+    const saved = savedScrollRef.current;
+    if (!saved) return;
+    savedScrollRef.current = null;
+    run(() => {
+      try {
+        iframeRef.current?.contentWindow?.scrollTo(saved.x, saved.y);
+      } catch {
+        /* cross-origin or detached */
+      }
+    });
+  }, [postToIframe, selectionAvailable]);
 
   const applyStatus = useCallback((status: WorkspaceStatus) => {
     setSetupStage(status.stage);
@@ -435,9 +521,9 @@ export function ProjectPreviewFrame({
     ? previewMode === 'live' && livePreviewUrl
       ? (() => {
           const sep = livePreviewUrl.includes('?') ? '&' : '?';
-          return `${livePreviewUrl}${sep}v=${mountedVersion}&_=${refreshKey}&pr=${previewRefreshKey}`;
+          return `${livePreviewUrl}${sep}v=${previewWorkspaceVersion}&_=${refreshKey}&pr=${previewRefreshKey}`;
         })()
-      : `/api/projects/${projectId}/preview/proxy/?v=${mountedVersion}&_=${refreshKey}&pr=${previewRefreshKey}`
+      : `/api/projects/${projectId}/preview/proxy/?v=${previewWorkspaceVersion}&_=${refreshKey}&pr=${previewRefreshKey}`
     : null;
 
   const showSetupOverlay = !previewReady || setupError;
@@ -517,51 +603,48 @@ export function ProjectPreviewFrame({
       </div>
 
       <div className="flex-1 relative min-h-[320px]">
-        {showSetupOverlay && (
+        {showSetupOverlay && setupError ? (
           <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white px-6">
-            {setupError ? (
-              <>
-                <p className="text-sm font-medium text-red-700 mb-1">Could not load preview</p>
-                <p className="text-xs text-red-600 text-center max-w-md mb-4">{setupError}</p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    bootstrapStarted.current = false;
-                    window.location.reload();
-                  }}
-                  className={cn('text-sm hover:underline', TEXT.primary)}
-                >
-                  Try again
-                </button>
-              </>
-            ) : (
-              <>
-                <Loading size="lg" className="mb-4" />
-                <p className={cn('text-sm font-medium mb-1', TEXT.primary)}>{setupLabel}</p>
-                <p className={cn('text-xs mb-4 text-center max-w-sm', TEXT.muted)}>
-                  First open clones from GitLab and may install dependencies. This can take a few
-                  minutes.
-                </p>
-                <div className="w-full max-w-xs h-1.5 bg-[#d2d2d7]/80 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-rose-600 transition-all duration-500 ease-out"
-                    style={{ width: `${progress}%` }}
-                  />
-                </div>
-                <p className={cn('text-xs mt-2 capitalize', TEXT.tertiary)}>
-                  {setupStage.replace(/_/g, ' ')}
-                </p>
-              </>
-            )}
+            <p className="text-sm font-medium text-red-700 mb-1">Could not load preview</p>
+            <p className="text-xs text-red-600 text-center max-w-md mb-4">{setupError}</p>
+            <button
+              type="button"
+              onClick={() => {
+                bootstrapStarted.current = false;
+                window.location.reload();
+              }}
+              className={cn('text-sm hover:underline', TEXT.primary)}
+            >
+              Try again
+            </button>
           </div>
-        )}
+        ) : null}
+
+        {showSetupOverlay && !setupError ? (
+          <PreviewPaneLoadingOverlay
+            title={setupLabel}
+            subtitle="First open clones from GitLab and may install dependencies. This can take a few minutes."
+            progressPercent={progress}
+            stageLabel={setupStage.replace(/_/g, ' ')}
+          />
+        ) : null}
+
+        {previewFrozen && previewReady && !showSetupOverlay ? (
+          <PreviewPaneLoadingOverlay
+            title="Updating preview…"
+            subtitle="Your changes will appear when the edit is complete."
+            indeterminate
+            stageLabel="applying change"
+          />
+        ) : null}
 
         {previewUrl && (
           <iframe
             ref={iframeRef}
-            key={`${projectId}-${mountedVersion}-${refreshKey}-${previewRefreshKey}`}
+            key={iframeRemountKey}
             src={previewUrl}
-            className="w-full h-full border-0"
+            className={cn('w-full h-full border-0', previewFrozen && 'invisible')}
+            aria-hidden={previewFrozen}
             onLoad={() => {
               setIframeLoading(false);
               chunkRetryCountRef.current = 0;
@@ -577,6 +660,10 @@ export function ProjectPreviewFrame({
                 if (highlightId) {
                   lastHighlightRef.current = { id: highlightId, hover };
                   postToIframe(buildSiteSectionHighlightMessage(highlightId, hover));
+                }
+                applyViewportAfterIframeLoad();
+                if (previewFrozen) {
+                  onPreviewReloadSettled?.();
                 }
               }
             }}

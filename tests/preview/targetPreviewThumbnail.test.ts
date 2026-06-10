@@ -225,4 +225,31 @@ describe('computeDragGhostDimensions', () => {
     );
     expect(withPreview.ghostHeight).toBeGreaterThan(withoutPreview.ghostHeight);
   });
+
+  it('stablePillThumb keeps ghost size when capture dimensions change', () => {
+    const small = computeDragGhostDimensions(
+      { kind: 'hero', pinScope: 'element', elementKind: 'heading' },
+      {
+        captureWidth: 120,
+        captureHeight: 40,
+        showPreview: true,
+        showBreadcrumb: true,
+        stablePillThumb: true,
+      }
+    );
+    const large = computeDragGhostDimensions(
+      { kind: 'hero', pinScope: 'section' },
+      {
+        captureWidth: 400,
+        captureHeight: 240,
+        showPreview: true,
+        showBreadcrumb: true,
+        stablePillThumb: true,
+      }
+    );
+    expect(small.ghostWidth).toBe(large.ghostWidth);
+    expect(small.ghostHeight).toBe(large.ghostHeight);
+    expect(small.thumbWidth).toBe(88);
+    expect(small.thumbHeight).toBe(56);
+  });
 });

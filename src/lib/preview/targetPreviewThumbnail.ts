@@ -350,6 +350,9 @@ export function resolvePreviewThumbDisplaySize(
   };
 }
 
+/** Fixed pill box for drag ghost — avoids resize when async captures arrive mid-drag. */
+export const DRAG_GHOST_PILL_THUMB_BOX = PREVIEW_THUMB_MAX.pill;
+
 /** Estimate compact drag ghost size (pill thumb + breadcrumb label). */
 export function computeDragGhostDimensions(
   target: PreviewThumbDimensionTarget,
@@ -358,19 +361,27 @@ export function computeDragGhostDimensions(
     captureHeight?: number;
     showPreview?: boolean;
     showBreadcrumb?: boolean;
+    /** Pin thumb slot to pill max box so late preview captures do not resize the ghost. */
+    stablePillThumb?: boolean;
   }
-): { ghostWidth: number; ghostHeight: number; thumbHeight: number } {
+): { ghostWidth: number; ghostHeight: number; thumbHeight: number; thumbWidth: number } {
+  const showPreview = options?.showPreview !== false;
+  const stableBox = options?.stablePillThumb && showPreview;
   const source = resolvePreviewThumbSourceDimensions(target, {
     width: options?.captureWidth,
     height: options?.captureHeight,
   });
-  const thumb = resolvePreviewThumbDisplaySize('pill', source.width, source.height, {
-    elementKind: target.elementKind,
-    pinScope: target.pinScope,
-    kind: target.kind,
-    captureKind: target.previewThumbnail?.captureKind,
-  });
-  const showPreview = options?.showPreview !== false;
+  const thumb = stableBox
+    ? {
+        width: DRAG_GHOST_PILL_THUMB_BOX.width,
+        height: DRAG_GHOST_PILL_THUMB_BOX.height,
+      }
+    : resolvePreviewThumbDisplaySize('pill', source.width, source.height, {
+        elementKind: target.elementKind,
+        pinScope: target.pinScope,
+        kind: target.kind,
+        captureKind: target.previewThumbnail?.captureKind,
+      });
   const thumbWidth = showPreview ? thumb.width : 0;
   const thumbHeight = showPreview ? thumb.height : 0;
   const ghostHeight = Math.max(thumbHeight, 18) + DRAG_GHOST_PILL_PADDING_Y;
@@ -385,6 +396,7 @@ export function computeDragGhostDimensions(
     ghostWidth: Math.max(ghostWidth, thumbWidth + DRAG_GHOST_PILL_PADDING_X),
     ghostHeight,
     thumbHeight,
+    thumbWidth,
   };
 }
 

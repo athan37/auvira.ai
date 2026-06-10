@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   getPreviewReloadDelaysMs,
+  getSinglePreviewReloadDelayMs,
   PREVIEW_IFRAME_SETTLE_MS,
+  PREVIEW_UNSYNCED_EXTRA_MS,
   schedulePreviewIframeReloads,
   workspaceEditNeedsPreviewReload,
 } from '@/lib/project-workspace/previewReloadAfterEdit';
@@ -19,6 +21,19 @@ describe('previewReloadAfterEdit', () => {
     expect(workspaceEditNeedsPreviewReload(['public/logo.png'])).toBe(false);
   });
 
+  describe('getSinglePreviewReloadDelayMs', () => {
+    it('reloads immediately when preview is synced', () => {
+      expect(getSinglePreviewReloadDelayMs({ previewSynced: true })).toBe(PREVIEW_IFRAME_SETTLE_MS);
+      expect(PREVIEW_IFRAME_SETTLE_MS).toBe(0);
+    });
+
+    it('adds extra delay when preview is still syncing', () => {
+      expect(getSinglePreviewReloadDelayMs({ previewSynced: false })).toBe(
+        PREVIEW_IFRAME_SETTLE_MS + PREVIEW_UNSYNCED_EXTRA_MS
+      );
+    });
+  });
+
   describe('schedulePreviewIframeReloads', () => {
     beforeEach(() => {
       vi.useFakeTimers();
@@ -28,37 +43,34 @@ describe('previewReloadAfterEdit', () => {
       vi.useRealTimers();
     });
 
-    it('does not schedule when preview already synced', () => {
+    it('schedules one immediate reload when preview is synced', () => {
       const bump = vi.fn();
       schedulePreviewIframeReloads(bump, {
         previewSynced: true,
         changedPaths: ['src/lib/siteConfig.ts'],
       });
-      vi.runAllTimers();
       expect(bump).not.toHaveBeenCalled();
+      vi.runAllTimers();
+      expect(bump).toHaveBeenCalledTimes(1);
     });
 
-    it('schedules delayed bumps after settle when preview is still syncing', () => {
+    it('schedules one delayed reload when preview is still syncing', () => {
       const bump = vi.fn();
       schedulePreviewIframeReloads(bump, {
         previewSynced: false,
         changedPaths: ['src/lib/siteConfig.ts'],
       });
       expect(bump).not.toHaveBeenCalled();
-      vi.advanceTimersByTime(PREVIEW_IFRAME_SETTLE_MS);
+      vi.advanceTimersByTime(PREVIEW_UNSYNCED_EXTRA_MS - 1);
+      expect(bump).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(1);
       expect(bump).toHaveBeenCalledTimes(1);
-      vi.advanceTimersByTime(2_500);
-      expect(bump).toHaveBeenCalledTimes(2);
-      vi.advanceTimersByTime(4_500);
-      expect(bump).toHaveBeenCalledTimes(3);
+      vi.runAllTimers();
+      expect(bump).toHaveBeenCalledTimes(1);
     });
 
-    it('exposes settle-aware reload delays', () => {
-      expect(getPreviewReloadDelaysMs()).toEqual([
-        PREVIEW_IFRAME_SETTLE_MS,
-        PREVIEW_IFRAME_SETTLE_MS + 2_500,
-        PREVIEW_IFRAME_SETTLE_MS + 7_000,
-      ]);
+    it('exposes single settle-aware reload delay', () => {
+      expect(getPreviewReloadDelaysMs()).toEqual([PREVIEW_IFRAME_SETTLE_MS]);
     });
 
     it('does not schedule when reload is deferred', () => {
@@ -72,7 +84,7 @@ describe('previewReloadAfterEdit', () => {
       expect(bump).not.toHaveBeenCalled();
     });
 
-    it('cancel clears pending bumps', () => {
+    it('cancel clears pending bump', () => {
       const bump = vi.fn();
       const { cancel } = schedulePreviewIframeReloads(bump, {
         previewSynced: false,

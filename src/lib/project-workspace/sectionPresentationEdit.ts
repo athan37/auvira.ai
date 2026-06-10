@@ -9,11 +9,12 @@ import {
   extractSectionBackgroundClassFromMessage,
   formatSectionBackgroundChangeSummary,
   formatSectionTextColorChangeSummary,
+  normalizeCardPresentationClass,
+  normalizeGradientBackgroundClass,
   resolveSectionCardClassForEdit,
   resolveSectionTextClassForEdit,
 } from '@/lib/builder/sectionPresentation';
 import { normalizeTailwindBackgroundClass } from '@/lib/builder/tailwindBackgroundResolver';
-import { normalizeGradientBackgroundClass } from '@/lib/builder/sectionPresentation';
 import {
   tailwindConfigCoversBackgroundClass,
   tailwindConfigCoversTextClass,
@@ -338,9 +339,11 @@ export async function applySectionBackgroundEdit(
   const appliedClass = rawAppliedClass
     ? isTextField
       ? rawAppliedClass.trim()
-      : rawAppliedClass.includes('gradient')
-        ? normalizeGradientBackgroundClass(rawAppliedClass, workspace.ownerMessage)
-        : normalizeTailwindBackgroundClass(rawAppliedClass, workspace.ownerMessage)
+      : presentationField === 'cardClass'
+        ? normalizeCardPresentationClass(rawAppliedClass, workspace.ownerMessage)
+        : rawAppliedClass.includes('gradient')
+          ? normalizeGradientBackgroundClass(rawAppliedClass, workspace.ownerMessage)
+          : normalizeTailwindBackgroundClass(rawAppliedClass, workspace.ownerMessage)
     : '';
 
   if (!appliedClass) {

@@ -46,6 +46,8 @@ export interface EditCompleteResult {
   jobId?: string;
   previewSynced?: boolean;
   changedFiles?: string[];
+  /** Section pinned when the edit started — parent scrolls preview here after reload. */
+  focusSectionId?: string;
 }
 
 type PendingImage = {
@@ -330,6 +332,8 @@ function selectedTargetFromSection(section: SelectedSection): SelectedTargetInpu
     pinScope: section.pinScope,
     previewThumbnail: section.previewThumbnail,
     previewThumbnailDataUrl: section.previewThumbnailDataUrl,
+    previewCaptureWidth: section.previewCaptureWidth ?? section.previewThumbnail?.width,
+    previewCaptureHeight: section.previewCaptureHeight ?? section.previewThumbnail?.height,
   })!;
 }
 
@@ -721,6 +725,7 @@ export function ProjectPreviewChat({
     setUploadError(null);
     setVoiceError(null);
     onEditStart?.();
+    const focusSectionIdForEdit = selectedSection?.sectionId;
     const pinnedTarget = selectedSection ? selectedTargetFromSection(selectedSection) : undefined;
     setMessages((prev) => [
       ...prev,
@@ -914,6 +919,7 @@ export function ProjectPreviewChat({
         jobId,
         previewSynced,
         changedFiles: changedFilesFromEdit,
+        focusSectionId: focusSectionIdForEdit,
       });
 
       if (success) {

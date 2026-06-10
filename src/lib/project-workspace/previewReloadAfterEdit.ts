@@ -9,11 +9,14 @@ const PREVIEW_RELOAD_PATHS = [
   'tailwind.config.js',
 ] as const;
 
-/** Wait for workspace next dev to finish recompiling before first iframe reload. */
-export const PREVIEW_IFRAME_SETTLE_MS = 2_000;
+/**
+ * Post-message reload delay when preview verify already passed on the server.
+ * Stream route waits for compile before emitting done — parent can reload immediately.
+ */
+export const PREVIEW_IFRAME_SETTLE_MS = 0;
 
-/** Delays after settle when server says preview is still syncing (dev compile lag). */
-const SYNC_RELOAD_DELAYS_MS = [2_500, 7_000] as const;
+/** Extra wait when server reports preview still syncing (dev compile lag). */
+export const PREVIEW_UNSYNCED_EXTRA_MS = 3_000;
 
 export type PreviewReloadSchedule = {
   cancel: () => void;
@@ -22,16 +25,28 @@ export type PreviewReloadSchedule = {
 export type PreviewReloadOptions = {
   changedPaths?: string[];
   previewSynced?: boolean;
-  /** When true, skip immediate reload scheduling (parent defers iframe remount). */
+  /** When true, skip reload scheduling (parent defers iframe remount). */
   deferReload?: boolean;
-  /** Extra delay before first reload bump (defaults to PREVIEW_IFRAME_SETTLE_MS). */
+  /** Base delay before reload (defaults to PREVIEW_IFRAME_SETTLE_MS). */
   settleMs?: number;
 };
 
-/** Delays used by schedulePreviewIframeReloads (settle + sync reloads). */
-export function getPreviewReloadDelaysMs(options: Pick<PreviewReloadOptions, 'settleMs'> = {}): number[] {
+/** Single post-edit reload delay — one bump at the end, not staggered retries. */
+export function getSinglePreviewReloadDelayMs(
+  options: Pick<PreviewReloadOptions, 'previewSynced' | 'settleMs'> = {}
+): number {
   const settleMs = options.settleMs ?? PREVIEW_IFRAME_SETTLE_MS;
-  return [settleMs, ...SYNC_RELOAD_DELAYS_MS.map((d) => settleMs + d)];
+  if (options.previewSynced === false) {
+    return settleMs + PREVIEW_UNSYNCED_EXTRA_MS;
+  }
+  return settleMs;
+}
+
+/** @deprecated Use getSinglePreviewReloadDelayMs — kept for tests migrating off multi-reload. */
+export function getPreviewReloadDelaysMs(
+  options: Pick<PreviewReloadOptions, 'settleMs'> = {}
+): number[] {
+  return [getSinglePreviewReloadDelayMs({ previewSynced: true, ...options })];
 }
 
 /** True when changed files affect the editable preview bundle (not just copy in JSON). */
@@ -43,8 +58,8 @@ export function workspaceEditNeedsPreviewReload(changedPaths: string[]): boolean
 }
 
 /**
- * Schedule light cache-bust bumps while preview HTML may still be compiling.
- * When previewSynced is true, skip — parent reload via codeWorkspace.version is enough.
+ * Schedule one iframe cache-bust after edit when preview-affecting files changed.
+ * Parent bumps previewRefreshKey once; frame syncs workspace version on that bump.
  */
 export function schedulePreviewIframeReloads(
   bump: () => void,
@@ -62,17 +77,12 @@ export function schedulePreviewIframeReloads(
     return { cancel };
   }
 
-  if (options.previewSynced !== false) {
-    return { cancel };
-  }
-
   if (!workspaceEditNeedsPreviewReload(options.changedPaths ?? [])) {
     return { cancel };
   }
 
-  for (const delayMs of getPreviewReloadDelaysMs({ settleMs: options.settleMs })) {
-    timers.push(setTimeout(() => bump(), delayMs));
-  }
+  const delayMs = getSinglePreviewReloadDelayMs(options);
+  timers.push(setTimeout(() => bump(), delayMs));
 
   return { cancel };
 }

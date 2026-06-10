@@ -286,11 +286,32 @@ export function resolveSectionBackgroundClassForEdit(
 
 export { isGradientBackgroundRequest } from '@/lib/project-workspace/edit-shared/preset/presetUtils';
 
-/** Map a color name to Tailwind classes for cards in a section. */
+/** Map a color name to a visible solid Tailwind background for inner cards. */
 export function colorNameToCardClass(color: string): string {
   const normalized = color.trim().toLowerCase();
-  if (normalized.includes('border-') || normalized.includes('bg-')) return normalized;
-  return `border-${normalized}-300 bg-${normalized}-50`;
+  if (!normalized) return '';
+  if (normalized.includes('gradient') || /\s/.test(normalized)) return color.trim();
+  if (normalized.startsWith('bg-') || normalized.startsWith('border-')) return color.trim();
+  return colorNameToBackgroundClass(normalized);
+}
+
+/**
+ * Normalize cardClass tokens without corrupting multi-class shells (border + bg).
+ */
+export function normalizeCardPresentationClass(
+  className: string,
+  ownerMessage?: string
+): string {
+  const trimmed = className.trim();
+  if (!trimmed) return '';
+  if (trimmed.includes('gradient')) {
+    return normalizeGradientBackgroundClass(trimmed, ownerMessage);
+  }
+  if (/\s/.test(trimmed)) return trimmed;
+  if (trimmed.startsWith('bg-')) {
+    return normalizeTailwindBackgroundClass(trimmed, ownerMessage);
+  }
+  return trimmed;
 }
 
 /** Resolve inner card class from owner message (solid colors on presentation.cardClass). */
@@ -302,9 +323,6 @@ export function resolveSectionCardClassForEdit(
     color?: string | null;
   }
 ): string | null {
-  const color = extractBackgroundColorFromMessage(ownerMessage);
-  if (color) return colorNameToCardClass(color);
-
   const explicitClass = overrides?.cardClass?.trim();
   if (explicitClass) return explicitClass;
 
@@ -312,6 +330,9 @@ export function resolveSectionCardClassForEdit(
   if (colorWord && !BACKGROUND_COLOR_META.has(colorWord)) {
     return colorNameToCardClass(colorWord);
   }
+
+  const color = extractBackgroundColorFromMessage(ownerMessage);
+  if (color) return colorNameToCardClass(color);
 
   return null;
 }

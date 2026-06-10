@@ -100,7 +100,11 @@ export default function ProjectPage() {
   const [error, setError] = useState<string | null>(null);
   const [latestJobId, setLatestJobId] = useState<string | null>(null);
   const [diffRefreshKey, setDiffRefreshKey] = useState(0);
-  const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
+  const [previewReload, setPreviewReload] = useState<{ key: number; version: number }>({
+    key: 0,
+    version: 1,
+  });
+  const [previewFrozen, setPreviewFrozen] = useState(false);
   const [previewReady, setPreviewReady] = useState(false);
   const [previewTargetingAvailable, setPreviewTargetingAvailable] = useState(false);
   const [editInProgress, setEditInProgress] = useState(false);
@@ -108,6 +112,9 @@ export default function ProjectPage() {
   const [historyHoverSectionId, setHistoryHoverSectionId] = useState<string | null>(null);
   const [focusedHistorySectionId, setFocusedHistorySectionId] = useState<string | null>(null);
   const [historyFocusNonce, setHistoryFocusNonce] = useState(0);
+  const [postEditFocus, setPostEditFocus] = useState<{ sectionId: string; nonce: number } | null>(
+    null
+  );
   const [sectionToast, setSectionToast] = useState<string | null>(null);
   const [focusChatInputKey, setFocusChatInputKey] = useState(0);
   const [scratchWarning, setScratchWarning] = useState<string | null>(null);
@@ -246,7 +253,12 @@ export default function ProjectPage() {
         let section = selectedSectionFromPayload(payloadToDrop);
         const dataUrl = dragPreview?.previewDataUrl;
         if (dataUrl) {
-          section = { ...section, previewThumbnailDataUrl: dataUrl };
+          section = {
+            ...section,
+            previewThumbnailDataUrl: dataUrl,
+            previewCaptureWidth: dragPreview?.previewWidth,
+            previewCaptureHeight: dragPreview?.previewHeight,
+          };
           handleSelectedSectionChange(section);
           try {
             const uploaded = await uploadTargetPreviewThumbnail(
@@ -257,7 +269,15 @@ export default function ProjectPage() {
             );
             setSelectedSection((prev) =>
               prev && prev.sectionId === section.sectionId
-                ? { ...prev, previewThumbnail: uploaded, previewThumbnailDataUrl: undefined }
+                ? {
+                    ...prev,
+                    previewThumbnail: uploaded,
+                    previewThumbnailDataUrl: undefined,
+                    previewCaptureWidth:
+                      prev.previewCaptureWidth ?? uploaded.width ?? dragPreview?.previewWidth,
+                    previewCaptureHeight:
+                      prev.previewCaptureHeight ?? uploaded.height ?? dragPreview?.previewHeight,
+                  }
                 : prev
             );
           } catch {
@@ -346,9 +366,11 @@ export default function ProjectPage() {
               previewCaptureKind?: TargetPreviewThumbMessage['captureKind'];
             }
           | null
-          | undefined
+          | undefined,
+        options?: { freezeAfterFirst?: boolean }
       ) => {
         if (!existing?.previewDataUrl) return true;
+        if (options?.freezeAfterFirst) return false;
         if (
           existing.previewCaptureKind === 'styled_fallback' &&
           thumb.captureKind === 'raster'
@@ -360,7 +382,9 @@ export default function ProjectPage() {
 
       if (activePayload && thumbMatchesPayload(activePayload, thumb)) {
         setSectionDrag((prev) =>
-          prev && shouldAcceptPreviewUpdate(prev) ? { ...prev, ...preview } : prev
+          prev && shouldAcceptPreviewUpdate(prev, { freezeAfterFirst: true })
+            ? { ...prev, ...preview }
+            : prev
         );
         return;
       }
@@ -455,7 +479,13 @@ export default function ProjectPage() {
   }, []);
 
   const handleDeploySuccess = useCallback(() => {
-    fetchProject();
+    void fetchProject().then((fetched) => {
+      const version = fetched?.codeWorkspace?.version;
+      setPreviewReload((prev) => ({
+        key: prev.key + 1,
+        version: typeof version === 'number' ? version : prev.version,
+      }));
+    });
     setDiffRefreshKey((k) => k + 1);
   }, [fetchProject]);
 
@@ -474,6 +504,12 @@ export default function ProjectPage() {
       fetchProject();
     }
   }, [sessionStatus, projectId, fetchProject, devBypassAuth]);
+
+  useEffect(() => {
+    const version = project?.codeWorkspace?.version;
+    if (typeof version !== 'number' || previewReload.key > 0) return;
+    setPreviewReload((prev) => (prev.version === version ? prev : { ...prev, version }));
+  }, [project?.codeWorkspace?.version, previewReload.key]);
 
   if ((!devBypassAuth && sessionStatus === 'loading') || loading) {
     return <LoadingShell message="Opening project…" />;
@@ -540,6 +576,7 @@ export default function ProjectPage() {
           x={sectionDrag.x}
           y={sectionDrag.y}
           previewDataUrl={sectionDrag.previewDataUrl}
+          previewCaptureKind={sectionDrag.previewCaptureKind}
           previewWidth={sectionDrag.previewWidth}
           previewHeight={sectionDrag.previewHeight}
           grabOffsetX={sectionDrag.grabOffsetX}
@@ -550,14 +587,18 @@ export default function ProjectPage() {
         <div className="flex-1 min-h-[320px] lg:min-h-0 min-w-0 flex flex-col">
           <ProjectPreviewFrame
             projectId={projectId}
-            codeWorkspaceVersion={project.codeWorkspace?.version}
-            previewRefreshKey={previewRefreshKey}
+            previewRefreshKey={previewReload.key}
+            previewWorkspaceVersion={previewReload.version}
+            previewFrozen={previewFrozen}
+            onPreviewReloadSettled={() => setPreviewFrozen(false)}
             editInProgress={editInProgress}
             onReadyChange={handlePreviewReadyChange}
             selectedSection={selectedSection}
             hoverSectionId={historyHoverSectionId}
             focusSectionId={focusedHistorySectionId}
             focusSectionNonce={historyFocusNonce}
+            postEditFocusSectionId={postEditFocus?.sectionId ?? null}
+            postEditFocusNonce={postEditFocus?.nonce ?? 0}
             onSelectedSectionChange={handleSelectedSectionChange}
             onSectionDragStart={handleSectionDragStart}
             onSectionPointerDown={handleSectionPointerDown}
@@ -612,27 +653,50 @@ export default function ProjectPage() {
             editInProgress={editInProgress}
             deployment={project.deployment}
             lastPublishedAt={project.lastPublishedAt}
-            onEditStart={() => setEditInProgress(true)}
-            onEditComplete={({ jobId, ok, previewSynced, changedFiles }) => {
+            onEditStart={() => {
+              setEditInProgress(true);
+              setPreviewFrozen(true);
+            }}
+            onEditComplete={({ jobId, ok, previewSynced, changedFiles, focusSectionId }) => {
               setEditInProgress(false);
               if (jobId) setLatestJobId(jobId);
               setDiffRefreshKey((k) => k + 1);
-              if (!ok) return;
+              if (!ok) {
+                setPreviewFrozen(false);
+                return;
+              }
 
               previewReloadCancelRef.current?.();
               previewReloadCancelRef.current = null;
+              setPostEditFocus(null);
 
-              void fetchProject().then(() => {
+              void fetchProject().then((fetched) => {
                 const affectsPreview = workspaceEditNeedsPreviewReload(changedFiles ?? []);
-                if (!affectsPreview) return;
+                const workspaceVersion =
+                  fetched?.codeWorkspace?.version ?? project?.codeWorkspace?.version ?? 1;
 
-                if (previewSynced === false) {
-                  const schedule = schedulePreviewIframeReloads(
-                    () => setPreviewRefreshKey((k) => k + 1),
-                    { changedPaths: changedFiles, previewSynced: false }
-                  );
-                  previewReloadCancelRef.current = schedule.cancel;
+                if (!affectsPreview) {
+                  setPreviewFrozen(false);
+                  if (focusSectionId && previewTargetingAvailable) {
+                    handleHistorySectionClick(focusSectionId);
+                  }
+                  return;
                 }
+
+                const schedule = schedulePreviewIframeReloads(
+                  () => {
+                    setPreviewReload((prev) => ({
+                      key: prev.key + 1,
+                      version: workspaceVersion,
+                    }));
+                    if (focusSectionId && previewTargetingAvailable) {
+                      setFocusedHistorySectionId(focusSectionId);
+                      setPostEditFocus({ sectionId: focusSectionId, nonce: Date.now() });
+                    }
+                  },
+                  { changedPaths: changedFiles, previewSynced }
+                );
+                previewReloadCancelRef.current = schedule.cancel;
               });
             }}
             onRollbackSuccess={handleDeploySuccess}

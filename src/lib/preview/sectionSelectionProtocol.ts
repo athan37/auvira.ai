@@ -44,6 +44,8 @@ export interface SelectedSectionPayload {
   pinScope?: PinScope;
   previewThumbnail?: TargetPreviewThumbnail;
   previewThumbnailDataUrl?: string;
+  previewCaptureWidth?: number;
+  previewCaptureHeight?: number;
 }
 
 /** Context-menu payload includes iframe viewport coordinates for parent menu placement. */
@@ -71,6 +73,8 @@ export interface SelectedSection {
   pinScope?: PinScope;
   previewThumbnail?: TargetPreviewThumbnail;
   previewThumbnailDataUrl?: string;
+  previewCaptureWidth?: number;
+  previewCaptureHeight?: number;
 }
 
 export interface SiteSectionSelectedMessage {
@@ -372,6 +376,8 @@ export function selectedSectionFromPayload(payload: SelectedSectionPayload): Sel
     pinScope: payload.pinScope ?? (payload.fieldPath ? 'element' : 'section'),
     previewThumbnail: payload.previewThumbnail,
     previewThumbnailDataUrl: payload.previewThumbnailDataUrl,
+    previewCaptureWidth: payload.previewCaptureWidth,
+    previewCaptureHeight: payload.previewCaptureHeight,
   };
 }
 
