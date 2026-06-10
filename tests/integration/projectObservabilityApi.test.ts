@@ -5,6 +5,9 @@ const mockGetServerUserId = vi.fn();
 const mockGetOwnerProject = vi.fn();
 const mockAggregateProject = vi.fn();
 const mockFetchContextRaw = vi.fn();
+const mockFetchDashboardRaw = vi.fn();
+const mockFetchIntentProfileRaw = vi.fn();
+const mockFetchObservabilityIntent = vi.fn();
 const mockIsObservabilityEnabled = vi.fn();
 
 vi.mock('@/lib/api/projectAccess', () => ({
@@ -18,6 +21,12 @@ vi.mock('@/lib/metrics/aggregateObservabilityMetrics', () => ({
 
 vi.mock('@/lib/observability/client', () => ({
   fetchObservabilityContextRaw: (...args: unknown[]) => mockFetchContextRaw(...args),
+  fetchObservabilityDashboardRaw: (...args: unknown[]) => mockFetchDashboardRaw(...args),
+  fetchObservabilityIntentProfileRaw: (...args: unknown[]) => mockFetchIntentProfileRaw(...args),
+}));
+
+vi.mock('@/lib/observability/fetchObservabilityIntent', () => ({
+  fetchObservabilityIntent: (...args: unknown[]) => mockFetchObservabilityIntent(...args),
 }));
 
 vi.mock('@/lib/observability/config', () => ({
@@ -52,6 +61,34 @@ describe('GET /api/projects/[projectId]/observability', () => {
         quality_snapshot: { grade: 'B', score: 0.85 },
       },
     });
+    mockFetchDashboardRaw.mockResolvedValue({
+      dashboard: {
+        cards: { turn_count: 2, session_grade: 'B', latest_score: 0.85 },
+        turns: [
+          {
+            turn_id: 't-1',
+            turn_index: 0,
+            created_at: '2026-06-09T12:00:00Z',
+            user_message: 'change background to my favorite color',
+            grade: 'B',
+            outcome: 'success',
+            trace_id: 'trace-1',
+          },
+        ],
+        coaching_hints: ['Hint one'],
+        recurring_issues: ['ambiguous section'],
+      },
+    });
+    mockFetchIntentProfileRaw.mockResolvedValue({
+      intent: {
+        keywords: ['favorite', 'color'],
+        intents: ['style_background'],
+        turn_count: 49,
+      },
+    });
+    mockFetchObservabilityIntent.mockResolvedValue({
+      sentence: 'Change the hero background to red, the owner favorite color.',
+    });
   });
 
   afterEach(() => {
@@ -82,7 +119,7 @@ describe('GET /api/projects/[projectId]/observability', () => {
     expect(res.status).toBe(404);
   });
 
-  it('returns 200 with summary, turns, and live context for owner', async () => {
+  it('returns 200 with monitor dashboard, intent profile, and probe intent', async () => {
     const { GET } = await import('@/app/api/projects/[projectId]/observability/route');
 
     const res = await GET(
@@ -98,12 +135,25 @@ describe('GET /api/projects/[projectId]/observability', () => {
     expect(json.projectName).toBe('Demo Site');
     expect(json.summary.syncedCount).toBe(1);
     expect(json.liveContext.parsed.coachingHints).toEqual(['Hint one']);
-    expect(json.liveContext.parsed.recurringIssues).toEqual(['ambiguous section']);
+    expect(json.monitorDashboard.turns).toHaveLength(1);
+    expect(json.monitorDashboard.turns[0].userMessage).toContain('favorite color');
+    expect(json.intentProfile.keywords).toEqual(['favorite', 'color']);
+    expect(json.intentProfile.intents).toEqual(['style_background']);
+    expect(json.probeIntent.sentence).toContain('red');
+    expect(json.probeIntent.extractedColor).toBe('red');
     expect(mockAggregateProject).toHaveBeenCalledWith({ projectId, days: 7 });
     expect(mockFetchContextRaw).toHaveBeenCalledWith(
       expect.objectContaining({
         projectId,
         latestUserMessage: 'make hero red',
+      })
+    );
+    expect(mockFetchDashboardRaw).toHaveBeenCalled();
+    expect(mockFetchIntentProfileRaw).toHaveBeenCalledWith({ projectId });
+    expect(mockFetchObservabilityIntent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectId,
+        userMessage: 'make hero red',
       })
     );
   });
@@ -121,6 +171,55 @@ describe('GET /api/projects/[projectId]/observability', () => {
     expect(res.status).toBe(200);
     expect(json.monitorEnabled).toBe(false);
     expect(json.liveContext).toBeNull();
+    expect(json.monitorDashboard).toBeNull();
+    expect(json.intentProfile).toBeNull();
     expect(mockFetchContextRaw).not.toHaveBeenCalled();
+    expect(mockFetchDashboardRaw).not.toHaveBeenCalled();
+    expect(mockFetchIntentProfileRaw).not.toHaveBeenCalled();
+  });
+});
+
+describe('GET /api/projects/[projectId]/observability/intent', () => {
+  const projectId = '665f4ec12f1fe71c6527f2df';
+
+  beforeEach(() => {
+    mockGetServerUserId.mockResolvedValue('user-1');
+    mockGetOwnerProject.mockResolvedValue({ _id: projectId, name: 'Demo Site' });
+    mockIsObservabilityEnabled.mockReturnValue(true);
+    mockFetchObservabilityIntent.mockResolvedValue({
+      sentence: 'Change the hero background to red, the owner favorite color.',
+    });
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns extracted color from monitor intent replay', async () => {
+    const { GET } = await import('@/app/api/projects/[projectId]/observability/intent/route');
+
+    const res = await GET(
+      new NextRequest(
+        `http://localhost/api/projects/${projectId}/observability/intent?userMessage=${encodeURIComponent('change background to my favorite color')}`
+      ),
+      { params: { projectId } }
+    );
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.ok).toBe(true);
+    expect(json.extractedColor).toBe('red');
+    expect(json.sentence).toContain('red');
+  });
+
+  it('returns 400 when userMessage is missing', async () => {
+    const { GET } = await import('@/app/api/projects/[projectId]/observability/intent/route');
+
+    const res = await GET(
+      new NextRequest(`http://localhost/api/projects/${projectId}/observability/intent`),
+      { params: { projectId } }
+    );
+
+    expect(res.status).toBe(400);
   });
 });

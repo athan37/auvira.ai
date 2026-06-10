@@ -100,6 +100,24 @@ export async function fetchObservabilityIntentRaw(input: {
   );
 }
 
+export async function fetchObservabilityDashboardRaw(input: {
+  projectId: string;
+  conversationId: string;
+}): Promise<Record<string, unknown> | null> {
+  return observabilityFetch(
+    `/projects/${encodeURIComponent(input.projectId)}/conversations/${encodeURIComponent(input.conversationId)}/dashboard`,
+    { method: 'GET' }
+  );
+}
+
+export async function fetchObservabilityIntentProfileRaw(input: {
+  projectId: string;
+}): Promise<Record<string, unknown> | null> {
+  return observabilityFetch(`/projects/${encodeURIComponent(input.projectId)}/intent`, {
+    method: 'GET',
+  });
+}
+
 export async function fetchObservabilityContextRaw(input: {
   projectId: string;
   conversationId: string;

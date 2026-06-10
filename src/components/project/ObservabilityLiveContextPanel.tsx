@@ -23,6 +23,7 @@ export function ObservabilityLiveContextPanel({
   monitorEnabled,
   liveContext,
   probeInput,
+  probeIntent,
   refreshing,
   onProbeInputChange,
   onRefresh,
@@ -30,6 +31,7 @@ export function ObservabilityLiveContextPanel({
   monitorEnabled: boolean;
   liveContext: ObservabilityLiveContext | null | undefined;
   probeInput: string;
+  probeIntent?: { sentence: string; extractedColor: string | null } | null;
   refreshing: boolean;
   onProbeInputChange: (value: string) => void;
   onRefresh: () => void;
@@ -142,6 +144,22 @@ export function ObservabilityLiveContextPanel({
           >
             Probe message
           </label>
+          {probeIntent?.sentence ? (
+            <div className="mb-3 rounded-xl border border-amber-100/90 bg-amber-50/50 px-3 py-2.5 text-sm">
+              <p className={`text-[10px] font-semibold uppercase tracking-wide mb-1 ${TEXT.tertiary}`}>
+                Monitor POST /intent
+              </p>
+              <p className={`text-sm ${TEXT.primary}`}>{probeIntent.sentence}</p>
+              {probeIntent.extractedColor ? (
+                <p className={`text-xs mt-1.5 ${TEXT.muted}`}>
+                  Extracted color:{' '}
+                  <Badge tone="warning" className="ml-1 capitalize">
+                    {probeIntent.extractedColor}
+                  </Badge>
+                </p>
+              ) : null}
+            </div>
+          ) : null}
           <div className="flex flex-col sm:flex-row gap-2">
             <Input
               id="observability-probe"
@@ -164,9 +182,7 @@ export function ObservabilityLiveContextPanel({
             </Button>
           </div>
           <p className={`text-xs mt-2 ${TEXT.tertiary}`}>
-            Sends{' '}
-            <code className="rounded bg-[#f5f5f7] px-1 py-0.5 text-[#6e6e73]">latest_user_message</code>{' '}
-            to Site Monitor GET /context.
+            Refreshes Site Monitor GET /context and POST /intent for the probe message.
           </p>
           {!monitorEnabled ? (
             <Alert variant="warning" className="mt-3 bg-[#f5f5f7] border-[#d2d2d7]/80 text-[#6e6e73]">

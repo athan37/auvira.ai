@@ -4,12 +4,15 @@ import { useCallback, useEffect, useState } from 'react';
 import { Alert } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
 import { Card, CardBody, CardHeader } from '@/components/ui/Card';
+import { ObservabilityIntentProfilePanel } from '@/components/project/ObservabilityIntentProfilePanel';
 import { ObservabilityLiveContextPanel } from '@/components/project/ObservabilityLiveContextPanel';
 import { ObservabilityStatCards } from '@/components/project/ObservabilityStatCards';
 import { ObservabilityTurnTable } from '@/components/project/ObservabilityTurnTable';
 import { TEXT } from '@/content/productTheme';
 import type { ProjectObservabilityTurnRow } from '@/lib/metrics/aggregateObservabilityMetrics';
 import { gradeToBadgeTone, outcomeToBadgeTone } from '@/lib/observability/observabilityUiHelpers';
+import type { MonitorDashboardView } from '@/lib/observability/parseMonitorDashboard';
+import type { MonitorIntentProfileView } from '@/lib/observability/parseIntentProfile';
 import type { ObservabilityCoachingContext } from '@/lib/observability/types';
 
 type ProjectObservabilityResponse = {
@@ -28,6 +31,9 @@ type ProjectObservabilityResponse = {
     clarificationCount: number;
   };
   turns?: ProjectObservabilityTurnRow[];
+  monitorDashboard?: MonitorDashboardView | null;
+  intentProfile?: MonitorIntentProfileView | null;
+  probeIntent?: { sentence: string; extractedColor: string | null } | null;
   liveContext?: {
     raw: Record<string, unknown>;
     parsed: ObservabilityCoachingContext;
@@ -167,6 +173,10 @@ export function ProjectObservabilityDashboard({ projectId }: { projectId: string
   };
 
   const summary = data?.summary;
+  const monitorCards = data?.monitorDashboard?.cards;
+  const useMonitorStats = Boolean(
+    data?.monitorEnabled && monitorCards && (monitorCards.turnCount ?? 0) > 0
+  );
 
   return (
     <div className="px-3 lg:px-4 pb-8 max-w-5xl mx-auto w-full">
@@ -175,7 +185,7 @@ export function ProjectObservabilityDashboard({ projectId }: { projectId: string
           Observability
         </h1>
         <p className={`text-sm mt-1 ${TEXT.muted}`}>
-          Site Monitor coaching context and edit turn scores
+          Site Monitor intent profile, coaching context, and Phoenix turn history
           {data?.days != null ? ` (last ${data.days} days)` : ''}.
         </p>
       </header>
@@ -187,26 +197,72 @@ export function ProjectObservabilityDashboard({ projectId }: { projectId: string
       ) : (
         <div className="space-y-6">
           <ObservabilityStatCards
-            cards={[
-              { label: 'Synced turns', value: String(summary?.syncedCount ?? 0) },
-              {
-                label: 'Avg score',
-                value: summary?.averageScore != null ? summary.averageScore.toFixed(2) : '—',
-              },
-              { label: 'Clarifications', value: String(summary?.clarificationCount ?? 0) },
-              { label: 'Coaching applied', value: String(summary?.coachingAppliedCount ?? 0) },
-            ]}
+            cards={
+              useMonitorStats
+                ? [
+                    {
+                      label: 'Monitor turns',
+                      value: String(monitorCards?.turnCount ?? 0),
+                    },
+                    {
+                      label: 'Session grade',
+                      value: monitorCards?.sessionGrade ?? '—',
+                    },
+                    {
+                      label: 'Latest score',
+                      value:
+                        monitorCards?.latestScore != null
+                          ? monitorCards.latestScore.toFixed(2)
+                          : '—',
+                    },
+                    {
+                      label: 'Top issue',
+                      value: monitorCards?.topIssueLabel ?? monitorCards?.topIssue ?? '—',
+                    },
+                  ]
+                : [
+                    { label: 'Synced turns', value: String(summary?.syncedCount ?? 0) },
+                    {
+                      label: 'Avg score',
+                      value:
+                        summary?.averageScore != null ? summary.averageScore.toFixed(2) : '—',
+                    },
+                    { label: 'Clarifications', value: String(summary?.clarificationCount ?? 0) },
+                    {
+                      label: 'Coaching applied',
+                      value: String(summary?.coachingAppliedCount ?? 0),
+                    },
+                  ]
+            }
           />
 
           <div className="grid lg:grid-cols-12 gap-4">
-            <div className="lg:col-span-8">
+            <div className="lg:col-span-5">
+              <ObservabilityIntentProfilePanel
+                monitorEnabled={data.monitorEnabled ?? false}
+                intentProfile={data.intentProfile}
+              />
+            </div>
+            <div className="lg:col-span-7">
               <ObservabilityLiveContextPanel
                 monitorEnabled={data.monitorEnabled ?? false}
                 liveContext={data.liveContext}
                 probeInput={probeInput}
+                probeIntent={data.probeIntent}
                 refreshing={refreshing}
                 onProbeInputChange={setProbeInput}
                 onRefresh={handleRefreshContext}
+              />
+            </div>
+          </div>
+
+          <div className="grid lg:grid-cols-12 gap-4">
+            <div className="lg:col-span-8">
+              <ObservabilityTurnTable
+                projectId={projectId}
+                monitorEnabled={data.monitorEnabled}
+                monitorTurns={data.monitorDashboard?.turns}
+                mongoTurns={data.turns ?? []}
               />
             </div>
             <div className="lg:col-span-4">
@@ -216,8 +272,6 @@ export function ProjectObservabilityDashboard({ projectId }: { projectId: string
               />
             </div>
           </div>
-
-          <ObservabilityTurnTable turns={data.turns ?? []} />
         </div>
       )}
     </div>
