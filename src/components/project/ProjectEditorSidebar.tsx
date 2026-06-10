@@ -123,8 +123,8 @@ export function ProjectEditorSidebar({
             className={cn(
               'flex-1 py-2.5 text-sm font-medium transition-colors',
               tab === t.id
-                ? cn('editor-tab-active bg-white/60', TEXT.primary)
-                : cn(TEXT.muted, 'hover:text-[#1d1d1f] hover:bg-white/40')
+                ? cn('editor-tab-active bg-white/25', TEXT.primary)
+                : cn(TEXT.muted, 'hover:text-[#1d1d1f] hover:bg-white/15')
             )}
           >
             {t.label}

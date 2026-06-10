@@ -70,13 +70,13 @@ export function RoseOrbitSvg({
     >
       <defs>
         <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#F08FA0" />
-          <stop offset="45%" stopColor="#E85672" />
-          <stop offset="100%" stopColor="#BD365E" />
+          <stop offset="0%" stopColor="#93c5fd" />
+          <stop offset="45%" stopColor="#3b82f6" />
+          <stop offset="100%" stopColor="#2563eb" />
         </linearGradient>
         <radialGradient id={glowId} cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#E85672" stopOpacity={0.35} />
-          <stop offset="100%" stopColor="#E85672" stopOpacity={0} />
+          <stop offset="0%" stopColor="#60a5fa" stopOpacity={0.3} />
+          <stop offset="100%" stopColor="#60a5fa" stopOpacity={0} />
         </radialGradient>
       </defs>
 
@@ -148,7 +148,7 @@ export function RoseOrbitSvg({
           cx={outerTip.cx}
           cy={outerTip.cy}
           r={outerTip.r}
-          fill="#E85672"
+          fill="#3b82f6"
         />
       </motion.g>
 
@@ -163,7 +163,7 @@ export function RoseOrbitSvg({
           cy={center}
           r={innerRadius}
           fill="none"
-          stroke="#DD8399"
+          stroke="#c4b5fd"
           strokeOpacity={0.92}
           strokeWidth={innerStroke}
           strokeLinecap="round"
@@ -174,7 +174,7 @@ export function RoseOrbitSvg({
           cx={innerTip.cx}
           cy={innerTip.cy}
           r={innerTip.r}
-          fill="#DD8399"
+          fill="#a78bfa"
           opacity={0.9}
         />
       </motion.g>
@@ -184,7 +184,7 @@ export function RoseOrbitSvg({
         cy={center}
         r={coreRadius + 2.5}
         fill="none"
-        stroke="#E85672"
+        stroke="#60a5fa"
         strokeOpacity={0.18}
         strokeWidth={size <= 48 ? 0.75 : 1}
       />

@@ -55,7 +55,7 @@ export function ObservabilityTurnTable({
         ) : useMonitor ? (
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
-              <thead className="bg-[#f5f5f7]/80 text-left text-xs uppercase tracking-wide text-[#86868b]">
+              <thead className="glass-panel text-left text-xs uppercase tracking-wide text-[#86868b]">
                 <tr>
                   <th className="px-4 py-2.5 font-medium">Time</th>
                   <th className="px-4 py-2.5 font-medium">User message</th>
@@ -122,7 +122,7 @@ export function ObservabilityTurnTable({
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
-              <thead className="bg-[#f5f5f7]/80 text-left text-xs uppercase tracking-wide text-[#86868b]">
+              <thead className="glass-panel text-left text-xs uppercase tracking-wide text-[#86868b]">
                 <tr>
                   <th className="px-4 py-2.5 font-medium">Time</th>
                   <th className="px-4 py-2.5 font-medium">Outcome</th>

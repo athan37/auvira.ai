@@ -38,8 +38,8 @@ export function ProjectWorkspaceTabs({ projectId }: { projectId: string }) {
             className={cn(
               'px-4 py-2 text-sm font-medium transition-colors',
               isActive
-                ? cn('editor-tab-active bg-white/60', TEXT.primary)
-                : cn(TEXT.muted, 'hover:text-[#1d1d1f] hover:bg-white/40')
+                ? cn('editor-tab-active bg-white/25', TEXT.primary)
+                : cn(TEXT.muted, 'hover:text-[#1d1d1f] hover:bg-white/15')
             )}
           >
             {tab.label}

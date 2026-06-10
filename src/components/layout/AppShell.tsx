@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { signOut, useSession } from 'next-auth/react';
 import { useState } from 'react';
-import { ACCENT } from '@/content/productTheme';
+import { ACCENT, CANVAS } from '@/content/productTheme';
 import { cn } from '@/lib/cn';
 import { BrandLogo } from '@/components/marketing/BrandLogo';
 import { Button } from '@/components/ui/Button';
@@ -39,7 +39,7 @@ export function AppShell({
   const showSideNav = variant === 'default';
 
   return (
-    <div className="min-h-screen bg-brand-canvas flex flex-col">
+    <div className={cn('min-h-screen flex flex-col', CANVAS.mesh)}>
       <header className="sticky top-0 z-40 glass-nav">
         <PageContainer className="flex h-12 items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
@@ -86,7 +86,7 @@ export function AppShell({
         {showSideNav && (
           <aside
             className={cn(
-              'border-r border-[#d2d2d7]/60 bg-white/60 backdrop-blur-xl w-52 shrink-0',
+              'border-r border-white/40 glass-panel w-52 shrink-0',
               mobileOpen ? 'absolute inset-y-12 left-0 z-30 shadow-glass md:static md:shadow-none' : 'hidden md:block'
             )}
           >
@@ -102,7 +102,7 @@ export function AppShell({
                       'block rounded-xl px-3 py-2 text-sm font-normal transition-colors',
                       active
                         ? ACCENT.pill
-                        : 'text-[#6e6e73] hover:bg-[#f5f5f7] hover:text-[#1d1d1f]'
+                        : 'text-[#6e6e73] hover:bg-white/30 hover:text-[#1d1d1f]'
                     )}
                   >
                     {item.label}

@@ -3,13 +3,18 @@ import { cn } from '@/lib/cn';
 type Tone = 'default' | 'success' | 'warning' | 'error' | 'info' | 'brand' | 'rose';
 
 const tones: Record<Tone, string> = {
-  default: 'bg-[#f5f5f7] text-[#1d1d1f] border border-[#d2d2d7]/80',
-  success: 'bg-emerald-50 text-emerald-800 border border-emerald-200/80 shadow-sm ring-1 ring-inset ring-white/40',
-  warning: 'bg-amber-50 text-amber-900 border border-amber-200/80 shadow-sm',
-  error: 'bg-red-50 text-red-800 border border-red-200/80 shadow-sm',
-  info: 'bg-rose-50 text-rose-800 border border-rose-200/80 shadow-sm ring-1 ring-inset ring-white/40',
-  brand: 'bg-rose-50 text-rose-700 border border-rose-200/80 shadow-sm ring-1 ring-inset ring-white/40',
-  rose: 'bg-rose-50 text-rose-700 border border-rose-200/80 shadow-sm ring-1 ring-inset ring-white/40',
+  default:
+    'bg-white/40 text-[#1d1d1f] border border-white/50 backdrop-blur-sm shadow-sm',
+  success:
+    'bg-emerald-50/60 text-emerald-800 border border-emerald-200/60 backdrop-blur-sm shadow-sm ring-1 ring-inset ring-white/40',
+  warning:
+    'bg-amber-50/60 text-amber-900 border border-amber-200/60 backdrop-blur-sm shadow-sm',
+  error: 'bg-red-50/60 text-red-800 border border-red-200/60 backdrop-blur-sm shadow-sm',
+  info: 'bg-blue-50/60 text-blue-800 border border-blue-200/60 backdrop-blur-sm shadow-sm ring-1 ring-inset ring-white/40',
+  brand:
+    'bg-blue-50/60 text-blue-700 border border-blue-200/60 backdrop-blur-sm shadow-sm ring-1 ring-inset ring-white/40',
+  rose:
+    'bg-rose-50/60 text-rose-700 border border-rose-200/60 backdrop-blur-sm shadow-sm ring-1 ring-inset ring-white/40',
 };
 
 export function Badge({

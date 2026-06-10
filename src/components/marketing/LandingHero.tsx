@@ -33,10 +33,10 @@ export function LandingHero() {
           </StaggerItem>
           <StaggerItem>
             <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-              <MarketingLink href="/auth/signin" variant="primaryRose">
+              <MarketingLink href="/auth/signin" variant="primary">
                 {HERO.primaryCta}
               </MarketingLink>
-              <MarketingLink href={HERO.secondaryHref} variant="secondaryRose">
+              <MarketingLink href={HERO.secondaryHref} variant="secondary">
                 {HERO.secondaryCta}
               </MarketingLink>
             </div>
@@ -74,7 +74,7 @@ export function LandingFinalCta({
           {subline}
         </p>
         <motion.div className="mt-8" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-          <MarketingLink href="/auth/signin" variant="primaryRose" size="lg" className="inline-flex">
+          <MarketingLink href="/auth/signin" variant="primary" size="lg" className="inline-flex">
             {cta}
           </MarketingLink>
         </motion.div>

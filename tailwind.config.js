@@ -4,6 +4,7 @@ module.exports = {
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/content/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
     extend: {
@@ -62,6 +63,8 @@ module.exports = {
         'rose-glass': '0 20px 60px rgba(200, 62, 95, 0.12)',
         'rose-cta': '0 1px 2px rgba(0, 0, 0, 0.06), 0 4px 16px rgba(200, 62, 95, 0.32)',
         'rose-cta-hover': '0 2px 4px rgba(0, 0, 0, 0.08), 0 8px 24px rgba(200, 62, 95, 0.38)',
+        'cta-blue': '0 1px 2px rgba(0, 0, 0, 0.06), 0 4px 16px rgba(59, 130, 246, 0.32)',
+        'cta-blue-hover': '0 2px 4px rgba(0, 0, 0, 0.08), 0 8px 24px rgba(59, 130, 246, 0.38)',
       },
       borderRadius: {
         DEFAULT: '8px',
@@ -77,6 +80,9 @@ module.exports = {
         'rose-gradient-cta': 'linear-gradient(180deg, #E85672 0%, #D24460 38%, #BD365E 100%)',
         'rose-glow': 'radial-gradient(circle at center, rgba(210,68,96,0.22), transparent 60%)',
         'rose-glow-soft': 'radial-gradient(ellipse 70% 45% at 50% 0%, rgba(210,68,96,0.08), transparent 55%)',
+        'mesh-canvas':
+          'radial-gradient(ellipse 55% 45% at 8% 18%, rgba(184,216,245,0.55), transparent 68%), radial-gradient(ellipse 50% 42% at 52% 12%, rgba(248,232,168,0.48), transparent 62%), radial-gradient(ellipse 48% 40% at 92% 28%, rgba(216,200,245,0.52), transparent 65%), radial-gradient(ellipse 55% 48% at 35% 88%, rgba(245,212,232,0.42), transparent 68%), linear-gradient(165deg, #f4f6fc 0%, #eef2fb 55%, #f8f4fc 100%)',
+        'cta-gradient': 'linear-gradient(180deg, #60a5fa 0%, #3b82f6 42%, #2563eb 100%)',
       },
       transitionTimingFunction: {
         apple: 'cubic-bezier(0.25, 0.1, 0.25, 1)',

@@ -116,7 +116,7 @@ export function MobileNav({ activeSection }: { activeSection: string | null }) {
                 );
               })}
               <div className="pt-6">
-                <MarketingLink href="/auth/signin" variant="primaryRose" className="w-full justify-center">
+                <MarketingLink href="/auth/signin" variant="primary" className="w-full justify-center">
                   Sign in
                 </MarketingLink>
               </div>
@@ -145,7 +145,7 @@ export function MarketingHeader() {
     <header
       className={cn(
         'sticky top-0 z-50 transition-all duration-300 ease-apple',
-        scrolled ? 'glass-nav shadow-sm' : 'bg-[#fbfbfd]/80 backdrop-blur-xl border-b border-transparent'
+        scrolled ? 'glass-nav shadow-sm' : 'glass-nav border-b border-transparent'
       )}
     >
       <div

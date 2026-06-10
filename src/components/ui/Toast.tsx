@@ -13,7 +13,7 @@ export function Toast({
   return (
     <div
       className={cn(
-        'glass-dark fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full px-4 py-2 text-sm font-medium text-white/90 shadow-glass ring-1 ring-rose-500/25',
+        'glass-elevated fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full px-4 py-2 text-sm font-medium text-[#1d1d1f] shadow-glass ring-1 ring-blue-500/20',
         className
       )}
       role="status"

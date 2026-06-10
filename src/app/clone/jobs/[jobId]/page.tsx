@@ -550,7 +550,7 @@ export default function CloneJobPage() {
           {/* RIGHT COLUMN — Actions (2/5) */}
           <div className="lg:col-span-2 space-y-4">
             {isReviewReady && job.suggestedTemplate && (
-              <div className={cn('bg-white rounded-2xl border p-4 space-y-4', BORDER.hairline)}>
+              <div className={cn('glass-card border p-4 space-y-4', BORDER.hairline)}>
                 <StarterGalleryPicker
                   selectedId={
                     selectedLayoutId ??
@@ -598,7 +598,7 @@ export default function CloneJobPage() {
 
             {/* Revise plan input */}
             {isReviewReady && showRevisionInput && (
-              <div className={cn('bg-white rounded-2xl border overflow-hidden', BORDER.hairline)}>
+              <div className={cn('glass-card border overflow-hidden', BORDER.hairline)}>
                 <div className="px-4 py-3 border-b border-yellow-200 bg-yellow-50">
                   <h2 className="font-medium text-yellow-800 text-sm">Revise Plan</h2>
                   <p className="text-xs text-yellow-600 mt-0.5">Tell us how to improve the proposed plan</p>
@@ -655,7 +655,7 @@ export default function CloneJobPage() {
             {isReviewReady && job.reviewChecklist && (() => {
               const hasBlocking = !job.reviewChecklist.businessNameFound;
               return (
-              <div className={cn('bg-white rounded-2xl border overflow-hidden', BORDER.hairline)}>
+              <div className={cn('glass-card border overflow-hidden', BORDER.hairline)}>
                 <div className="px-4 py-3 border-t-4 border-rose-500">
                   <div className="space-y-2">
                     <Button
@@ -682,7 +682,7 @@ export default function CloneJobPage() {
 
             {/* In progress spinner */}
             {isInProgress && !isReviewReady && (
-              <div className={cn('bg-white rounded-2xl border p-6 text-center', BORDER.hairline)}>
+              <div className={cn('glass-card border p-6 text-center', BORDER.hairline)}>
                 <Loading size="md" className="mx-auto mb-4" />
                 <p className={cn('text-sm', TEXT.muted)}>{job.currentStageLabel}</p>
                 <p className={cn('text-xs mt-1', TEXT.tertiary)}>You can keep this page open to watch progress. If you leave, you can return from your dashboard.</p>
@@ -696,7 +696,7 @@ export default function CloneJobPage() {
 
             {/* Building spinner */}
             {isBuilding && (
-              <div className={cn('bg-white rounded-2xl border p-6 text-center', BORDER.hairline)}>
+              <div className={cn('glass-card border p-6 text-center', BORDER.hairline)}>
                 <Loading size="md" className="mx-auto mb-4" />
                 <p className={cn('text-sm', TEXT.muted)}>{job.currentStageLabel}</p>
                 <p className={cn('text-xs mt-1', TEXT.tertiary)}>Building takes 1-3 min.</p>
@@ -705,7 +705,7 @@ export default function CloneJobPage() {
 
             {/* Deploying — preview stays live */}
             {isDeploying && (
-              <div className={cn('bg-white rounded-2xl border p-6 text-center', BORDER.hairline)}>
+              <div className={cn('glass-card border p-6 text-center', BORDER.hairline)}>
                 <Loading size="md" className="mx-auto mb-4" />
                 <p className={cn('text-sm', TEXT.muted)}>{job.currentStageLabel}</p>
                 <p className={cn('text-xs mt-1', TEXT.tertiary)}>Your preview is still available while we publish the website.</p>
@@ -724,7 +724,7 @@ export default function CloneJobPage() {
 
             {/* Preview building spinner */}
             {isPreviewBuilding && (
-              <div className={cn('bg-white rounded-2xl border p-6 text-center', BORDER.hairline)}>
+              <div className={cn('glass-card border p-6 text-center', BORDER.hairline)}>
                 <Loading size="md" className="mx-auto mb-4" />
                 <p className={cn('text-sm', TEXT.muted)}>{job.currentStageLabel}</p>
                 <p className={cn('text-xs mt-1', TEXT.tertiary)}>This takes 1-2 minutes. You can keep this page open.</p>

@@ -58,7 +58,7 @@ const HOW_IT_WORKS = [
 ] as const;
 
 const selectClassName =
-  'w-full h-11 rounded-xl border border-[#d2d2d7] bg-white px-4 text-[17px] text-[#1d1d1f] focus:border-rose-600 focus:outline-none focus:ring-2 focus:ring-rose-500/20 disabled:bg-[#f5f5f7] disabled:text-[#86868b]';
+  'glass-input w-full h-11 rounded-xl px-4 text-[17px] text-[#1d1d1f] focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-60 disabled:text-[#86868b]';
 
 function ScratchProgressSteps({ stage }: { stage: ScratchProgressStage }) {
   if (stage === 'idle' || stage === 'revising') return null;
@@ -115,7 +115,7 @@ function ScratchStepPill({
         className={cn(
           'rounded-lg px-3 py-1.5 text-sm font-medium transition-all',
           step === 'intake'
-            ? cn('btn-rose-outline text-rose-700', TEXT.primary)
+            ? cn('btn-blue-outline text-blue-700', TEXT.primary)
             : cn(TEXT.muted, 'hover:text-[#1d1d1f]')
         )}
       >
@@ -128,7 +128,7 @@ function ScratchStepPill({
         className={cn(
           'rounded-lg px-3 py-1.5 text-sm font-medium transition-all',
           step === 'review'
-            ? cn('btn-rose-outline text-rose-700', TEXT.primary)
+            ? cn('btn-blue-outline text-blue-700', TEXT.primary)
             : cn(TEXT.muted, 'hover:text-[#1d1d1f]'),
           !hasPlan && 'cursor-not-allowed opacity-50'
         )}

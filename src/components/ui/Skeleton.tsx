@@ -1,7 +1,7 @@
 import { cn } from '@/lib/cn';
 import { LOADING } from '@/content/productTheme';
 
-/** Rectangular rose shimmer placeholder. */
+/** Rectangular mesh shimmer placeholder. */
 export function SkeletonBlock({
   className,
 }: {

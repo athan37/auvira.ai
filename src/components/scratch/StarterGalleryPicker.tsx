@@ -122,7 +122,7 @@ export function StarterGalleryPicker({
                   className={cn(
                     'text-left rounded-xl border p-3 transition-all',
                     selected
-                      ? 'border-rose-600 ring-2 ring-rose-500/20 bg-rose-50 shadow-rose-cta'
+                      ? 'border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/40 shadow-cta-blue'
                       : 'border-[#d2d2d7]/80 hover:border-rose-200 bg-white',
                     disabled && 'opacity-60 cursor-not-allowed'
                   )}

@@ -59,6 +59,7 @@ export default function AdminObservabilityPage() {
   const obs = data?.observability;
 
   return (
+    <div className="min-h-screen bg-mesh-canvas">
     <PageContainer className="py-10 max-w-5xl">
       <h1 className="text-2xl font-semibold text-neutral-900 mb-2">Observability</h1>
       <p className="text-sm text-neutral-600 mb-8">
@@ -152,12 +153,13 @@ export default function AdminObservabilityPage() {
         </>
       )}
     </PageContainer>
+    </div>
   );
 }
 
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-neutral-200 bg-white px-4 py-3">
+    <div className="glass-card px-4 py-3">
       <p className="text-xs text-neutral-500 uppercase tracking-wide">{label}</p>
       <p className="text-xl font-semibold text-neutral-900 mt-1">{value}</p>
     </div>

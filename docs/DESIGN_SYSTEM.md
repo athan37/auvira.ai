@@ -1,6 +1,6 @@
-# Design System — Apple-style UI
+# Design System — Glassmorphism UI
 
-Single source of truth for First Site product chrome. Inspired by [apple.com](https://www.apple.com) patterns: neutral canvas, **rose accent**, frosted glass, editorial typography, restrained motion.
+Single source of truth for First Site product chrome. **Pastel mesh canvas**, frosted glass panels, **blue primary CTAs**, navy typography, rose as secondary accent (drag pins, targeting), restrained motion.
 
 ## Colors
 
@@ -15,11 +15,15 @@ Single source of truth for First Site product chrome. Inspired by [apple.com](ht
 | Text secondary | `--color-text-muted` | `#6e6e73` | Subcopy |
 | Text tertiary | `--color-text-tertiary` | `#86868b` | Meta labels |
 | Border | `--color-border` | `#d2d2d7` | Hairlines |
-| Accent | `--rose-raspberry` / rose-* | `#C83E5F` | Primary actions, links, tabs |
-| Accent hover | `--rose-text-hover` | `#C83E5F` | Hover |
-| Accent muted | `--rose-pale` | `#F1CDD7` | Soft wash, nav pills |
-| Glass fill | `--color-glass` | `rgb(255 255 255 / 0.72)` | Frosted panels |
-| Glass border | `--color-border-glass` | `rgb(255 255 255 / 0.8)` | Glass rim |
+| Primary CTA | `--cta-blue` | `#3B82F6` | Buttons, links, active tabs |
+| CTA hover | `--cta-blue-hover` | `#2563EB` | Hover |
+| Rose (secondary) | `--rose-raspberry` | `#C83E5F` | Drag pins, drop zones, marketing |
+| Mesh sky | `--mesh-sky` | `#B8D8F5` | Canvas blob |
+| Mesh lemon | `--mesh-lemon` | `#F8E8A8` | Canvas blob |
+| Mesh lavender | `--mesh-lavender` | `#D8C8F5` | Canvas blob |
+| Mesh blush | `--mesh-blush` | `#F5D4E8` | Canvas blob |
+| Glass fill | `--color-glass` | `rgb(255 255 255 / 0.22)` | Frosted panels |
+| Glass border | `--color-border-glass` | `rgb(255 255 255 / 0.45)` | Glass rim |
 | Danger | — | `#ff3b30` | Destructive |
 | Success | — | `#34c759` | Status only |
 
@@ -27,39 +31,26 @@ Tailwind: `brand-*` maps to the blue accent scale for backward compatibility. Pr
 
 ## Canvas (page background)
 
-Product pages use a **neutral layered canvas** — not flat white. Rose atmosphere is **landing-only** (hero, promo); product chrome stays cool grey.
+Product pages use a **pastel mesh gradient** — sky blue, lemon, lavender, blush blobs over a light base. Glass panels blur this colorful canvas.
 
 ### Utilities
 
 | Class | Usage |
 |-------|--------|
-| `.bg-brand-canvas` | Full-page roots: `body`, `AppShell`, landing wrapper, sign-in |
-| `.bg-canvas-alt` | Alternate bands: card headers, toolbar strips, error states |
+| `.bg-mesh-canvas` | Full-page roots: `body`, `AppShell`, landing, sign-in |
+| `.bg-mesh-alt` | Alternate bands: toolbars, card headers |
+| `.bg-mesh-freeze` | Preview freeze overlay during edits |
+| `.bg-brand-canvas` | Alias → `.bg-mesh-canvas` |
 
-### Layer stack (`.bg-brand-canvas`)
-
-1. Base vertical gradient `#fbfbfd` → `#f5f5f7`
-2. Top vignette (ellipse at 50% -30%)
-3. Top-right corner wash
-4. Bottom-left corner wash
-
-CSS variables: `--canvas-gradient-base`, `--canvas-gradient-top`, `--canvas-gradient-corner-tr`, `--canvas-gradient-corner-bl`.
-
-### Alt bands (`.bg-canvas-alt`)
-
-1. Base `#f5f5f7` → `#ebebed`
-2. Subtle top highlight (white wash)
-3. Bottom vignette
-
-Use `SURFACE.canvas` / `SURFACE.alt` from `@/content/productTheme` — do not hardcode `bg-white` or flat `bg-[#f5f5f7]` for page-level roots.
+Use `CANVAS.mesh` / `SURFACE.canvas` from `@/content/productTheme` — do not hardcode flat `bg-white` for page roots.
 
 ### Landing vs product
 
 | Zone | Background |
 |------|------------|
-| Product (dashboard, editor, clone, scratch) | Neutral canvas only |
-| Landing hero / promo | Neutral base + localized `.bg-rose-atmosphere` overlays |
-| Cards / inputs | `#ffffff` or `glass-card` (foreground surfaces, not page canvas) |
+| Product (dashboard, editor, clone, scratch) | Mesh canvas |
+| Landing hero | Mesh + optional rose atmosphere overlay |
+| Cards / inputs | `glass-card` / `glass-input` (translucent, not solid white) |
 
 ## Typography
 
@@ -73,15 +64,16 @@ Font stack: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", 
 | Section H2 | `text-3xl sm:text-4xl lg:text-5xl font-semibold tracking-[-0.03em]` |
 | Body | `text-[17px] leading-[1.47] text-[#6e6e73]` |
 | Eyebrow | `text-xs font-semibold uppercase tracking-[0.08em] text-[#6e6e73]` |
-| Link | `text-rose-700 hover:underline underline-offset-4` |
+| Link | `text-blue-600 hover:underline underline-offset-4` |
 
 ## Buttons
 
 | Variant | Pattern | Use |
 |---------|---------|-----|
-| Primary | `.btn-rose-primary` + `border-white/25` | Main CTAs — vertical `--rose-gradient-cta`, top sheen, `--rose-shadow-cta` |
-| Secondary | `.btn-rose-outline` | Visible outline pills (dashboard, rollback, sync) |
-| Secondary link | `secondaryLink` / `secondaryRose` | Inline underline CTAs (landing text links) |
+| Primary | `.btn-blue-primary` | Main CTAs — blue gradient, `--cta-shadow` |
+| Primary rose | `.btn-rose-primary` | Rare brand moments |
+| Secondary | `.btn-blue-outline` | Outline pills |
+| Secondary link | `secondaryLink` | Inline underline CTAs |
 | Glass | `.btn-glass` | Attach, mic, tertiary actions |
 | Ghost | minimal + `hover:bg-black/[0.04]` | Toolbar icons |
 | Danger | `.btn-danger` | Destructive actions |
@@ -99,11 +91,15 @@ Use `Button` from `@/components/ui/Button` or `MarketingLink` on public pages.
 ## Glass
 
 ```css
-.glass-panel     — frosted white, saturate(180%) blur(20px)
-.glass-nav       — sticky header variant
+.glass-panel     — frosted white 22%, saturate(150%) blur(14px)
+.glass-nav       — sticky header, white 28%
 .glass-card      — glass-panel + rounded-2xl
+.glass-input     — form fields, white 35%
+.glass-elevated  — toasts/modals, white 55%
 .glass-dark      — dark frosted overlay
 ```
+
+`prefers-reduced-transparency: reduce` → opaque white panels (no blur).
 
 ## Radius & shadow
 
@@ -126,66 +122,66 @@ Helpers: `@/components/motion` — `FadeIn`, `ScrollReveal`, `StaggerChildren`, 
 
 Respect `prefers-reduced-motion`: no transforms, opacity-only or instant.
 
-## Loading (SVG Rose Ring)
+## Loading (progress-first)
 
-Unified loading system for product chrome. Do **not** use raw `animate-spin` or border-only spinners in app UI.
+Unified loading system for product chrome. Do **not** use raw `animate-spin`, border spinners, or ornate ring graphics in app UI.
+
+Loaders are **typography + blue progress bars** — the same language as primary CTAs and editor chrome.
 
 ### Anatomy
 
-1. **Dual SVG rings** — `RoseOrbitSvg` (Apple Watch style): thin gray tracks, rose gradient outer arc + pale inner arc, both rotate clockwise at different speeds, tick bezel, arc-tip dots, breathing rose core
-2. **Floating orbs** — `LoadingBackdrop` soft blurred rose/white blobs (framer-motion figure-8 drift)
-3. **Copy stack** — brand eyebrow, message + animated ellipsis, 4px gradient indeterminate progress bar
-4. **Rose glow** — subtle `ROSE.glowSoft` overlay (~12% opacity) on full-screen shell
+1. **Inline bar** — `loader-inline-bar` (3px shimmer) for buttons, rows, and lazy panels
+2. **Four-dot glow** — `loader-dots-four` (sky, lavender, lemon, blue mesh colors with soft glow) for panel, shell, and preview waits
+3. **Progress track** — `loader-progress-track` / `loader-progress-shimmer` (indeterminate) or `loader-progress-fill` (determinate %)
+4. **Plain canvas** — `LOADING.shell` (`bg-loader-shell`, `#fbfbfd`) for full-screen and preview overlays
 
-CSS pseudo-element orbits (`.loader-orbit::before/::after`) and glass ribbons are **deprecated** — SVG guarantees visible pixels in all browsers.
+`RoseOrbitSvg` is **deprecated** — kept on disk only; do not use in new UI.
 
 ### Components
 
 | Component | Import | When to use |
 |-----------|--------|-------------|
-| `RoseOrbitSvg` | `@/components/ui/RoseOrbitSvg` | Dual-ring SVG hero/inline graphic |
-| `Loading` | `@/components/ui/Loading` | Inline / section waits; sizes `sm` / `md` / `lg` / `xl` |
-| `LoadingShell` | `@/components/ui/LoadingShell` | Full-page cinematic wait — orbs + SVG rings + copy |
-| `LoadingBackdrop` | `@/components/ui/LoadingBackdrop` | Internal — floating orbs (used by `LoadingShell`) |
+| `LoadingDots` | `@/components/ui/LoadingDots` | Four-dot mesh glow (`md` or `lg` size) |
+| `Loading` | `@/components/ui/Loading` | `sm` / `inline` → thin bar; `md`+ → four-dot glow |
+| `LoadingShell` | `@/components/ui/LoadingShell` | Full-page wait — brand + dots + message + indeterminate bar |
 | `SkeletonBlock` / `SkeletonText` / `SkeletonCircle` | `@/components/ui/Skeleton` | Content placeholders while data loads |
 | `Spinner` | `@/components/ui/Spinner` | **Deprecated alias** → `Loading variant="inline"` |
 
-**Full-screen rule:** `LoadingShell` renders `RoseOrbitSvg` (128px) directly on canvas — never nest inside a white `glass-card`.
-
-**Choreography:** Rings fade/scale in first; brand + message + progress bar follow ~120ms later; hero label uses animated ellipsis dots.
-
-### Sizes (`Loading` → `RoseOrbitSvg`)
-
-| Size | SVG px | When |
-|------|--------|------|
-| `sm` | 22 | Buttons, panel rows, lazy sidebar |
-| `md` | 44 | Preview bootstrap, panel centers |
-| `lg` | 64 | Section waits |
-| `xl` | 80 | Large inline waits |
-| (shell) | 128 | `LoadingShell` full-screen hero |
+**Preview bootstrap:** `PreviewPaneLoadingOverlay` uses four-dot glow + title + subtitle + determinate `loader-progress-track-pane` + stage label.
 
 ### Tokens
 
 ```ts
 import { LOADING } from '@/content/productTheme';
-// LOADING.ringSpin, ringSpinReverse, ringStatic, ringPrimary, ringSecondary,
-// ringCore, progressTrack, progressShimmer, heroEllipsis, skeleton
+// shell, inlineBar, dots, dotsLg, progressTrack, progressTrackPane, progressShimmer,
+// progressFill, heroEllipsis, skeleton
 ```
 
 ### Reduced motion
 
 When `prefers-reduced-motion: reduce` (or `useReducedMotion()`):
 
-- Ring rotation disabled (static arcs at fixed angles; both same direction when frozen)
-- Core breathe disabled
-- Backdrop orbs static (no drift)
-- Shell entrance is instant (no scale fade)
+- Dot pulse disabled (static mid-opacity)
+- Shell entrance is instant
 - Hero ellipsis static (`...`)
 - Progress shimmer static at partial fill
 
 ### Skeleton shimmer
 
-`.skeleton-rose` — `#f5f5f7` base with transform-based rose shimmer sweep (`::after`).
+`.skeleton-mesh` — `#eef2fb` base with transform-based sky/lavender shimmer sweep (`::after`). `.skeleton-rose` is a deprecated alias (same styles) for one release cycle.
+
+### Loader palette
+
+| Element | Colors |
+|---------|--------|
+| Progress fill / shimmer | `--loader-fill` / `--loader-shimmer` (horizontal mirror of `--cta-gradient`) |
+| Track background | `--loader-track-bg` / `--loader-track-bg-pane` |
+| Dot 1 sky | `--loader-dot-sky` (`--cta-blue-light`) |
+| Dot 2 lavender | `--loader-dot-lavender` |
+| Dot 3 lemon | `--loader-dot-lemon` |
+| Dot 4 blue | `--loader-dot-blue` (`--cta-blue`) |
+| Shell canvas | `#fbfbfd` via `bg-loader-shell` |
+| Skeleton base | `#eef2fb` with white + `#b8d8f5` / `#d8c8f5` sweep |
 
 **Out of scope:** generated site runtime loaders in `src/lib/preview/` and builder templates.
 
@@ -207,7 +203,9 @@ When `prefers-reduced-motion: reduce` (or `useReducedMotion()`):
 - [ ] Clone flow has no green CTAs
 - [ ] Mobile nav sheet works on landing
 - [ ] Reduced motion disables parallax/float
-- [ ] Full-screen loading shows dual SVG rose rings + floating orbs + progress bar
+- [ ] Full-screen loading shows brand + message + blue progress bar on plain `#fbfbfd` canvas (no spinner)
+- [ ] Preview bootstrap/freeze overlay uses `LOADING.shell` + `LOADING.progressTrack` tokens
+- [ ] Skeleton placeholders use `.skeleton-mesh` (no rose pink sweep)
 - [ ] Button inline loads use `Loading size="sm"` without layout stretch
 
 ## Raspberry accent (app-wide)

@@ -56,7 +56,7 @@ export function MarketingTextLink({
       ? 'text-white/90 hover:text-rose-50 hover:underline underline-offset-4'
       : inverted
         ? 'text-white/90 hover:text-white hover:underline underline-offset-4'
-        : 'text-rose-700 hover:text-rose-600 hover:underline underline-offset-4',
+        : 'text-blue-600 hover:text-blue-500 hover:underline underline-offset-4',
     className
   );
 

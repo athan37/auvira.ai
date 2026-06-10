@@ -14,7 +14,7 @@ export default function SignInPage() {
       : null;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-brand-canvas px-4">
+    <div className="min-h-screen flex items-center justify-center bg-mesh-canvas px-4">
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">

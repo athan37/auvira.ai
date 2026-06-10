@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/cn';
-import { Loading } from '@/components/ui/Loading';
 import {
   buildSiteSectionClearMessage,
   buildSiteSectionFocusMessage,
@@ -25,7 +24,8 @@ import {
 import { usePageVisible } from '@/lib/hooks/usePageVisible';
 import { markEditorVital, recordIframeReload } from '@/lib/metrics/clientVitals';
 import { PREVIEW_IFRAME_SETTLE_MS } from '@/lib/project-workspace/previewReloadAfterEdit';
-import { BORDER, RADIUS, SURFACE, TEXT } from '@/content/productTheme';
+import { LoadingDots } from '@/components/ui/LoadingDots';
+import { BORDER, LOADING, RADIUS, SURFACE, TEXT } from '@/content/productTheme';
 
 interface WorkspaceStatus {
   ok?: boolean;
@@ -127,25 +127,32 @@ function PreviewPaneLoadingOverlay({
   indeterminate?: boolean;
 }) {
   return (
-    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white px-6">
-      <Loading size="lg" className="mb-4" />
-      <p className={cn('text-sm font-medium mb-1', TEXT.primary)}>{title}</p>
-      {subtitle ? (
-        <p className={cn('text-xs mb-4 text-center max-w-sm', TEXT.muted)}>{subtitle}</p>
-      ) : null}
-      <div className="w-full max-w-xs h-1.5 bg-[#d2d2d7]/80 rounded-full overflow-hidden">
-        {indeterminate ? (
-          <div className="h-full w-2/5 rounded-full bg-rose-600 motion-safe:animate-pulse" />
-        ) : (
-          <div
-            className="h-full bg-rose-600 transition-all duration-500 ease-out"
-            style={{ width: `${progressPercent ?? 0}%` }}
-          />
-        )}
+    <div
+      className={cn(
+        'absolute inset-0 z-20 flex flex-col items-center justify-center px-6',
+        LOADING.shell
+      )}
+    >
+      <div className="flex w-full max-w-sm flex-col items-center gap-3 text-center">
+        <LoadingDots size="lg" />
+        <p className={cn('text-sm font-medium', TEXT.primary)}>{title}</p>
+        {subtitle ? (
+          <p className={cn('text-xs', TEXT.muted)}>{subtitle}</p>
+        ) : null}
+        <div className={LOADING.progressTrackPane} aria-hidden>
+          {indeterminate ? (
+            <div className={LOADING.progressShimmer} />
+          ) : (
+            <div
+              className={LOADING.progressFill}
+              style={{ width: `${progressPercent ?? 0}%` }}
+            />
+          )}
+        </div>
+        {stageLabel ? (
+          <p className={cn('text-xs capitalize', TEXT.tertiary)}>{stageLabel}</p>
+        ) : null}
       </div>
-      {stageLabel ? (
-        <p className={cn('text-xs mt-2 capitalize', TEXT.tertiary)}>{stageLabel}</p>
-      ) : null}
     </div>
   );
 }
@@ -534,7 +541,7 @@ export function ProjectPreviewFrame({
       className={cn(
         'flex flex-col h-full overflow-hidden shadow-card border',
         RADIUS.card,
-        SURFACE.alt,
+        'bg-[#f5f5f7]',
         BORDER.hairline
       )}
     >
@@ -604,7 +611,12 @@ export function ProjectPreviewFrame({
 
       <div className="flex-1 relative min-h-[320px]">
         {showSetupOverlay && setupError ? (
-          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white px-6">
+          <div
+            className={cn(
+              'absolute inset-0 z-20 flex flex-col items-center justify-center px-6',
+              LOADING.shell
+            )}
+          >
             <p className="text-sm font-medium text-red-700 mb-1">Could not load preview</p>
             <p className="text-xs text-red-600 text-center max-w-md mb-4">{setupError}</p>
             <button

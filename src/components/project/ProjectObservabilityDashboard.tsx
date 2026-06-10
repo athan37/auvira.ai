@@ -46,14 +46,14 @@ function ObservabilityDashboardSkeleton() {
     <div className="space-y-6">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="rounded-2xl bg-[#f5f5f7] animate-pulse h-20" />
+          <div key={i} className="glass-card animate-pulse h-20" />
         ))}
       </div>
       <div className="grid lg:grid-cols-12 gap-4">
-        <div className="lg:col-span-8 rounded-2xl bg-[#f5f5f7] animate-pulse h-64" />
-        <div className="lg:col-span-4 rounded-2xl bg-[#f5f5f7] animate-pulse h-64" />
+        <div className="lg:col-span-8 glass-card animate-pulse h-64" />
+        <div className="lg:col-span-4 glass-card animate-pulse h-64" />
       </div>
-      <div className="rounded-2xl bg-[#f5f5f7] animate-pulse h-48" />
+      <div className="glass-card animate-pulse h-48" />
     </div>
   );
 }

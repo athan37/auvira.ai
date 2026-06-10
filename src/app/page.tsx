@@ -22,7 +22,7 @@ export default async function Home() {
   if (session) redirect('/dashboard');
 
   return (
-    <div className="min-h-screen bg-brand-canvas">
+    <div className="min-h-screen bg-mesh-canvas">
       <MarketingHeader />
       <main>
         <LandingHero />

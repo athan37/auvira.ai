@@ -1,23 +1,20 @@
 'use client';
 
 import { cn } from '@/lib/cn';
-import { useReducedMotion } from '@/components/motion/tokens';
-import { RoseOrbitSvg } from './RoseOrbitSvg';
+import { LOADING } from '@/content/productTheme';
+import { LoadingDots } from './LoadingDots';
 
-type LoadingVariant = 'orbit' | 'inline';
+type LoadingVariant = 'dots' | 'inline';
 type LoadingSize = 'sm' | 'md' | 'lg' | 'xl';
 
-const svgSizes: Record<LoadingSize, number> = {
-  sm: 22,
-  md: 44,
-  lg: 64,
-  xl: 80,
-};
-
-/** Inline / panel SVG ring loader. Full-screen waits use LoadingShell. */
+/**
+ * Product loading indicator — progress-first, no spinners.
+ * `sm` / `inline`: thin blue bar for buttons and rows.
+ * `md`+ : four-dot mesh glow pulse for panel centers.
+ */
 export function Loading({
   size = 'md',
-  variant = 'orbit',
+  variant = 'dots',
   label,
   className,
 }: {
@@ -26,17 +23,29 @@ export function Loading({
   label?: string;
   className?: string;
 }) {
-  const reduced = useReducedMotion();
   const resolvedSize = variant === 'inline' ? 'sm' : size;
-  const svgSize = svgSizes[resolvedSize];
   const showLabel = Boolean(label) && resolvedSize !== 'sm';
+  const dotSize = resolvedSize === 'md' ? 'md' : 'lg';
 
   const labelClass =
-    resolvedSize === 'xl'
+    resolvedSize === 'xl' || resolvedSize === 'lg'
       ? 'text-[17px] font-medium text-[#1d1d1f]'
-      : resolvedSize === 'lg'
+      : resolvedSize === 'md'
         ? 'text-base font-medium text-[#1d1d1f]'
         : 'text-sm text-[#6e6e73]';
+
+  if (resolvedSize === 'sm') {
+    return (
+      <span
+        className={cn('inline-flex items-center', className)}
+        role="status"
+        aria-live="polite"
+        aria-label={label ?? 'Loading'}
+      >
+        <span className={LOADING.inlineBar} aria-hidden />
+      </span>
+    );
+  }
 
   return (
     <div
@@ -48,7 +57,7 @@ export function Loading({
       aria-live="polite"
       aria-label={label ?? 'Loading'}
     >
-      <RoseOrbitSvg size={svgSize} reduced={reduced} />
+      <LoadingDots size={dotSize} />
       {showLabel && (
         <p className={cn(labelClass, 'text-center max-w-xs')}>{label}</p>
       )}

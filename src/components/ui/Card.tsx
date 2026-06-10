@@ -1,11 +1,12 @@
 import { cn } from '@/lib/cn';
 import { CONTROL } from '@/content/productTheme';
 
-type CardVariant = 'default' | 'glass';
+type CardVariant = 'default' | 'glass' | 'solid';
 
 const variantClasses: Record<CardVariant, string> = {
-  default: 'rounded-2xl border border-[#d2d2d7]/80 bg-white shadow-card',
+  default: 'glass-card shadow-card',
   glass: 'glass-card shadow-card',
+  solid: 'rounded-2xl border border-[#d2d2d7]/80 bg-white shadow-card',
 };
 
 export function Card({
@@ -39,7 +40,7 @@ export function CardHeader({
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cn('px-4 py-3 border-b border-[#d2d2d7]/80', className)} {...props}>
+    <div className={cn('px-4 py-3 border-b border-white/40', className)} {...props}>
       {children}
     </div>
   );

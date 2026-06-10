@@ -14,20 +14,20 @@ type Size = 'sm' | 'md' | 'lg';
 
 export const buttonVariants: Record<Variant, string> = {
   primary:
-    'btn-rose-primary text-white focus-visible:ring-rose-500/35 border border-white/25',
+    'btn-blue-primary text-white focus-visible:ring-blue-500/35 border border-white/25',
   primaryBlue:
-    'bg-brand-600 text-white hover:bg-brand-500 focus-visible:ring-brand-500/30 border border-transparent',
+    'btn-blue-primary text-white focus-visible:ring-blue-500/35 border border-white/25',
   primaryRose:
     'btn-rose-primary text-white focus-visible:ring-rose-500/35 border border-white/25',
   secondary:
-    'btn-rose-outline text-rose-700 hover:text-rose-600 focus-visible:ring-rose-500/35 border-rose-300/60',
+    'btn-blue-outline text-blue-700 hover:text-blue-600 focus-visible:ring-blue-500/35',
   secondaryLink:
-    'bg-transparent text-rose-700 hover:text-rose-600 hover:underline underline-offset-4 border border-transparent px-0',
+    'bg-transparent text-blue-600 hover:text-blue-500 hover:underline underline-offset-4 border border-transparent px-0',
   secondaryRose:
     'bg-transparent text-rose-700 hover:text-rose-600 hover:underline underline-offset-4 border border-transparent px-0',
-  glass: 'btn-glass text-[#1d1d1f] focus-visible:ring-rose-500/20',
+  glass: 'btn-glass text-[#1d1d1f] focus-visible:ring-blue-500/20',
   ghost:
-    'text-[#6e6e73] hover:text-[#1d1d1f] hover:bg-black/[0.04] focus-visible:ring-rose-500/10 border border-transparent',
+    'text-[#6e6e73] hover:text-[#1d1d1f] hover:bg-black/[0.04] focus-visible:ring-blue-500/10 border border-transparent',
   danger: 'btn-danger text-white focus-visible:ring-red-500/30 border border-white/20',
 };
 

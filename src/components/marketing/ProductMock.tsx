@@ -20,12 +20,12 @@ export function ProductMock({ variant = 'default', animateEntrance = true }: Pro
     'rounded-3xl p-3 transition-all',
     isGlass
       ? 'border border-white/25 bg-white/15 shadow-rose-glass backdrop-blur-xl'
-      : 'border border-[#d2d2d7]/80 bg-white shadow-product hover:border-rose-highlight hover:shadow-rose-glass'
+      : 'glass-card shadow-product hover:shadow-glass'
   );
 
   const chromeClass = cn(
     'flex items-center gap-2 rounded-t-2xl px-4 py-3',
-    isGlass ? 'border-b border-white/10 bg-white/10' : 'bg-[#f5f5f7]'
+    isGlass ? 'border-b border-white/10 bg-white/10' : 'glass-panel border-b border-white/30'
   );
 
   const urlBarClass = cn(
@@ -42,7 +42,7 @@ export function ProductMock({ variant = 'default', animateEntrance = true }: Pro
 
   const previewPanelClass = cn(
     'mt-5 rounded-xl p-5',
-    isGlass ? 'border border-white/10 bg-white/12' : 'bg-white'
+    isGlass ? 'border border-white/10 bg-white/12' : 'glass-panel'
   );
 
   const inner = (

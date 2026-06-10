@@ -93,7 +93,7 @@ function ProjectCard({ project }: { project: Project }) {
 
 function ActiveCloneJobCard({ job }: { job: ActiveCloneJob }) {
   return (
-    <Card variant="glass" className="p-4 border-rose-200/40 bg-rose-50/30">
+    <Card variant="glass" className="p-4 border-blue-200/40">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-[#1d1d1f] truncate">
@@ -102,7 +102,7 @@ function ActiveCloneJobCard({ job }: { job: ActiveCloneJob }) {
           <p className="text-xs text-[#6e6e73] mt-0.5">{job.currentStageLabel}</p>
           <div className="mt-2 w-full bg-[#d2d2d7]/60 rounded-full h-1">
             <div
-              className="bg-rose-600 h-1 rounded-full"
+              className="bg-blue-500 h-1 rounded-full"
               style={{ width: `${job.progressPercent}%` }}
             />
           </div>

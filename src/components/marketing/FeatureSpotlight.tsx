@@ -100,7 +100,7 @@ export function FeatureSpotlight({
       className={cn(
         'scroll-mt-20 py-20 lg:py-28',
         isDark && 'bg-[#1d1d1f] text-white',
-        !isDark && 'bg-brand-canvas text-[#1d1d1f]'
+        !isDark && 'bg-mesh-canvas text-[#1d1d1f]'
       )}
     >
       <div className="mx-auto grid max-w-[980px] items-center gap-12 px-4 sm:px-6 lg:grid-cols-2 lg:gap-16">

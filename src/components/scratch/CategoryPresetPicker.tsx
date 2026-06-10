@@ -64,7 +64,7 @@ export function CategoryPresetPicker({ selectedId, onSelect, disabled }: Props) 
               className={cn(
                 'relative rounded-2xl border p-4 text-left transition-all',
                 selected
-                  ? 'border-rose-600 ring-2 ring-rose-500/20 shadow-rose-cta'
+                  ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-cta-blue'
                   : cn('hover:shadow-sm', BORDER.hairline, 'hover:border-rose-200'),
                 disabled && 'opacity-60 cursor-not-allowed'
               )}

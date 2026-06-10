@@ -125,14 +125,23 @@ export function buildPreviewLoadingHtml(projectId: string, label: string): strin
   <meta http-equiv="refresh" content="3" />
   <title>Loading preview</title>
   <style>
-    body { font-family: system-ui, sans-serif; padding: 2rem; max-width: 40rem; margin: 0 auto; color: #1f2937; text-align: center; }
-    .spinner { width: 2rem; height: 2rem; border: 3px solid #e5e7eb; border-top-color: #4f46e5; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1rem; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    p { color: #4b5563; line-height: 1.5; }
+    :root {
+      --cta-blue-light: #60a5fa;
+      --cta-blue: #3b82f6;
+      --cta-blue-hover: #2563eb;
+      --loader-track-bg: color-mix(in srgb, var(--cta-blue) 14%, transparent);
+      --loader-shimmer: linear-gradient(90deg, transparent, var(--cta-blue-light), var(--cta-blue), var(--cta-blue-hover), transparent);
+    }
+    body { font-family: system-ui, sans-serif; padding: 2rem; max-width: 40rem; margin: 0 auto; color: #1d1d1f; text-align: center; background: #fbfbfd; }
+    .track { position: relative; height: 4px; width: min(12rem, 80vw); margin: 0 auto 1.25rem; overflow: hidden; border-radius: 9999px; background: var(--loader-track-bg); }
+    .shimmer { position: absolute; inset: 0; width: 50%; border-radius: inherit; background: var(--loader-shimmer); animation: slide 1.5s ease-in-out infinite; }
+    @keyframes slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(200%); } }
+    p { color: #6e6e73; line-height: 1.5; }
+    @media (prefers-reduced-motion: reduce) { .shimmer { animation: none; transform: translateX(25%); opacity: 0.6; } }
   </style>
 </head>
 <body>
-  <div class="spinner"></div>
+  <div class="track" aria-hidden="true"><div class="shimmer"></div></div>
   <p>${label}</p>
   <p style="font-size:0.75rem;color:#9ca3af">Project ${projectId}</p>
 </body>

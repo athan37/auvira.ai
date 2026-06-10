@@ -3,10 +3,10 @@ import { cn } from '@/lib/cn';
 type Variant = 'info' | 'success' | 'warning' | 'error';
 
 const styles: Record<Variant, string> = {
-  info: 'bg-rose-50 border-rose-200/80 text-[#1d1d1f]',
-  success: 'bg-emerald-50 border-emerald-200 text-emerald-900',
-  warning: 'bg-amber-50 border-amber-200 text-amber-900',
-  error: 'bg-red-50 border-red-200 text-red-800',
+  info: 'glass-panel bg-blue-50/30 border-blue-200/50 text-[#1d1d1f]',
+  success: 'glass-panel bg-emerald-50/30 border-emerald-200/50 text-emerald-900',
+  warning: 'glass-panel bg-amber-50/30 border-amber-200/50 text-amber-900',
+  error: 'glass-panel bg-red-50/30 border-red-200/50 text-red-800',
 };
 
 export function Alert({
