@@ -97,6 +97,23 @@ export function buildTargetChainFromFlat(target: SelectedTargetInput): TargetCha
     });
   }
 
+  const isContactInnerCardField =
+    target.sectionType === 'contact' &&
+    Boolean(
+      target.fieldPath &&
+        (target.fieldPath.endsWith('.subtitle') ||
+          target.fieldPath.startsWith('contact.') ||
+          /^sections\[\d+\]\.subtitle$/.test(target.fieldPath))
+    );
+
+  if (isContactInnerCardField) {
+    chain.push({
+      role: 'container',
+      kind: 'inner_card',
+      label: 'Contact card',
+    });
+  }
+
   if (target.fieldPath) {
     const parsed = parseConfigFieldPath(target.fieldPath);
     if (parsed?.scope === 'sectionItem' && parsed.itemIndex != null) {

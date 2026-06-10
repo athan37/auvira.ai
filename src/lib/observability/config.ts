@@ -2,6 +2,11 @@
 export const DEFAULT_OBSERVABILITY_API_URL =
   'https://la-mue-site-monitor-production.up.railway.app';
 
+/** Relative path to optional shipped read-only Monitor client key (override via env). */
+export const BUNDLED_OBSERVABILITY_ENV_PATH = 'config/observability-public.env';
+
+let cachedBundledApiKey: string | undefined | null = null;
+
 function isObservabilityExplicitlyDisabled(): boolean {
   return process.env.OBSERVABILITY_ENABLED === '0';
 }
@@ -10,15 +15,36 @@ function isCoachingExplicitlyDisabled(): boolean {
   return process.env.OBSERVABILITY_COACHING_ENABLED === '0';
 }
 
+/** Read shared read-only key shipped in repo (see config/observability-public.env). */
+export function readBundledObservabilityApiKey(): string | undefined {
+  if (cachedBundledApiKey !== null) return cachedBundledApiKey;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const fs = require('node:fs') as typeof import('node:fs');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const path = require('node:path') as typeof import('node:path');
+    const filePath = path.join(process.cwd(), BUNDLED_OBSERVABILITY_ENV_PATH);
+    const content = fs.readFileSync(filePath, 'utf8');
+    const match = content.match(/^OBSERVABILITY_API_KEY=(.+)$/m);
+    cachedBundledApiKey = match?.[1]?.trim() || undefined;
+  } catch {
+    cachedBundledApiKey = undefined;
+  }
+  return cachedBundledApiKey;
+}
+
+/** Resolve Monitor API key: env override, then bundled public client key. */
+export function observabilityApiKey(): string | undefined {
+  return process.env.OBSERVABILITY_API_KEY?.trim() || readBundledObservabilityApiKey();
+}
+
 /**
- * True when observability is on (default) and API key + URL are available.
- * Set OBSERVABILITY_ENABLED=0 to opt out.
+ * True when observability is on (default). Set OBSERVABILITY_ENABLED=0 to opt out.
+ * Does not require OBSERVABILITY_API_KEY in .env — uses bundled config/observability-public.env.
  */
 export function isObservabilityEnabled(): boolean {
   if (isObservabilityExplicitlyDisabled()) return false;
-  return Boolean(
-    observabilityApiBaseUrl() && process.env.OBSERVABILITY_API_KEY?.trim()
-  );
+  return Boolean(observabilityApiBaseUrl());
 }
 
 /**
@@ -73,4 +99,23 @@ export function phoenixTraceUrl(traceId: string): string | null {
 /** Whether observability debug UI (grades, trace links) is enabled in the client. */
 export function isObservabilityDebugUiEnabled(): boolean {
   return process.env.NEXT_PUBLIC_OBSERVABILITY_DEBUG === '1';
+}
+
+/**
+ * When true, skip Monitor POST /intent and use local hardcoded sentences only.
+ * Set OBSERVABILITY_INTENT_HARDCODE=1 for dev testing before Monitor ships the endpoint.
+ */
+export function isHardcodedIntentForced(): boolean {
+  const raw = process.env.OBSERVABILITY_INTENT_HARDCODE?.trim().toLowerCase();
+  return raw === '1' || raw === 'true' || raw === 'always';
+}
+
+/**
+ * When Monitor returns no sentence, synthesize a detailed local intent (default on).
+ * Set OBSERVABILITY_INTENT_HARDCODE=0 to disable fallback.
+ */
+export function isHardcodedIntentFallbackEnabled(): boolean {
+  const raw = process.env.OBSERVABILITY_INTENT_HARDCODE?.trim().toLowerCase();
+  if (raw === '0' || raw === 'false' || raw === 'off') return false;
+  return true;
 }

@@ -78,7 +78,10 @@ describe('targetChain', () => {
     });
 
     expect(enriched.pinScope).toBe('element');
-    expect(resolveTargetChain(enriched).length).toBeGreaterThan(1);
+    const chain = resolveTargetChain(enriched);
+    expect(chain.length).toBeGreaterThan(1);
+    expect(chain.some((n) => n.role === 'container' && n.kind === 'inner_card')).toBe(true);
+    expect(findPinnedInnerCardContainer(chain)?.label).toBe('Contact card');
   });
 
   it('finds pinned inner card container from target chain', () => {

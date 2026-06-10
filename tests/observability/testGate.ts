@@ -1,10 +1,11 @@
 import { beforeAll, describe } from 'vitest';
+import { observabilityApiKey } from '@/lib/observability/config';
 
 export const OBSERVABILITY_INTEGRATION_TIMEOUT_MS = 30_000;
 
-/** API key present in .env (URL defaults to production in live tests). */
+/** API key from env or bundled config/observability-public.env. */
 export function hasObservabilityCredentials(): boolean {
-  return Boolean(process.env.OBSERVABILITY_API_KEY?.trim());
+  return Boolean(observabilityApiKey());
 }
 
 export function shouldRunObservabilityIntegrationTests(): boolean {
@@ -17,7 +18,7 @@ export function shouldRunObservabilityIntegrationTests(): boolean {
 export function requireObservabilityCredentials(): void {
   if (hasObservabilityCredentials()) return;
   throw new Error(
-    'Observability integration tests require OBSERVABILITY_API_KEY in .env. ' +
+    'Observability integration tests require a Monitor API key (bundled config/observability-public.env or OBSERVABILITY_API_KEY in .env). ' +
       'Run: npm run test:observability:live'
   );
 }

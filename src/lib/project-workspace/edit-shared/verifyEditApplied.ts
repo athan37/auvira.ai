@@ -444,16 +444,22 @@ export function summarizeActualChanges(
       for (let i = 0; i < sections.length; i++) {
         const afterSection = sections[i] as {
           title?: string;
-          presentation?: { backgroundClass?: string };
+          presentation?: { backgroundClass?: string; cardClass?: string };
         };
         const beforeSection = beforeParsed?.sections?.[i] as
-          | { presentation?: { backgroundClass?: string } }
+          | { presentation?: { backgroundClass?: string; cardClass?: string } }
           | undefined;
         const afterBg = afterSection.presentation?.backgroundClass?.trim();
         const beforeBg = beforeSection?.presentation?.backgroundClass?.trim();
         if (afterBg && afterBg !== beforeBg) {
           const title = afterSection.title ?? `section ${i + 1}`;
           return formatSectionBackgroundChangeSummary(title, afterBg, message);
+        }
+        const afterCard = afterSection.presentation?.cardClass?.trim();
+        const beforeCard = beforeSection?.presentation?.cardClass?.trim();
+        if (afterCard && afterCard !== beforeCard) {
+          const title = afterSection.title ?? `section ${i + 1}`;
+          return `Changed inner card styling of "${title}" to ${afterCard}.`;
         }
       }
     }

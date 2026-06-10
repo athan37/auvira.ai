@@ -16,9 +16,15 @@ import {
 import type {
   ObservabilityCoachingContext,
   ObservabilityProjectIntent,
+  ObservabilityProjectMemory,
+  ProjectMemorySlot,
 } from '@/lib/observability/types';
 import type { ImplicitReferenceRecord } from '@/lib/project-workspace/edit-context/implicitReferenceTypes';
 import { formatReferenceSourceLabel } from '@/lib/project-workspace/edit-context/implicitReferenceResolver';
+import {
+  formatMemorySlotForDisplay,
+  selectMemorySlotsForPlanner,
+} from '@/lib/project-workspace/edit-context/projectMemoryRanker';
 import { EDIT_SKILL_NAMES } from './editPlan.schema';
 
 const MAX_VOCAB_KEYWORDS = 10;
@@ -62,25 +68,20 @@ function dedupeShortStrings(values: string[], max: number): string[] {
   return out;
 }
 
-/** Small project vocabulary block from Site Monitor /intent (optional). */
+/** Monitor POST /intent single-sentence block for planner (authoritative for this turn). */
+export function formatProjectIntentBlock(
+  intent?: ObservabilityProjectIntent | null
+): string | null {
+  const sentence = intent?.sentence?.trim();
+  if (!sentence) return null;
+  return ['', '## Project intent', sentence].join('\n');
+}
+
+/** @deprecated Use formatProjectIntentBlock — kept for tests migrating off keyword vocabulary. */
 export function formatProjectVocabularyBlock(
   intent?: ObservabilityProjectIntent | null
 ): string | null {
-  if (!intent || intent.turn_count === 0) return null;
-  const keywords = dedupeShortStrings(intent.keywords, MAX_VOCAB_KEYWORDS);
-  const intents = intent.intents
-    .filter((entry) => entry.label.trim().length > 0)
-    .slice(0, MAX_VOCAB_INTENTS)
-    .map((entry) => `${entry.label} (${entry.count})`);
-  if (keywords.length === 0 && intents.length === 0) return null;
-  const lines = ['', '## Project vocabulary'];
-  if (keywords.length > 0) {
-    lines.push(`Recurring topics: ${keywords.join(', ')}`);
-  }
-  if (intents.length > 0) {
-    lines.push(`Common edit types: ${intents.join(', ')}`);
-  }
-  return lines.join('\n');
+  return formatProjectIntentBlock(intent);
 }
 
 /** Resolved implicit references for planner (only entries with concrete values). */
@@ -116,14 +117,36 @@ function formatCoachingBlock(coaching: ObservabilityCoachingContext): string {
   ].join('\n');
 }
 
+/** Scoped project memory block for planner (Monitor GET /memory). */
+export function formatProjectMemoryBlock(
+  memory?: ObservabilityProjectMemory | null,
+  editContext?: EditContext
+): string | null {
+  if (!memory?.slots.length) return null;
+  const slots = editContext
+    ? selectMemorySlotsForPlanner(memory, editContext, 8)
+    : memory.slots.slice(0, 8);
+  if (slots.length === 0) return null;
+  const lines = slots.map((slot: ProjectMemorySlot) => {
+    const aliases =
+      slot.phrase_aliases.length > 0 ? ` (aliases: ${slot.phrase_aliases.slice(0, 3).join(', ')})` : '';
+    return `- [${slot.kind}/${slot.scope.type}] ${formatMemorySlotForDisplay(slot)}${aliases}`;
+  });
+  return ['', '## Project memory', ...lines].join('\n');
+}
+
 export function buildPlanEditSystemPrompt(
   coaching?: ObservabilityCoachingContext | null,
   projectIntent?: ObservabilityProjectIntent | null,
-  resolvedReferences?: ImplicitReferenceRecord[] | null
+  resolvedReferences?: ImplicitReferenceRecord[] | null,
+  projectMemory?: ObservabilityProjectMemory | null,
+  editContext?: EditContext
 ): string {
   const blocks = [PLANNER_SYSTEM];
-  const vocabulary = formatProjectVocabularyBlock(projectIntent);
-  if (vocabulary) blocks.push(vocabulary);
+  const intentBlock = formatProjectIntentBlock(projectIntent);
+  if (intentBlock) blocks.push(intentBlock);
+  const memoryBlock = formatProjectMemoryBlock(projectMemory, editContext);
+  if (memoryBlock) blocks.push(memoryBlock);
   const resolved = formatResolvedReferencesBlock(resolvedReferences);
   if (resolved) blocks.push(resolved);
   if (coaching && coaching.coachingHints.length > 0) {

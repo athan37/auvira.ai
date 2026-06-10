@@ -1,5 +1,6 @@
 import {
   resolveSectionBackgroundClassForEdit,
+  resolveSectionCardClassForEdit,
   resolveSectionTextClassForEdit,
 } from '@/lib/builder/sectionPresentation';
 import {
@@ -67,13 +68,21 @@ export async function applySectionBackgroundTool(
     : null;
 
   const backgroundClass = !isTextField
-    ? resolveSectionBackgroundClassForEdit(ownerMessage, {
-        backgroundClass:
-          typeof params.backgroundClass === 'string' ? params.backgroundClass : undefined,
-        backgroundColor:
-          typeof params.backgroundColor === 'string' ? params.backgroundColor : undefined,
-        color: typeof params.color === 'string' ? params.color : undefined,
-      })
+    ? presentationField === 'cardClass'
+      ? resolveSectionCardClassForEdit(ownerMessage, {
+          cardClass:
+            typeof params.backgroundClass === 'string' ? params.backgroundClass : undefined,
+          backgroundColor:
+            typeof params.backgroundColor === 'string' ? params.backgroundColor : undefined,
+          color: typeof params.color === 'string' ? params.color : undefined,
+        })
+      : resolveSectionBackgroundClassForEdit(ownerMessage, {
+          backgroundClass:
+            typeof params.backgroundClass === 'string' ? params.backgroundClass : undefined,
+          backgroundColor:
+            typeof params.backgroundColor === 'string' ? params.backgroundColor : undefined,
+          color: typeof params.color === 'string' ? params.color : undefined,
+        })
     : null;
 
   const appliedClass = isTextField ? textClass : backgroundClass;

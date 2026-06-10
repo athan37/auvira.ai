@@ -7,11 +7,13 @@ export type ImplicitReferenceKind =
   | 'cta'
   | 'section_reference'
   | 'offer'
+  | 'edit_pattern'
   | 'unknown';
 
 export type ImplicitReferenceSource =
   | 'explicit_message'
   | 'project_intent'
+  | 'project_memory'
   | 'coaching_context'
   | 'chat_history'
   | 'llm_inference';
@@ -33,4 +35,9 @@ export interface ImplicitReferenceResolution {
   needsClarification?: boolean;
   clarificationMessage?: string;
   suggestedReplies?: string[];
+}
+
+/** True when any reference was resolved with a concrete value. */
+export function hasResolvedReferenceValues(references: ImplicitReferenceRecord[]): boolean {
+  return references.some((r) => Boolean(r.resolvedValue?.trim()));
 }

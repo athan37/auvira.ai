@@ -34,7 +34,11 @@ import {
   MISSING_IMAGE_ATTACHMENT_MESSAGE,
 } from '@/lib/project-workspace/edit-shared/imagePlacementIntent';
 import { LEGACY_PROJECT_UNSUPPORTED_MESSAGE } from '@/lib/project-workspace/requireGitLabProject';
-import type { ProjectMessageArizeMetadata, ProjectMessageObservabilityMetadata } from '@/lib/chat/projectMessageMetadata';
+import type {
+  ProjectChatOutcome,
+  ProjectMessageArizeMetadata,
+  ProjectMessageObservabilityMetadata,
+} from '@/lib/chat/projectMessageMetadata';
 import { useBrowserSpeechRecognition } from '@/lib/hooks/useBrowserSpeechRecognition';
 
 export interface EditCompleteResult {
@@ -67,7 +71,7 @@ type ChatMessage = {
   errorJobId?: string;
   arize?: ProjectMessageArizeMetadata;
   observability?: ProjectMessageObservabilityMetadata;
-  outcome?: import('@/lib/chat/projectMessageMetadata').ProjectChatOutcome;
+  outcome?: ProjectChatOutcome;
   metadata?: import('@/lib/chat/projectMessageMetadata').ProjectMessageMetadata;
   guidanceHints?: string[];
 };
@@ -104,6 +108,8 @@ function hydrateHistoryMessages(raw: ChatHistoryApiMessage[]): ChatMessage[] {
       id,
       arize: rest.arize ?? metadata?.arize,
       observability: rest.observability ?? metadata?.observability,
+      outcome: rest.outcome ?? metadata?.outcome,
+      guidanceHints: rest.guidanceHints ?? metadata?.guidanceHints,
     };
   });
 }
@@ -743,6 +749,7 @@ export function ProjectPreviewChat({
     let changedFilesFromEdit: string[] | undefined;
     let streamArize: ProjectMessageArizeMetadata | undefined;
     let streamObservability: ProjectMessageObservabilityMetadata | undefined;
+    let streamGuidanceHints: string[] | undefined;
     let attachments: WorkspaceAssetAttachment[] = [];
 
     try {
@@ -858,6 +865,11 @@ export function ProjectPreviewChat({
               if (result.observability && typeof result.observability === 'object') {
                 streamObservability = result.observability as ProjectMessageObservabilityMetadata;
               }
+              if (Array.isArray(result.guidanceHints)) {
+                streamGuidanceHints = result.guidanceHints.filter(
+                  (hint): hint is string => typeof hint === 'string' && hint.trim().length > 0
+                );
+              }
             }
           } catch {
             /* skip malformed SSE */
@@ -875,6 +887,9 @@ export function ProjectPreviewChat({
         setAgentSteps((prev) => markStepsOnEditFailure(prev));
       }
 
+      const streamOutcome: ProjectChatOutcome | undefined =
+        needsClarification ? 'clarification' : editFailed ? 'failure' : success ? 'success' : undefined;
+
       setMessages((prev) => [
         ...prev,
         {
@@ -889,6 +904,8 @@ export function ProjectPreviewChat({
           errorJobId: editFailed && jobId ? jobId : undefined,
           arize: streamArize,
           observability: streamObservability,
+          outcome: streamOutcome,
+          guidanceHints: streamGuidanceHints,
         },
       ]);
       onEditComplete?.({

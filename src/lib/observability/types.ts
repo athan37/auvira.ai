@@ -12,12 +12,46 @@ export interface ObservabilityCoachingContext {
   source: string;
 }
 
-/** Site Monitor GET /intent — recurring project vocabulary (optional planner/resolver evidence). */
+/** Site Monitor POST /intent — single resolved intent sentence for this edit turn. */
 export interface ObservabilityProjectIntent {
-  keywords: string[];
-  intents: Array<{ label: string; count: number }>;
+  sentence: string;
+}
+
+export type ProjectMemorySlotKind = 'color' | 'copy' | 'cta' | 'style_token' | 'edit_pattern';
+
+/** Structured edit pattern stored in project memory. */
+export interface EditPatternValue {
+  what: 'copy' | 'style_background' | 'style_text' | 'style_card' | 'structure';
+  params?: Record<string, unknown>;
+}
+
+export type ProjectMemoryScope =
+  | { type: 'project' }
+  | { type: 'section_type'; sectionType: string }
+  | { type: 'section_index'; sectionIndex: number }
+  | { type: 'field'; fieldPath: string }
+  | { type: 'hero' };
+
+/** Site Monitor GET /memory — typed project memory slot. */
+export interface ProjectMemorySlot {
+  id: string;
+  kind: ProjectMemorySlotKind;
+  phrase_aliases: string[];
+  value: string | EditPatternValue;
+  scope: ProjectMemoryScope;
+  provenance?: { turn_id: string; user_message_excerpt?: string };
+  updated_at?: string;
+}
+
+/** Site Monitor GET /memory response. */
+export interface ObservabilityProjectMemory {
+  slots: ProjectMemorySlot[];
   turn_count: number;
   updated_at: string | null;
+}
+
+export interface UpsertProjectMemoryPayload {
+  slots: Array<Omit<ProjectMemorySlot, 'id' | 'updated_at'> & { id?: string }>;
 }
 
 export interface ObservabilityTurnPhase {
@@ -45,6 +79,16 @@ export interface RecordTurnPayload {
   experiment_variant?: string;
   coaching_applied?: boolean;
   coaching_hint_count?: number;
+  /** Blocked by ambiguity/implicit gate before planEdit. */
+  pre_gate_blocked?: boolean;
+  ambiguity_reasons?: string[];
+  planner_path?: string | null;
+  target_resolved?: Record<string, unknown> | null;
+  selected_target?: Record<string, unknown> | null;
+  idempotent_success?: boolean;
+  classified_intent?: string | null;
+  is_refinement_turn?: boolean;
+  previous_changed_file_count?: number | null;
   /** Flow metadata serialized for Monitor (flow_type, phase_events, clone_phase). */
   plan?: Record<string, unknown>;
 }

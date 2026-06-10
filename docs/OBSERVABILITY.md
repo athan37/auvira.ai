@@ -4,16 +4,11 @@ Connects the editor and clone/generation flows to [la-mue-site-monitor](https://
 
 ## Environment variables
 
-Observability is **on by default** when `OBSERVABILITY_API_KEY` is set. Use `=0` to opt out.
+Observability is **on by default**. Uses `config/observability-public.env` (shipped read-only client key). Set `OBSERVABILITY_ENABLED=0` to opt out.
 
 ```env
-# Optional — omit or =1 for on; set =0 to disable
-OBSERVABILITY_ENABLED=1
-OBSERVABILITY_COACHING_ENABLED=1
-
-OBSERVABILITY_API_URL=https://la-mue-site-monitor-production.up.railway.app  # default if unset
-OBSERVABILITY_TENANT_ID=la-mue
-OBSERVABILITY_API_KEY=<secret>
+# Optional override — omit for zero-config local dev
+# OBSERVABILITY_API_KEY=<secret>
 OBSERVABILITY_TIMEOUT_MS=5000        # optional, default 5000
 
 # Phoenix / debug UI (optional)
@@ -60,17 +55,23 @@ Sub-phase data (`phase_events`, `planner_path`) is serialized into the Monitor `
 4. Local edit agent runs (`runWebsiteEdit`) with agent sub-phase timing
 5. `POST /turns` with redacted payload → store `metadata.arize.externalId` (trace_id)
 
-### Phase B: `/intent` and implicit reference resolution
+### Phase B: `/intent`, `/memory`, and implicit reference resolution
 
-`GET /api/v1/projects/{project_id}/intent` returns project vocabulary (`keywords`, `intents`, `turn_count`). la-mue uses it as **optional evidence** for the [Implicit Reference Resolver](./EDIT_AGENT.md#implicit-reference-resolver) and (when coaching is on) a small `## Project vocabulary` block in the planner prompt.
+`GET /api/v1/projects/{project_id}/intent` returns project vocabulary (`keywords`, `intents`, `turn_count`).  
+`GET /api/v1/projects/{project_id}/memory` returns **structured memory slots** (`kind`, `phrase_aliases`, `value`, `scope`, `provenance`).  
+`POST /api/v1/projects/{project_id}/memory` upserts slots after successful edits (soft-fail).
 
-| Flag | Fetch `/context` + `/intent` | Planner vocabulary + coaching | Resolver evidence |
-|------|------------------------------|-------------------------------|-------------------|
+la-mue uses both as optional evidence for the [Implicit Reference Resolver](./EDIT_AGENT.md#implicit-reference-resolver) and (when coaching is on) planner blocks `## Project vocabulary` and `## Project memory`.
+
+| Flag | Fetch `/context` + `/intent` + `/memory` | Planner vocabulary + memory + coaching | Resolver evidence |
+|------|------------------------------------------|----------------------------------------|-------------------|
 | `OBSERVABILITY_ENABLED=0` | No | No | Chat history / site config only |
-| Enabled, `OBSERVABILITY_COACHING_ENABLED=0` | Yes | No | Yes (deterministic + optional LLM) |
+| Enabled, `OBSERVABILITY_COACHING_ENABLED=0` | Yes | No | Yes (memory rank + optional LLM) |
 | Both on | Yes | Yes | Yes |
 
-**Not a routing or safety gate.** `/intent` does not pick section targets, bypass the ambiguity gate, or replace verification. Prompt caps: max 10 keywords, max 5 intent labels. Skip vocabulary injection when `turn_count === 0` or lists are empty.
+**Not a routing or safety gate.** `/intent` and `/memory` do not pick section targets, bypass the ambiguity gate, or replace verification. Prompt caps: max 10 keywords, max 5 intent labels, max 8 memory slots (scoped to target first). Skip vocabulary injection when `turn_count === 0` or lists are empty.
+
+Turn payloads may include `plan.project_memory_applied`, `plan.project_memory_phrase_count`, and `plan.project_memory_slots_written` when memory is applied or written on a turn.
 
 ## Identity mapping
 

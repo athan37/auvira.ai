@@ -164,13 +164,28 @@ function guidanceForReasons(reasons: AmbiguityReason[]): string[] {
   return [...new Set(reasons.map((reason) => GUIDANCE_BY_REASON[reason]))];
 }
 
+function hasResolvedColorReference(context: EditContext): boolean {
+  return Boolean(
+    context.resolvedReferences?.some(
+      (ref) => ref.resolvedKind === 'color' && ref.resolvedValue?.trim()
+    )
+  );
+}
+
+function messageHasResolvedColor(context: EditContext, message: string): boolean {
+  if (hasResolvedColorReference(context)) return true;
+  return extractColorsFromMessage(message).length > 0;
+}
+
 function hasSmartDefaultStylePath(
   context: EditContext,
   what: EditWhatKind,
   message: string
 ): boolean {
   const styleWhat = what === 'style_background' || what === 'style_text' || what === 'style_card';
-  if (!styleWhat || !hasStyleValue(message)) return false;
+  if (!styleWhat || !hasStyleValue(message)) {
+    if (!(styleWhat && hasResolvedColorReference(context))) return false;
+  }
   if (messageHasKeyword(message.toLowerCase(), 'card')) return false;
 
   if (context.selectedTarget) {
@@ -179,6 +194,10 @@ function hasSmartDefaultStylePath(
       context.selectedTarget.sectionIndex != null ||
       context.target.sectionIndex != null
     );
+  }
+
+  if (hasResolvedColorReference(context) && hasPinOrFocus(context)) {
+    return true;
   }
 
   return (
@@ -314,7 +333,7 @@ export function assessEditAmbiguity(context: EditContext): EditAmbiguityAssessme
     if (!detail) detail = vagueStructureClarification();
   }
 
-  if (what === 'copy' && !hasCopyValue(message)) {
+  if (what === 'copy' && !hasCopyValue(message) && !messageHasResolvedColor(context, message)) {
     reasons.push('missing_value');
     if (!detail) {
       detail = {
@@ -336,7 +355,7 @@ export function assessEditAmbiguity(context: EditContext): EditAmbiguityAssessme
     }
   }
 
-  if (styleWhat && !hasStyleValue(message)) {
+  if (styleWhat && !hasStyleValue(message) && !messageHasResolvedColor(context, message)) {
     reasons.push('missing_value');
   }
 

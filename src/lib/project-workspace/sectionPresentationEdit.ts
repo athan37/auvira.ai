@@ -5,9 +5,11 @@
 
 import {
   colorNameToBackgroundClass,
+  colorNameToCardClass,
   extractSectionBackgroundClassFromMessage,
   formatSectionBackgroundChangeSummary,
   formatSectionTextColorChangeSummary,
+  resolveSectionCardClassForEdit,
   resolveSectionTextClassForEdit,
 } from '@/lib/builder/sectionPresentation';
 import { normalizeTailwindBackgroundClass } from '@/lib/builder/tailwindBackgroundResolver';
@@ -318,11 +320,19 @@ export async function applySectionBackgroundEdit(
       }) ||
       ''
     : input.backgroundClass?.trim() ||
-      (workspace.ownerMessage
-        ? extractSectionBackgroundClassFromMessage(workspace.ownerMessage)
-        : null) ||
+      (presentationField === 'cardClass'
+        ? resolveSectionCardClassForEdit(workspace.ownerMessage ?? '', {
+            cardClass: input.backgroundClass,
+            backgroundColor: input.colorName,
+            color: input.colorName,
+          })
+        : workspace.ownerMessage
+          ? extractSectionBackgroundClassFromMessage(workspace.ownerMessage)
+          : null) ||
       (input.colorName
-        ? colorNameToBackgroundClass(input.colorName, workspace.ownerMessage)
+        ? presentationField === 'cardClass'
+          ? colorNameToCardClass(input.colorName)
+          : colorNameToBackgroundClass(input.colorName, workspace.ownerMessage)
         : '');
 
   const appliedClass = rawAppliedClass

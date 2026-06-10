@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildPlanEditSystemPrompt,
-  formatProjectVocabularyBlock,
+  formatProjectIntentBlock,
   formatResolvedReferencesBlock,
 } from '@/lib/project-workspace/planner/planEditPrompt';
 import type { ObservabilityCoachingContext } from '@/lib/observability/types';
@@ -34,27 +34,17 @@ describe('buildPlanEditSystemPrompt coaching block', () => {
     expect(prompt).not.toContain('Coaching from prior edits');
   });
 
-  it('omits vocabulary when turn_count is zero', () => {
-    const block = formatProjectVocabularyBlock({
-      keywords: ['blue'],
-      intents: [{ label: 'color', count: 1 }],
-      turn_count: 0,
-      updated_at: null,
-    });
+  it('omits intent block when sentence is empty', () => {
+    const block = formatProjectIntentBlock({ sentence: '  ' });
     expect(block).toBeNull();
   });
 
-  it('caps vocabulary keywords and intents', () => {
-    const block = formatProjectVocabularyBlock({
-      keywords: Array.from({ length: 15 }, (_, i) => `kw${i}`),
-      intents: Array.from({ length: 8 }, (_, i) => ({ label: `intent${i}`, count: i })),
-      turn_count: 3,
-      updated_at: null,
+  it('includes Monitor intent sentence in planner prompt', () => {
+    const block = formatProjectIntentBlock({
+      sentence: 'Change sections[2].presentation.cardClass to green.',
     });
-    expect(block).toContain('kw0');
-    expect(block).not.toContain('kw14');
-    expect(block).toContain('intent4');
-    expect(block).not.toContain('intent7');
+    expect(block).toContain('## Project intent');
+    expect(block).toContain('sections[2].presentation.cardClass');
   });
 
   it('omits resolved block without resolvedValue', () => {
@@ -70,7 +60,7 @@ describe('buildPlanEditSystemPrompt coaching block', () => {
     expect(formatResolvedReferencesBlock(refs)).toBeNull();
   });
 
-  it('orders vocabulary before coaching and includes resolved references', () => {
+  it('orders intent before coaching and includes resolved references', () => {
     const refs: ImplicitReferenceRecord[] = [
       {
         phrase: 'usual CTA',
@@ -81,24 +71,23 @@ describe('buildPlanEditSystemPrompt coaching block', () => {
         reason: 'history',
       },
     ];
-    const prompt = buildPlanEditSystemPrompt(coaching, {
-      keywords: ['cta'],
-      intents: [{ label: 'button', count: 2 }],
-      turn_count: 2,
-      updated_at: null,
-    }, refs);
-    const vocabIdx = prompt.indexOf('## Project vocabulary');
+    const prompt = buildPlanEditSystemPrompt(
+      coaching,
+      { sentence: 'Change hero.primaryCta to "Book Now".' },
+      refs
+    );
+    const intentIdx = prompt.indexOf('## Project intent');
     const resolvedIdx = prompt.indexOf('## Resolved user references');
     const coachingIdx = prompt.indexOf('## Coaching from prior edits');
-    expect(vocabIdx).toBeGreaterThan(-1);
-    expect(resolvedIdx).toBeGreaterThan(vocabIdx);
+    expect(intentIdx).toBeGreaterThan(-1);
+    expect(resolvedIdx).toBeGreaterThan(intentIdx);
     expect(coachingIdx).toBeGreaterThan(resolvedIdx);
     expect(prompt).toContain('"Book Now"');
   });
 
-  it('coaching disabled means no vocabulary injection via buildPlanEditSystemPrompt args', () => {
+  it('coaching disabled means no intent injection via null args', () => {
     const prompt = buildPlanEditSystemPrompt(null, null, null);
-    expect(prompt).not.toContain('Project vocabulary');
+    expect(prompt).not.toContain('Project intent');
     expect(prompt).not.toContain('Resolved user references');
   });
 });

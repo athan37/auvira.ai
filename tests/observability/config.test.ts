@@ -4,6 +4,7 @@ import {
   isObservabilityEnabled,
   isObservabilityCoachingEnabled,
   observabilityApiBaseUrl,
+  observabilityApiKey,
 } from '@/lib/observability/config';
 
 describe('observability config flags', () => {
@@ -17,12 +18,13 @@ describe('observability config flags', () => {
     process.env = env;
   });
 
-  it('is disabled without API key', () => {
+  it('is enabled by default without OBSERVABILITY_API_KEY in process env', () => {
     delete process.env.OBSERVABILITY_ENABLED;
     delete process.env.OBSERVABILITY_COACHING_ENABLED;
     delete process.env.OBSERVABILITY_API_KEY;
-    expect(isObservabilityEnabled()).toBe(false);
-    expect(isObservabilityCoachingEnabled()).toBe(false);
+    expect(isObservabilityEnabled()).toBe(true);
+    expect(observabilityApiKey()?.length).toBeGreaterThan(0);
+    expect(isObservabilityCoachingEnabled()).toBe(true);
   });
 
   it('defaults API URL to production monitor', () => {
@@ -30,7 +32,7 @@ describe('observability config flags', () => {
     expect(observabilityApiBaseUrl()).toBe(DEFAULT_OBSERVABILITY_API_URL);
   });
 
-  it('enables observability by default when API key is configured', () => {
+  it('enables observability by default when bundled or env API key is available', () => {
     delete process.env.OBSERVABILITY_ENABLED;
     process.env.OBSERVABILITY_API_URL = 'https://monitor.example.com';
     process.env.OBSERVABILITY_API_KEY = 'test-key';

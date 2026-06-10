@@ -60,6 +60,33 @@ export function buildRedactedSiteConfigSnapshot(parsedConfig: {
   };
 }
 
+function redactMonitorTargetBlock(
+  block: Record<string, unknown> | null | undefined
+): Record<string, unknown> | null | undefined {
+  if (!block) return block;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(block)) {
+    if (typeof value === 'string') {
+      out[key] = redactPiiText(value);
+      continue;
+    }
+    if (Array.isArray(value)) {
+      out[key] = value.map((entry) =>
+        entry && typeof entry === 'object'
+          ? redactMonitorTargetBlock(entry as Record<string, unknown>)
+          : entry
+      );
+      continue;
+    }
+    if (value && typeof value === 'object') {
+      out[key] = redactMonitorTargetBlock(value as Record<string, unknown>);
+      continue;
+    }
+    out[key] = value;
+  }
+  return out;
+}
+
 /** Apply PII redaction to a turn payload before POST /turns. */
 export function redactTurnPayload(payload: RecordTurnPayload): RecordTurnPayload {
   return {
@@ -69,5 +96,7 @@ export function redactTurnPayload(payload: RecordTurnPayload): RecordTurnPayload
     site_config: payload.site_config
       ? (redactSiteConfigValue(payload.site_config) as Record<string, unknown>)
       : payload.site_config,
+    selected_target: redactMonitorTargetBlock(payload.selected_target) ?? payload.selected_target,
+    target_resolved: redactMonitorTargetBlock(payload.target_resolved) ?? payload.target_resolved,
   };
 }

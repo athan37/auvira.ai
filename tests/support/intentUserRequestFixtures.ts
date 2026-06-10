@@ -7,30 +7,20 @@ import { enrichObservabilityMetadataForChat } from '@/lib/observability/formatEd
 import type { ImplicitReferenceRecord } from '@/lib/project-workspace/edit-context/implicitReferenceTypes';
 import type { EditContext } from '@/lib/project-workspace/edit-context/types';
 
-/** Representative Monitor /intent payload after a few successful edits. */
+/** Representative Monitor POST /intent sentence after context is established. */
 export function sampleProjectIntent(
   overrides: Partial<ObservabilityProjectIntent> = {}
 ): ObservabilityProjectIntent {
   return {
-    keywords: ['favorite color blue', 'hvac', 'contact section'],
-    intents: [
-      { label: 'CTA Book Now', count: 3 },
-      { label: 'color edit', count: 2 },
-    ],
-    turn_count: 4,
-    updated_at: '2026-06-08T12:00:00Z',
+    sentence:
+      "Change the contact section background (sections[1].presentation.backgroundClass) to blue, the owner's favorite color.",
     ...overrides,
   };
 }
 
-/** Fresh project — intent exists but has no turn history yet. */
-export function firstTurnProjectIntent(): ObservabilityProjectIntent {
-  return {
-    keywords: ['plumber'],
-    intents: [],
-    turn_count: 0,
-    updated_at: null,
-  };
+/** No Monitor intent sentence available yet. */
+export function firstTurnProjectIntent(): ObservabilityProjectIntent | null {
+  return null;
 }
 
 export function sampleCoachingContext(
@@ -110,11 +100,14 @@ export function intentFlowEditContext(overrides: Partial<EditContext> = {}): Edi
 export function chatObservabilityFromEditTurn(input: {
   turnObservability?: ProjectMessageObservabilityMetadata | null;
   projectIntent?: ObservabilityProjectIntent | null;
+  coachingContext?: ObservabilityCoachingContext | null;
   resolvedReferences?: ImplicitReferenceRecord[] | null;
   outcome?: ProjectChatOutcome;
 }): ProjectMessageObservabilityMetadata | undefined {
   return enrichObservabilityMetadataForChat(input.turnObservability ?? undefined, {
     outcome: input.outcome,
     resolvedReferences: input.resolvedReferences,
+    projectIntent: input.projectIntent,
+    coachingContext: input.coachingContext,
   });
 }

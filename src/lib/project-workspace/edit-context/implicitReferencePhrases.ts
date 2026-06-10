@@ -7,8 +7,11 @@ export interface DetectedImplicitPhrase {
   pattern: RegExp;
 }
 
+const FAVORITE_COLOR_PATTERN =
+  /\bmy\s+(?:favorite|favourite|faviorite|faviourite)\s+colou?r\b/i;
+
 const IMPLICIT_PHRASE_PATTERNS: Array<{ pattern: RegExp; kind: ImplicitReferenceKind }> = [
-  { pattern: /\bmy\s+favorite\s+colou?r\b/i, kind: 'color' },
+  { pattern: FAVORITE_COLOR_PATTERN, kind: 'color' },
   { pattern: /\bbrand\s+colou?r\b/i, kind: 'color' },
   { pattern: /\bmatch\s+my\s+brand\b/i, kind: 'color' },
   { pattern: /\bsame\s+as\s+before\b/i, kind: 'unknown' },

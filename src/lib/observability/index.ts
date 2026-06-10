@@ -2,6 +2,7 @@ export {
   isObservabilityEnabled,
   isObservabilityCoachingEnabled,
   isObservabilityDebugUiEnabled,
+  observabilityApiKey,
   observabilityTenantId,
   observabilityApiBaseUrl,
   phoenixAppUrl,
@@ -12,8 +13,10 @@ export type {
   ObservabilityEditOutcome,
   ObservabilityFlowType,
   ObservabilityProjectIntent,
+  ObservabilityProjectMemory,
   ObservabilityTurnMetadata,
   ObservabilityTurnPhase,
+  ProjectMemorySlot,
   RecordTurnPayload,
 } from './types';
 export { redactPiiText, buildRedactedSiteConfigSnapshot, redactTurnPayload } from './redactPii';
@@ -40,7 +43,21 @@ export type {
 export { AgentPhaseTimer, mergeLatencyBreakdown } from './agentPhaseTimer';
 export { ensureObservabilityRegistration } from './ensureRegistration';
 export { fetchCoachingContext } from './fetchCoachingContext';
-export { fetchObservabilityIntent, parseObservabilityProjectIntent } from './fetchObservabilityIntent';
+export {
+  fetchObservabilityIntent,
+  parseObservabilityProjectIntent,
+  type FetchObservabilityIntentInput,
+} from './fetchObservabilityIntent';
+export {
+  evidenceFromIntentSentence,
+  hasUsableIntentSentence,
+  intentSentenceIsUnresolved,
+} from './intentSentence';
+export {
+  fetchObservabilityMemory,
+  parseObservabilityProjectMemory,
+} from './fetchObservabilityMemory';
+export { emitProjectMemorySlots } from './emitProjectMemorySlots';
 export { mapTurnPayload } from './mapTurnPayload';
 export type { MapTurnPayloadInput } from './mapTurnPayload';
 export { recordEditTurn, recordObservabilityTurn } from './recordObservabilityTurn';

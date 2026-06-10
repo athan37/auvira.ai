@@ -1,17 +1,29 @@
 import { parseSiteConfigSource } from '@/lib/site-manager/siteConfigParser';
 import { isObservabilityCoachingEnabled } from '@/lib/observability/config';
-import type { ObservabilityCoachingContext, ObservabilityProjectIntent } from '@/lib/observability/types';
+import {
+  evidenceFromIntentSentence,
+  hasUsableIntentSentence,
+  intentSentenceIsUnresolved,
+} from '@/lib/observability/intentSentence';
+import type {
+  ObservabilityCoachingContext,
+  ObservabilityProjectIntent,
+  ObservabilityProjectMemory,
+} from '@/lib/observability/types';
 import { getLLMClient } from '@/lib/project-workspace/planner/llmClient';
 import type { ConversationTurn } from '@/lib/project-workspace/edit-shared/editAmbiguity';
 import { TAILWIND_COLOR_NAMES } from '@/lib/project-workspace/edit-shared/preset/presetUtils';
 import type { EditContext } from './types';
 import {
-  detectImplicitPhrases,
-  type DetectedImplicitPhrase,
+  collectImplicitPhrases,
+  type ExtractedImplicitRef,
+} from './extractImplicitReferences';
+import {
   extractExplicitColorValue,
   extractExplicitQuotedValue,
   hasExplicitValueForKind,
 } from './implicitReferencePhrases';
+import { rankProjectMemorySlots } from './projectMemoryRanker';
 import type {
   ImplicitReferenceKind,
   ImplicitReferenceRecord,
@@ -39,6 +51,7 @@ export interface ResolveImplicitReferencesInput {
   editContext: EditContext;
   coachingContext?: ObservabilityCoachingContext | null;
   projectIntent?: ObservabilityProjectIntent | null;
+  projectMemory?: ObservabilityProjectMemory | null;
   recentHistory?: ConversationTurn[];
 }
 
@@ -69,8 +82,145 @@ function findColorsInText(text: string): string[] {
   return uniqueStrings(found);
 }
 
-function searchColorFromIntent(intent: ObservabilityProjectIntent): string[] {
-  return uniqueStrings(intent.keywords.flatMap((kw) => findColorsInText(kw)));
+function evidenceFromProjectIntentSentence(
+  intent: ObservabilityProjectIntent | null | undefined,
+  kind: ImplicitReferenceKind
+): EvidenceCandidate[] {
+  const sentence = intent?.sentence?.trim();
+  if (!sentence) return [];
+  const mapped = evidenceFromIntentSentence(sentence, kind);
+  if (!mapped) return [];
+  return [
+    {
+      value: mapped.value,
+      source: 'project_intent',
+      reason: mapped.reason,
+    },
+  ];
+}
+
+const FAVORITE_COLOR_PHRASE_PATTERN =
+  /\b(?:my\s+)?(?:favorite|favourite|faviorite|faviourite)\s+colou?r\b/i;
+
+function isFavoriteColorPhrase(phrase: string): boolean {
+  return FAVORITE_COLOR_PHRASE_PATTERN.test(phrase);
+}
+
+function isColorClarificationAssistantTurn(turn: ConversationTurn): boolean {
+  if (turn.role !== 'assistant') return false;
+  return (
+    /What color should I use/i.test(turn.content) ||
+    Boolean(
+      (turn.metadata as { pendingImplicitRef?: { kind?: string } } | undefined)?.pendingImplicitRef
+        ?.kind === 'color'
+    )
+  );
+}
+
+/** Most recent owner color answer after a favorite-color clarify thread. */
+function searchFavoriteColorFromClarificationThread(
+  history: ConversationTurn[]
+): EvidenceCandidate[] {
+  for (let i = history.length - 1; i >= 0; i--) {
+    const turn = history[i];
+    if (!isColorClarificationAssistantTurn(turn)) continue;
+    const answerTurn = history[i + 1];
+    if (answerTurn?.role !== 'user') continue;
+    const color =
+      extractExplicitColorValue(answerTurn.content) ??
+      findColorsInText(answerTurn.content)[0] ??
+      null;
+    if (!color) continue;
+    return [
+      {
+        value: color,
+        source: 'chat_history',
+        reason: 'Owner answered a prior color clarification in chat',
+      },
+    ];
+  }
+  return [];
+}
+
+/** Explicit statements like "my favorite color is green" in prior chat. */
+function searchFavoriteColorExplicitInChat(
+  history: ConversationTurn[]
+): EvidenceCandidate[] {
+  for (let i = history.length - 1; i >= 0; i--) {
+    const turn = history[i];
+    const content = turn.content;
+    const match = content.match(
+      /\b(?:my\s+)?(?:favorite|favourite|faviorite|faviourite)\s+colou?r\s*(?:is|=|:)\s*([a-z#][a-z0-9#-]*)/i
+    );
+    if (match?.[1]) {
+      return [
+        {
+          value: match[1].toLowerCase(),
+          source: 'chat_history',
+          reason: 'Owner stated favorite color explicitly in chat',
+        },
+      ];
+    }
+  }
+  return [];
+}
+
+function searchFavoriteColorFromHistoryMetadata(
+  history: ConversationTurn[]
+): EvidenceCandidate[] {
+  for (let i = history.length - 1; i >= 0; i--) {
+    const turn = history[i];
+    if (turn.role !== 'assistant') continue;
+    const meta = turn.metadata as
+      | {
+          resolvedReferences?: Array<{ phrase?: string; resolvedValue?: string }>;
+          appliedProjectMemory?: Array<{ phrase?: string; resolvedValue?: string }>;
+        }
+      | undefined;
+    const refs = meta?.resolvedReferences ?? meta?.appliedProjectMemory ?? [];
+    for (const ref of refs) {
+      if (!ref.phrase?.trim() || !ref.resolvedValue?.trim()) continue;
+      if (!isFavoriteColorPhrase(ref.phrase)) continue;
+      return [
+        {
+          value: ref.resolvedValue.trim(),
+          source: 'chat_history',
+          reason: `Most recent prior edit resolved "${ref.phrase}"`,
+        },
+      ];
+    }
+  }
+  return [];
+}
+
+function gatherPhraseBoundFavoriteColorEvidence(
+  detected: ExtractedImplicitRef,
+  input: ResolveImplicitReferencesInput
+): EvidenceCandidate[] {
+  if (detected.kind !== 'color' || !isFavoriteColorPhrase(detected.phrase)) {
+    return [];
+  }
+  const history = input.recentHistory ?? input.editContext.conversationHistory ?? [];
+
+  const sources = [
+    evidenceFromProjectIntentSentence(input.projectIntent, 'color'),
+    searchFavoriteColorFromHistoryMetadata(history),
+    searchFavoriteColorFromClarificationThread(history),
+    searchFavoriteColorExplicitInChat(history),
+    searchMemoryEvidence(detected, input).slice(0, 1),
+  ];
+
+  for (const candidates of sources) {
+    if (candidates.length === 1) {
+      return candidates;
+    }
+  }
+
+  if (input.projectIntent?.sentence && intentSentenceIsUnresolved(input.projectIntent.sentence)) {
+    return [];
+  }
+
+  return [];
 }
 
 function searchColorFromCoaching(coaching: ObservabilityCoachingContext): string[] {
@@ -103,15 +253,6 @@ function searchCtaFromHistory(history: ConversationTurn[]): string[] {
   return uniqueStrings(candidates);
 }
 
-function searchCtaFromIntent(intent: ObservabilityProjectIntent): string[] {
-  return uniqueStrings(
-    intent.intents
-      .filter((entry) => /\bcta\b/i.test(entry.label))
-      .map((entry) => entry.label.replace(/\bcta\b/i, '').trim())
-      .filter((label) => label.length >= 2)
-  );
-}
-
 function readHeroPresentation(editContext: EditContext): string | null {
   const heroFromSections = editContext.sections.find((s) => s.type === 'hero');
   const sectionBg = heroFromSections?.presentation?.backgroundClass;
@@ -141,6 +282,17 @@ function pickSingleCandidate(candidates: EvidenceCandidate[]): EvidenceCandidate
   return null;
 }
 
+function searchMemoryEvidence(
+  detected: ExtractedImplicitRef,
+  input: ResolveImplicitReferencesInput
+): EvidenceCandidate[] {
+  return rankProjectMemorySlots(input.projectMemory, detected, input.editContext).map((entry) => ({
+    value: entry.value,
+    source: entry.source,
+    reason: entry.reason,
+  }));
+}
+
 function searchDeterministicEvidence(
   kind: ImplicitReferenceKind,
   input: ResolveImplicitReferencesInput
@@ -150,15 +302,7 @@ function searchDeterministicEvidence(
   const candidates: EvidenceCandidate[] = [];
 
   if (kind === 'color') {
-    if (projectIntent) {
-      for (const color of searchColorFromIntent(projectIntent)) {
-        candidates.push({
-          value: color,
-          source: 'project_intent',
-          reason: `Project vocabulary keyword mentions "${color}"`,
-        });
-      }
-    }
+    candidates.push(...evidenceFromProjectIntentSentence(projectIntent, 'color'));
     if (coachingContext) {
       for (const color of searchColorFromCoaching(coachingContext)) {
         candidates.push({
@@ -177,22 +321,18 @@ function searchDeterministicEvidence(
     }
   }
 
+  if (kind === 'copy') {
+    candidates.push(...evidenceFromProjectIntentSentence(projectIntent, 'copy'));
+  }
+
   if (kind === 'cta') {
+    candidates.push(...evidenceFromProjectIntentSentence(projectIntent, 'cta'));
     for (const cta of searchCtaFromHistory(history)) {
       candidates.push({
         value: cta,
         source: 'chat_history',
         reason: `Prior chat mentions CTA "${cta}"`,
       });
-    }
-    if (projectIntent) {
-      for (const cta of searchCtaFromIntent(projectIntent)) {
-        candidates.push({
-          value: cta,
-          source: 'project_intent',
-          reason: `Project intent label references CTA`,
-        });
-      }
     }
   }
 
@@ -210,10 +350,17 @@ function searchDeterministicEvidence(
   return candidates;
 }
 
+function resolveKindForExplicitCheck(kind: ImplicitReferenceKind): ImplicitReferenceKind {
+  if (kind === 'edit_pattern') return 'unknown';
+  return kind;
+}
+
 function sourceLabel(source: ImplicitReferenceSource): string {
   switch (source) {
     case 'project_intent':
-      return 'project vocabulary';
+      return 'Project Memory';
+    case 'project_memory':
+      return 'Project Memory';
     case 'coaching_context':
       return 'coaching context';
     case 'chat_history':
@@ -244,6 +391,9 @@ function clarificationForKind(kind: ImplicitReferenceKind, phrase: string): stri
   if (kind === 'cta') return 'What CTA text should I use?';
   if (kind === 'style') return `Which style from "${phrase}" should I copy?`;
   if (kind === 'offer') return 'Which service or offer should I use?';
+  if (kind === 'edit_pattern') {
+    return `What kind of edit do you mean by "${phrase}" — background, text, copy, or something else?`;
+  }
   return `Can you clarify what you mean by "${phrase}"?`;
 }
 
@@ -258,11 +408,18 @@ async function resolveWithLlm(
     .map((t) => `${t.role}: ${t.content}`)
     .join('\n');
 
-  const intentBlock = input.projectIntent
+  const intentBlock = input.projectIntent?.sentence?.trim()
+    ? JSON.stringify({ intent: input.projectIntent.sentence.trim() })
+    : '{}';
+
+  const memoryBlock = input.projectMemory
     ? JSON.stringify({
-        keywords: input.projectIntent.keywords.slice(0, 10),
-        intents: input.projectIntent.intents.slice(0, 5),
-        turn_count: input.projectIntent.turn_count,
+        slots: input.projectMemory.slots.slice(0, 12).map((slot) => ({
+          kind: slot.kind,
+          scope: slot.scope,
+          value: slot.value,
+          aliases: slot.phrase_aliases.slice(0, 3),
+        })),
       })
     : '{}';
 
@@ -276,7 +433,7 @@ async function resolveWithLlm(
   const system = `You resolve implicit references in website edit requests.
 Rules:
 - Do not invent preferences or guess favorite colors from generic keywords.
-- Only resolve when evidence exists in project vocabulary, coaching, or chat history.
+- Only resolve when evidence exists in project memory, vocabulary, coaching, or chat history.
 - Do not pick section targets.
 - Do not override explicit user values in the message.
 - If uncertain, set canResolve false and provide clarificationQuestion.`;
@@ -284,6 +441,9 @@ Rules:
   const prompt = `Owner message: ${input.ownerMessage}
 Implicit phrase to resolve: "${phrase}"
 Expected kind: ${kind}
+
+Project memory:
+${memoryBlock}
 
 Project vocabulary:
 ${intentBlock}
@@ -345,34 +505,101 @@ Return structured JSON.`;
 
 function hasEvidenceContext(input: ResolveImplicitReferencesInput): boolean {
   const history = input.recentHistory ?? input.editContext.conversationHistory ?? [];
-  return Boolean(input.projectIntent || input.coachingContext || history.length > 0);
+  return Boolean(
+    hasUsableIntentSentence(input.projectIntent?.sentence) ||
+      input.projectMemory?.slots.length ||
+      input.coachingContext ||
+      history.length > 0
+  );
 }
 
 function mayUseLlmResolver(input: ResolveImplicitReferencesInput): boolean {
   if (!hasEvidenceContext(input)) return false;
   return (
     isObservabilityCoachingEnabled() ||
-    Boolean(input.projectIntent || input.coachingContext)
+    Boolean(
+      hasUsableIntentSentence(input.projectIntent?.sentence) ||
+        input.projectMemory ||
+        input.coachingContext
+    )
   );
 }
 
+function gatherEvidence(
+  detected: ExtractedImplicitRef,
+  input: ResolveImplicitReferencesInput
+): EvidenceCandidate[] {
+  const memory = searchMemoryEvidence(detected, input);
+  const legacy = searchDeterministicEvidence(detected.kind, input);
+  return [...memory, ...legacy];
+}
+
+function findPendingImplicitRefFromHistory(
+  history: ConversationTurn[]
+): { phrase: string; kind: ImplicitReferenceKind } | null {
+  for (let i = history.length - 1; i >= 0; i--) {
+    const turn = history[i];
+    if (turn.role !== 'assistant') continue;
+    const pending = (
+      turn.metadata as { pendingImplicitRef?: { phrase?: string; kind?: ImplicitReferenceKind } } | undefined
+    )?.pendingImplicitRef;
+    if (pending?.phrase && pending.kind) {
+      return { phrase: pending.phrase, kind: pending.kind };
+    }
+  }
+  return null;
+}
+
+function resolvePendingImplicitFromHistory(
+  input: ResolveImplicitReferencesInput
+): ImplicitReferenceResolution | null {
+  const history = input.recentHistory ?? input.editContext.conversationHistory ?? [];
+  const pending = findPendingImplicitRefFromHistory(history);
+  if (!pending) return null;
+
+  if (pending.kind === 'color') {
+    const explicitColor = extractExplicitColorValue(input.ownerMessage);
+    if (!explicitColor) return null;
+    const record: ImplicitReferenceRecord = {
+      phrase: pending.phrase,
+      resolvedValue: explicitColor,
+      resolvedKind: 'color',
+      source: 'explicit_message',
+      confidence: 'high',
+      reason: 'Owner answered pending color clarification',
+    };
+    return {
+      references: [record],
+      resolvedMessage: buildResolvedMessage(input.ownerMessage, [record]),
+    };
+  }
+
+  return null;
+}
+
 /**
- * Resolve vague value references using project vocabulary, coaching, history, and guarded LLM fallback.
+ * Resolve vague value references using project memory, vocabulary, coaching, history, and guarded LLM fallback.
  * Does not modify edit target — values only.
  */
 export async function resolveImplicitReferences(
   input: ResolveImplicitReferencesInput
 ): Promise<ImplicitReferenceResolution> {
-  const phrases = detectImplicitPhrases(input.ownerMessage);
+  const pendingResolution = resolvePendingImplicitFromHistory(input);
+  if (pendingResolution) {
+    return pendingResolution;
+  }
+
+  const { refs: phrases } = await collectImplicitPhrases(input.ownerMessage);
   if (phrases.length === 0) {
     return { references: [] };
   }
 
   const references: ImplicitReferenceRecord[] = [];
-  const unresolved: DetectedImplicitPhrase[] = [];
+  const unresolved: ExtractedImplicitRef[] = [];
 
   for (const detected of phrases) {
-    if (hasExplicitValueForKind(input.ownerMessage, detected.kind)) {
+    const explicitKind = resolveKindForExplicitCheck(detected.kind);
+    if (hasExplicitValueForKind(input.ownerMessage, explicitKind)) {
       const explicitColor = detected.kind === 'color' ? extractExplicitColorValue(input.ownerMessage) : null;
       const explicitQuote =
         detected.kind === 'cta' || detected.kind === 'copy'
@@ -390,7 +617,31 @@ export async function resolveImplicitReferences(
       continue;
     }
 
-    const evidence = searchDeterministicEvidence(detected.kind, input);
+    if (detected.kind === 'color' && isFavoriteColorPhrase(detected.phrase)) {
+      const phraseBound = gatherPhraseBoundFavoriteColorEvidence(detected, input);
+      const phrasePicked = pickSingleCandidate(phraseBound);
+      if (phrasePicked) {
+        references.push({
+          phrase: detected.phrase,
+          resolvedValue: phrasePicked.value,
+          resolvedKind: detected.kind,
+          source: phrasePicked.source,
+          confidence: 'high',
+          reason: phrasePicked.reason,
+        });
+        continue;
+      }
+      if (phraseBound.length > 1) {
+        return {
+          references,
+          needsClarification: true,
+          clarificationMessage: clarificationForKind(detected.kind, detected.phrase),
+          suggestedReplies: uniqueStrings(phraseBound.map((e) => e.value)).slice(0, 4),
+        };
+      }
+    }
+
+    const evidence = gatherEvidence(detected, input);
     const picked = pickSingleCandidate(evidence);
     if (picked) {
       references.push({
@@ -453,7 +704,4 @@ export function formatReferenceSourceLabel(source: ImplicitReferenceSource): str
   return sourceLabel(source);
 }
 
-/** True when any reference was resolved with a concrete value (for job logs). */
-export function hasResolvedReferenceValues(references: ImplicitReferenceRecord[]): boolean {
-  return references.some((r) => Boolean(r.resolvedValue?.trim()));
-}
+export { hasResolvedReferenceValues } from './implicitReferenceTypes';

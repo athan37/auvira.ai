@@ -1,6 +1,7 @@
 import {
   isObservabilityEnabled,
   observabilityApiBaseUrl,
+  observabilityApiKey,
   observabilityRequestTimeoutMs,
   observabilityTenantId,
 } from './config';
@@ -12,7 +13,7 @@ async function observabilityFetch<T>(
 ): Promise<T | null> {
   if (!isObservabilityEnabled()) return null;
 
-  const apiKey = process.env.OBSERVABILITY_API_KEY?.trim();
+  const apiKey = observabilityApiKey();
   if (!apiKey) return null;
 
   const controller = new AbortController();
@@ -80,12 +81,44 @@ export async function createObservabilityConversation(input: {
   });
 }
 
-export async function fetchObservabilityIntentRaw(
+export interface FetchObservabilityIntentBody {
+  user_message: string;
+  selected_target?: Record<string, unknown> | null;
+  conversation_id?: string;
+}
+
+export async function fetchObservabilityIntentRaw(input: {
+  projectId: string;
+  body: FetchObservabilityIntentBody;
+}): Promise<Record<string, unknown> | null> {
+  return observabilityFetch(
+    `/projects/${encodeURIComponent(input.projectId)}/intent`,
+    {
+      method: 'POST',
+      body: JSON.stringify(input.body),
+    }
+  );
+}
+
+export async function fetchObservabilityMemoryRaw(
   projectId: string
 ): Promise<Record<string, unknown> | null> {
   return observabilityFetch(
-    `/projects/${encodeURIComponent(projectId)}/intent`,
+    `/projects/${encodeURIComponent(projectId)}/memory`,
     { method: 'GET' }
+  );
+}
+
+export async function postObservabilityMemory(input: {
+  projectId: string;
+  payload: import('./types').UpsertProjectMemoryPayload;
+}): Promise<Record<string, unknown> | null> {
+  return observabilityFetch(
+    `/projects/${encodeURIComponent(input.projectId)}/memory`,
+    {
+      method: 'POST',
+      body: JSON.stringify(input.payload),
+    }
   );
 }
 

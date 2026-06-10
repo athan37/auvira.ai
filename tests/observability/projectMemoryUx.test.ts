@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { enrichObservabilityMetadataForChat } from '@/lib/observability/formatEditContextSummary';
-import { getProjectMemoryView, getTipsView } from '@/lib/observability/formatCoachingSummary';
+import { getIntentFeedView, getMonitorContextView, getProjectMemoryView, getProjectVocabularyView, getTipsView } from '@/lib/observability/formatCoachingSummary';
 
 const resolvedRef = {
   phrase: 'my favorite color',
@@ -20,7 +20,33 @@ describe('Project Memory UX matrix', () => {
     expect(getProjectMemoryView('success', meta)).not.toBeNull();
     expect(getTipsView('success', [], meta)).toBeNull();
     expect(meta?.appliedProjectMemory).toHaveLength(1);
-    expect(meta?.projectVocabulary).toBeUndefined();
+  });
+
+  it('success + project intent → intent feed visible in chat metadata', () => {
+    const meta = enrichObservabilityMetadataForChat(undefined, {
+      outcome: 'success',
+      projectIntent: {
+        sentence: 'Change hero.primaryCta to "Book Now".',
+      },
+    });
+    expect(meta?.intentFeed?.sentence).toContain('Book Now');
+    expect(getIntentFeedView(meta)?.panelLines[0]).toContain('Book Now');
+  });
+
+  it('every edit with monitor payloads → /context and /intent feeds', () => {
+    const meta = enrichObservabilityMetadataForChat(undefined, {
+      outcome: 'clarification',
+      projectIntent: null,
+      coachingContext: {
+        coachingHints: ['Honor pinned target.'],
+        constraints: { honor_target_section: true },
+        qualitySnapshot: { latest_grade: 'C' },
+        recurringIssues: ['EDIT_INTENT_KEYWORD_MISSING'],
+        source: 'turn_ledger',
+      },
+    });
+    expect(getMonitorContextView(meta)?.panelLines[0]).toMatch(/^Source:/);
+    expect(getIntentFeedView(meta)).toBeNull();
   });
 
   it('success + no refs → neither surface', () => {

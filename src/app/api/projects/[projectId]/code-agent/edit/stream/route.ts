@@ -51,9 +51,12 @@ import {
   appendAssistantMessage,
   appendUserMessage,
   buildConversationHistory,
+  HISTORY_TURN_PAIR_LIMIT,
   resolveEditFocusFromProject,
   resolveLastGalleryEditForProject,
+  trimCurrentUserTurn,
 } from '@/lib/chat/projectChatService';
+import { inheritSelectedTargetForClarificationReply } from '@/lib/chat/conversationContextForEdit';
 import {
   EditStepTimer,
   appendTimedEditJobLog,
@@ -67,18 +70,28 @@ import {
   ensureObservabilityRegistration,
   fetchCoachingContext,
   fetchObservabilityIntent,
+  fetchObservabilityMemory,
   isObservabilityCoachingEnabled,
   isObservabilityEnabled,
   loadSiteConfigForObservability,
   recordEditTurn,
 } from '@/lib/observability';
 import { enrichObservabilityMetadataForChat } from '@/lib/observability/formatEditContextSummary';
+import {
+  classifiedIntentFromMessage,
+  inferPreGateBlocked,
+  serializeResolvedReferencesForMonitor,
+  serializeSelectedTargetForMonitor,
+  serializeTargetResolvedForMonitor,
+} from '@/lib/observability/serializeTurnContext';
+import type { ClarificationAnchor } from '@/lib/chat/projectMessageMetadata';
 import type { ImplicitReferenceRecord } from '@/lib/project-workspace/edit-context/implicitReferenceTypes';
 import type { ProjectMessageObservabilityMetadata, ProjectChatOutcome } from '@/lib/chat/projectMessageMetadata';
 import type {
   ObservabilityCoachingContext,
   ObservabilityEditOutcome,
   ObservabilityProjectIntent,
+  ObservabilityProjectMemory,
   ObservabilityTurnMetadata,
 } from '@/lib/observability/types';
 import { promises as fs } from 'fs';
@@ -160,7 +173,7 @@ export async function POST(
     return NextResponse.json({ detail: 'message is required' }, { status: 400 });
   }
 
-  const selectedTarget = normalizeSelectedTarget(rawSelectedTarget);
+  let selectedTarget = normalizeSelectedTarget(rawSelectedTarget) ?? null;
 
   const attachments: WorkspaceAssetAttachment[] = Array.isArray(rawAttachments)
     ? rawAttachments
@@ -218,6 +231,7 @@ export async function POST(
       let conversationHistory: { role: 'user' | 'assistant'; content: string }[] = [];
       let coachingContext: ObservabilityCoachingContext | null = null;
       let projectIntent: ObservabilityProjectIntent | null = null;
+      let projectMemory: ObservabilityProjectMemory | null = null;
       let turnIndex = 0;
       let lastAgentLatencyBreakdown: Record<string, number> | undefined;
       let lastPlannerPath: 'deterministic' | 'explorer' | 'llm' | 'clarification' | undefined;
@@ -227,6 +241,10 @@ export async function POST(
         selectedTarget?.elementLabel ??
         selectedTarget?.targetChain?.find((node) => node.role === 'section')?.label ??
         null;
+      const monitorClassifiedIntent = classifiedIntentFromMessage(message);
+      const monitorSelectedTarget = serializeSelectedTargetForMonitor(selectedTarget) ?? null;
+      const monitorTargetResolved =
+        serializeTargetResolvedForMonitor({ selectedTarget }) ?? null;
 
       function observabilityMetadataForChat(
         base: ObservabilityTurnMetadata | null | undefined,
@@ -236,6 +254,8 @@ export async function POST(
         return enrichObservabilityMetadataForChat(base?.observability, {
           outcome,
           resolvedReferences,
+          projectIntent,
+          coachingContext,
         });
       }
 
@@ -252,8 +272,19 @@ export async function POST(
         } | null;
         agentLatencyBreakdown?: Record<string, number>;
         plannerPath?: 'deterministic' | 'explorer' | 'llm' | 'clarification';
+        ambiguityReasons?: string[];
+        preGateBlocked?: boolean;
+        clarificationAnchor?: ClarificationAnchor;
+        resolvedReferences?: ImplicitReferenceRecord[] | null;
+        projectMemorySlotsWritten?: number;
+        idempotentSuccess?: boolean;
+        isRefinementTurn?: boolean;
+        previousChangedFileCount?: number | null;
       }): Promise<ObservabilityTurnMetadata | null> {
         if (!isObservabilityEnabled() || !jobId) return null;
+        const plannerPath = args.plannerPath ?? lastPlannerPath;
+        const resolvedRefs = serializeResolvedReferencesForMonitor(args.resolvedReferences);
+        const resolvedCount = args.resolvedReferences?.filter((ref) => ref.resolvedValue?.trim()).length ?? 0;
         try {
           return await recordEditTurn({
             projectId,
@@ -273,7 +304,28 @@ export async function POST(
             requestedBuilderType: 'la_mue_edit',
             flowType: 'edit',
             agentLatencyBreakdown: args.agentLatencyBreakdown ?? lastAgentLatencyBreakdown,
-            plannerPath: args.plannerPath ?? lastPlannerPath,
+            plannerPath,
+            classifiedIntent: monitorClassifiedIntent,
+            selectedTarget: monitorSelectedTarget,
+            targetResolved:
+              serializeTargetResolvedForMonitor({
+                clarificationAnchor: args.clarificationAnchor,
+                selectedTarget,
+              }) ?? monitorTargetResolved,
+            ambiguityReasons: args.ambiguityReasons ?? [],
+            preGateBlocked:
+              args.preGateBlocked ??
+              inferPreGateBlocked({
+                needsClarification: args.needsClarification,
+                plannerPath,
+              }),
+            resolvedReferences: resolvedRefs,
+            projectMemoryApplied: resolvedCount > 0,
+            projectMemoryPhraseCount: args.resolvedReferences?.length ?? 0,
+            projectMemorySlotsWritten: args.projectMemorySlotsWritten ?? 0,
+            idempotentSuccess: args.idempotentSuccess ?? false,
+            isRefinementTurn: args.isRefinementTurn ?? false,
+            previousChangedFileCount: args.previousChangedFileCount ?? null,
           });
         } catch {
           return null;
@@ -331,6 +383,8 @@ export async function POST(
             typeof options.extra?.verifyPass === 'boolean'
               ? options.extra.verifyPass
               : undefined,
+          ambiguityReasons: options.extra?.ambiguityReasons,
+          plannerPath: lastPlannerPath,
         });
         await appendAssistantMessage({
           projectId: project._id,
@@ -439,10 +493,38 @@ export async function POST(
           clientMessageId: typeof clientMessageId === 'string' ? clientMessageId : undefined,
           selectedTarget,
         });
-        conversationHistory = await buildConversationHistory({
-          projectId: project._id,
-          maxTurns: 8,
-        });
+        conversationHistory = trimCurrentUserTurn(
+          await buildConversationHistory({
+            projectId: project._id,
+            maxTurns: HISTORY_TURN_PAIR_LIMIT,
+          }),
+          message
+        );
+        selectedTarget =
+          inheritSelectedTargetForClarificationReply(
+            message,
+            conversationHistory,
+            selectedTarget
+          ) ?? selectedTarget;
+        await appendEditJobLog(jobId, 'conversation_history', 'Loaded chat history for edit', {
+          messageCount: conversationHistory.length,
+          hasSelectedTarget: Boolean(selectedTarget),
+          hasPendingImplicitInHistory: conversationHistory.some(
+            (turn) =>
+              turn.role === 'assistant' &&
+              Boolean(
+                (turn.metadata as { pendingImplicitRef?: unknown } | undefined)?.pendingImplicitRef
+              )
+          ),
+          hasResolvedRefsInHistory: conversationHistory.some(
+            (turn) =>
+              turn.role === 'assistant' &&
+              Boolean(
+                (turn.metadata as { resolvedReferences?: unknown[] } | undefined)?.resolvedReferences
+                  ?.length
+              )
+          ),
+        }).catch(() => {});
         const editFocusStack = await resolveEditFocusFromProject({
           projectId: project._id,
         });
@@ -499,12 +581,24 @@ export async function POST(
             projectId,
             title: project.name || 'Untitled project',
           });
-          const [fetchedContext, fetchedIntent] = await Promise.all([
+          const [fetchedContext, fetchedIntent, fetchedMemory] = await Promise.all([
             fetchCoachingContext({ projectId, userMessage: message }),
-            fetchObservabilityIntent(projectId),
+            fetchObservabilityIntent({
+              projectId,
+              userMessage: message,
+              selectedTarget,
+            }),
+            fetchObservabilityMemory(projectId),
           ]);
-          coachingContext = fetchedContext;
+          coachingContext = fetchedContext ?? {
+            coachingHints: [],
+            constraints: {},
+            qualitySnapshot: {},
+            recurringIssues: [],
+            source: 'unavailable',
+          };
           projectIntent = fetchedIntent;
+          projectMemory = fetchedMemory;
           await appendEditJobLog(jobId, 'observability_context', 'Fetched monitor context', {
             hintCount: coachingContext?.coachingHints.length ?? 0,
             source: coachingContext?.source ?? 'none',
@@ -512,10 +606,10 @@ export async function POST(
             coachingInjected: isObservabilityCoachingEnabled(),
           });
           await appendEditJobLog(jobId, 'observability_intent', 'Fetched monitor intent', {
-            turnCount: projectIntent?.turn_count ?? 0,
-            keywordCount: projectIntent?.keywords.length ?? 0,
-            intentCount: projectIntent?.intents.length ?? 0,
-            resolverUsed: Boolean(projectIntent || coachingContext),
+            intentSentence: projectIntent?.sentence?.slice(0, 200) ?? null,
+            hasIntentSentence: Boolean(projectIntent?.sentence?.trim()),
+            memorySlotCount: projectMemory?.slots.length ?? 0,
+            resolverUsed: Boolean(projectIntent || projectMemory || coachingContext),
           });
         }
 
@@ -536,6 +630,7 @@ export async function POST(
             infraVersion: project.infraVersion,
             coachingContext: coachingContext ?? undefined,
             projectIntent: projectIntent ?? undefined,
+            projectMemory: projectMemory ?? undefined,
           },
           (stepEvent) => {
             emit('step', {
@@ -579,6 +674,14 @@ export async function POST(
               outcome: 'clarification',
               reply: clarificationReply,
               needsClarification: true,
+              plannerPath: agentResult.plannerPath ?? 'clarification',
+              ambiguityReasons: agentResult.ambiguityReasons,
+              clarificationAnchor: agentResult.clarificationAnchor,
+              resolvedReferences: agentResult.resolvedReferences,
+              preGateBlocked: inferPreGateBlocked({
+                needsClarification: true,
+                plannerPath: agentResult.plannerPath ?? 'clarification',
+              }),
             });
             await appendAssistantMessage({
               projectId: project._id,
@@ -592,6 +695,9 @@ export async function POST(
                 errorStage: 'needs_clarification',
                 strategy: agentResult.strategy,
                 clarificationAnchor: agentResult.clarificationAnchor,
+                ...(agentResult.pendingImplicitRef
+                  ? { pendingImplicitRef: agentResult.pendingImplicitRef }
+                  : {}),
                 ...(agentResult.clarificationAnchor?.kind === 'hero'
                   ? {
                       editFocusStack: {
@@ -1265,6 +1371,10 @@ export async function POST(
           buildGatePass: true,
           changedFiles: changedPaths,
           siteConfigParsed,
+          plannerPath: agentResult.plannerPath,
+          resolvedReferences: agentResult.resolvedReferences,
+          projectMemorySlotsWritten: agentResult.projectMemorySlotsWritten ?? 0,
+          idempotentSuccess: changedPaths.length === 0,
         });
         await appendAssistantMessage({
           projectId: project._id,

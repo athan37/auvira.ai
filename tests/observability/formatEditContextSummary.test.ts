@@ -1,34 +1,27 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildAppliedProjectMemoryForChat,
+  buildIntentFeedForChat,
+  buildMonitorContextForChat,
   buildProjectVocabularyForChat,
   buildResolvedReferencesForChat,
   enrichObservabilityMetadataForChat,
+  formatMonitorContextPanelLines,
+  formatIntentFeedPanelLines,
   formatUsedProjectContextLines,
 } from '@/lib/observability/formatEditContextSummary';
-import { getProjectMemoryView, getTipsView } from '@/lib/observability/formatCoachingSummary';
+import { getIntentFeedView, getMonitorContextView, getProjectMemoryView, getTipsView } from '@/lib/observability/formatCoachingSummary';
 
 describe('formatEditContextSummary', () => {
-  it('skips vocabulary when turn_count is zero', () => {
-    expect(
-      buildProjectVocabularyForChat({
-        keywords: ['blue'],
-        intents: [],
-        turn_count: 0,
-        updated_at: null,
-      })
-    ).toBeUndefined();
+  it('skips intent feed when sentence is empty', () => {
+    expect(buildProjectVocabularyForChat({ sentence: '  ' })).toBeUndefined();
   });
 
-  it('builds capped vocabulary snapshot', () => {
-    const vocab = buildProjectVocabularyForChat({
-      keywords: Array.from({ length: 12 }, (_, i) => `kw${i}`),
-      intents: [{ label: 'color edit', count: 2 }],
-      turn_count: 3,
-      updated_at: null,
+  it('builds intent sentence snapshot', () => {
+    const feed = buildProjectVocabularyForChat({
+      sentence: 'Change sections[2].presentation.cardClass to green.',
     });
-    expect(vocab?.keywords).toHaveLength(10);
-    expect(vocab?.intents).toHaveLength(1);
+    expect(feed?.sentence).toContain('cardClass');
   });
 
   it('builds resolved references with values only', () => {
@@ -75,11 +68,22 @@ describe('formatEditContextSummary', () => {
     expect(buildAppliedProjectMemoryForChat(refs, 'failure')).toBeUndefined();
   });
 
-  it('does not attach vocabulary or raw refs to chat metadata', () => {
+  it('attaches vocabulary and monitor context when feeds are provided', () => {
     const meta = enrichObservabilityMetadataForChat(
       { coachingApplied: false, experimentVariant: 'control' },
       {
         outcome: 'success',
+        projectIntent: {
+          sentence:
+            "Change the contact background (sections[1].presentation.backgroundClass) to blue, the owner's favorite color.",
+        },
+        coachingContext: {
+          coachingHints: ['Keep palette consistent.'],
+          constraints: { require_verify_pass: true },
+          qualitySnapshot: { latest_grade: 'B', latest_overall_score: 0.72 },
+          recurringIssues: ['WRONG_SECTION_TARGET'],
+          source: 'phoenix_traces',
+        },
         resolvedReferences: [
           {
             phrase: 'my favorite color',
@@ -92,9 +96,35 @@ describe('formatEditContextSummary', () => {
         ],
       }
     );
-    expect(meta?.projectVocabulary).toBeUndefined();
+    expect(meta?.intentFeed?.sentence).toContain('blue');
+    expect(meta?.monitorContext?.coachingHints[0]).toContain('palette');
     expect(meta?.resolvedReferences).toBeUndefined();
     expect(meta?.appliedProjectMemory).toHaveLength(1);
+    expect(getMonitorContextView(meta)?.label).toMatch(/^\/context/);
+    expect(getIntentFeedView(meta)?.label).toMatch(/^\/intent/);
+  });
+
+  it('formats empty intent feed panel', () => {
+    expect(formatIntentFeedPanelLines(undefined)).toEqual(['Intent: (none)']);
+  });
+
+  it('formats monitor context feed panel lines', () => {
+    const context = buildMonitorContextForChat({
+      coachingHints: ['Hint one'],
+      constraints: { require_verify_pass: true },
+      qualitySnapshot: { latest_grade: 'B', latest_overall_score: 0.7 },
+      recurringIssues: ['ISSUE_A'],
+      source: 'turn_ledger',
+    });
+    expect(formatMonitorContextPanelLines(context)).toEqual(
+      expect.arrayContaining([
+        'Source: turn_ledger',
+        'Coaching: Hint one',
+        'Recurring issues: ISSUE_A',
+        'Constraints: require_verify_pass',
+        'Quality: B · score 0.70',
+      ])
+    );
   });
 
   it('shows applied memory in project memory view, not tips', () => {

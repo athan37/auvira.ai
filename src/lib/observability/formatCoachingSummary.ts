@@ -1,5 +1,7 @@
 import type { ProjectMessageObservabilityMetadata } from '@/lib/chat/projectMessageMetadata';
 import {
+  formatIntentFeedPanelLines,
+  formatMonitorContextPanelLines,
   formatProjectMemoryPanelLines,
   formatUsedProjectContextLines,
 } from './formatEditContextSummary';
@@ -19,6 +21,81 @@ export interface ProjectMemoryView {
   lines: string[];
   panelLines: string[];
   label: string;
+}
+
+export interface ProjectVocabularyView {
+  lines: string[];
+  panelLines: string[];
+  label: string;
+}
+
+export interface MonitorContextView {
+  lines: string[];
+  panelLines: string[];
+  label: string;
+}
+
+function resolveIntentFeed(
+  observability?: ProjectMessageObservabilityMetadata
+): ProjectMessageObservabilityMetadata['intentFeed'] {
+  return observability?.intentFeed ?? observability?.projectVocabulary;
+}
+
+/** Site Monitor POST /intent — fed into every edit when observability is on. */
+export function getIntentFeedView(
+  observability?: ProjectMessageObservabilityMetadata
+): ProjectVocabularyView | null {
+  const feed = resolveIntentFeed(observability);
+  if (!feed) return null;
+  const panelLines = formatIntentFeedPanelLines(feed);
+  const label = feed.sentence?.trim()
+    ? '/intent'
+    : (feed.keywords?.length ?? 0) + (feed.intents?.length ?? 0) > 0
+      ? `/intent · ${(feed.keywords?.length ?? 0) + (feed.intents?.length ?? 0)}`
+      : '/intent';
+  return {
+    lines: panelLines,
+    panelLines,
+    label,
+  };
+}
+
+/** Site Monitor GET /context — fed into every edit when observability is on. */
+export function getMonitorContextView(
+  observability?: ProjectMessageObservabilityMetadata
+): MonitorContextView | null {
+  const context = observability?.monitorContext;
+  if (!context) return null;
+  const panelLines = formatMonitorContextPanelLines(context);
+  const hintCount = context.coachingHints.length + context.recurringIssues.length;
+  return {
+    lines: panelLines,
+    panelLines,
+    label: hintCount > 0 ? `/context · ${hintCount}` : '/context',
+  };
+}
+
+/** @deprecated Use getIntentFeedView */
+export function getProjectVocabularyView(
+  observability?: ProjectMessageObservabilityMetadata
+): ProjectVocabularyView | null {
+  return getIntentFeedView(observability);
+}
+
+/** Applied implicit-reference resolutions on successful edits. */
+export function getProjectMemoryView(
+  outcome?: string,
+  observability?: ProjectMessageObservabilityMetadata
+): ProjectMemoryView | null {
+  if (outcome !== 'success') return null;
+  const refs = memoryReferences(observability);
+  if (!refs?.length) return null;
+  const count = refs.length;
+  return {
+    lines: formatUsedProjectContextLines(refs),
+    panelLines: formatProjectMemoryPanelLines(refs),
+    label: count > 1 ? `Memory · ${count}` : 'Memory',
+  };
 }
 
 function hintCount(observability: ProjectMessageObservabilityMetadata): number {
@@ -45,23 +122,22 @@ function memoryReferences(
   return observability?.resolvedReferences;
 }
 
-/** Project Memory surface — success turns with applied resolved references only. */
-export function getProjectMemoryView(
+/** @deprecated Monitor /context feed replaces post-turn applied coaching chip. */
+export function getAppliedCoachingView(
   outcome?: string,
   observability?: ProjectMessageObservabilityMetadata
-): ProjectMemoryView | null {
+): CoachingSummaryView | null {
   if (outcome !== 'success') return null;
-  const refs = memoryReferences(observability);
-  if (!refs?.length) return null;
-  const count = refs.length;
+  if (!observability?.coachingApplied) return null;
+  const hints = appliedHints(observability);
+  if (hints.length === 0) return null;
   return {
-    lines: formatUsedProjectContextLines(refs),
-    panelLines: formatProjectMemoryPanelLines(refs),
-    label: count > 1 ? `Context · ${count}` : 'Context',
+    label: hints.length === 1 ? '1 hint applied' : `${hints.length} hints applied`,
+    hints,
   };
 }
 
-/** Tips surface — clarification/failure guidance and coaching only (never on success). */
+/** Tips surface — clarification/failure local guidance only (never on success). */
 export function getTipsView(
   outcome?: string,
   guidanceHints?: string[],

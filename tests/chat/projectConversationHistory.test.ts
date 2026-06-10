@@ -27,6 +27,45 @@ describe('projectChatService conversation history', () => {
     vi.clearAllMocks();
   });
 
+  it('trimCurrentUserTurn drops matching trailing user message', async () => {
+    const svc = await import('../../src/lib/chat/projectChatService');
+    const trimmed = svc.trimCurrentUserTurn(
+      [
+        { role: 'user', content: 'older' },
+        { role: 'assistant', content: 'ok' },
+        { role: 'user', content: 'latest request' },
+      ],
+      'latest request'
+    );
+    expect(trimmed).toHaveLength(2);
+    expect(trimmed[trimmed.length - 1]?.content).toBe('ok');
+  });
+
+  it('maps legacy top-level resolvedReferences into history metadata', async () => {
+    mockFindResult([
+      {
+        role: 'assistant',
+        content: 'Done',
+        metadata: {
+          outcome: 'success',
+          resolvedReferences: [
+            { phrase: 'my favorite color', resolvedValue: 'green', source: 'chat_history' },
+          ],
+        },
+      },
+    ]);
+
+    const svc = await import('../../src/lib/chat/projectChatService');
+    const history = await svc.buildConversationHistory({
+      projectId: '665f4ec12f1fe71c6527f2df',
+      maxTurns: 4,
+    });
+
+    expect(history[0]?.metadata?.resolvedReferences).toEqual([
+      { phrase: 'my favorite color', resolvedValue: 'green', source: 'chat_history' },
+    ]);
+  });
+
   it('returns normalized last turns in chronological order', async () => {
     mockFindResult([
       { role: 'assistant', content: 'second' },

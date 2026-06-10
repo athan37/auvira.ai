@@ -1,5 +1,9 @@
 import type { ConversationTurn } from '@/lib/project-workspace/edit-shared/editAmbiguity';
 import type { ClarificationAnchor } from '@/lib/chat/projectMessageMetadata';
+import {
+  normalizeSelectedTarget,
+  type SelectedTargetInput,
+} from '@/lib/project-workspace/edit-shared/selectedTargetTypes';
 import { enrichMessageWithEditFocus } from '@/lib/project-workspace/edit-shared/resolveEditFocus';
 import type { EditFocusStack } from '@/lib/project-workspace/edit-shared/types';
 import type { SiteSectionCatalog } from '@/lib/project-workspace/edit-shared/siteSectionCatalog';
@@ -9,8 +13,10 @@ import { isCompoundImagePlacementAndCaption } from '@/lib/project-workspace/edit
 import {
   extractColorsFromMessage,
 } from '@/lib/project-workspace/edit-shared/preset/presetUtils';
+import { extractExplicitColorValue } from '@/lib/project-workspace/edit-context/implicitReferencePhrases';
+import { TAILWIND_COLOR_NAMES } from '@/lib/project-workspace/edit-shared/preset/presetUtils';
 
-export const DEFAULT_EDIT_CONTEXT_TURNS = 8;
+export const DEFAULT_EDIT_CONTEXT_TURNS = 16;
 
 const STYLE_FOLLOW_UP_PHRASES = [
   'card backgrounds in that section',
@@ -298,6 +304,73 @@ function mergeStyleFollowUp(message: string, history: ConversationTurn[]): strin
   return null;
 }
 
+/**
+ * Re-use the preview pin from the prior user turn when answering a clarification
+ * (e.g. "green" after "What color?" with a dragged Contact card target).
+ */
+export function inheritSelectedTargetForClarificationReply(
+  message: string,
+  history: ConversationTurn[],
+  selectedTarget?: SelectedTargetInput | null
+): SelectedTargetInput | null | undefined {
+  if (selectedTarget) return selectedTarget;
+
+  const recent = history.slice(-DEFAULT_EDIT_CONTEXT_TURNS);
+  const answeringColor =
+    wasColorClarificationAsked(recent) &&
+    Boolean(
+      extractExplicitColorValue(message) ??
+        extractColorsFromMessage(message)[0]
+    );
+  const answeringSurface = wasSurfaceClarificationAsked(recent);
+  if (!answeringColor && !answeringSurface) return selectedTarget;
+
+  for (let i = recent.length - 1; i >= 0; i--) {
+    const turn = recent[i];
+    if (turn.role !== 'user') continue;
+    const meta = turn.metadata as { selectedTarget?: unknown } | undefined;
+    if (!meta?.selectedTarget || typeof meta.selectedTarget !== 'object') continue;
+    return normalizeSelectedTarget(meta.selectedTarget) ?? (meta.selectedTarget as SelectedTargetInput);
+  }
+
+  return selectedTarget;
+}
+
+/** True when assistant asked which color to use for an implicit reference. */
+export function wasColorClarificationAsked(history: ConversationTurn[]): boolean {
+  return history.some(
+    (turn) =>
+      turn.role === 'assistant' &&
+      (/What color should I use/i.test(turn.content) ||
+        (Array.isArray(
+          (turn.metadata as { suggestedReplies?: string[] } | undefined)?.suggestedReplies
+        ) &&
+          (turn.metadata as { suggestedReplies?: string[] }).suggestedReplies!.some((reply) =>
+            TAILWIND_COLOR_NAMES.includes(reply.toLowerCase() as (typeof TAILWIND_COLOR_NAMES)[number])
+          )) ||
+        Boolean(
+          (turn.metadata as { pendingImplicitRef?: { kind?: string } } | undefined)
+            ?.pendingImplicitRef?.kind === 'color'
+        ))
+  );
+}
+
+function mergeColorClarificationReply(message: string, history: ConversationTurn[]): string | null {
+  if (!wasColorClarificationAsked(history)) return null;
+
+  const color =
+    extractExplicitColorValue(message) ??
+    extractColorsFromMessage(message)[0] ??
+    null;
+  if (!color) return null;
+
+  const prior = findPriorUserMessage(history, message);
+  if (prior) {
+    return `${prior.content} — color clarification: ${color}`;
+  }
+  return `${message.trim()} — color clarification: ${color}`;
+}
+
 function mergeTestimonialOptionReply(message: string, history: ConversationTurn[]): string | null {
   if (!wasTestimonialCardClarificationAsked(history)) return null;
 
@@ -540,6 +613,7 @@ export function resolveClarificationRepliesOnly(
 ): string {
   const recent = history.slice(-DEFAULT_EDIT_CONTEXT_TURNS);
   return (
+    mergeColorClarificationReply(message, recent) ??
     mergeTestimonialOptionReply(message, recent) ??
     mergeSurfaceClarificationReply(message, recent) ??
     mergeSectionNumberReply(message, recent) ??
@@ -598,6 +672,7 @@ export function resolveEffectiveEditMessage(
   }
 
   return (
+    mergeColorClarificationReply(message, recent) ??
     mergeTestimonialOptionReply(message, recent) ??
     mergeSurfaceClarificationReply(message, recent) ??
     mergeSectionNumberReply(message, recent) ??

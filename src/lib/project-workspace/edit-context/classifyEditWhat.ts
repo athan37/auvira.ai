@@ -1,6 +1,8 @@
 import { hasExplicitEditTarget } from '@/lib/project-workspace/edit-shared/editTargetUtils';
 import type { EditWhatKind } from '@/lib/project-workspace/edit-shared/types';
 import { stripPinnedTargetSuffix } from '@/lib/project-workspace/edit-context/configTextEditUtils';
+import { detectImplicitPhrases } from '@/lib/project-workspace/edit-context/implicitReferencePhrases';
+import { shouldExtractImplicitRefs } from '@/lib/project-workspace/edit-context/extractImplicitReferences';
 import {
   isBackgroundColorEditRequest,
   isTextColorEditRequest,
@@ -39,6 +41,14 @@ export function classifyEditWhat(message: string): EditWhatKind {
 
   if (/\b(image|photo|picture|gallery|upload)\b/.test(lower) && !hasColorSignal) {
     return 'images';
+  }
+
+  const hasImplicitColor =
+    detectImplicitPhrases(message).some((hit) => hit.kind === 'color') ||
+    (/\bcolou?rs?\b/i.test(message) && shouldExtractImplicitRefs(message));
+
+  if (hasImplicitColor) {
+    return 'style_background';
   }
 
   if (

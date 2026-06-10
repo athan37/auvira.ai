@@ -1,8 +1,25 @@
 import { buildEditContext } from '@/lib/project-workspace/edit-context/buildEditContext';
 import { clarificationAnchorFromTarget } from '@/lib/project-workspace/edit-context/clarificationAnchor';
 import {
+  assessEditAmbiguity,
+  defaultGuidanceHints,
+} from '@/lib/project-workspace/edit-context/assessEditAmbiguity';
+import {
   resolveImplicitReferences,
 } from '@/lib/project-workspace/edit-context/implicitReferenceResolver';
+import { collectImplicitPhrases } from '@/lib/project-workspace/edit-context/extractImplicitReferences';
+import {
+  deriveMemorySlotsFromResolvedReferences,
+  deriveProjectMemorySlots,
+} from '@/lib/project-workspace/edit-context/projectMemoryWriter';
+import { emitProjectMemorySlots } from '@/lib/observability/emitProjectMemorySlots';
+import { upsertLocalProjectMemorySlots } from '@/lib/observability/localProjectMemory';
+import {
+  GLOBALS_CSS,
+  PAGE_TSX,
+  readWorkspaceRel,
+  SITE_CONFIG,
+} from '@/lib/project-workspace/edit-shared/strategyContext';
 import { planEdit } from '@/lib/project-workspace/planner/planEdit';
 import { routeAttachmentEdits } from '@/lib/project-workspace/edit-shared/attachmentRouter';
 import { computeWorkspaceHashes } from '@/lib/project-workspace/workspaceEditShared';
@@ -17,6 +34,15 @@ function emitStep(
   status: AgentStepEvent['status']
 ) {
   onStep?.({ type: 'step', id, label, status });
+}
+
+async function pendingImplicitRefFromMessage(
+  ownerMessage: string
+): Promise<WebsiteEditAgentResult['pendingImplicitRef']> {
+  const { refs } = await collectImplicitPhrases(ownerMessage);
+  const colorRef = refs.find((ref) => ref.kind === 'color');
+  if (!colorRef) return undefined;
+  return { phrase: colorRef.phrase, kind: colorRef.kind };
 }
 
 /**
@@ -60,44 +86,32 @@ export async function runWebsiteEditAgent(
 
   emitStep(onStep, 'v3_context', 'Understanding your site', 'completed');
 
-  if (contextResult.needsClarification && contextResult.clarificationMessage) {
-    return {
-      ok: false,
-      needsClarification: true,
-      error: contextResult.clarificationMessage,
-      ownerMessage: contextResult.clarificationMessage,
-      suggestedReplies: contextResult.suggestedReplies,
-      guidanceHints: contextResult.guidanceHints,
-      ambiguityReasons: contextResult.ambiguityReasons,
-      strategy: 'section_config',
-      tier: 'L3',
-      confidence: 'low',
-      clarificationAnchor: clarificationAnchorFromTarget(contextResult.context.target),
-      agentLatencyBreakdown: phaseTimer.toLatencyBreakdown(),
-    };
-  }
-
   const editContext = contextResult.context;
+
   const implicitResolution = await resolveImplicitReferences({
     ownerMessage: options.ownerMessage,
     editContext,
     coachingContext: options.coachingContext,
     projectIntent: options.projectIntent,
+    projectMemory: options.projectMemory,
     recentHistory: options.conversationHistory,
   });
 
   if (implicitResolution.needsClarification && implicitResolution.clarificationMessage) {
+    const pendingImplicitRef = await pendingImplicitRefFromMessage(options.ownerMessage);
     return {
       ok: false,
       needsClarification: true,
       error: implicitResolution.clarificationMessage,
       ownerMessage: implicitResolution.clarificationMessage,
       suggestedReplies: implicitResolution.suggestedReplies,
+      guidanceHints: defaultGuidanceHints(),
       strategy: 'section_config',
       tier: 'L3',
       confidence: 'low',
       clarificationAnchor: clarificationAnchorFromTarget(editContext.target),
       resolvedReferences: implicitResolution.references,
+      pendingImplicitRef,
       agentLatencyBreakdown: phaseTimer.toLatencyBreakdown(),
     };
   }
@@ -109,6 +123,47 @@ export async function runWebsiteEditAgent(
     editContext.resolvedReferences = implicitResolution.references;
   }
 
+  const structuralAssessment = assessEditAmbiguity(editContext);
+  if (structuralAssessment.blocked && structuralAssessment.clarificationMessage) {
+    return {
+      ok: false,
+      needsClarification: true,
+      error: structuralAssessment.clarificationMessage,
+      ownerMessage: structuralAssessment.clarificationMessage,
+      suggestedReplies: structuralAssessment.suggestedReplies,
+      guidanceHints: structuralAssessment.guidanceHints,
+      ambiguityReasons: structuralAssessment.reasons,
+      strategy: 'section_config',
+      tier: 'L3',
+      confidence: 'low',
+      clarificationAnchor: clarificationAnchorFromTarget(editContext.target),
+      resolvedReferences: implicitResolution.references,
+      agentLatencyBreakdown: phaseTimer.toLatencyBreakdown(),
+    };
+  }
+
+  if (
+    contextResult.needsClarification &&
+    contextResult.clarificationMessage &&
+    !implicitResolution.resolvedMessage
+  ) {
+    return {
+      ok: false,
+      needsClarification: true,
+      error: contextResult.clarificationMessage,
+      ownerMessage: contextResult.clarificationMessage,
+      suggestedReplies: contextResult.suggestedReplies,
+      guidanceHints: contextResult.guidanceHints ?? defaultGuidanceHints(),
+      ambiguityReasons: contextResult.ambiguityReasons,
+      strategy: 'section_config',
+      tier: 'L3',
+      confidence: 'low',
+      clarificationAnchor: clarificationAnchorFromTarget(editContext.target),
+      resolvedReferences: implicitResolution.references,
+      agentLatencyBreakdown: phaseTimer.toLatencyBreakdown(),
+    };
+  }
+
   emitStep(onStep, 'v3_plan', 'Planning the edit', 'active');
 
   phaseTimer.start('agent_plan');
@@ -118,6 +173,7 @@ export async function runWebsiteEditAgent(
     hasAttachments: (options.attachments?.length ?? 0) > 0,
     coachingContext: options.coachingContext,
     projectIntent: options.projectIntent,
+    projectMemory: options.projectMemory,
   });
   phaseTimer.finish('agent_plan');
 
@@ -138,6 +194,12 @@ export async function runWebsiteEditAgent(
   emitStep(onStep, 'v3_plan', 'Planning the edit', 'completed');
   emitStep(onStep, 'v3_execute', 'Applying the edit', 'active');
 
+  const memoryBeforeFiles: Record<string, string> = {};
+  for (const rel of [SITE_CONFIG, PAGE_TSX, GLOBALS_CSS]) {
+    const content = await readWorkspaceRel(options, rel).catch(() => null);
+    if (content !== null) memoryBeforeFiles[rel] = content;
+  }
+
   phaseTimer.start('agent_execute');
   const result = await executePlan(
     planResult.plan,
@@ -153,6 +215,49 @@ export async function runWebsiteEditAgent(
     'Applying the edit',
     result.ok ? 'completed' : 'failed'
   );
+
+  if (result.ok && planResult.plan && options.projectId) {
+    const afterFiles: Record<string, string> = {};
+    for (const rel of [SITE_CONFIG, PAGE_TSX, GLOBALS_CSS]) {
+      const after = await readWorkspaceRel(options, rel).catch(() => null);
+      if (after !== null) afterFiles[rel] = after;
+    }
+    const turnId = options.editJobId ?? 'unknown';
+    const memorySlots = [
+      ...deriveProjectMemorySlots({
+        plan: planResult.plan,
+        editContext,
+        ownerMessage: options.ownerMessage,
+        turnId,
+        beforeFiles: memoryBeforeFiles,
+        afterFiles,
+      }),
+      ...deriveMemorySlotsFromResolvedReferences({
+        references: editContext.resolvedReferences ?? implicitResolution.references,
+        editContext,
+        ownerMessage: options.ownerMessage,
+        turnId,
+      }),
+    ];
+    const seen = new Set<string>();
+    const uniqueSlots = memorySlots.filter((slot) => {
+      const key = `${slot.kind}:${JSON.stringify(slot.scope)}:${typeof slot.value === 'string' ? slot.value : JSON.stringify(slot.value)}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    if (uniqueSlots.length > 0) {
+      void emitProjectMemorySlots({ projectId: options.projectId, slots: uniqueSlots });
+      void upsertLocalProjectMemorySlots({ projectId: options.projectId, slots: uniqueSlots });
+    }
+    return {
+      ...result,
+      plannerPath: planResult.plannerPath,
+      resolvedReferences: editContext.resolvedReferences ?? implicitResolution.references,
+      projectMemorySlotsWritten: uniqueSlots.length,
+      agentLatencyBreakdown: phaseTimer.toLatencyBreakdown(),
+    };
+  }
 
   return {
     ...result,

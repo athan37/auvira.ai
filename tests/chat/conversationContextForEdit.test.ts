@@ -8,6 +8,7 @@ import {
   formatWeightedConversationForPrompt,
   messageExplicitlyExcludesHero,
   messageRefersToHeroStyle,
+  inheritSelectedTargetForClarificationReply,
   resolveEffectiveEditMessage,
   wasRecentGalleryImageSectionCreated,
 } from '../../src/lib/chat/conversationContextForEdit';
@@ -24,6 +25,55 @@ describe('conversationContextForEdit', () => {
     expect(block).toContain('★★★ User [CURRENT — highest weight]: latest request');
     expect(block).toContain('★★ Assistant [high recency]: Which section?');
     expect(block).toContain('★ User: older request');
+  });
+
+  it('inherits preview pin from prior user turn on color clarification reply', () => {
+    const pinned = {
+      kind: 'section' as const,
+      sectionIndex: 4,
+      sectionType: 'contact',
+      sectionTitle: 'Contact Us',
+      fieldPath: 'sections[4].subtitle',
+      elementLabel: 'Contact Information',
+      targetChain: [
+        { role: 'section' as const, label: 'Contact Us', kind: 'contact' },
+        { role: 'container' as const, label: 'Contact card', kind: 'inner_card' },
+        {
+          role: 'element' as const,
+          label: 'Contact Information',
+          kind: 'heading',
+          fieldPath: 'sections[4].subtitle',
+        },
+      ],
+    };
+    const history = [
+      {
+        role: 'user' as const,
+        content: 'change this to my favourite color',
+        metadata: { selectedTarget: pinned },
+      },
+      { role: 'assistant' as const, content: 'What color should I use?' },
+    ];
+
+    const inherited = inheritSelectedTargetForClarificationReply('green', history, null);
+    expect(inherited?.sectionType).toBe('contact');
+    expect(inherited?.elementLabel).toBe('Contact Information');
+    expect(inherited?.targetChain?.some((n) => n.kind === 'inner_card')).toBe(true);
+  });
+
+  it('merges color clarification follow-up with prior user intent', () => {
+    const history = [
+      { role: 'user' as const, content: 'change this to my favourite color' },
+      {
+        role: 'assistant' as const,
+        content: 'What color should I use?',
+        metadata: { pendingImplicitRef: { phrase: 'my favourite color', kind: 'color' } },
+      },
+    ];
+
+    const effective = resolveEffectiveEditMessage('Green', history);
+    expect(effective).toContain('change this to my favourite color');
+    expect(effective.toLowerCase()).toContain('green');
   });
 
   it('merges section number reply with prior user intent', () => {
@@ -99,7 +149,7 @@ describe('conversationContextForEdit', () => {
   });
 
   it('uses eight turns by default for edit context', () => {
-    expect(DEFAULT_EDIT_CONTEXT_TURNS).toBe(8);
+    expect(DEFAULT_EDIT_CONTEXT_TURNS).toBe(16);
   });
 
   it('merges gallery description follow-up after product section with images', () => {

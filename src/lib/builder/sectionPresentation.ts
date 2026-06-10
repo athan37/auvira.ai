@@ -293,6 +293,29 @@ export function colorNameToCardClass(color: string): string {
   return `border-${normalized}-300 bg-${normalized}-50`;
 }
 
+/** Resolve inner card class from owner message (solid colors on presentation.cardClass). */
+export function resolveSectionCardClassForEdit(
+  ownerMessage: string,
+  overrides?: {
+    cardClass?: string | null;
+    backgroundColor?: string | null;
+    color?: string | null;
+  }
+): string | null {
+  const color = extractBackgroundColorFromMessage(ownerMessage);
+  if (color) return colorNameToCardClass(color);
+
+  const explicitClass = overrides?.cardClass?.trim();
+  if (explicitClass) return explicitClass;
+
+  const colorWord = (overrides?.backgroundColor ?? overrides?.color)?.trim().toLowerCase();
+  if (colorWord && !BACKGROUND_COLOR_META.has(colorWord)) {
+    return colorNameToCardClass(colorWord);
+  }
+
+  return null;
+}
+
 /** Map a color name from owner chat to a Tailwind text utility (e.g. "green" -> text-green-600). */
 export function colorNameToTextClass(color: string, ownerMessage?: string): string {
   return resolveTailwindTextClass(color, ownerMessage);

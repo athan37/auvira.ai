@@ -199,6 +199,10 @@ export interface WebsiteEditAgentOptions {
   coachingContext?: import('@/lib/observability/types').ObservabilityCoachingContext | null;
   /** Site Monitor project vocabulary (optional resolver/planner evidence). */
   projectIntent?: import('@/lib/observability/types').ObservabilityProjectIntent | null;
+  /** Site Monitor structured project memory (GET /memory). */
+  projectMemory?: import('@/lib/observability/types').ObservabilityProjectMemory | null;
+  /** Edit job id for memory provenance and Monitor turns. */
+  editJobId?: string;
 }
 
 export interface WebsiteEditAgentResult {
@@ -237,4 +241,8 @@ export interface WebsiteEditAgentResult {
   ambiguityReasons?: string[];
   /** Implicit phrases resolved (or attempted) before planning. */
   resolvedReferences?: import('@/lib/project-workspace/edit-context/implicitReferenceTypes').ImplicitReferenceRecord[];
+  /** Unresolved implicit phrase when returning color/value clarification. */
+  pendingImplicitRef?: import('@/lib/chat/projectMessageMetadata').PendingImplicitRef;
+  /** Structured memory slots written after a successful edit. */
+  projectMemorySlotsWritten?: number;
 }

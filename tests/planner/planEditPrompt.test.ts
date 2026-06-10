@@ -36,10 +36,10 @@ function minimalEditContext(
 }
 
 describe('buildPlanEditUserPrompt', () => {
-  it('includes the last 8 conversation turns for the planner LLM', () => {
-    const history = Array.from({ length: 10 }, (_, i) => ({
+  it('includes the last 16 conversation turns for the planner LLM', () => {
+    const history = Array.from({ length: 18 }, (_, i) => ({
       role: (i % 2 === 0 ? 'user' : 'assistant') as 'user' | 'assistant',
-      content: `turn-${i}`,
+      content: `msg-${String(i).padStart(2, '0')}`,
     }));
 
     const prompt = buildPlanEditUserPrompt(
@@ -48,9 +48,9 @@ describe('buildPlanEditUserPrompt', () => {
     );
 
     expect(prompt).toContain('CONVERSATION CONTEXT');
-    expect(prompt).toContain('turn-2');
-    expect(prompt).toContain('turn-9');
-    expect(prompt).not.toContain('turn-0');
-    expect(prompt).not.toContain('turn-1');
+    expect(prompt).toContain('msg-02');
+    expect(prompt).toContain('msg-17');
+    expect(prompt).not.toContain('msg-00');
+    expect(prompt).not.toContain('msg-01');
   });
 });

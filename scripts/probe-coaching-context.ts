@@ -5,7 +5,7 @@
 import { fetchCoachingContext } from '../src/lib/observability/fetchCoachingContext';
 import { fetchObservabilityContextRaw } from '../src/lib/observability/client';
 import { editorConversationId } from '../src/lib/observability/conversationId';
-import { isObservabilityEnabled } from '../src/lib/observability/config';
+import { isObservabilityEnabled, observabilityApiKey } from '../src/lib/observability/config';
 
 const projectId = process.argv[2] ?? '6a1f8d175872cf542bda0c54';
 const conversationId = editorConversationId(projectId);
@@ -39,7 +39,11 @@ async function main() {
   console.log('conversationId:', conversationId);
 
   if (!isObservabilityEnabled()) {
-    console.error('OBSERVABILITY_ENABLED is off or OBSERVABILITY_API_KEY missing');
+    console.error('OBSERVABILITY_ENABLED is off');
+    process.exit(1);
+  }
+  if (!observabilityApiKey()) {
+    console.error('No Monitor API key (config/observability-public.env or OBSERVABILITY_API_KEY)');
     process.exit(1);
   }
 

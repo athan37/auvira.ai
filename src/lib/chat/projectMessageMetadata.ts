@@ -1,6 +1,7 @@
 import type { WorkspaceAssetAttachment } from '@/lib/project-workspace/workspaceAssetTypes';
 import type { EditFocusStack } from '@/lib/project-workspace/edit-shared/types';
 import type { SelectedTargetInput } from '@/lib/project-workspace/edit-shared/selectedTargetTypes';
+import type { ImplicitReferenceKind } from '@/lib/project-workspace/edit-context/implicitReferenceTypes';
 
 export type ProjectChatOutcome = 'success' | 'clarification' | 'failure';
 export type ArizeSyncStatus = 'pending' | 'synced' | 'failed';
@@ -31,9 +32,22 @@ export interface ProjectMessageArizeMetadata {
 }
 
 export interface ProjectMessageVocabulary {
-  keywords: string[];
-  intents: Array<{ label: string; count: number }>;
-  turnCount: number;
+  /** Monitor POST /intent sentence fed into this edit. */
+  sentence: string;
+  /** @deprecated Legacy GET /intent vocabulary on old messages. */
+  keywords?: string[];
+  intents?: Array<{ label: string; count: number }>;
+  turnCount?: number;
+}
+
+/** Site Monitor GET /context snapshot for the edit request (planner/resolver feed). */
+export interface ProjectMessageMonitorContext {
+  source: string;
+  coachingHints: string[];
+  recurringIssues: string[];
+  constraintSummary?: string;
+  qualityGrade?: string;
+  qualityScore?: number;
 }
 
 export interface ProjectMessageResolvedReference {
@@ -48,7 +62,11 @@ export interface ProjectMessageObservabilityMetadata {
   coachingApplied?: boolean;
   /** Hint text injected into the planner when coaching was applied (shown in chat hints panel). */
   coachingHints?: string[];
-  /** Site Monitor /intent vocabulary used as optional planner/resolver context. */
+  /** Site Monitor GET /context fed into this edit (planner/resolver). */
+  monitorContext?: ProjectMessageMonitorContext;
+  /** Site Monitor POST /intent sentence fed into this edit. */
+  intentFeed?: ProjectMessageVocabulary;
+  /** @deprecated Use intentFeed — kept for persisted messages. */
   projectVocabulary?: ProjectMessageVocabulary;
   /** @deprecated Legacy chat field — use appliedProjectMemory on new messages. */
   resolvedReferences?: ProjectMessageResolvedReference[];
@@ -62,6 +80,11 @@ export interface ClarificationAnchor {
   kind: 'hero' | 'section';
   sectionIndex?: number;
   title?: string;
+}
+
+export interface PendingImplicitRef {
+  phrase: string;
+  kind: ImplicitReferenceKind;
 }
 
 export interface ProjectMessageMetadata {
@@ -91,6 +114,8 @@ export interface ProjectMessageMetadata {
   selectedSurfaceId?: string;
   /** Edit target preserved across clarification turns. */
   clarificationAnchor?: ClarificationAnchor;
+  /** Unresolved implicit phrase awaiting a follow-up value (e.g. color after "What color?"). */
+  pendingImplicitRef?: PendingImplicitRef;
   /** Local tips shown on clarification / failure / zero-change turns. */
   guidanceHints?: string[];
   ambiguityReasons?: string[];

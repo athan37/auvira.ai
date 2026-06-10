@@ -65,4 +65,34 @@ describe('mapTurnPayload', () => {
     expect(payload.coaching_applied).toBe(true);
     expect(payload.coaching_hint_count).toBe(1);
   });
+
+  it('maps full Monitor turn context fields', () => {
+    const timer = new EditStepTimer();
+    const payload = mapTurnPayload({
+      turnId: 'job-3',
+      turnIndex: 4,
+      userMessage: 'make contact card green',
+      reply: 'Updated contact card background.',
+      outcome: 'success',
+      editTimer: timer,
+      classifiedIntent: 'style_card',
+      selectedTarget: { kind: 'section', section_index: 2, element_label: 'Contact card' },
+      targetResolved: { kind: 'section', section_index: 2, confidence: 'high' },
+      ambiguityReasons: [],
+      preGateBlocked: false,
+      plannerPath: 'llm',
+      resolvedReferences: [{ phrase: 'my favorite color', resolved_value: 'green' }],
+      projectMemoryApplied: true,
+      projectMemoryPhraseCount: 1,
+      projectMemorySlotsWritten: 2,
+    });
+
+    expect(payload.classified_intent).toBe('style_card');
+    expect(payload.planner_path).toBe('llm');
+    expect(payload.selected_target?.element_label).toBe('Contact card');
+    expect(payload.target_resolved?.confidence).toBe('high');
+    expect(payload.plan?.project_memory_applied).toBe(true);
+    expect(payload.plan?.project_memory_slots_written).toBe(2);
+    expect(payload.plan?.resolved_references).toHaveLength(1);
+  });
 });

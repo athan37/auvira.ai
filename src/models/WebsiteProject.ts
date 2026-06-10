@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose';
+import type { ProjectMemorySlot } from '@/lib/observability/types';
 
 export type DeploymentStatus = 'pending' | 'triggered' | 'building' | 'ready' | 'failed' | 'trigger_failed';
 export type ProjectMode = 'clone' | 'scratch';
@@ -132,6 +133,8 @@ export interface IWebsiteProject extends Document {
   createdAt: Date;
   updatedAt: Date;
   lastEditedAt?: Date;
+  /** Local fallback for Monitor GET /memory when unavailable. */
+  projectMemorySlots?: ProjectMemorySlot[];
 }
 
 const WebsiteProjectSchema = new Schema<IWebsiteProject>(
@@ -199,6 +202,7 @@ const WebsiteProjectSchema = new Schema<IWebsiteProject>(
     lastPreviewEditedAt: Date,
     lastPublishedAt: Date,
     lastEditedAt: Date,
+    projectMemorySlots: { type: [Schema.Types.Mixed], default: undefined },
   },
   { timestamps: true }
 );

@@ -9,7 +9,11 @@ import {
   formatVocabularyPanelLines,
 } from '@/lib/observability/formatEditContextSummary';
 import {
+  getAppliedCoachingView,
+  getIntentFeedView,
+  getMonitorContextView,
   getProjectMemoryView,
+  getProjectVocabularyView,
   getTipsView,
 } from '@/lib/observability/formatCoachingSummary';
 import {
@@ -58,6 +62,7 @@ describe('intent user-request flow — resolver to chat metadata', () => {
         coachingHints: ['Keep palette consistent.'],
       },
       projectIntent,
+      coachingContext: sampleCoachingContext(),
       resolvedReferences: resolution.references,
       outcome: 'success',
     });
@@ -68,12 +73,19 @@ describe('intent user-request flow — resolver to chat metadata', () => {
     expect(memory?.lines[0]).toContain('blue');
     expect(memory?.panelLines[0]).toContain('my favorite color');
     expect(memory?.panelLines[0]).not.toContain('Recurring topics');
+    expect(getIntentFeedView(observability)?.panelLines[0]).toContain('blue');
+    expect(getMonitorContextView(observability)?.panelLines[0]).toMatch(/^Source:/);
+    expect(getAppliedCoachingView('success', observability)?.hints).toEqual([
+      'Keep palette consistent.',
+    ]);
     expect(getTipsView('success', [], observability)).toBeNull();
   });
 
   it('usual CTA request resolves and appears in project memory on success', async () => {
     const ownerMessage = 'change the hero button to our usual CTA';
-    const projectIntent = sampleProjectIntent();
+    const projectIntent = sampleProjectIntent({
+      sentence: 'Change the hero CTA (hero.primaryCta) to "Book Now".',
+    });
 
     const resolution = await resolveImplicitReferences({
       ownerMessage,
@@ -111,7 +123,8 @@ describe('intent user-request flow — resolver to chat metadata', () => {
   it('conflicting colors ask clarification and omit applied memory from chat', async () => {
     const ownerMessage = 'paint this my favorite color';
     const projectIntent = sampleProjectIntent({
-      keywords: ['favorite color blue', 'favorite color green'],
+      sentence:
+        "Change the card background to the owner's favorite color; color not yet known from project history.",
     });
 
     const resolution = await resolveImplicitReferences({
@@ -121,7 +134,6 @@ describe('intent user-request flow — resolver to chat metadata', () => {
     });
 
     expect(resolution.needsClarification).toBe(true);
-    expect(resolution.suggestedReplies).toEqual(expect.arrayContaining(['blue', 'green']));
     expect(hasResolvedReferenceValues(resolution.references)).toBe(false);
 
     const observability = chatObservabilityFromEditTurn({
@@ -131,7 +143,9 @@ describe('intent user-request flow — resolver to chat metadata', () => {
     });
     expect(getProjectMemoryView('clarification', observability)).toBeNull();
     expect(observability?.appliedProjectMemory).toBeUndefined();
-    expect(observability?.projectVocabulary).toBeUndefined();
+    expect(getProjectVocabularyView(observability)?.panelLines).toEqual(
+      getIntentFeedView(observability)?.panelLines
+    );
   });
 
   it('plain copy edit stores no applied memory when nothing resolved', async () => {
@@ -194,6 +208,9 @@ describe('intent user-request flow — resolver to chat metadata', () => {
       outcome: 'success',
     });
     expect(getProjectMemoryView('success', successObs)?.panelLines[0]).toContain('blue');
+    expect(getAppliedCoachingView('success', successObs)?.hints).toEqual(
+      coachingContext.coachingHints
+    );
     expect(getTipsView('success', [], successObs)).toBeNull();
 
     const clarifyObs = chatObservabilityFromEditTurn({
@@ -225,28 +242,21 @@ describe('intent user-request flow — planner prompt injection', () => {
     });
 
     const prompt = buildPlanEditSystemPrompt(coaching, projectIntent, resolution.references);
-    const vocabIdx = prompt.indexOf('## Project vocabulary');
+    const intentIdx = prompt.indexOf('## Project intent');
     const resolvedIdx = prompt.indexOf('## Resolved user references');
     const coachingIdx = prompt.indexOf('## Coaching from prior edits');
 
-    expect(vocabIdx).toBeGreaterThan(-1);
-    expect(resolvedIdx).toBeGreaterThan(vocabIdx);
+    expect(intentIdx).toBeGreaterThan(-1);
+    expect(resolvedIdx).toBeGreaterThan(intentIdx);
     expect(coachingIdx).toBeGreaterThan(resolvedIdx);
-    expect(prompt).toContain('favorite color blue');
+    expect(prompt).toContain('blue');
     expect(prompt).toContain('"my favorite color" → "blue"');
     expect(prompt).toContain('Prior color edit used blue');
   });
 
-  it('planner blocks stay null when turn_count is zero or values are empty', () => {
+  it('planner blocks stay null when intent sentence or resolved values are empty', () => {
     expect(formatProjectVocabularyBlock(firstTurnProjectIntent())).toBeNull();
-    expect(
-      formatProjectVocabularyBlock({
-        keywords: [],
-        intents: [],
-        turn_count: 2,
-        updated_at: null,
-      })
-    ).toBeNull();
+    expect(formatProjectVocabularyBlock({ sentence: '  ' })).toBeNull();
     expect(
       formatResolvedReferencesBlock([
         {
@@ -268,12 +278,17 @@ describe('intent user-request flow — chat hints gating (when intent shows)', (
     expect(enrichObservabilityMetadataForChat(undefined, {})).toBeUndefined();
   });
 
-  it('does not attach vocabulary-only metadata to chat', () => {
+  it('attaches intent and context feeds when monitor payloads are present', () => {
     const meta = enrichObservabilityMetadataForChat(undefined, {
       outcome: 'success',
+      projectIntent: sampleProjectIntent(),
+      coachingContext: sampleCoachingContext(),
       resolvedReferences: [],
     });
-    expect(meta).toBeUndefined();
+    expect(meta?.intentFeed?.sentence).toContain('blue');
+    expect(meta?.monitorContext?.coachingHints.length).toBeGreaterThan(0);
+    expect(getIntentFeedView(meta)?.label).toMatch(/^\/intent/);
+    expect(getMonitorContextView(meta)?.label).toMatch(/^\/context/);
     expect(getProjectMemoryView('success', meta)).toBeNull();
   });
 
@@ -310,20 +325,14 @@ describe('intent user-request flow — chat hints gating (when intent shows)', (
     expect(getProjectMemoryView('clarification', meta)).toBeNull();
   });
 
-  it('dedupes and caps vocabulary for planner helpers', () => {
+  it('formats intent sentence for chat panel helpers', () => {
     const vocab = buildProjectVocabularyForChat({
-      keywords: ['Blue', 'blue', 'cta', ...Array.from({ length: 12 }, (_, i) => `topic${i}`)],
-      intents: Array.from({ length: 8 }, (_, i) => ({ label: `edit type ${i}`, count: i + 1 })),
-      turn_count: 6,
-      updated_at: null,
+      sentence: 'Change sections[0].presentation.backgroundClass to blue.',
     });
-    expect(vocab?.keywords).toHaveLength(10);
-    expect(vocab?.keywords.filter((k) => k.toLowerCase() === 'blue')).toHaveLength(1);
-    expect(vocab?.intents).toHaveLength(5);
+    expect(vocab?.sentence).toContain('backgroundClass');
 
     const panelLines = formatVocabularyPanelLines(vocab);
-    expect(panelLines[0]).toMatch(/^Recurring topics:/);
-    expect(panelLines[1]).toMatch(/^Common edit types:/);
+    expect(panelLines[0]).toContain('backgroundClass');
 
     const resolvedRows = buildResolvedReferencesForChat([
       {

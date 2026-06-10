@@ -120,6 +120,20 @@ export function inferPresentationStyleTarget(
     };
   }
 
+  if (
+    ctx?.resolved.sectionType === 'contact' &&
+    ctx?.element?.fieldPath?.match(/\.subtitle$/) &&
+    !isTextColorEditRequest(ownerMessage)
+  ) {
+    const pinnedInnerCard = findPinnedInnerCardContainer(ctx?.target?.targetChain);
+    return {
+      presentationField: 'cardClass',
+      label: pinnedInnerCard?.label ?? 'Contact card',
+      confidence: 'high',
+      reason: 'Pinned Contact Information — style applies to inner card panel',
+    };
+  }
+
   const pinnedInnerCard = findPinnedInnerCardContainer(ctx?.target?.targetChain);
   if (pinnedInnerCard) {
     return {

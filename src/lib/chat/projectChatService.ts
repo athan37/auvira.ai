@@ -21,9 +21,14 @@ import {
   type ProjectMessageMetadata,
 } from './projectMessageMetadata';
 
+/** Max user+assistant turn pairs fed into the edit agent. */
+export const HISTORY_TURN_PAIR_LIMIT = 16;
+/** Max chat messages loaded for agent context (2 per turn pair). */
+export const HISTORY_MESSAGE_LIMIT = HISTORY_TURN_PAIR_LIMIT * 2;
+
 const DEFAULT_MESSAGE_LIMIT = 100;
 const MAX_MESSAGE_LIMIT = 200;
-const DEFAULT_CONTEXT_TURNS = 8;
+const DEFAULT_CONTEXT_TURNS = HISTORY_TURN_PAIR_LIMIT;
 
 function asObjectId(projectId: string | mongoose.Types.ObjectId): mongoose.Types.ObjectId {
   if (projectId instanceof mongoose.Types.ObjectId) return projectId;
@@ -101,35 +106,57 @@ export async function listProjectMessages(input: {
     );
 }
 
+function resolvedReferencesFromMessageMetadata(
+  meta: ProjectMessageMetadata | undefined
+): ProjectMessageMetadata['resolvedReferences'] {
+  if (meta?.observability?.appliedProjectMemory?.length) {
+    return meta.observability.appliedProjectMemory;
+  }
+  if (meta?.resolvedReferences?.length) {
+    return meta.resolvedReferences;
+  }
+  const legacyObs = meta?.observability as { resolvedReferences?: typeof meta.resolvedReferences } | undefined;
+  if (legacyObs?.resolvedReferences?.length) {
+    return legacyObs.resolvedReferences;
+  }
+  return undefined;
+}
+
 export async function buildConversationHistory(input: {
   projectId: string | mongoose.Types.ObjectId;
+  /** Approximate user+assistant turn pairs; fetches up to 2× this many messages. */
   maxTurns?: number;
 }): Promise<ConversationTurn[]> {
   await connectMongoDB();
   const projectObjectId = asObjectId(input.projectId);
-  const maxTurns = Math.max(1, Math.floor(input.maxTurns ?? DEFAULT_CONTEXT_TURNS));
+  const turnPairs = Math.max(1, Math.floor(input.maxTurns ?? DEFAULT_CONTEXT_TURNS));
+  const messageLimit = Math.min(turnPairs * 2, HISTORY_MESSAGE_LIMIT);
   const docs = await ProjectMessage.find({
     projectId: projectObjectId,
     role: { $in: ['user', 'assistant'] },
   })
     .select('role content metadata')
     .sort({ createdAt: -1 })
-    .limit(maxTurns)
+    .limit(messageLimit)
     .lean();
 
   return docs
     .reverse()
     .map((doc) => {
       const meta = doc.metadata as ProjectMessageMetadata | undefined;
-      const metadata: Record<string, unknown> | undefined =
-        meta?.selectedTarget || meta?.clarificationAnchor
-          ? {
-              ...(meta.selectedTarget ? { selectedTarget: meta.selectedTarget } : {}),
-              ...(meta.clarificationAnchor
-                ? { clarificationAnchor: meta.clarificationAnchor as ClarificationAnchor }
-                : {}),
-            }
-          : undefined;
+      const metadataFields: Record<string, unknown> = {};
+      if (meta?.selectedTarget) metadataFields.selectedTarget = meta.selectedTarget;
+      if (meta?.clarificationAnchor) {
+        metadataFields.clarificationAnchor = meta.clarificationAnchor as ClarificationAnchor;
+      }
+      if (meta?.outcome) metadataFields.outcome = meta.outcome;
+      if (meta?.suggestedReplies?.length) metadataFields.suggestedReplies = meta.suggestedReplies;
+      if (meta?.pendingImplicitRef) metadataFields.pendingImplicitRef = meta.pendingImplicitRef;
+      const appliedMemory = resolvedReferencesFromMessageMetadata(meta);
+      if (appliedMemory?.length) metadataFields.resolvedReferences = appliedMemory;
+
+      const metadata =
+        Object.keys(metadataFields).length > 0 ? metadataFields : undefined;
       return {
         role: doc.role === 'assistant' ? ('assistant' as const) : ('user' as const),
         content: String(doc.content || '').slice(0, 2000),
@@ -200,6 +227,24 @@ export async function resolveEditFocusFromProject(input: {
   }
 
   return { items: [] };
+}
+
+/** Drop the current user turn when it was just appended before building agent history. */
+export function trimCurrentUserTurn(
+  history: ConversationTurn[],
+  ownerMessage: string
+): ConversationTurn[] {
+  if (history.length === 0) return history;
+  const last = history[history.length - 1];
+  const owner = ownerMessage.trim();
+  const lastContent = last?.content.trim() ?? '';
+  if (
+    last?.role === 'user' &&
+    (lastContent === owner || lastContent.toLowerCase() === owner.toLowerCase())
+  ) {
+    return history.slice(0, -1);
+  }
+  return history;
 }
 
 /** Resolve gallery artifact — prefers focus stack, falls back to legacy metadata. */
