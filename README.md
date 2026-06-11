@@ -22,7 +22,7 @@ Auvira.ai is a Next.js application that:
 3. **Validates** every build locally before GitLab commit or Vercel deploy
 4. **Maintains** the site via a GitLab-backed edit agent: chat edits run against a workspace preview, with rollback and diff review
 
-Authenticated owners get a dashboard, per-project editor (preview + chat + publish), optional product catalog, and site health monitoring.
+Authenticated owners get a dashboard, per-project editor (preview + chat + publish), optional product catalog, site health monitoring, and a **Site Monitor analytics** view per project.
 
 ---
 
@@ -40,8 +40,12 @@ Authenticated owners get a dashboard, per-project editor (preview + chat + publi
 | **Dashboard** | Getting-started checklist; in-progress clone jobs; project list |
 | **Clone wizard** | Phase progress; template gallery; **Save backup copy** / **Publish live site** |
 | **Editor** (`/projects/[projectId]`) | Draft preview; Chat / Changes / Publish tabs; sticky publish when there are unpublished edits |
+| **Analytics** (`/projects/[projectId]/observability`) | Site Monitor session quality — auto-loads on open: keyword cloud, coaching context, turn history (workspace tab: **Observability**) |
+| **Landing** (`/intro`) | Product narrative and entry points for new owners |
 
 Primary actions avoid GitLab/Vercel jargon — **backup copy**, **draft preview**, **live website**.
+
+Root `/` redirects to `/intro`.
 
 ---
 
@@ -98,7 +102,8 @@ Owners can **drag a section from the preview iframe onto chat** to pin a `select
 
 - **Product catalog (Phase 2)** — MongoDB `Product` model; sync into draft `siteConfig`; static export with inquiry CTAs (no native checkout)
 - **Site Manager** — scheduled checks (uptime, phone, hours, services, banner expiry); incidents and fix proposals via `/api/projects/[projectId]/site-manager/*`
-- **Analytics** — optional runtime on generated sites; collect endpoint at `/api/analytics/collect`
+- **Site Monitor (observability)** — turn scoring, Phoenix traces, optional edit coaching; per-project **Analytics** dashboard at `/projects/[projectId]/observability` (bootstrap + parallel analyze; Monitor-only, no Mongo chat fallback). Admin rollup: `/admin/observability`. See [`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md)
+- **Site analytics (generated sites)** — optional runtime on customer sites; collect endpoint at `/api/analytics/collect`
 - **Commerce (Phase 3, not enabled)** — Stripe checkout stub in `src/lib/commerce/stripeConfig.ts`; not wired in `.env.example`
 
 ---
@@ -208,6 +213,15 @@ Names from [`.env.example`](.env.example) — set values locally; do not commit 
 | `SITE_AGENT_SANDBOX_TIMEOUT` | Sandbox session timeout (default `30m`) |
 | `SITE_AGENT_SANDBOX_ENABLED` | Set `0` to disable sandbox preview on Vercel |
 | `VITEST_LLM_RETRY` | Retries for live LLM tests (default `2`) |
+| `OBSERVABILITY_ENABLED` | Set `0` to disable Site Monitor integration (on by default when key is present) |
+| `OBSERVABILITY_COACHING_ENABLED` | Set `0` to record turns without planner coaching injection |
+| `OBSERVABILITY_API_KEY` | Optional override; default ships via `config/observability-public.env` |
+| `OBSERVABILITY_API_URL` | Site Monitor API base (Railway production default) |
+| `OBSERVABILITY_TENANT_ID` | Monitor tenant id (default `la-mue`) |
+| `OBSERVABILITY_TIMEOUT_MS` | Monitor HTTP timeout (default `5000`; context fetch allows longer server-side) |
+| `NEXT_PUBLIC_OBSERVABILITY_DEBUG` | Show grade badges + Phoenix trace links on chat bubbles |
+
+Full observability flags: [`.env.example`](.env.example) and [`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md).
 
 ---
 
@@ -243,6 +257,10 @@ Names from [`.env.example`](.env.example) — set values locally; do not commit 
 | `test:scratch-live` | Live scratch workflow script |
 | `test:diff-local` | Local diff API script |
 | `test:build-gate-local` | Local build gate script |
+| `test:observability` | Site Monitor unit tests (`tests/observability/`) |
+| `test:observability:clone` | Clone/generation observability wiring subset |
+| `test:observability:live` | Opt-in live Monitor integration (needs API + `RUN_OBSERVABILITY_INTEGRATION_TESTS=true`) |
+| `test:observability:accuracy:llm` | Opt-in LLM accuracy harness for coached planner |
 
 LLM scripts load `.env` via `node --env-file=.env`. Live LLM tests need `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) with `LLM_PROVIDER=gemini`.
 
@@ -257,6 +275,7 @@ LLM scripts load `.env` via `node --env-file=.env`. Live LLM tests need `GEMINI_
 | LLM smoke | `npm run test:llm:contracts` | 3 synthetic section-color cases |
 | Live LLM integration | `npm run test:llm` | **Only when you explicitly request** (API cost) |
 | LLM edit-errors | `npm run test:llm:edit-errors` | Copy, structural, planner guardrails |
+| Observability unit | `npm run test:observability` | Site Monitor parsers, API wiring, keyword cloud |
 | **Final gate** | `npm run test:all` | Unit + contracts (no LLM) |
 | **LLM gate (opt-in)** | `npm run test:all:llm` | Unit + contracts + full LLM |
 
@@ -294,6 +313,9 @@ For agent workflow details, test harness paths, and preview drag-to-chat trouble
 | GitLab client | `src/lib/gitlab/` |
 | Vercel Sandbox | `src/lib/sandbox/` |
 | Site Manager | `src/lib/site-manager/` |
+| Site Monitor client + parsers | `src/lib/observability/` |
+| Per-project analytics UI | `src/components/project/ProjectObservabilityDashboard.tsx` |
+| Observability API routes | `src/app/api/projects/[projectId]/observability/` |
 | Models | `src/models/` |
 | Project editor UI | `src/app/projects/[projectId]/page.tsx` |
 | Synthetic test fixtures | `tests/support/syntheticSiteWorkspace.ts` |
@@ -306,6 +328,7 @@ For agent workflow details, test harness paths, and preview drag-to-chat trouble
 |-----|----------|
 | [`AGENTS.md`](AGENTS.md) | AI agent / contributor guide: credentials, testing gates, key paths, preview drag-to-chat |
 | [`docs/EDIT_AGENT.md`](docs/EDIT_AGENT.md) | Edit agent pipeline, selected target, focus stack |
+| [`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md) | Site Monitor env, turn recording, analytics API, per-project dashboard |
 | [`docs/VERCEL_SANDBOX_IMPLEMENTATION.md`](docs/VERCEL_SANDBOX_IMPLEMENTATION.md) | Sandbox architecture and env on Vercel |
 
 ---
@@ -351,6 +374,10 @@ When `VERCEL=1`, owner previews use Vercel Sandbox by default. Disable with `SIT
 | GET | `/api/projects/[projectId]/messages` | Chat history |
 | GET | `/api/projects/[projectId]/deployment-status` | Vercel deployment status |
 | GET/POST | `/api/projects/[projectId]/catalog` | Product catalog |
+| GET | `/api/projects/[projectId]/observability/bootstrap` | Conversations + Monitor health |
+| POST | `/api/projects/[projectId]/observability/analyze` | Parallel session fetch (dashboard, intent profile, context) |
+| GET | `/api/projects/[projectId]/observability/intent?userMessage=` | Turn-table intent lookup |
+| GET | `/api/admin/observability` | Admin turn-score rollup |
 
 Legacy/smoke routes (no auth in some setups): `/api/agent/rebuild`, `/api/agent/edit`, `/api/agent/build-from-plan`, `/api/agent/propose-website-plan`, `/api/llm/generate-json`, `/api/gitlab/test-create-project`.
 
