@@ -262,8 +262,8 @@ Full edit-agent map: [docs/EDIT_AGENT.md](docs/EDIT_AGENT.md)
 **Prerequisites:** Node.js 20 · MongoDB · Google OAuth · GitLab token + group · Gemini API key
 
 ```bash
-git clone https://github.com/athan37/la-mue-site-builder.git
-cd la-mue-site-builder
+git clone https://github.com/athan37/auvira.ai.git
+cd auvira.ai
 npm install
 cp .env.example .env.local
 cp .env.example .env          # optional; recommended for npm test

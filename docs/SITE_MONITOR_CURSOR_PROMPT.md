@@ -14,7 +14,7 @@ You are the backend SWE for **la-mue-site-monitor** — a FastAPI observability 
 - `docs/data_capture_and_signals.md` — dashboard signals
 
 **Consumer repo (la-mue, already integrated):**
-- GitHub: `https://github.com/athan37/la-mue-site-builder` (package: `ai-website-migration-agent`)
+- GitHub: `https://github.com/athan37/auvira.ai` (package: `ai-website-migration-agent`)
 - Production API base: `https://la-mue-site-monitor-production.up.railway.app/api/v1`
 - Phoenix: `https://app.phoenix.arize.com/s/lamnguyen8075-sjsu` (project `la-mue-site-monitor-phoenix`)
 
