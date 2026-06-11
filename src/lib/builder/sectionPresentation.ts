@@ -55,6 +55,15 @@ export function resolveSectionCardClass(section: SectionLike, preset: PresetLike
   return pickPresentation(section, 'cardClass', 'card', preset, preset.card ?? 'bg-white border');
 }
 
+/**
+ * Phone/email/address rows inside the contact card — follow cardClass when styled via chat.
+ */
+export function resolveContactFieldClass(section: SectionLike, preset: PresetLike): string {
+  const cardOverride = section.presentation?.cardClass?.trim();
+  if (cardOverride) return cardOverride;
+  return preset.contactField ?? 'border-white/10 bg-white/5 text-slate-200';
+}
+
 export function resolveSectionEyebrowClass(section: SectionLike, preset: PresetLike): string {
   return pickPresentation(
     section,

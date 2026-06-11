@@ -93,6 +93,44 @@ describe('contact info panel workspace routing', () => {
     120_000
   );
 
+  it('routes pinned Phone in card to cardClass for background color requests', async () => {
+    workspacePath = await createContactInfoPanelWorkspace();
+    const built = await buildEditContext({
+      workspacePath,
+      mode: 'gitlab',
+      ownerMessage: 'change background to red',
+      infraBaselineReady: true,
+      selectedTarget: {
+        kind: 'section',
+        sectionIndex: 0,
+        sectionType: 'contact',
+        sectionTitle: 'hi, this hema',
+        sectionId: CONTACT_SECTION_ANALYTICS_ID,
+        analyticsId: CONTACT_SECTION_ANALYTICS_ID,
+        fieldPath: 'contact.phone',
+        elementKind: 'contact_field',
+        elementLabel: 'Phone in card',
+        pinScope: 'element',
+        targetChain: [
+          { role: 'section', label: 'hi, this hema', kind: 'contact' },
+          { role: 'container', label: 'Contact card', kind: 'inner_card' },
+          {
+            role: 'element',
+            label: 'Phone in card',
+            kind: 'contact_field',
+            fieldPath: 'contact.phone',
+          },
+        ],
+      },
+    });
+
+    const plan = buildDeterministicPlan(built.context);
+    expect(plan?.needsClarification).toBe(false);
+    expect(plan?.steps[0]?.skill).toBe('update_section_style');
+    expect(plan?.steps[0]?.params?.presentationField).toBe('cardClass');
+    expect(String(plan?.steps[0]?.params?.backgroundColor)).toBe('red');
+  });
+
   it('routes pinned contact card container to cardClass for generic background requests', async () => {
     workspacePath = await createContactInfoPanelWorkspace();
     const message = 'change the background to a blue to green gradient';

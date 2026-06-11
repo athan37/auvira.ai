@@ -71,7 +71,7 @@ export default function SignInPage() {
             </Button>
 
             <p className={`mt-6 text-center text-sm ${TEXT.tertiary}`}>
-              By signing in you agree to use First Site for your business websites.
+              By signing in you agree to use Auvira.ai for your business websites.
             </p>
           </CardBody>
         </Card>

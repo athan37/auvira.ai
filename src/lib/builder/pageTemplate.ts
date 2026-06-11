@@ -481,19 +481,19 @@ function ContactSection({ section, sectionIndex }: { section: SiteSection; secti
             <div className="mt-6 space-y-4">
               {contact.phone && (
                 <div
-                  className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-200"
+                  className={"rounded-2xl border p-4 text-sm " + resolveContactFieldClass(section, preset)}
                   {...SITE_ELEMENT_ATTRS({ kind: "contact_field", label: "Phone in card", fieldPath: "contact.phone", surfaceId: "contact-phone-card" })}
                 >{contact.phone}</div>
               )}
               {contact.email && (
                 <div
-                  className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-200"
+                  className={"rounded-2xl border p-4 text-sm " + resolveContactFieldClass(section, preset)}
                   {...SITE_ELEMENT_ATTRS({ kind: "contact_field", label: "Email in card", fieldPath: "contact.email" })}
                 >{contact.email}</div>
               )}
               {contact.address && (
                 <div
-                  className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-200"
+                  className={"rounded-2xl border p-4 text-sm " + resolveContactFieldClass(section, preset)}
                   {...SITE_ELEMENT_ATTRS({ kind: "contact_field", label: "Address in card", fieldPath: "contact.address" })}
                 >{contact.address}</div>
               )}
@@ -501,7 +501,7 @@ function ContactSection({ section, sectionIndex }: { section: SiteSection; secti
                 line ? (
                   <div
                     key={"contact-extra-" + extraIndex}
-                    className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-200"
+                    className={"rounded-2xl border p-4 text-sm " + resolveContactFieldClass(section, preset)}
                     {...SITE_ELEMENT_ATTRS({ kind: "contact_field", label: "Contact line " + (extraIndex + 1), fieldPath: "contact.extraLines[" + extraIndex + "]", surfaceId: "contact-extra-" + extraIndex })}
                   >{line}</div>
                 ) : null

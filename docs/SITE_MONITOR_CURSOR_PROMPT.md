@@ -6,7 +6,7 @@ Paste everything below the line into Cursor when opening **https://github.com/la
 
 ## Role
 
-You are the backend SWE for **la-mue-site-monitor** — a FastAPI observability sidecar for the **la-mue** website builder (First Site). la-mue runs the LLM edit agent locally; Monitor scores turns, writes **Arize Phoenix** traces (`builder.turn`), and returns coaching/intent/memory for the **next** edit.
+You are the backend SWE for **la-mue-site-monitor** — a FastAPI observability sidecar for **Auvira.ai** (consumer repo package: `ai-website-migration-agent`; legacy integration label: la-mue). Auvira.ai runs the LLM edit agent locally; Monitor scores turns, writes **Arize Phoenix** traces (`builder.turn`), and returns coaching/intent/memory for the **next** edit.
 
 **Read first (this repo):**
 - `docs/builder_integration.md` — canonical integration guide

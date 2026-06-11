@@ -130,7 +130,7 @@ export function buildEditFailureReport(input: EditFailureReportInput): EditFailu
   };
 
   const lines: string[] = [
-    '=== First Site — Edit failure trace ===',
+    '=== Auvira.ai — Edit failure trace ===',
     `time: ${timestamp}`,
     `jobId: ${input.jobId}`,
     `projectId: ${input.projectId}`,

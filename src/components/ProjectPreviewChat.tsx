@@ -538,7 +538,8 @@ export function ProjectPreviewChat({
   const chatFormRef = useRef<HTMLFormElement>(null);
   const chatInputId = `project-chat-input-${projectId}`;
   const voiceBaseInputRef = useRef('');
-  const pendingVoiceSubmitRef = useRef(false);
+  const pendingVoiceApplyRef = useRef(false);
+  const [listeningBaseInput, setListeningBaseInput] = useState('');
 
   const speech = useBrowserSpeechRecognition();
   const [voiceError, setVoiceError] = useState<string | null>(null);
@@ -562,6 +563,9 @@ export function ProjectPreviewChat({
   useEffect(() => {
     if (sending && speech.listening) {
       speech.stop();
+      pendingVoiceApplyRef.current = false;
+      voiceBaseInputRef.current = '';
+      setListeningBaseInput('');
     }
   }, [sending, speech.listening, speech.stop]);
 
@@ -934,7 +938,7 @@ export function ProjectPreviewChat({
       const message =
         error instanceof Error ? error.message : 'Something went wrong. Please try again.';
       const clientTrace = [
-        '=== First Site — Client-side failure ===',
+        '=== Auvira.ai — Client-side failure ===',
         `time: ${new Date().toISOString()}`,
         `projectId: ${projectId}`,
         jobId ? `jobId: ${jobId}` : 'jobId: (not assigned)',
@@ -975,19 +979,22 @@ export function ProjectPreviewChat({
   );
 
   useEffect(() => {
-    if (speech.listening || !pendingVoiceSubmitRef.current) return;
-    pendingVoiceSubmitRef.current = false;
+    if (speech.listening || !pendingVoiceApplyRef.current) return;
+    pendingVoiceApplyRef.current = false;
 
     const spoken = speech.finalTranscript.trim();
     const finalMessage = [voiceBaseInputRef.current, spoken].filter(Boolean).join(' ').trim();
     voiceBaseInputRef.current = '';
+    setListeningBaseInput('');
 
     if (finalMessage) {
-      void submitMessage(finalMessage);
+      setInput(finalMessage);
+      setVoiceError(null);
+      refocusChatInput();
       return;
     }
     setVoiceError(VOICE_EMPTY_TRANSCRIPT_MESSAGE);
-  }, [speech.listening, speech.finalTranscript, submitMessage]);
+  }, [speech.listening, speech.finalTranscript, refocusChatInput]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1000,23 +1007,17 @@ export function ProjectPreviewChat({
     setVoiceError(null);
 
     if (speech.listening) {
-      pendingVoiceSubmitRef.current = true;
+      pendingVoiceApplyRef.current = true;
       speech.stop();
       return;
     }
 
     voiceBaseInputRef.current = input.trim();
-    if (input.trim()) {
-      setInput('');
-    }
+    setListeningBaseInput(input.trim());
     speech.start();
   };
 
-  const voicePreviewText = [voiceBaseInputRef.current, speech.interimTranscript || speech.finalTranscript]
-    .filter(Boolean)
-    .join(' ')
-    .trim();
-  const textareaValue = speech.listening ? voicePreviewText : input;
+  const textareaValue = speech.listening ? listeningBaseInput : input;
   const inlineError = voiceError || uploadError;
 
   const applyPrompt = useCallback((text: string) => {
@@ -1227,7 +1228,7 @@ export function ProjectPreviewChat({
             }}
             placeholder={
               speech.listening
-                ? 'Listening… tap the mic when you are done.'
+                ? 'Listening… tap the mic when finished, then edit and send.'
                 : previewReady
                   ? 'e.g. Add this photo to the hero… (Shift+Enter for a new line)'
                   : 'Waiting for preview…'
@@ -1270,11 +1271,11 @@ export function ProjectPreviewChat({
                 size="sm"
                 disabled={inputDisabled}
                 onClick={handleMicToggle}
-                aria-label={speech.listening ? 'Stop and send' : 'Speak edit request'}
+                aria-label={speech.listening ? 'Stop listening' : 'Speak edit request'}
                 aria-pressed={speech.listening}
                 title={
                   speech.listening
-                    ? 'Stop listening and send'
+                    ? 'Stop listening — transcript appears in the box to edit before sending'
                     : 'Speak your edit request (Chrome, Edge, or Safari)'
                 }
                 className={cn(

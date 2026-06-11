@@ -11,6 +11,7 @@ import {
   normalizeGradientBackgroundClass,
   resolveSectionBackground,
   resolveSectionCardClass,
+  resolveContactFieldClass,
   colorNameToCardClass,
   normalizeCardPresentationClass,
 } from '@/lib/builder/sectionPresentation';
@@ -88,6 +89,19 @@ describe('sectionPresentation', () => {
       presentation: { cardClass: 'border-red-300 bg-red-50' },
     };
     expect(resolveSectionCardClass(section, preset)).toBe('border-red-300 bg-red-50');
+  });
+
+  it('resolveContactFieldClass follows cardClass override for phone rows', () => {
+    const preset = { contactField: 'border-white/10 bg-white/5 text-slate-200' };
+    expect(
+      resolveContactFieldClass(
+        { type: 'contact', presentation: { cardClass: 'bg-red-600' } },
+        preset
+      )
+    ).toBe('bg-red-600');
+    expect(resolveContactFieldClass({ type: 'contact' }, preset)).toBe(
+      'border-white/10 bg-white/5 text-slate-200'
+    );
   });
 
   it('resolveGradientBackgroundClass supports two-hue gradients', () => {

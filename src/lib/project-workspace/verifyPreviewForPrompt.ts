@@ -258,7 +258,7 @@ export async function resolveEditPreviewVerification(
   if (
     strictColorHints &&
     siteConfigAfter.includes('presentation') &&
-    siteConfigAfter.includes('backgroundClass')
+    (siteConfigAfter.includes('backgroundClass') || siteConfigAfter.includes('cardClass'))
   ) {
     const wiringIssues = pageAfter
       ? presentationWiringIssues(siteConfigAfter, pageAfter)

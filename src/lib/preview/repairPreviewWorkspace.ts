@@ -4,6 +4,7 @@ import { instrumentGeneratedSite } from '@/lib/analytics/generated-sites/instrum
 import { repairPageTsxStructure } from '@/lib/project-workspace/repairPageTsxStructure';
 import { repairContactSectionSubtitleInPage } from '@/lib/preview/repairContactSectionSubtitle';
 import { repairContactSectionPrimaryCtaInPage } from '@/lib/preview/repairContactSectionPrimaryCta';
+import { repairContactFieldClassInPage } from '@/lib/preview/repairContactFieldClass';
 import { repairPreviewContainerAttrsInPage } from '@/lib/preview/repairPreviewContainerAttrs';
 import { repairSiteConfigTypesInWorkspace } from '@/lib/preview/repairSiteConfigTypes';
 import { repairSectionPresentationWiringInWorkspace } from '@/lib/project-workspace/edit-shared/legacySectionPresentation';
@@ -38,6 +39,12 @@ export async function repairPreviewWorkspace(workspacePath: string): Promise<voi
     const containerRepair = repairPreviewContainerAttrsInPage(page);
     if (containerRepair.repaired) {
       page = containerRepair.content;
+      pageChanged = true;
+    }
+
+    const contactFieldRepair = repairContactFieldClassInPage(page);
+    if (contactFieldRepair.repaired) {
+      page = contactFieldRepair.content;
       pageChanged = true;
     }
 

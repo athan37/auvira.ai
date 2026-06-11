@@ -40,7 +40,7 @@ export const INTRO = {
   promoAccent: 'intro-promo-accent',
 } as const;
 
-export type IntroAccentId = 'hero' | 'describe' | 'preview' | 'edit' | 'publish' | 'final';
+export type IntroAccentId = 'hero' | 'why' | 'teammate' | 'websites' | 'clone' | 'vision';
 
 /** Per-section rose accent palette — background stays shared mesh; accents differ. */
 export const INTRO_ACCENTS: Record<
@@ -51,35 +51,34 @@ export const INTRO_ACCENTS: Record<
     stripe?: string;
     dot?: string;
     cursor?: string;
-    checkmark?: string;
   }
 > = {
   hero: {
     eyebrow: 'text-rose-400',
     glow: 'intro-rose-glow-tr intro-rose-glow-soft',
   },
-  describe: {
+  why: {
     eyebrow: 'text-rose-500',
     glow: 'intro-rose-glow-bl',
-    dot: 'bg-rose-500',
-    cursor: 'bg-rose-500',
   },
-  preview: {
+  teammate: {
     eyebrow: 'text-rose-600',
     glow: 'intro-rose-glow-tr',
-    stripe: INTRO.promoAccent,
   },
-  edit: {
+  websites: {
     eyebrow: 'text-rose-700',
     glow: 'intro-rose-glow-br',
+    stripe: INTRO.promoAccent,
+    dot: 'bg-rose-700',
+    cursor: 'bg-rose-700',
   },
-  publish: {
+  clone: {
+    eyebrow: 'text-rose-accent',
+    glow: 'intro-rose-glow-center',
+    stripe: INTRO.promoAccent,
+  },
+  vision: {
     eyebrow: 'text-rose-800',
     glow: 'intro-rose-glow-bl intro-rose-glow-deep',
-    checkmark: 'bg-rose-700',
-  },
-  final: {
-    eyebrow: 'text-rose-600',
-    glow: 'intro-rose-glow-center',
   },
 } as const;

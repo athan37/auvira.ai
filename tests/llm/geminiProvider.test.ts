@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { GeminiProvider } from '@/lib/llm/geminiProvider';
+import { GEMINI_RATE_LIMIT_RETRY_MS } from '@/lib/llm/geminiRetryDelay';
 
 describe('GeminiProvider', () => {
   const fetchMock = vi.fn();
@@ -84,6 +85,49 @@ describe('GeminiProvider', () => {
     expect(result.ok).toBe(true);
     expect(result.attempt).toBe(2);
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('waits ~5s then retries on 429 rate limit', async () => {
+    vi.useFakeTimers();
+
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        statusText: 'Too Many Requests',
+        json: async () => ({
+          error: { message: 'quota exceeded' },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          candidates: [{ content: { parts: [{ text: '{"msg":"ok"}' }] } }],
+        }),
+      });
+
+    const provider = new GeminiProvider({
+      apiKey: 'test-gemini-key',
+      apiBase: 'https://generativelanguage.googleapis.com/v1beta',
+    });
+
+    const resultPromise = provider.generateJSON<{ msg: string }>({
+      prompt: 'say hi',
+      schema: {
+        type: 'object',
+        required: ['msg'],
+        properties: { msg: { type: 'string' } },
+      },
+    });
+
+    await vi.advanceTimersByTimeAsync(GEMINI_RATE_LIMIT_RETRY_MS);
+    const result = await resultPromise;
+
+    expect(result.ok).toBe(true);
+    expect(result.attempt).toBe(2);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    vi.useRealTimers();
   });
 
   it('throws when API key is missing', () => {

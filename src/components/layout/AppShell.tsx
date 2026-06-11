@@ -55,17 +55,19 @@ export function AppShell({
                 </svg>
               </button>
             )}
-            <Link href="/dashboard" className="shrink-0">
+            <Link href="/intro" className="shrink-0 flex items-center" aria-label="Auvira.ai home">
               <BrandLogo size="sm" />
             </Link>
             {breadcrumb && (
-              <span className="hidden sm:flex items-center gap-2 text-sm text-[#86868b] truncate">
+              <span className="hidden sm:flex items-center gap-2 text-sm leading-none text-[#86868b] truncate">
                 <span aria-hidden>/</span>
                 {breadcrumb}
               </span>
             )}
             {title && !breadcrumb && (
-              <span className="hidden sm:block text-sm font-medium text-[#6e6e73] truncate">{title}</span>
+              <span className="hidden sm:flex items-center text-sm font-medium leading-none text-[#6e6e73] truncate">
+                {title}
+              </span>
             )}
           </div>
           <div className="flex items-center gap-2 shrink-0">

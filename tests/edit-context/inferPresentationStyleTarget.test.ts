@@ -131,6 +131,47 @@ describe('inferPresentationStyleTarget', () => {
     expect(result.confidence).toBe('high');
   });
 
+  it('routes pinned Phone in card field to contact card cardClass', () => {
+    const result = inferPresentationStyleTarget(
+      'change background to red',
+      {
+        target: {
+          kind: 'section',
+          sectionIndex: 13,
+          sectionType: 'contact',
+          sectionTitle: 'Contact Us',
+          targetChain: [
+            { role: 'section', label: 'Contact Us', kind: 'contact' },
+            { role: 'container', label: 'Contact card', kind: 'inner_card' },
+            {
+              role: 'element',
+              label: 'Phone in card',
+              kind: 'contact_field',
+              fieldPath: 'contact.phone',
+            },
+          ],
+        },
+        resolved: {
+          kind: 'section',
+          sectionIndex: 13,
+          sectionType: 'contact',
+          sectionTitle: 'Contact Us',
+          confidence: 'high',
+        },
+        element: {
+          kind: 'contact_field',
+          label: 'Phone in card',
+          fieldPath: 'contact.phone',
+        },
+        editableFields: [],
+        sourceHints: { siteConfigPath: 'src/lib/siteConfig.ts' },
+      },
+      'Contact Us'
+    );
+    expect(result.presentationField).toBe('cardClass');
+    expect(result.confidence).toBe('high');
+  });
+
   it('routes pinned inner card container to cardClass without naming the card', () => {
     const result = inferPresentationStyleTarget(
       'change the background to a blue to green gradient',

@@ -1,6 +1,8 @@
 # Design System — Glassmorphism UI
 
-Single source of truth for First Site product chrome. **Pastel mesh canvas**, frosted glass panels, **blue primary CTAs**, navy typography, rose as secondary accent (drag pins, targeting), restrained motion.
+Single source of truth for **Auvira.ai** product chrome. **Pastel mesh canvas**, frosted glass panels, **blue primary CTAs**, navy typography, rose as secondary accent (drag pins, targeting), restrained motion.
+
+See also [`STYLING_THEMES.md`](./STYLING_THEMES.md) for the full theme inventory (product chrome + generated customer-site presets).
 
 ## Colors
 
@@ -194,13 +196,13 @@ When `prefers-reduced-motion: reduce` (or `useReducedMotion()`):
 
 ## Visual QA checklist
 
-- [ ] Page canvas shows soft grey depth (not flat white) on dashboard, editor, clone
-- [ ] Primary buttons are rose gradient pills
+- [ ] Page canvas shows mesh depth (not flat white) on dashboard, editor, clone
+- [ ] Primary buttons are **blue** gradient pills (`btn-blue-primary`)
 - [ ] Glass nav blurs content behind it
 - [ ] Dark sections use `#1d1d1f` or `#000`
-- [ ] Focus rings use rose at 35% opacity
+- [ ] Focus rings use blue at 35% opacity (`--cta-blue-focus`); rose for pin/drop targeting
 - [ ] Chat bubbles use consistent `rounded-2xl` + glass/rose clarify
-- [ ] Editor tabs use rose active underline
+- [ ] Editor tabs use blue active underline (`ACCENT.tabActive`)
 - [ ] Clone flow has no green CTAs
 - [ ] Mobile nav sheet works on landing
 - [ ] Reduced motion disables parallax/float
@@ -211,7 +213,7 @@ When `prefers-reduced-motion: reduce` (or `useReducedMotion()`):
 
 ## Raspberry accent (app-wide)
 
-Rose is the **primary accent** across landing and product chrome. Use `productTheme.ts` and `marketingTheme.ts` for semantic class names.
+Rose is the **secondary accent** (pins, drop zones, intro eyebrows). **Blue** is the primary CTA accent. Use `productTheme.ts` and `marketingTheme.ts` for semantic class names.
 
 | Token | CSS variable / Tailwind | Value | Usage |
 |-------|-------------------------|-------|--------|
@@ -262,14 +264,14 @@ The `/intro` page uses **one** fixed `bg-mesh-canvas` backdrop (`INTRO.pageMesh`
 
 Visual rhythm comes from `INTRO_ACCENTS` in `marketingTheme.ts` (eyebrow shade + positioned rose glow):
 
-| Section | Eyebrow | Glow | Extra accent |
+| Section | Eyebrow | Glow | Demo animation |
 |---------|---------|------|----------------|
 | hero | `rose-400` | `intro-rose-glow-tr` soft | — |
-| describe | `rose-500` | `intro-rose-glow-bl` | PromptDemo dot |
-| preview | `rose-600` | `intro-rose-glow-tr` | left stripe + mock ring |
-| edit | `rose-700` | `intro-rose-glow-br` | — |
-| publish | `rose-800` | `intro-rose-glow-bl` deep | checklist badges |
-| final | `rose-600` | `intro-rose-glow-center` | — |
+| vision | `rose-800` | `intro-rose-glow-bl` deep | `dragToChat`: drag + voice edit in chat |
+| why | `rose-500` | `intro-rose-glow-bl` | `teamsToChat`: hiring burden → owner request → build & maintain |
+| teammate | `rose-600` | `intro-rose-glow-tr` | `memory`: chat + context pills |
+| websites | `rose-700` | `intro-rose-glow-br` | `describe`: typewriter + voice waveform |
+| clone | `rose-accent` | `intro-rose-glow-center` | `cloneFromUrl`: URL crawl + preserved content |
 
 **Rules:**
 

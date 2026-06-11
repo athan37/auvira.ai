@@ -17,7 +17,7 @@ function readIntEnv(name: string, fallback: number): number {
 /** Default clone crawl / prompt limits (overridable via env). */
 export function getCloneCrawlPromptLimits(): CloneCrawlPromptLimits {
   return {
-    maxPages: readIntEnv('CLONE_MAX_PAGES', 15),
+    maxPages: readIntEnv('CLONE_MAX_PAGES', 10),
     maxCharsPerPage: readIntEnv('CLONE_MAX_CHARS_PER_PAGE', 12000),
     maxFactualChars: readIntEnv('CLONE_MAX_FACTUAL_CHARS', 30000),
     maxPlanPromptChars: readIntEnv('CLONE_MAX_PLAN_PROMPT_CHARS', 30000),

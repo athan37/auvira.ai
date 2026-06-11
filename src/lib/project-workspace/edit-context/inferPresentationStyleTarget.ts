@@ -134,6 +134,20 @@ export function inferPresentationStyleTarget(
     };
   }
 
+  if (
+    ctx?.element?.kind === 'contact_field' &&
+    !isTextColorEditRequest(ownerMessage)
+  ) {
+    const pinnedInnerCard = findPinnedInnerCardContainer(ctx?.target?.targetChain);
+    return {
+      presentationField: 'cardClass',
+      label: pinnedInnerCard?.label ?? ctx.element.label ?? 'Contact card',
+      confidence: 'high',
+      reason:
+        'Pinned contact field (phone/email) — background styles apply to presentation.cardClass on the contact card',
+    };
+  }
+
   const pinnedInnerCard = findPinnedInnerCardContainer(ctx?.target?.targetChain);
   if (pinnedInnerCard) {
     return {

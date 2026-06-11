@@ -3,8 +3,8 @@
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
+import { AuviraLogoMark } from '@/components/marketing/AuviraLogoMark';
 import { cn } from '@/lib/cn';
-import { BRAND } from '@/content/marketing';
 import { LOADING } from '@/content/productTheme';
 import { APPLE_EASE, useReducedMotion } from '@/components/motion/tokens';
 import { LoadingDots } from './LoadingDots';
@@ -62,11 +62,7 @@ export function LoadingShell({
           ease: APPLE_EASE,
         }}
       >
-        {showBrand && (
-          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[#86868b]">
-            {BRAND.name}
-          </p>
-        )}
+        {showBrand && <AuviraLogoMark size="lg" />}
         <LoadingDots size="lg" />
         <p className="text-[17px] font-medium text-[#1d1d1f]">
           {displayMessage}

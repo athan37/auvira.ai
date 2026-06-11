@@ -1,5 +1,6 @@
 import type { GenerateJSONInput, GenerateJSONResult, LLMProvider } from './types';
 import { extractJsonText, parseJsonOutput, validateAgainstSchema } from './jsonOutputHelpers';
+import { geminiRetryDelayMs } from './geminiRetryDelay';
 
 const DEFAULT_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 const DEFAULT_MODEL = 'gemini-flash-latest';
@@ -63,6 +64,12 @@ export class GeminiProvider implements LLMProvider {
         });
       } catch (err) {
         lastError = err instanceof Error ? err.message : 'Gemini API call failed';
+        if (attempt < MAX_ATTEMPTS) {
+          const delayMs = geminiRetryDelayMs(lastError);
+          if (delayMs != null) {
+            await sleep(delayMs);
+          }
+        }
         continue;
       }
       lastRaw = raw;
@@ -169,4 +176,8 @@ export class GeminiProvider implements LLMProvider {
     }
     return parts.join('\n').trim();
   }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

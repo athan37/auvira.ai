@@ -28,6 +28,23 @@
   --mesh-lavender: #d8c8f5;
   --mesh-blush: #f5d4e8;
 
+  /* Auvira.ai ".ai" suffix — rose / sky / lemon (logo + mesh palette) */
+  --brand-ai-pink: #d24460;
+  --brand-ai-blue: #60a5fa;
+  --brand-ai-yellow: #e8c84a;
+  --brand-ai-gradient: linear-gradient(
+    115deg,
+    var(--brand-ai-pink) 0%,
+    var(--brand-ai-blue) 52%,
+    var(--brand-ai-yellow) 100%
+  );
+  --brand-ai-gradient-inverted: linear-gradient(
+    115deg,
+    #f0a0b8 0%,
+    #93c5fd 52%,
+    #fde68a 100%
+  );
+
   /* Blue primary CTA */
   --cta-blue-light: #60a5fa;
   --cta-blue: #3b82f6;
@@ -133,6 +150,20 @@
 }
 
 @layer utilities {
+  .text-brand-ai {
+    background-image: var(--brand-ai-gradient);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .text-brand-ai-inverted {
+    background-image: var(--brand-ai-gradient-inverted);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
   .bg-mesh-canvas {
     background-color: var(--mesh-base);
     background-image:

@@ -194,7 +194,7 @@ function DashboardContent() {
         <Card variant="bright">
           <EmptyState
             title="No websites yet"
-            description="Describe your business or paste an existing URL — First Site builds the draft for you."
+            description="Describe your business or paste an existing URL — Auvira.ai builds the draft for you."
             action={
               <div className="flex flex-wrap gap-2 justify-center">
                 <Link href="/projects/new/scratch">

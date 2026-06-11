@@ -37,7 +37,7 @@ crawlWebsite
 
 | Variable | Default |
 |----------|---------|
-| `CLONE_MAX_PAGES` | 15 |
+| `CLONE_MAX_PAGES` | 10 |
 | `CLONE_MAX_CHARS_PER_PAGE` | 12000 |
 | `CLONE_MAX_FACTUAL_CHARS` | 30000 |
 | `CLONE_MAX_PLAN_PROMPT_CHARS` | 30000 |

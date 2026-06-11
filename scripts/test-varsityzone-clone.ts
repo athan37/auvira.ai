@@ -25,7 +25,7 @@ async function main() {
   console.log('');
 
   console.log('[1/4] Crawling...');
-  const crawl = await crawlWebsite(sourceUrl, { useHeadless: true, maxPages: 15 });
+  const crawl = await crawlWebsite(sourceUrl, { useHeadless: true });
   console.log(`  Pages: ${crawl.pages.length}, discovered links: ${crawl.siteSummary.discoveredInternalLinks}`);
 
   console.log('[2/4] Factual extraction (Gemini)...');

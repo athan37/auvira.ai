@@ -1,6 +1,6 @@
 import { readSiteConfigFromWorkspace } from '@/lib/site-manager/siteConfigParser';
 
-/** Port where the First Site Next app runs locally (`npm run dev`). Never use for workspace preview. */
+/** Port where the Auvira.ai Next app runs locally (`npm run dev`). Never use for workspace preview. */
 export function getSiteAgentDevPort(): number {
   const raw = process.env.PORT || process.env.SITE_AGENT_DEV_PORT || '3000';
   const n = Number(raw);
@@ -24,7 +24,7 @@ export function htmlIncludesText(html: string, text: string): boolean {
   return encoded !== text && html.includes(encoded);
 }
 
-/** HTML signatures of the First Site shell, not a customer workspace site. */
+/** HTML signatures of the Auvira.ai shell, not a customer workspace site. */
 export function isSiteAgentShellHtml(html: string): boolean {
   const lower = html.toLowerCase();
   return (
@@ -76,7 +76,7 @@ export async function checkWorkspacePreviewChunksReady(
 
 /**
  * True when something is listening and it looks like this project's workspace site,
- * not the First Site app on the main dev port.
+ * not the Auvira.ai app on the main dev port.
  */
 export async function checkWorkspacePreviewHealthy(
   port: number,

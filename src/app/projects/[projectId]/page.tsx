@@ -478,7 +478,14 @@ export default function ProjectPage() {
     setPreviewTargetingAvailable(state.targetingAvailable);
   }, []);
 
-  const handleDeploySuccess = useCallback(() => {
+  /** Refresh badges, deployment status, and diff panel — does not remount the preview iframe. */
+  const refreshProjectMetadata = useCallback(() => {
+    void fetchProject();
+    setDiffRefreshKey((k) => k + 1);
+  }, [fetchProject]);
+
+  /** Rollback restores workspace files on disk — preview must reload to match. */
+  const handleRollbackSuccess = useCallback(() => {
     void fetchProject().then((fetched) => {
       const version = fetched?.codeWorkspace?.version;
       setPreviewReload((prev) => ({
@@ -699,8 +706,8 @@ export default function ProjectPage() {
                 previewReloadCancelRef.current = schedule.cancel;
               });
             }}
-            onRollbackSuccess={handleDeploySuccess}
-            onDeploySuccess={handleDeploySuccess}
+            onRollbackSuccess={handleRollbackSuccess}
+            onDeploySuccess={refreshProjectMetadata}
           />
         </div>
       </div>

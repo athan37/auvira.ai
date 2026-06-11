@@ -2,15 +2,14 @@ import type { Metadata } from 'next';
 import {
   MarketingHeader,
   MarketingFooter,
-  FeatureSpotlight,
+  NarrativeSection,
   LandingHero,
-  LandingFinalCta,
 } from '@/components/marketing';
-import { BRAND, FEATURE_SPOTLIGHTS, FINAL_CTA } from '@/content/marketing';
+import { BRAND, INTRO_NARRATIVE } from '@/content/marketing';
 import { INTRO } from '@/content/marketingTheme';
 
 export const metadata: Metadata = {
-  title: `${BRAND.name} — ${BRAND.tagline}`,
+  title: `${BRAND.name} | ${BRAND.tagline}`,
   description: BRAND.description,
 };
 
@@ -25,18 +24,13 @@ export default function IntroPage() {
       <MarketingHeader />
       <main>
         <LandingHero />
-        {FEATURE_SPOTLIGHTS.map((feature, index) => (
-          <FeatureSpotlight
-            key={feature.id}
-            feature={feature}
+        {INTRO_NARRATIVE.map((section, index) => (
+          <NarrativeSection
+            key={section.id}
+            section={section}
             reverse={index % 2 === 1}
           />
         ))}
-        <LandingFinalCta
-          headline={FINAL_CTA.headline}
-          subline={FINAL_CTA.subline}
-          cta={FINAL_CTA.cta}
-        />
       </main>
       <MarketingFooter />
     </div>

@@ -113,12 +113,11 @@ describe('design system contract', () => {
     expect(INTRO.section).toBe('intro-section');
     expect(INTRO.pageMesh).toBe('bg-mesh-canvas');
     expect(INTRO.promoAccent).toBe('intro-promo-accent');
-    for (const id of ['hero', 'describe', 'preview', 'edit', 'publish', 'final'] as const) {
+    for (const id of ['hero', 'why', 'teammate', 'websites', 'clone', 'vision'] as const) {
       expect(INTRO_ACCENTS[id].eyebrow).toMatch(/^text-rose-/);
       expect(INTRO_ACCENTS[id].glow).toMatch(/^intro-rose-glow-/);
     }
-    expect(INTRO_ACCENTS.preview.stripe).toBe('intro-promo-accent');
-    expect(INTRO_ACCENTS.publish.checkmark).toBe('bg-rose-700');
+    expect(INTRO_ACCENTS.websites.stripe).toBe('intro-promo-accent');
   });
 
   it('defines intro rose glow utilities in globals.css', () => {
@@ -139,8 +138,8 @@ describe('design system contract', () => {
   });
 
   it('uses unified intro section shell without theme forks', () => {
-    const spotlight = fs.readFileSync(
-      path.join(process.cwd(), 'src/components/marketing/FeatureSpotlight.tsx'),
+    const narrative = fs.readFileSync(
+      path.join(process.cwd(), 'src/components/marketing/NarrativeSection.tsx'),
       'utf8'
     );
     const introPage = fs.readFileSync(
@@ -152,13 +151,13 @@ describe('design system contract', () => {
       'utf8'
     );
 
-    expect(spotlight).toContain('IntroSection');
-    expect(spotlight).toContain('INTRO_ACCENTS');
-    expect(spotlight).not.toContain('isPromo');
-    expect(spotlight).not.toContain('isDark');
-    expect(spotlight).not.toContain('intro-dark-glass');
-    expect(spotlight).not.toContain('bg-mesh-alt');
-    expect(spotlight).not.toMatch(/<section[\s\S]*ROSE\.gradient/);
+    expect(narrative).toContain('IntroSection');
+    expect(narrative).toContain('IntroSectionDemo');
+    expect(narrative).not.toContain('isPromo');
+    expect(narrative).not.toContain('isDark');
+    expect(narrative).not.toContain('intro-dark-glass');
+    expect(narrative).not.toContain('bg-mesh-alt');
+    expect(narrative).not.toMatch(/<section[\s\S]*ROSE\.gradient/);
     expect(hero).toContain('IntroSection');
     expect(hero).not.toContain('INTRO.atmosphere');
     expect(introPage).toContain('INTRO.pageMesh');

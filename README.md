@@ -1,10 +1,12 @@
-# First Site (`ai-website-migration-agent`)
+# Auvira.ai
 
-**Love at first site.** Describe your business in plain language — First Site builds your website, no code required.
+**Your website. Built with AI.** Describe your business in plain language — Auvira.ai builds your website, no code required.
+
+> **Dev note:** npm package / repo folder name remains `ai-website-migration-agent` for tooling compatibility.
 
 Turn an outdated business website into a clean live site, or start from a short prompt. Review a draft preview, refine in chat, and publish when it feels right.
 
-**Design system:** See [`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md) for Apple-style UI tokens, components, and motion guidelines.
+**Design system:** See [`docs/DESIGN_SYSTEM.md`](docs/DESIGN_SYSTEM.md) for UI tokens, components, and motion. Theme inventory: [`docs/STYLING_THEMES.md`](docs/STYLING_THEMES.md).
 
 **Package name:** `ai-website-migration-agent`  
 **Node:** `>=20 <21` (see `engines` in [`package.json`](package.json))
@@ -13,7 +15,7 @@ Turn an outdated business website into a clean live site, or start from a short 
 
 ## Overview
 
-First Site is a Next.js application that:
+Auvira.ai is a Next.js application that:
 
 1. **Extracts** business facts from an existing site (clone mode) or a short intake form (scratch mode)
 2. **Generates** a one-page Next.js + Tailwind site from deterministic templates — the LLM produces JSON (`siteConfig`, copy, colors), not React source
@@ -310,7 +312,7 @@ For agent workflow details, test harness paths, and preview drag-to-chat trouble
 
 ## Deployment
 
-### This app (First Site)
+### This app (Auvira.ai)
 
 1. Connect the GitHub repo to [Vercel](https://vercel.com)
 2. **Production branch:** `main`

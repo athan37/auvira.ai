@@ -1,77 +1,134 @@
-/** Marketing copy — Apple editorial tone. */
+/** Marketing copy for intro and landing (Apple editorial tone). */
 
 export const BRAND = {
-  name: 'First Site',
-  tagline: 'Your website. Built in minutes.',
+  name: 'Auvira.ai',
+  tagline: 'Your website. Built with AI.',
   description:
-    'Describe your business. Preview your site. Publish when it is ready. No code required.',
+    'Auvira is an AI teammate for small business, starting with websites you describe from scratch or refresh from your existing URL. Augmented Vision. Unlimited Potential.',
+  /** Scalable mark (transparent); PNG kept for favicon raster fallback. */
+  logoSrc: '/brand/auvira-logo.svg',
+  logoPngSrc: '/brand/auvira-logo.png',
+  logoAlt: 'Auvira.ai logo',
 } as const;
 
+export type IntroDemoId =
+  | 'teamsToChat'
+  | 'memory'
+  | 'describe'
+  | 'cloneFromUrl'
+  | 'dragToChat';
+
+export const INTRO_DEMO_PROMPT =
+  'A family dental practice in Austin, warm and trustworthy, book online' as const;
+
+export const INTRO_DEMO_WHY_REQUEST =
+  'Update our hours and refresh the homepage for spring.' as const;
+
+export const INTRO_DEMO_WHY_REPLY =
+  'Done. Built, updated, and maintained. Your site stays live.' as const;
+
+export const INTRO_DEMO_WHY_BURDEN = [
+  'Developer',
+  'Agency',
+  'Operator',
+  'Ongoing dev costs',
+] as const;
+
+export const INTRO_DEMO_WHY_HANDLED = [
+  'Built for you',
+  'Changes applied',
+  'Maintained for you',
+] as const;
+
+export const INTRO_DEMO_DRAG_LABEL = 'Hero › Headline' as const;
+
+export const INTRO_DEMO_VISION_VOICE_EDIT =
+  'Make the hero headline warmer and friendlier.' as const;
+
+export const INTRO_DEMO_VISION_EDIT_REPLY =
+  'Updated hero headline with a warmer tone applied.' as const;
+
+export const INTRO_DEMO_CLONE_URL = 'https://northstardental.com' as const;
+
+export const INTRO_DEMO_CLONE_STEPS = [
+  'Crawling pages',
+  'Extracting content',
+  'Preserving your copy',
+] as const;
+
+export const INTRO_DEMO_CLONE_PRESERVED = [
+  'Services',
+  'About',
+  'Contact',
+  'Hours',
+] as const;
+
 export const NAV_LINKS = [
-  { href: '#describe', label: 'Describe' },
-  { href: '#preview', label: 'Preview' },
-  { href: '#edit', label: 'Edit' },
-  { href: '#publish', label: 'Publish' },
+  { href: '#vision', label: 'Vision' },
+  { href: '#why', label: 'Why' },
+  { href: '#teammate', label: 'Teammate' },
+  { href: '#websites', label: 'Websites' },
+  { href: '#clone', label: 'Clone' },
 ] as const;
 
 export const HERO = {
-  headline: 'Your website. Built in minutes.',
+  headline: "The future of small business won't be built by larger teams.",
   subline:
-    'Tell us about your business in plain language. First Site drafts a complete website you can preview, refine, and publish.',
+    "Most small businesses can't hire developers, designers, marketers, and operators, yet customers expect the same digital experience as large companies. That's why we're building Auvira.",
   primaryCta: 'Get started',
-  secondaryCta: 'See it in action',
-  secondaryHref: '#preview',
+  secondaryCta: 'Our vision',
+  secondaryHref: '#vision',
 } as const;
 
-export const HERO_PROMPTS = [
-  'A family dental practice in Austin — warm, trustworthy, book online',
-  'Mobile dog grooming, playful and premium',
-  'Local bakery with online ordering — cozy and inviting',
+export const INTRO_NARRATIVE = [
+  {
+    id: 'vision' as const,
+    demo: 'dragToChat' as const,
+    eyebrow: 'Our vision',
+    headline: 'The AI operating system for small business.',
+    subline:
+      "We're not building another website builder. We're building a teammate that learns, remembers, and grows alongside every organization it serves. After your site is live, refine it by dragging a section into chat or speaking your edit out loud.",
+    tagline: 'Augmented Vision. Unlimited Potential.',
+  },
+  {
+    id: 'why' as const,
+    demo: 'teamsToChat' as const,
+    eyebrow: 'Why',
+    headline: 'An unfair burden.',
+    subline:
+      'Most small businesses could never afford a team to build and run a website. With Auvira, you craft and maintain yours your way. Say what you want, we handle the rest. No developers. No agencies. Full control, zero technical upkeep.',
+  },
+  {
+    id: 'teammate' as const,
+    demo: 'memory' as const,
+    eyebrow: 'AI teammate',
+    headline: 'An AI teammate that learns.',
+    subline:
+      'Most AI tools start every conversation from scratch. Auvira is built so every interaction strengthens its understanding of your business, not from templates, but from context.',
+  },
+  {
+    id: 'websites' as const,
+    demo: 'describe' as const,
+    eyebrow: 'Where we start',
+    headline: 'Starting with websites.',
+    subline:
+      'Every business needs a digital presence. Describe what you want. No coding, no agencies, no complicated software. Just conversation. Start from a description or an existing URL. Websites are the foundation for understanding your organization.',
+  },
+  {
+    id: 'clone' as const,
+    demo: 'cloneFromUrl' as const,
+    eyebrow: 'Or refresh yours',
+    headline: 'Clone any existing website.',
+    subline:
+      'Already have a site? Paste the URL. Auvira crawls your pages, preserves your content and contact details, and rebuilds a modern draft you can enhance without starting from scratch.',
+  },
 ] as const;
-
-export const FEATURE_SPOTLIGHTS = [
-  {
-    id: 'describe' as const,
-    eyebrow: 'Describe',
-    headline: 'Say it once.',
-    subline: 'Paste your existing URL or describe your business in a sentence. First Site extracts what matters and builds from there.',
-    cta: 'Learn more',
-    ctaHref: '/auth/signin',
-  },
-  {
-    id: 'preview' as const,
-    eyebrow: 'Preview',
-    headline: 'See it instantly.',
-    subline: 'Your draft loads in a live preview. Scroll, click, and decide if the direction feels right before you change a word.',
-    cta: 'Try the preview',
-    ctaHref: '/auth/signin',
-  },
-  {
-    id: 'edit' as const,
-    eyebrow: 'Edit',
-    headline: 'Refine in chat.',
-    subline: 'Drag any section into chat and describe the change. First Site updates the preview — no HTML, no settings maze.',
-    cta: 'See how editing works',
-    ctaHref: '#edit',
-  },
-  {
-    id: 'publish' as const,
-    eyebrow: 'Publish',
-    headline: 'Go live with confidence.',
-    subline: 'Built-in checks run before every publish. Your live status only appears when the deployed site is actually ready.',
-    cta: 'Get started',
-    ctaHref: '/auth/signin',
-  },
-] as const;
-
-export const FINAL_CTA = {
-  headline: 'Ready to build?',
-  subline: 'Sign in and see your first draft in minutes.',
-  cta: 'Get started',
-} as const;
 
 export const FOOTER_LINKS = [
-  { href: '#describe', label: 'Describe' },
-  { href: '#preview', label: 'Preview' },
+  { href: '#vision', label: 'Vision' },
+  { href: '#why', label: 'Why' },
+  { href: '#teammate', label: 'Teammate' },
+  { href: '#websites', label: 'Websites' },
+  { href: '#clone', label: 'Clone' },
   { href: '/auth/signin', label: 'Sign in' },
 ] as const;

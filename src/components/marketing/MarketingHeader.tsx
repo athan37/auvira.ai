@@ -154,7 +154,7 @@ export function MarketingHeader() {
           scrolled ? 'h-12' : 'h-16'
         )}
       >
-        <Link href="/intro" aria-label="First Site home">
+        <Link href="/intro" aria-label="Auvira.ai home">
           <BrandLogo />
         </Link>
         <nav className="hidden items-center gap-2 text-xs font-normal text-[#1d1d1f] sm:flex">

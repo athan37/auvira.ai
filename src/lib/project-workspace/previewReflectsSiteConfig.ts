@@ -1,4 +1,5 @@
 import { colorNameToBackgroundClass, colorNameToTextClass } from '@/lib/builder/sectionPresentation';
+import { stripPinnedTargetSuffix } from '@/lib/project-workspace/edit-context/configTextEditUtils';
 import { parseSiteConfigSource } from '@/lib/site-manager/siteConfigParser';
 import { extractPreviewVerifyHints, htmlShowsTailwindColor } from './verifyPreviewHints';
 import { rendererComponentForSectionType } from './edit-shared/legacySectionPresentation';
@@ -54,6 +55,40 @@ export function sectionPresentationCardClass(
     | undefined;
   const card = section?.presentation?.cardClass;
   return typeof card === 'string' && card.trim() ? card.trim() : null;
+}
+
+/** Tailwind presentation.cardClass values across all sections. */
+export function presentationCardClassesInSiteConfig(siteConfigContent: string): string[] {
+  const parsed = parseSiteConfigSource(siteConfigContent);
+  if (!parsed?.sections?.length) return [];
+  const classes: string[] = [];
+  for (const section of parsed.sections) {
+    const card = (section as { presentation?: { cardClass?: string } }).presentation?.cardClass;
+    if (typeof card === 'string' && card.trim()) {
+      classes.push(card.trim());
+    }
+  }
+  return classes;
+}
+
+/** Split multi-token presentation classes into preview-visible Tailwind tokens. */
+export function presentationClassTokensForPreviewVerify(classString: string): string[] {
+  const trimmed = classString.trim();
+  if (!trimmed) return [];
+  const tokens = trimmed.split(/\s+/).filter(Boolean);
+  const visual = tokens.filter(
+    (token) =>
+      token.startsWith('bg-') ||
+      token.startsWith('from-') ||
+      token.startsWith('to-') ||
+      token.startsWith('via-')
+  );
+  return visual.length > 0 ? visual : [trimmed];
+}
+
+function messageTargetsInnerCardPresentation(ownerMessage: string): boolean {
+  const normalized = stripPinnedTargetSuffix(ownerMessage).toLowerCase();
+  return /\b(?:card|contact information|phone in card|email in card|inner|panel)\b/.test(normalized);
 }
 
 type TextPresentationField = 'titleClass' | 'bodyClass' | 'eyebrowClass';
@@ -215,20 +250,36 @@ export async function waitForPresentationClassInPreview(
 export function resolveExpectedPreviewPresentationClasses(
   siteConfigContent: string | null | undefined,
   ownerMessage: string,
-  sectionIndex?: number
+  sectionIndex?: number,
+  options?: { presentationField?: 'backgroundClass' | 'cardClass' }
 ): string[] {
   const hints = extractPreviewVerifyHints(ownerMessage);
+  const innerCardIntent =
+    options?.presentationField === 'cardClass' || messageTargetsInnerCardPresentation(ownerMessage);
+
   if (siteConfigContent && sectionIndex != null) {
     if (hints.isTextColorRequest) {
       const fromTitle = sectionPresentationTextClass(siteConfigContent, sectionIndex, 'titleClass');
-      if (fromTitle) return [fromTitle];
+      if (fromTitle) return presentationClassTokensForPreviewVerify(fromTitle);
+    }
+    if (innerCardIntent) {
+      const fromCard = sectionPresentationCardClass(siteConfigContent, sectionIndex);
+      if (fromCard) return presentationClassTokensForPreviewVerify(fromCard);
     }
     const fromSection = sectionPresentationBackgroundClass(siteConfigContent, sectionIndex);
-    if (fromSection) return [fromSection];
+    if (fromSection) return presentationClassTokensForPreviewVerify(fromSection);
+    const fromCard = sectionPresentationCardClass(siteConfigContent, sectionIndex);
+    if (fromCard) return presentationClassTokensForPreviewVerify(fromCard);
   }
   if (siteConfigContent) {
     const fromConfig = presentationBackgroundClassesInSiteConfig(siteConfigContent);
-    if (fromConfig.length > 0) return fromConfig;
+    if (fromConfig.length > 0) {
+      return fromConfig.flatMap(presentationClassTokensForPreviewVerify);
+    }
+    const fromCards = presentationCardClassesInSiteConfig(siteConfigContent);
+    if (fromCards.length > 0) {
+      return fromCards.flatMap(presentationClassTokensForPreviewVerify);
+    }
   }
   if (hints.isTextColorRequest && hints.colors.length > 0) {
     return [...new Set(hints.colors.map((c) => colorNameToTextClass(c, ownerMessage)))];

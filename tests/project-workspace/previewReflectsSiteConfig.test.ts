@@ -42,6 +42,26 @@ describe('previewReflectsSiteConfig', () => {
     ).toEqual(['bg-red-200']);
   });
 
+  it('prefers cardClass tokens when inner card is targeted', () => {
+    const siteConfig = `export const siteConfig = {
+  sections: [
+    {
+      type: "contact",
+      title: "Contact Us",
+      presentation: { cardClass: "bg-red-600 border-red-300" }
+    }
+  ]
+};`;
+    expect(
+      resolveExpectedPreviewPresentationClasses(
+        siteConfig,
+        'change background to red',
+        0,
+        { presentationField: 'cardClass' }
+      )
+    ).toEqual(['bg-red-600']);
+  });
+
   it('requires exact Tailwind class, not generic red elsewhere', () => {
     const html =
       '<button class="bg-red-600"></button><p class="text-red-500">red</p>';

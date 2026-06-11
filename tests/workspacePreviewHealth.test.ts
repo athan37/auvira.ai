@@ -6,12 +6,12 @@ import {
 } from '../src/lib/preview/workspacePreviewHealth';
 
 describe('workspacePreviewHealth', () => {
-  it('reserves First Site dev port 3000', () => {
+  it('reserves Auvira.ai dev port 3000', () => {
     expect(isReservedWorkspacePreviewPort(3000)).toBe(true);
     expect(isReservedWorkspacePreviewPort(3053)).toBe(false);
   });
 
-  it('detects First Site shell HTML', () => {
+  it('detects Auvira.ai shell HTML', () => {
     expect(isSiteAgentShellHtml('<a href="/projects/new/scratch">New</a>')).toBe(true);
     expect(isSiteAgentShellHtml('<h1>Houston HVAC All-Stars</h1>')).toBe(false);
   });

@@ -1,7 +1,7 @@
 import { cn } from '@/lib/cn';
-import { BRAND } from '@/content/marketing';
+import { AuviraLogoMark } from './AuviraLogoMark';
 
-/** Minimal monochrome wordmark. */
+/** Auvira.ai wordmark with gradient SVG mark. */
 export function BrandLogo({
   className,
   showName = true,
@@ -13,41 +13,24 @@ export function BrandLogo({
   size?: 'sm' | 'md';
   inverted?: boolean;
 }) {
-  const iconSize = size === 'sm' ? 'h-7 w-7' : 'h-8 w-8';
   const textSize = size === 'sm' ? 'text-sm' : 'text-sm';
 
   return (
-    <span className={cn('inline-flex items-center gap-2', className)}>
-      <span
-        className={cn(
-          'flex items-center justify-center rounded-lg border',
-          inverted
-            ? 'border-white/20 bg-white/10'
-            : 'border-[#d2d2d7]/80 bg-[#f5f5f7]',
-          iconSize
-        )}
-        aria-hidden
-      >
-        <svg
-          viewBox="0 0 24 24"
-          className={cn('h-4 w-4', inverted ? 'text-white' : 'text-[#1d1d1f]')}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-        >
-          <rect x="3" y="3" width="18" height="18" rx="3" />
-          <path d="M8 12h8M8 8h5" strokeLinecap="round" />
-        </svg>
-      </span>
+    <span className={cn('inline-flex items-center gap-2 leading-none', className)}>
+      <AuviraLogoMark
+        size={size}
+        className={cn('relative', size === 'sm' ? '-top-0.5' : 'top-0')}
+      />
       {showName && (
         <span
           className={cn(
-            'font-semibold tracking-tight',
+            'font-semibold tracking-tight leading-none',
             inverted ? 'text-white' : 'text-[#1d1d1f]',
             textSize
           )}
         >
-          {BRAND.name}
+          Auvira
+          <span className={cn(inverted ? 'text-brand-ai-inverted' : 'text-brand-ai')}>.ai</span>
         </span>
       )}
     </span>

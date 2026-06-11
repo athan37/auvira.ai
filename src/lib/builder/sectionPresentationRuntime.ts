@@ -52,6 +52,12 @@ function resolveSectionCardClass(section: SectionWithPresentation, preset: Recor
   return pickPresentation(section, "cardClass", "card", preset, preset.card ?? "bg-white border");
 }
 
+function resolveContactFieldClass(section: SectionWithPresentation, preset: Record<string, string>): string {
+  const cardOverride = section.presentation?.cardClass?.trim();
+  if (cardOverride) return cardOverride;
+  return preset.contactField ?? "border-white/10 bg-white/5 text-slate-200";
+}
+
 function resolveSectionEyebrowClass(section: SectionWithPresentation, preset: Record<string, string>): string {
   return pickPresentation(section, "eyebrowClass", "sectionEyebrow", preset, preset.sectionEyebrow ?? "text-slate-600");
 }
