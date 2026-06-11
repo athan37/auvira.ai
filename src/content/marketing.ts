@@ -21,6 +21,21 @@ export type IntroDemoId =
 export const INTRO_DEMO_PROMPT =
   'A family dental practice in Austin, warm and trustworthy, book online' as const;
 
+/** Suggestion chips for the websites intro demo (assembled into INTRO_DEMO_PROMPT). */
+export const INTRO_DEMO_DESCRIBE_CHIPS = [
+  'Family dental practice',
+  'Warm & trustworthy',
+  'Book online',
+] as const;
+
+/** Site sections that build in the websites intro demo wireframe. */
+export const INTRO_DEMO_DESCRIBE_SECTIONS = [
+  'Navigation',
+  'Hero',
+  'Services',
+  'Contact',
+] as const;
+
 export const INTRO_DEMO_WHY_REQUEST =
   'Update our hours and refresh the homepage for spring.' as const;
 
@@ -110,9 +125,9 @@ export const INTRO_NARRATIVE = [
     id: 'websites' as const,
     demo: 'describe' as const,
     eyebrow: 'Where we start',
-    headline: 'Starting with websites.',
+    headline: 'Starting with ideas.',
     subline:
-      'Every business needs a digital presence. Describe what you want. No coding, no agencies, no complicated software. Just conversation. Start from a description or an existing URL. Websites are the foundation for understanding your organization.',
+      'Every business starts with an idea. Describe what you want in plain language. No coding, no agencies, no complicated software. Just conversation, whether you begin from scratch or paste an existing URL. Your website is how Auvira first learns your organization.',
   },
   {
     id: 'clone' as const,
