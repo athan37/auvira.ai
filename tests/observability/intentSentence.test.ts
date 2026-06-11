@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   evidenceFromIntentSentence,
   extractColorFromIntentSentence,
+  extractColorsFromIntentSentence,
   hasUsableIntentSentence,
   intentSentenceIsUnresolved,
 } from '@/lib/observability/intentSentence';
@@ -20,6 +21,12 @@ describe('intentSentence', () => {
     expect(intentSentenceIsUnresolved(sentence)).toBe(true);
     expect(hasUsableIntentSentence(sentence)).toBe(false);
     expect(evidenceFromIntentSentence(sentence, 'color')).toBeNull();
+  });
+
+  it('extracts gradient class and phrase colors', () => {
+    const sentence = 'Apply gradient-red to the hero and use gradient blue accents.';
+    expect(extractColorsFromIntentSentence(sentence)).toEqual(['red', 'blue']);
+    expect(extractColorFromIntentSentence(sentence)).toBe('blue');
   });
 
   it('extracts quoted copy from Monitor sentence', () => {

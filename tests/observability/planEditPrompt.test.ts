@@ -11,8 +11,9 @@ describe('buildPlanEditSystemPrompt coaching block', () => {
   const coaching: ObservabilityCoachingContext = {
     coachingHints: ['Prior turn failed build gate — verify TypeScript compiles.'],
     constraints: { require_build_gate_pass: true },
-    qualitySnapshot: { latest_grade: 'B' },
+    qualitySnapshot: { latestGrade: 'B' },
     recurringIssues: ['EDIT_BUILD_GATE_FAILED'],
+    missingKeywords: [],
     source: 'phoenix_traces',
   };
 

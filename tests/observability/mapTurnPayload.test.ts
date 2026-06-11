@@ -57,6 +57,7 @@ describe('mapTurnPayload', () => {
         constraints: { require_build_gate_pass: true },
         qualitySnapshot: {},
         recurringIssues: ['EDIT_BUILD_GATE_FAILED'],
+        missingKeywords: [],
         source: 'phoenix_traces',
       },
     });

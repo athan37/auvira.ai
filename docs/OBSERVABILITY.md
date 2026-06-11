@@ -106,32 +106,43 @@ Filter spans named `builder.turn` in [Phoenix Cloud](https://app.phoenix.arize.c
 
 - **Chat:** successful edits with applied project memory show an inline **Used project context** line and a sky **Context** chip; clarification/failure turns show a violet **Tips** chip when guidance or coaching exists (click to expand; Escape or click outside to close). Coaching "hints applied" badges are not shown on success. Set `NEXT_PUBLIC_OBSERVABILITY_DEBUG=1` for grade badges and Phoenix trace links ([`ObservabilityTraceChip`](../src/components/project/ObservabilityTraceChip.tsx)).
 - **Admin page:** [`/admin/observability`](../src/app/admin/observability/page.tsx) — recent turn scores across all projects via `GET /api/admin/observability`.
-- **Per-project page:** [`/projects/{projectId}/observability`](../src/app/projects/[projectId]/observability/page.tsx) — project owners see live Site Monitor `GET /context` (coaching hints, recurring issues, quality snapshot) plus turn history from chat metadata.
+- **Per-project page:** [`/projects/{projectId}/observability`](../src/app/projects/[projectId]/observability/page.tsx) — analytics dashboard wired to Site Monitor (conversation picker, **Analyze session**, on-demand **Probe intent**). Data is Monitor-only when enabled (no Mongo chat-metadata fallback).
 
-### Per-project API
+### Per-project analytics API
 
-```
-GET /api/projects/{projectId}/observability?days=7&probeMessage=optional
-```
+Auth: project owner only (`getOwnerProject`). Never exposes `OBSERVABILITY_API_KEY` to the client.
 
-Auth: project owner only (`getOwnerProject`). Response:
+**Bootstrap** — `GET /api/projects/{projectId}/observability/bootstrap`
 
-| Field | Description |
-|-------|-------------|
-| `summary` | Synced/failed counts, avg score, grade/outcome counts, coaching applied |
-| `turns[]` | Per-assistant-turn rows (grade, hints, changed files, trace id) |
-| `liveContext.raw` | Raw Site Monitor context payload |
-| `liveContext.parsed` | Typed coaching hints, constraints, quality snapshot |
-| `monitorEnabled` | False when `OBSERVABILITY_ENABLED=0` or no API key — Mongo history still loads |
+Returns `conversations[]`, `defaultConversationId` (`{projectId}-editor`), optional `health` from Monitor `/health/ready`.
 
-Optional `probeMessage` re-fetches context with `latest_user_message` (same as curl probe). Never exposes `OBSERVABILITY_API_KEY` to the client.
+**Analyze session** — `POST /api/projects/{projectId}/observability/analyze`
+
+Body: `{ conversationId?, probeMessage? }` (default probe: `change background to my favorite color`).
+
+Parallel server fetch: `GET .../dashboard?turn_limit=50`, `GET .../intent?turn_limit=200`, `GET .../context?conversation_id&latest_user_message`.
+
+| Response field | Panel group |
+|----------------|-------------|
+| `sessionSummary` | Group 1 — dashboard.cards (turn count, grades, pass rates, trend, top_issue_label) |
+| `intentProfile` | Group 2 — keywords, intents, turn_count, scope |
+| `coachingContext` | Group 3 — coaching_hints, recurring_issues, missing_keywords, quality_snapshot |
+| `developerAnalytics` | Groups 5–9 — executive_kpis, learning_metrics, charts, turns[], improvement_brief |
+
+**Probe intent** — `POST /api/projects/{projectId}/observability/intent`
+
+Body: `{ userMessage, conversationId?, selectedTarget? }` → Group 4 intent sentence + `extractedColors[]`.
+
+Legacy `GET .../observability/intent?userMessage=` remains for turn-table intent cells.
 
 ## Code entry points
 
 | Path | Role |
 |------|------|
 | [`src/lib/metrics/aggregateObservabilityMetrics.ts`](../src/lib/metrics/aggregateObservabilityMetrics.ts) | Admin + per-project turn aggregation |
-| [`src/app/api/projects/[projectId]/observability/route.ts`](../src/app/api/projects/[projectId]/observability/route.ts) | Per-project observability API |
+| [`src/app/api/projects/[projectId]/observability/bootstrap/route.ts`](../src/app/api/projects/[projectId]/observability/bootstrap/route.ts) | Conversations + health bootstrap |
+| [`src/app/api/projects/[projectId]/observability/analyze/route.ts`](../src/app/api/projects/[projectId]/observability/analyze/route.ts) | Parallel Monitor session analyze |
+| [`src/app/api/projects/[projectId]/observability/intent/route.ts`](../src/app/api/projects/[projectId]/observability/intent/route.ts) | On-demand POST /intent probe |
 | [`src/lib/observability/`](../src/lib/observability/) | Client, redaction, turn recording, builder_type normalization |
 | [`src/lib/observability/recordCloneTurn.ts`](../src/lib/observability/recordCloneTurn.ts) | Clone wizard turn recording |
 | [`src/app/api/projects/[projectId]/code-agent/edit/stream/route.ts`](../src/app/api/projects/[projectId]/code-agent/edit/stream/route.ts) | Editor hooks + agent sub-span payload |

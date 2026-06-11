@@ -80,8 +80,9 @@ describe('formatEditContextSummary', () => {
         coachingContext: {
           coachingHints: ['Keep palette consistent.'],
           constraints: { require_verify_pass: true },
-          qualitySnapshot: { latest_grade: 'B', latest_overall_score: 0.72 },
+          qualitySnapshot: { latestGrade: 'B', latestOverallScore: 0.72 },
           recurringIssues: ['WRONG_SECTION_TARGET'],
+          missingKeywords: [],
           source: 'phoenix_traces',
         },
         resolvedReferences: [
@@ -110,8 +111,9 @@ describe('formatEditContextSummary', () => {
     const context = buildMonitorContextForChat({
       coachingHints: ['Hint one'],
       constraints: { require_verify_pass: true },
-      qualitySnapshot: { latest_grade: 'B', latest_overall_score: 0.7 },
+      qualitySnapshot: { latestGrade: 'B', latestOverallScore: 0.7 },
       recurringIssues: ['ISSUE_A'],
+      missingKeywords: [],
       source: 'turn_ledger',
     });
     expect(formatMonitorContextPanelLines(context)).toEqual(

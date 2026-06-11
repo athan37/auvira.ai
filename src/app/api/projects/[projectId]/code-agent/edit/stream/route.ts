@@ -586,6 +586,7 @@ export async function POST(
             constraints: {},
             qualitySnapshot: {},
             recurringIssues: [],
+            missingKeywords: [],
             source: 'unavailable',
           };
           projectIntent = fetchedIntent;

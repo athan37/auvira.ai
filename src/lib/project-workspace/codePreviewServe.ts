@@ -1,5 +1,6 @@
 import { promises as fs } from 'fs';
 import path from 'path';
+import { BRAND } from '@/content/marketing';
 import type { IWebsiteProject } from '@/models/WebsiteProject';
 import { getGitWorkspacePath } from '@/lib/project-workspace/gitWorkspaceManager';
 import { scratchPath } from '@/lib/runtime/scratchDir';
@@ -133,6 +134,7 @@ export function buildPreviewLoadingHtml(projectId: string, label: string): strin
       --loader-shimmer: linear-gradient(90deg, transparent, var(--cta-blue-light), var(--cta-blue), var(--cta-blue-hover), transparent);
     }
     body { font-family: system-ui, sans-serif; padding: 2rem; max-width: 40rem; margin: 0 auto; color: #1d1d1f; text-align: center; background: #fbfbfd; }
+    .logo { display: block; width: 2.5rem; height: 2.5rem; margin: 0 auto 1rem; object-fit: contain; }
     .track { position: relative; height: 4px; width: min(12rem, 80vw); margin: 0 auto 1.25rem; overflow: hidden; border-radius: 9999px; background: var(--loader-track-bg); }
     .shimmer { position: absolute; inset: 0; width: 50%; border-radius: inherit; background: var(--loader-shimmer); animation: slide 1.5s ease-in-out infinite; }
     @keyframes slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(200%); } }
@@ -141,6 +143,7 @@ export function buildPreviewLoadingHtml(projectId: string, label: string): strin
   </style>
 </head>
 <body>
+  <img class="logo" src="${BRAND.logoPngSrc}" width="40" height="40" alt="${BRAND.logoAlt}" />
   <div class="track" aria-hidden="true"><div class="shimmer"></div></div>
   <p>${label}</p>
   <p style="font-size:0.75rem;color:#9ca3af">Project ${projectId}</p>

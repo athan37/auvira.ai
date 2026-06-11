@@ -10,8 +10,9 @@ const BASE_ENV = { ...process.env };
 const SAMPLE_COACHING: ObservabilityCoachingContext = {
   coachingHints: ['Prior turn failed build gate — ensure TypeScript compiles before replying.'],
   constraints: { require_build_gate_pass: true, require_verify_pass: true },
-  qualitySnapshot: { latest_grade: 'C', latest_overall_score: 0.62 },
+  qualitySnapshot: { latestGrade: 'C', latestOverallScore: 0.62 },
   recurringIssues: ['EDIT_BUILD_GATE_FAILED'],
+  missingKeywords: [],
   source: 'phoenix_traces',
 };
 

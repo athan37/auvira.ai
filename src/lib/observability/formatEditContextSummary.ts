@@ -70,8 +70,8 @@ export function buildMonitorContextForChat(
 ): ProjectMessageMonitorContext | undefined {
   if (!context) return undefined;
   const constraintKeys = Object.keys(context.constraints);
-  const grade = context.qualitySnapshot.latest_grade;
-  const score = context.qualitySnapshot.latest_overall_score;
+  const grade = context.qualitySnapshot.latestGrade;
+  const score = context.qualitySnapshot.latestOverallScore;
   return {
     source: context.source,
     coachingHints: context.coachingHints

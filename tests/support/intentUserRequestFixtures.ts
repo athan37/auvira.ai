@@ -29,8 +29,9 @@ export function sampleCoachingContext(
   return {
     coachingHints: ['Prior color edit used blue — keep palette consistent.'],
     constraints: { require_build_gate_pass: true },
-    qualitySnapshot: { latest_grade: 'B' },
+    qualitySnapshot: { latestGrade: 'B' },
     recurringIssues: ['EDIT_BUILD_GATE_FAILED'],
+    missingKeywords: [],
     source: 'phoenix_traces',
     ...overrides,
   };

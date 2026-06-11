@@ -4,11 +4,22 @@ export type ObservabilityEditOutcome = 'success' | 'failed' | 'clarification';
 
 export type ObservabilityFlowType = 'edit' | 'clone' | 'generate';
 
+export interface ObservabilityQualitySnapshot {
+  trend?: string;
+  latestOverallScore?: number;
+  latestGrade?: string;
+  score?: number;
+  grade?: string;
+}
+
 export interface ObservabilityCoachingContext {
   coachingHints: string[];
   constraints: Record<string, unknown>;
-  qualitySnapshot: Record<string, unknown>;
+  hintPolicy?: Record<string, unknown>;
+  qualitySnapshot: ObservabilityQualitySnapshot;
   recurringIssues: string[];
+  missingKeywords: string[];
+  traceCount?: number;
   source: string;
 }
 

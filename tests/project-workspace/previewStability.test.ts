@@ -10,6 +10,7 @@ describe('previewStability', () => {
   it('detects loading placeholder HTML', () => {
     const html = buildPreviewLoadingHtml('proj-1', 'Preview is starting');
     expect(isPreviewLoadingHtml(html)).toBe(true);
+    expect(html).toContain('/brand/auvira-logo.png');
   });
 
   it('classifies timeout as soft pending', () => {

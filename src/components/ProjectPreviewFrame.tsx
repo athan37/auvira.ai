@@ -24,6 +24,7 @@ import {
 import { usePageVisible } from '@/lib/hooks/usePageVisible';
 import { markEditorVital, recordIframeReload } from '@/lib/metrics/clientVitals';
 import { PREVIEW_IFRAME_SETTLE_MS } from '@/lib/project-workspace/previewReloadAfterEdit';
+import { AuviraLogoMark } from '@/components/marketing/AuviraLogoMark';
 import { LoadingDots } from '@/components/ui/LoadingDots';
 import { BORDER, LOADING, RADIUS, SURFACE, TEXT } from '@/content/productTheme';
 
@@ -133,7 +134,8 @@ function PreviewPaneLoadingOverlay({
         LOADING.shell
       )}
     >
-      <div className="flex w-full max-w-sm flex-col items-center gap-3 text-center">
+      <div className="flex w-full max-w-sm flex-col items-center gap-4 text-center">
+        <AuviraLogoMark size="lg" />
         <LoadingDots size="lg" />
         <p className={cn('text-sm font-medium', TEXT.primary)}>{title}</p>
         {subtitle ? (

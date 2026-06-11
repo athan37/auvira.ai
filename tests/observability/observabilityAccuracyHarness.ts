@@ -22,8 +22,9 @@ export const COACHING_WRONG_SECTION_INDEX: ObservabilityCoachingContext = {
     'Do not default to index 0 when multiple sections share keywords like "grow" or "everything you need".',
   ],
   constraints: { require_correct_section_index: true },
-  qualitySnapshot: { latest_grade: 'D', latest_overall_score: 0.45, trend: 'declining' },
+  qualitySnapshot: { latestGrade: 'D', latestOverallScore: 0.45, trend: 'declining' },
   recurringIssues: ['WRONG_SECTION_TARGET', 'CATALOG_AMBIGUITY'],
+  missingKeywords: [],
   source: 'phoenix_traces',
 };
 
@@ -34,8 +35,9 @@ export const COACHING_NUMBERED_REPLY: ObservabilityCoachingContext = {
     'Do not re-open deictic ambiguity once the owner picked a catalog number.',
   ],
   constraints: { honor_numbered_catalog_reply: true },
-  qualitySnapshot: { latest_grade: 'C', latest_overall_score: 0.58, trend: 'flat' },
+  qualitySnapshot: { latestGrade: 'C', latestOverallScore: 0.58, trend: 'flat' },
   recurringIssues: ['CLARIFICATION_LOOP', 'DEICTIC_MISREAD'],
+  missingKeywords: [],
   source: 'phoenix_traces',
 };
 
@@ -46,8 +48,9 @@ export const COACHING_RECENCY_OVERRIDE: ObservabilityCoachingContext = {
     'When owner says "Sorry, I meant {section} instead", the latest named section wins over prior turns.',
   ],
   constraints: { prefer_latest_section_mention: true },
-  qualitySnapshot: { latest_grade: 'C', latest_overall_score: 0.55, trend: 'declining' },
+  qualitySnapshot: { latestGrade: 'C', latestOverallScore: 0.55, trend: 'declining' },
   recurringIssues: ['STALE_SECTION_TARGET'],
+  missingKeywords: [],
   source: 'phoenix_traces',
 };
 
@@ -58,8 +61,9 @@ export const COACHING_WRONG_NUMBER_CORRECTION: ObservabilityCoachingContext = {
     'When owner sends a single correcting number like "1" after a wrong pick, apply the style edit to that catalog index only.',
   ],
   constraints: { honor_catalog_number_correction: true },
-  qualitySnapshot: { latest_grade: 'D', latest_overall_score: 0.42, trend: 'declining' },
+  qualitySnapshot: { latestGrade: 'D', latestOverallScore: 0.42, trend: 'declining' },
   recurringIssues: ['WRONG_CATALOG_NUMBER'],
+  missingKeywords: [],
   source: 'phoenix_traces',
 };
 
@@ -70,8 +74,9 @@ export const COACHING_CARD_NOT_SECTION: ObservabilityCoachingContext = {
     'For "contact information background" on a pinned contact section, use presentationField cardClass — keep section backgroundClass unchanged.',
   ],
   constraints: { inner_card_not_section_wrapper: true },
-  qualitySnapshot: { latest_grade: 'C', latest_overall_score: 0.6, trend: 'flat' },
+  qualitySnapshot: { latestGrade: 'C', latestOverallScore: 0.6, trend: 'flat' },
   recurringIssues: ['CARD_VS_SECTION_CONFUSION'],
+  missingKeywords: [],
   source: 'phoenix_traces',
 };
 
@@ -82,8 +87,9 @@ export const COACHING_HERO_NOT_SECTION: ObservabilityCoachingContext = {
     'Do not route gradient or color follow-ups to About/services sections after hero was named in the thread.',
   ],
   constraints: { hero_not_content_section: true },
-  qualitySnapshot: { latest_grade: 'D', latest_overall_score: 0.4, trend: 'declining' },
+  qualitySnapshot: { latestGrade: 'D', latestOverallScore: 0.4, trend: 'declining' },
   recurringIssues: ['HERO_SECTION_CONFUSION'],
+  missingKeywords: [],
   source: 'phoenix_traces',
 };
 
@@ -94,8 +100,9 @@ export const COACHING_BUILD_GATE: ObservabilityCoachingContext = {
     'Verify section background class exists in tailwind safelist before finishing.',
   ],
   constraints: { require_build_gate_pass: true, require_verify_pass: true },
-  qualitySnapshot: { latest_grade: 'C', latest_overall_score: 0.62, trend: 'declining' },
+  qualitySnapshot: { latestGrade: 'C', latestOverallScore: 0.62, trend: 'declining' },
   recurringIssues: ['EDIT_BUILD_GATE_FAILED'],
+  missingKeywords: [],
   source: 'phoenix_traces',
 };
 

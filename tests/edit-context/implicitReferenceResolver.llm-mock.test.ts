@@ -75,6 +75,7 @@ describe('resolveImplicitReferences LLM fallback', () => {
         constraints: {},
         qualitySnapshot: {},
         recurringIssues: [],
+        missingKeywords: [],
         source: 'test',
       },
     });
@@ -108,6 +109,7 @@ describe('resolveImplicitReferences LLM fallback', () => {
         constraints: {},
         qualitySnapshot: {},
         recurringIssues: [],
+        missingKeywords: [],
         source: 'test',
       },
     });

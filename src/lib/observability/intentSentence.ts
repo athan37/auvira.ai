@@ -3,10 +3,19 @@ import type { ImplicitReferenceKind } from '@/lib/project-workspace/edit-context
 const COLOR_WORDS =
   /\b(red|blue|green|yellow|orange|purple|pink|black|white|gray|grey|navy|teal|cyan|amber|indigo|violet|brown|beige|gold|silver)\b/gi;
 
+const GRADIENT_CLASS_PATTERN = /gradient-([a-z]+)/gi;
+const GRADIENT_PHRASE_PATTERN = /gradient\s+([a-z]+)/gi;
+
 function findColorsInText(text: string): string[] {
   const found: string[] = [];
   for (const match of text.matchAll(COLOR_WORDS)) {
     if (match[0]) found.push(match[0].toLowerCase());
+  }
+  for (const match of text.matchAll(GRADIENT_CLASS_PATTERN)) {
+    if (match[1]) found.push(match[1].toLowerCase());
+  }
+  for (const match of text.matchAll(GRADIENT_PHRASE_PATTERN)) {
+    if (match[1]) found.push(match[1].toLowerCase());
   }
   return [...new Set(found)];
 }
@@ -19,10 +28,15 @@ export function intentSentenceIsUnresolved(sentence: string): boolean {
   return UNRESOLVED_INTENT_PATTERN.test(sentence);
 }
 
+/** Extract all color tokens from a Monitor intent sentence. */
+export function extractColorsFromIntentSentence(sentence: string): string[] {
+  if (intentSentenceIsUnresolved(sentence)) return [];
+  return findColorsInText(sentence);
+}
+
 /** Extract a concrete color from a Monitor intent sentence. */
 export function extractColorFromIntentSentence(sentence: string): string | null {
-  if (intentSentenceIsUnresolved(sentence)) return null;
-  const colors = findColorsInText(sentence);
+  const colors = extractColorsFromIntentSentence(sentence);
   if (colors.length === 0) return null;
   return colors[colors.length - 1] ?? null;
 }

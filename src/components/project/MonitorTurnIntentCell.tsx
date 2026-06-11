@@ -15,9 +15,11 @@ type IntentProbeResult = {
 export function MonitorTurnIntentCell({
   projectId,
   userMessage,
+  conversationId,
 }: {
   projectId: string;
   userMessage: string;
+  conversationId?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -33,6 +35,7 @@ export function MonitorTurnIntentCell({
     setError(null);
     try {
       const qs = new URLSearchParams({ userMessage });
+      if (conversationId) qs.set('conversationId', conversationId);
       const res = await fetch(
         `/api/projects/${projectId}/observability/intent?${qs.toString()}`
       );
