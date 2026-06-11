@@ -4,9 +4,16 @@ import { validateSandboxWorkspace } from '@/lib/sandbox/validateSandboxWorkspace
 const mockRunCommand = vi.fn();
 const mockGetSandbox = vi.fn();
 const mockGetGateway = vi.fn();
+const mockClearSandboxDevArtifacts = vi.fn();
+const mockRestartSandboxDevServer = vi.fn();
 
 vi.mock('@/lib/sandbox/sandboxClient', () => ({
   getProjectSandbox: (...args: unknown[]) => mockGetSandbox(...args),
+}));
+
+vi.mock('@/lib/sandbox/sandboxDevServer', () => ({
+  clearSandboxDevArtifacts: (...args: unknown[]) => mockClearSandboxDevArtifacts(...args),
+  restartSandboxDevServer: (...args: unknown[]) => mockRestartSandboxDevServer(...args),
 }));
 
 vi.mock('@/lib/sandbox/sandboxWorkspaceGateway', () => ({
@@ -27,6 +34,8 @@ describe('validateSandboxWorkspace', () => {
     mockGetSandbox.mockResolvedValue({
       runCommand: mockRunCommand,
     });
+    mockClearSandboxDevArtifacts.mockResolvedValue(undefined);
+    mockRestartSandboxDevServer.mockResolvedValue('https://sandbox.example');
   });
 
   it('skips npm build for tailwind-only edits and strips legacy page exports', async () => {
@@ -93,9 +102,43 @@ export const __siteAgentPageGallerySync = 999;
 
     expect(result.ok).toBe(true);
     expect(files.get('src/app/page.tsx')).not.toContain('__siteAgentPageGallerySync');
+    expect(mockClearSandboxDevArtifacts).toHaveBeenCalledTimes(1);
     expect(mockRunCommand).toHaveBeenCalledWith(
       expect.objectContaining({ cmd: 'npm', args: ['run', 'build'] })
     );
+    expect(mockRestartSandboxDevServer).not.toHaveBeenCalled();
+  });
+
+  it('clears dev artifacts, runs build, and restarts preview for deploy gate (no changedFiles)', async () => {
+    const files = new Map<string, string>([
+      ['src/app/page.tsx', 'export default function Home() { return null; }\n'],
+      ['src/lib/siteConfig.ts', 'export const siteConfig = {};\n'],
+    ]);
+
+    mockRunCommand.mockImplementation(async (opts: { cmd: string; args: string[] }) => {
+      if (opts.cmd === 'test') return { exitCode: 0 };
+      if (opts.cmd === 'npm' && opts.args[0] === 'run') {
+        return { exitCode: 0, stdout: async () => 'ok', stderr: async () => '' };
+      }
+      return { exitCode: 0, stdout: async () => '', stderr: async () => '' };
+    });
+
+    mockGetGateway.mockResolvedValue({
+      readFile: async (rel: string) => files.get(rel) ?? Promise.reject(new Error('missing')),
+      writeFile: async (rel: string, body: string) => {
+        files.set(rel, body);
+      },
+    });
+
+    const result = await validateSandboxWorkspace('proj-deploy');
+
+    expect(result.ok).toBe(true);
+    expect(mockClearSandboxDevArtifacts).toHaveBeenCalledTimes(1);
+    expect(mockRunCommand).toHaveBeenCalledWith(
+      expect.objectContaining({ cmd: 'npm', args: ['run', 'build'] })
+    );
+    expect(mockRestartSandboxDevServer).toHaveBeenCalledWith('proj-deploy');
+    expect(result.buildLog).toContain('cleared .next before production build');
   });
 
   it('skips npm build for section color edits (siteConfig + page + tailwind)', async () => {
@@ -136,6 +179,7 @@ export const __siteAgentPageGallerySync = 1;
     expect(result.ok).toBe(true);
     expect(files.get('src/app/page.tsx')).not.toContain('__siteAgentPageGallerySync');
     expect(result.buildLog).toContain('skipping npm run build');
+    expect(mockClearSandboxDevArtifacts).not.toHaveBeenCalled();
     expect(mockRunCommand).not.toHaveBeenCalledWith(
       expect.objectContaining({ cmd: 'npm', args: ['run', 'build'] })
     );

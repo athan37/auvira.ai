@@ -4,12 +4,14 @@ import { repairSiteConfigTypesViaGateway } from '@/lib/preview/repairSiteConfigT
 import { repairPreviewSandbox } from '@/lib/sandbox/repairPreviewSandbox';
 import { validateChangedSourceSyntax } from '@/lib/project-workspace/validateTsxSyntax';
 import { sanitizeAgentMarkerFilesInWorkspace } from '@/lib/site-manager/siteConfigAgentMarkers';
+import { clearSandboxDevArtifacts, restartSandboxDevServer } from './sandboxDevServer';
 import { getProjectSandbox } from './sandboxClient';
 import { getSandboxGateway } from './sandboxWorkspaceGateway';
 import { SANDBOX_WORKDIR } from './types';
 
 /**
- * Run `npm run build` inside the sandbox VM after an edit.
+ * Run `npm run build` inside the sandbox VM (post-edit or pre-deploy gate).
+ * Stops `next dev` and clears `.next` before production build — same as local validateWorkspace.
  */
 export async function validateSandboxWorkspace(
   projectId: string,
@@ -95,6 +97,19 @@ export async function validateSandboxWorkspace(
     return { ok: true, buildLog: logs.join('\n'), errors, warnings };
   }
 
+  const isDeployBuildGate = changedFiles === undefined;
+
+  try {
+    await clearSandboxDevArtifacts(sandbox);
+    logs.push('Stopped sandbox next dev and cleared .next before production build');
+  } catch (e) {
+    warnings.push(
+      `Could not clear sandbox dev artifacts before build: ${
+        e instanceof Error ? e.message : String(e)
+      }`
+    );
+  }
+
   const build = await sandbox.runCommand({
     cmd: 'npm',
     args: ['run', 'build'],
@@ -104,7 +119,22 @@ export async function validateSandboxWorkspace(
   const stderr = await build.stderr();
   logs.push(stdout, stderr);
 
-  if (build.exitCode !== 0) {
+  const buildOk = build.exitCode === 0;
+
+  if (isDeployBuildGate) {
+    try {
+      await restartSandboxDevServer(projectId);
+      logs.push('Restarted sandbox next dev after production build check');
+    } catch (e) {
+      warnings.push(
+        `Preview restart after build check failed: ${
+          e instanceof Error ? e.message : String(e)
+        }`
+      );
+    }
+  }
+
+  if (!buildOk) {
     errors.push('Build failed in sandbox preview');
     if (changedFiles?.length) {
       warnings.push(`Changed files: ${changedFiles.slice(0, 10).join(', ')}`);
