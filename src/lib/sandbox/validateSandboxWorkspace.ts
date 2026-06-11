@@ -1,4 +1,6 @@
+import type { Sandbox } from '@vercel/sandbox';
 import type { ValidateWorkspaceResult } from '@/lib/project-workspace/validateWorkspace';
+import { customerSiteProductionBuildEnv } from '@/lib/builder/prepareGeneratedWorkspaceForBuild';
 import { isPreviewSafeEdit } from '@/lib/project-workspace/previewSafeValidation';
 import { repairSiteConfigTypesViaGateway } from '@/lib/preview/repairSiteConfigTypes';
 import { repairPreviewSandbox } from '@/lib/sandbox/repairPreviewSandbox';
@@ -8,6 +10,61 @@ import { clearSandboxDevArtifacts, restartSandboxDevServer } from './sandboxDevS
 import { getProjectSandbox } from './sandboxClient';
 import { getSandboxGateway } from './sandboxWorkspaceGateway';
 import { SANDBOX_WORKDIR } from './types';
+
+function sandboxProductionBuildEnv(): Record<string, string> {
+  const env = customerSiteProductionBuildEnv();
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(env)) {
+    if (value !== undefined) {
+      out[key] = String(value);
+    }
+  }
+  return out;
+}
+
+function summarizeSandboxBuildFailure(stdout: string, stderr: string): string {
+  const combined = `${stderr}\n${stdout}`.trim();
+  if (!combined) {
+    return 'Build failed in sandbox preview';
+  }
+  const lines = combined.split('\n').map((line) => line.trim()).filter(Boolean);
+  const tail = lines.slice(-8).join(' | ');
+  return tail.length > 400 ? `Build failed in sandbox preview: …${tail.slice(-400)}` : `Build failed in sandbox preview: ${tail}`;
+}
+
+/** Ensure deps exist before a production build in the sandbox VM. */
+async function ensureSandboxNodeModules(
+  sandbox: Sandbox,
+  logs: string[]
+): Promise<void> {
+  const check = await sandbox.runCommand({
+    cmd: 'test',
+    args: ['-d', 'node_modules'],
+    cwd: SANDBOX_WORKDIR,
+  });
+  if (check.exitCode === 0) {
+    return;
+  }
+
+  logs.push('> npm install --legacy-peer-deps (node_modules missing before production build)');
+  const install = await sandbox.runCommand({
+    cmd: 'npm',
+    args: ['install', '--legacy-peer-deps'],
+    cwd: SANDBOX_WORKDIR,
+    env: { CI: 'true', NODE_ENV: 'development' },
+  });
+  const installOut = await install.stdout();
+  const installErr = await install.stderr();
+  if (installOut) {
+    logs.push(installOut);
+  }
+  if (installErr) {
+    logs.push(installErr);
+  }
+  if (install.exitCode !== 0) {
+    throw new Error(installErr.slice(-500) || 'npm install failed in sandbox before production build');
+  }
+}
 
 /**
  * Run `npm run build` inside the sandbox VM (post-edit or pre-deploy gate).
@@ -110,10 +167,19 @@ export async function validateSandboxWorkspace(
     );
   }
 
+  try {
+    await ensureSandboxNodeModules(sandbox, logs);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    errors.push(msg);
+    return { ok: false, buildLog: logs.join('\n').slice(-8000), errors, warnings };
+  }
+
   const build = await sandbox.runCommand({
     cmd: 'npm',
     args: ['run', 'build'],
     cwd: SANDBOX_WORKDIR,
+    env: sandboxProductionBuildEnv(),
   });
   const stdout = await build.stdout();
   const stderr = await build.stderr();
@@ -122,20 +188,21 @@ export async function validateSandboxWorkspace(
   const buildOk = build.exitCode === 0;
 
   if (isDeployBuildGate) {
-    try {
-      await restartSandboxDevServer(projectId);
-      logs.push('Restarted sandbox next dev after production build check');
-    } catch (e) {
-      warnings.push(
-        `Preview restart after build check failed: ${
-          e instanceof Error ? e.message : String(e)
-        }`
-      );
-    }
+    void restartSandboxDevServer(projectId)
+      .then(() => {
+        logs.push('Restarted sandbox next dev after production build check');
+      })
+      .catch((e) => {
+        warnings.push(
+          `Preview restart after build check failed: ${
+            e instanceof Error ? e.message : String(e)
+          }`
+        );
+      });
   }
 
   if (!buildOk) {
-    errors.push('Build failed in sandbox preview');
+    errors.push(summarizeSandboxBuildFailure(stdout, stderr));
     if (changedFiles?.length) {
       warnings.push(`Changed files: ${changedFiles.slice(0, 10).join(', ')}`);
     }

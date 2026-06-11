@@ -8,15 +8,16 @@ import { saveWorkspaceToGitLab } from '@/lib/project-workspace/commitWorkspaceTo
 import { getGitWorkspacePath } from '@/lib/project-workspace/gitWorkspaceManager';
 import { validateWorkspace } from '@/lib/project-workspace/validateWorkspace';
 import { isSandboxPreviewEnabled } from '@/lib/runtime/isSandboxPreviewEnabled';
-import { validateSandboxWorkspace } from '@/lib/sandbox/validateSandboxWorkspace';
+import { restartSandboxDevServer } from '@/lib/sandbox/sandboxDevServer';
 import { ensureVercelProjectLinked } from '@/lib/vercel/ensureVercelProject';
 import { triggerVercelDeployment } from '@/lib/vercel/triggerVercelDeployment';
 import { hasVercelApiToken } from '@/lib/vercel/vercelEnv';
 
 export const runtime = 'nodejs';
+export const maxDuration = 300;
 
 /**
- * Deploy route — sync local preview to GitLab (if dirty), link Vercel if needed,
+ * Deploy route — sync preview to GitLab, link Vercel if needed,
  * then trigger a Vercel deployment from the latest GitLab code.
  */
 export async function POST(
@@ -81,20 +82,6 @@ export async function POST(
   }
 
   try {
-    const preDeployValidation = isSandboxPreviewEnabled()
-      ? await validateSandboxWorkspace(projectId)
-      : await validateWorkspace(getGitWorkspacePath(projectId), { forceFullBuild: true });
-
-    if (!preDeployValidation.ok) {
-      const detail =
-        preDeployValidation.errors[0] ||
-        'Workspace build check failed before deploy.';
-      if (editJobId) {
-        await appendEditJobLog(editJobId, 'deploy_failed', detail);
-      }
-      return NextResponse.json({ ok: false, error: detail }, { status: 400 });
-    }
-
     const syncResult = await saveWorkspaceToGitLab(project, projectId, {
       force: true,
       commitMessage:
@@ -110,6 +97,35 @@ export async function POST(
         commitSha: sync.commitSha,
         changedFiles: sync.changedFiles,
       });
+    }
+
+    if (isSandboxPreviewEnabled()) {
+      // Vercel builds from GitLab on deploy. Sandbox `next dev` + production build in the
+      // same VM produced false failures; rely on the customer's Vercel project build instead.
+      void restartSandboxDevServer(projectId).catch((err) => {
+        console.warn(
+          `[code-agent/deploy] Preview restart after GitLab sync failed for ${projectId}:`,
+          err instanceof Error ? err.message : err
+        );
+      });
+    } else {
+      const preDeployValidation = await validateWorkspace(getGitWorkspacePath(projectId), {
+        forceFullBuild: true,
+      });
+      if (!preDeployValidation.ok) {
+        const detail =
+          preDeployValidation.errors[0] || 'Workspace build check failed before deploy.';
+        const buildLogExcerpt = preDeployValidation.buildLog.slice(-1500);
+        if (editJobId) {
+          await appendEditJobLog(editJobId, 'deploy_failed', detail, {
+            buildLogExcerpt,
+          });
+        }
+        return NextResponse.json(
+          { ok: false, error: detail, buildLogExcerpt },
+          { status: 400 }
+        );
+      }
     }
 
     let deployment = project.deployment;

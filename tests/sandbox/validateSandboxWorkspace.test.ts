@@ -79,9 +79,10 @@ export const __siteAgentPageGallerySync = 999;
       ['src/lib/siteConfig.ts', 'export const siteConfig = {};\n'],
     ]);
 
-    mockRunCommand.mockImplementation(async (opts: { cmd: string; args: string[] }) => {
+    mockRunCommand.mockImplementation(async (opts: { cmd: string; args: string[]; env?: Record<string, string> }) => {
       if (opts.cmd === 'test') return { exitCode: 0 };
       if (opts.cmd === 'npm' && opts.args[0] === 'run') {
+        expect(opts.env).toMatchObject({ CI: 'true', NODE_ENV: 'production' });
         const page = files.get('src/app/page.tsx') ?? '';
         if (page.includes('__siteAgentPageGallerySync')) {
           return { exitCode: 1, stdout: async () => '', stderr: async () => 'invalid page export' };
@@ -115,9 +116,10 @@ export const __siteAgentPageGallerySync = 999;
       ['src/lib/siteConfig.ts', 'export const siteConfig = {};\n'],
     ]);
 
-    mockRunCommand.mockImplementation(async (opts: { cmd: string; args: string[] }) => {
+    mockRunCommand.mockImplementation(async (opts: { cmd: string; args: string[]; env?: Record<string, string> }) => {
       if (opts.cmd === 'test') return { exitCode: 0 };
       if (opts.cmd === 'npm' && opts.args[0] === 'run') {
+        expect(opts.env).toMatchObject({ CI: 'true', NODE_ENV: 'production' });
         return { exitCode: 0, stdout: async () => 'ok', stderr: async () => '' };
       }
       return { exitCode: 0, stdout: async () => '', stderr: async () => '' };
@@ -131,6 +133,7 @@ export const __siteAgentPageGallerySync = 999;
     });
 
     const result = await validateSandboxWorkspace('proj-deploy');
+    await Promise.resolve();
 
     expect(result.ok).toBe(true);
     expect(mockClearSandboxDevArtifacts).toHaveBeenCalledTimes(1);
