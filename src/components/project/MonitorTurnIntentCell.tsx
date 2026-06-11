@@ -5,7 +5,7 @@ import { cn } from '@/lib/cn';
 import { Badge } from '@/components/ui/Badge';
 import { TEXT } from '@/content/productTheme';
 
-type IntentProbeResult = {
+type IntentLookupResult = {
   sentence: string | null;
   extractedColor: string | null;
   unresolved?: boolean;
@@ -23,7 +23,7 @@ export function MonitorTurnIntentCell({
 }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<IntentProbeResult | null>(null);
+  const [result, setResult] = useState<IntentLookupResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const loadIntent = async () => {
@@ -39,9 +39,9 @@ export function MonitorTurnIntentCell({
       const res = await fetch(
         `/api/projects/${projectId}/observability/intent?${qs.toString()}`
       );
-      const json = (await res.json()) as IntentProbeResult & { ok?: boolean; error?: string };
+      const json = (await res.json()) as IntentLookupResult & { ok?: boolean; error?: string };
       if (!res.ok || json.ok === false) {
-        setError(json.error ?? 'Intent probe failed');
+        setError(json.error ?? 'Intent lookup failed');
         return;
       }
       setResult({
@@ -51,7 +51,7 @@ export function MonitorTurnIntentCell({
       });
       setOpen(true);
     } catch {
-      setError('Intent probe failed');
+      setError('Intent lookup failed');
     } finally {
       setLoading(false);
     }

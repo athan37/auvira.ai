@@ -8,7 +8,6 @@ const mockFetchHealth = vi.fn();
 const mockFetchDashboardDetailed = vi.fn();
 const mockFetchIntentProfileDetailed = vi.fn();
 const mockFetchContextDetailed = vi.fn();
-const mockFetchIntentDetailed = vi.fn();
 const mockIsObservabilityEnabled = vi.fn();
 
 vi.mock('@/lib/api/projectAccess', () => ({
@@ -24,7 +23,6 @@ vi.mock('@/lib/observability/client', () => ({
   fetchObservabilityIntentProfileDetailed: (...args: unknown[]) =>
     mockFetchIntentProfileDetailed(...args),
   fetchObservabilityContextDetailed: (...args: unknown[]) => mockFetchContextDetailed(...args),
-  fetchObservabilityIntentDetailed: (...args: unknown[]) => mockFetchIntentDetailed(...args),
 }));
 
 vi.mock('@/lib/observability/config', () => ({
@@ -138,7 +136,7 @@ describe('POST /api/projects/[projectId]/observability/analyze', () => {
     const res = await POST(
       new NextRequest(`http://localhost/api/projects/${projectId}/observability/analyze`, {
         method: 'POST',
-        body: JSON.stringify({ conversationId, probeMessage: 'make hero red' }),
+        body: JSON.stringify({ conversationId }),
       }),
       { params: { projectId } }
     );
@@ -173,57 +171,5 @@ describe('POST /api/projects/[projectId]/observability/analyze', () => {
     const json = await res.json();
 
     expect(json.errors[0].message).toBe('Conversation not found');
-  });
-});
-
-describe('POST /api/projects/[projectId]/observability/intent', () => {
-  const projectId = '665f4ec12f1fe71c6527f2df';
-
-  beforeEach(() => {
-    mockGetServerUserId.mockResolvedValue('user-1');
-    mockGetOwnerProject.mockResolvedValue({ _id: projectId, name: 'Demo Site' });
-    mockIsObservabilityEnabled.mockReturnValue(true);
-    mockFetchIntentDetailed.mockResolvedValue({
-      ok: true,
-      status: 200,
-      data: { intent: 'Change the hero background to red, the owner favorite color.' },
-    });
-  });
-
-  afterEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('returns extracted colors from probe', async () => {
-    const { POST } = await import('@/app/api/projects/[projectId]/observability/intent/route');
-    const res = await POST(
-      new NextRequest(`http://localhost/api/projects/${projectId}/observability/intent`, {
-        method: 'POST',
-        body: JSON.stringify({
-          userMessage: 'change background to my favorite color',
-          conversationId: `${projectId}-editor`,
-        }),
-      }),
-      { params: { projectId } }
-    );
-    const json = await res.json();
-
-    expect(res.status).toBe(200);
-    expect(json.ok).toBe(true);
-    expect(json.extractedColors).toContain('red');
-    expect(json.intent).toContain('red');
-  });
-
-  it('returns 400 when userMessage is missing', async () => {
-    const { POST } = await import('@/app/api/projects/[projectId]/observability/intent/route');
-    const res = await POST(
-      new NextRequest(`http://localhost/api/projects/${projectId}/observability/intent`, {
-        method: 'POST',
-        body: JSON.stringify({}),
-      }),
-      { params: { projectId } }
-    );
-
-    expect(res.status).toBe(400);
   });
 });

@@ -1,4 +1,4 @@
-/** Default probe message for GET /context missing-keyword detection. */
+/** Default user message for GET /context missing-keyword detection during analyze. */
 export const DEFAULT_OBSERVABILITY_PROBE_MESSAGE =
   'change background to my favorite color' as const;
 

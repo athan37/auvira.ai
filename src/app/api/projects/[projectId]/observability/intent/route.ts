@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOwnerProject, getServerUserId } from '@/lib/api/projectAccess';
-import { fetchObservabilityIntentDetailed } from '@/lib/observability/client';
 import { isObservabilityEnabled } from '@/lib/observability/config';
 import { editorConversationId } from '@/lib/observability/conversationId';
-import { fetchObservabilityIntent, parseObservabilityProjectIntent } from '@/lib/observability/fetchObservabilityIntent';
+import { fetchObservabilityIntent } from '@/lib/observability/fetchObservabilityIntent';
 import {
   extractColorsFromIntentSentence,
   intentSentenceIsUnresolved,
@@ -20,7 +19,7 @@ function parseSelectedTarget(raw: unknown): SelectedTargetInput | null {
   return parsed?.kind ? parsed : null;
 }
 
-function probeResponse(input: {
+function intentResponse(input: {
   sentence: string | null;
   unresolved: boolean;
   selectedTarget: Record<string, unknown> | null;
@@ -41,121 +40,8 @@ function probeResponse(input: {
   });
 }
 
-async function resolveIntentProbe(input: {
-  projectId: string;
-  userMessage: string;
-  conversationId: string;
-  selectedTarget: SelectedTargetInput | null;
-  useDetailedFetch: boolean;
-}) {
-  if (input.useDetailedFetch) {
-    const result = await fetchObservabilityIntentDetailed({
-      projectId: input.projectId,
-      body: {
-        user_message: input.userMessage,
-        conversation_id: input.conversationId,
-        selected_target: serializeSelectedTargetForMonitor(input.selectedTarget) ?? null,
-      },
-    });
-
-    if (!result.ok) {
-      return {
-        sentence: null,
-        unresolved: true,
-        error: result.error ?? 'Intent probe failed',
-      };
-    }
-
-    const parsed = result.data ? parseObservabilityProjectIntent(result.data) : null;
-    const sentence = parsed?.sentence?.trim() ?? null;
-    return {
-      sentence,
-      unresolved: sentence ? intentSentenceIsUnresolved(sentence) : true,
-      error: sentence ? undefined : 'Intent probe returned no sentence',
-    };
-  }
-
-  const intent = await fetchObservabilityIntent({
-    projectId: input.projectId,
-    userMessage: input.userMessage,
-    selectedTarget: input.selectedTarget,
-    conversationId: input.conversationId,
-  });
-  const sentence = intent?.sentence?.trim() ?? null;
-  return {
-    sentence,
-    unresolved: sentence ? intentSentenceIsUnresolved(sentence) : true,
-    error: undefined,
-  };
-}
-
 /**
- * POST /api/projects/{projectId}/observability/intent — on-demand Monitor POST /intent probe.
- */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { projectId: string } }
-) {
-  const userId = await getServerUserId();
-  if (!userId) {
-    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const project = await getOwnerProject(params.projectId);
-  if (!project) {
-    return NextResponse.json({ ok: false, error: 'Project not found' }, { status: 404 });
-  }
-
-  if (!isObservabilityEnabled()) {
-    return NextResponse.json({ ok: false, error: 'Site Monitor is not enabled' }, { status: 503 });
-  }
-
-  let body: {
-    userMessage?: string;
-    conversationId?: string;
-    selectedTarget?: unknown;
-  } = {};
-
-  try {
-    body = (await request.json()) as typeof body;
-  } catch {
-    return NextResponse.json({ ok: false, error: 'Invalid JSON body' }, { status: 400 });
-  }
-
-  const userMessage = body.userMessage?.trim() ?? '';
-  if (!userMessage) {
-    return NextResponse.json({ ok: false, error: 'userMessage is required' }, { status: 400 });
-  }
-
-  const conversationId =
-    body.conversationId?.trim() || editorConversationId(params.projectId);
-  const selectedTarget = parseSelectedTarget(body.selectedTarget);
-
-  const result = await resolveIntentProbe({
-    projectId: params.projectId,
-    userMessage,
-    conversationId,
-    selectedTarget,
-    useDetailedFetch: true,
-  });
-
-  if (result.error && !result.sentence) {
-    return NextResponse.json(
-      { ok: false, error: result.error },
-      { status: 502 }
-    );
-  }
-
-  return probeResponse({
-    sentence: result.sentence,
-    unresolved: result.unresolved,
-    selectedTarget: serializeSelectedTargetForMonitor(selectedTarget) ?? null,
-    error: result.error,
-  });
-}
-
-/**
- * GET /api/projects/{projectId}/observability/intent — legacy query probe (turn table cells).
+ * GET /api/projects/{projectId}/observability/intent — turn-table intent lookup.
  */
 export async function GET(
   request: NextRequest,
@@ -194,18 +80,17 @@ export async function GET(
     request.nextUrl.searchParams.get('conversationId')?.trim() ||
     editorConversationId(params.projectId);
 
-  const result = await resolveIntentProbe({
+  const intent = await fetchObservabilityIntent({
     projectId: params.projectId,
     userMessage,
-    conversationId,
     selectedTarget,
-    useDetailedFetch: false,
+    conversationId,
   });
+  const sentence = intent?.sentence?.trim() ?? null;
 
-  return probeResponse({
-    sentence: result.sentence,
-    unresolved: result.unresolved,
+  return intentResponse({
+    sentence,
+    unresolved: sentence ? intentSentenceIsUnresolved(sentence) : true,
     selectedTarget: serializeSelectedTargetForMonitor(selectedTarget) ?? null,
-    error: result.error,
   });
 }

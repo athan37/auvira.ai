@@ -21,7 +21,6 @@ export const dynamic = 'force-dynamic';
 
 interface AnalyzeBody {
   conversationId?: string;
-  probeMessage?: string;
 }
 
 /**
@@ -57,8 +56,7 @@ export async function POST(
 
   const conversationId =
     body.conversationId?.trim() || editorConversationId(params.projectId);
-  const probeMessage =
-    body.probeMessage?.trim() || DEFAULT_OBSERVABILITY_PROBE_MESSAGE;
+  const contextMessage = DEFAULT_OBSERVABILITY_PROBE_MESSAGE;
 
   const errors: Array<{ source: string; status: number; message: string }> = [];
 
@@ -75,7 +73,7 @@ export async function POST(
     fetchObservabilityContextDetailed({
       projectId: params.projectId,
       conversationId,
-      latestUserMessage: probeMessage,
+      latestUserMessage: contextMessage,
     }),
   ]);
 
@@ -119,7 +117,6 @@ export async function POST(
     projectId: params.projectId,
     projectName: project.name ?? 'Project',
     conversationId,
-    probeMessage,
     monitorEnabled: true,
     sessionSummary: monitorDashboard?.cards ?? null,
     intentProfile,

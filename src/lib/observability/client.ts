@@ -164,20 +164,6 @@ export async function fetchObservabilityIntentRaw(input: {
   });
 }
 
-/** POST /intent with structured error for analytics probe UI. */
-export async function fetchObservabilityIntentDetailed(input: {
-  projectId: string;
-  body: FetchObservabilityIntentBody;
-}): Promise<ObservabilityFetchResult<Record<string, unknown>>> {
-  return observabilityFetchDetailed(
-    `/projects/${encodeURIComponent(input.projectId)}/intent`,
-    {
-      method: 'POST',
-      body: JSON.stringify(input.body),
-    }
-  );
-}
-
 export async function fetchObservabilityDashboardRaw(input: {
   projectId: string;
   conversationId: string;

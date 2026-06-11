@@ -17,10 +17,12 @@ export function ObservabilityLiveContextPanel({
   monitorEnabled,
   liveContext,
   analyzed,
+  analyzing,
 }: {
   monitorEnabled: boolean;
   liveContext: ObservabilityLiveContext | null | undefined;
   analyzed?: boolean;
+  analyzing?: boolean;
 }) {
   const parsed = liveContext?.parsed;
   const quality = parsed?.qualitySnapshot;
@@ -37,10 +39,16 @@ export function ObservabilityLiveContextPanel({
             description="Enable Site Monitor to load coaching context."
             className="py-8"
           />
+        ) : analyzing ? (
+          <EmptyState
+            title="Loading session analytics…"
+            description="Fetching coaching context from Site Monitor."
+            className="py-8"
+          />
         ) : !analyzed ? (
           <EmptyState
-            title="Not analyzed yet"
-            description="Analyze a session to load coaching hints and missing keywords for the probe message."
+            title="No session data"
+            description="Coaching context could not be loaded for this conversation."
             className="py-8"
           />
         ) : !liveContext ? (
@@ -119,7 +127,7 @@ export function ObservabilityLiveContextPanel({
             {parsed?.missingKeywords && parsed.missingKeywords.length > 0 ? (
               <div>
                 <h3 className={`text-xs font-semibold uppercase tracking-wide mb-2 ${TEXT.tertiary}`}>
-                  Missing keywords (probe)
+                  Missing keywords
                 </h3>
                 <ul className="flex flex-wrap gap-2">
                   {parsed.missingKeywords.map((kw) => (

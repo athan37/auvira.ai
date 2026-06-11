@@ -16,10 +16,12 @@ export function ObservabilityIntentProfilePanel({
   monitorEnabled,
   intentProfile,
   analyzed,
+  analyzing,
 }: {
   monitorEnabled: boolean;
   intentProfile?: MonitorIntentProfileView | null;
   analyzed?: boolean;
+  analyzing?: boolean;
 }) {
   const profile = renderIntentProfile(intentProfile);
 
@@ -38,10 +40,16 @@ export function ObservabilityIntentProfilePanel({
             description="Enable Site Monitor to load project intent attributes."
             className="py-6"
           />
+        ) : analyzing ? (
+          <EmptyState
+            title="Loading session analytics…"
+            description="Fetching intent profile from Site Monitor."
+            className="py-6"
+          />
         ) : !analyzed ? (
           <EmptyState
-            title="Not analyzed yet"
-            description="Select a conversation and click Analyze session."
+            title="No session data"
+            description="Session analytics could not be loaded for this conversation."
             className="py-6"
           />
         ) : !profile ? (

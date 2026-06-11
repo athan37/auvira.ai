@@ -106,7 +106,7 @@ Filter spans named `builder.turn` in [Phoenix Cloud](https://app.phoenix.arize.c
 
 - **Chat:** successful edits with applied project memory show an inline **Used project context** line and a sky **Context** chip; clarification/failure turns show a violet **Tips** chip when guidance or coaching exists (click to expand; Escape or click outside to close). Coaching "hints applied" badges are not shown on success. Set `NEXT_PUBLIC_OBSERVABILITY_DEBUG=1` for grade badges and Phoenix trace links ([`ObservabilityTraceChip`](../src/components/project/ObservabilityTraceChip.tsx)).
 - **Admin page:** [`/admin/observability`](../src/app/admin/observability/page.tsx) — recent turn scores across all projects via `GET /api/admin/observability`.
-- **Per-project page:** [`/projects/{projectId}/observability`](../src/app/projects/[projectId]/observability/page.tsx) — analytics dashboard wired to Site Monitor (conversation picker, **Analyze session**, on-demand **Probe intent**). Data is Monitor-only when enabled (no Mongo chat-metadata fallback).
+- **Per-project page:** [`/projects/{projectId}/observability`](../src/app/projects/[projectId]/observability/page.tsx) — analytics dashboard wired to Site Monitor (conversation picker, **Analyze session**). Data is Monitor-only when enabled (no Mongo chat-metadata fallback).
 
 ### Per-project analytics API
 
@@ -118,9 +118,9 @@ Returns `conversations[]`, `defaultConversationId` (`{projectId}-editor`), optio
 
 **Analyze session** — `POST /api/projects/{projectId}/observability/analyze`
 
-Body: `{ conversationId?, probeMessage? }` (default probe: `change background to my favorite color`).
+Body: `{ conversationId? }`.
 
-Parallel server fetch: `GET .../dashboard?turn_limit=50`, `GET .../intent?turn_limit=200`, `GET .../context?conversation_id&latest_user_message`.
+Parallel server fetch: `GET .../dashboard?turn_limit=50`, `GET .../intent?turn_limit=200`, `GET .../context?conversation_id&latest_user_message` (context uses a fixed default message server-side).
 
 | Response field | Panel group |
 |----------------|-------------|
@@ -129,11 +129,7 @@ Parallel server fetch: `GET .../dashboard?turn_limit=50`, `GET .../intent?turn_l
 | `coachingContext` | Group 3 — coaching_hints, recurring_issues, missing_keywords, quality_snapshot |
 | `developerAnalytics` | Groups 5–9 — executive_kpis, learning_metrics, charts, turns[], improvement_brief |
 
-**Probe intent** — `POST /api/projects/{projectId}/observability/intent`
-
-Body: `{ userMessage, conversationId?, selectedTarget? }` → Group 4 intent sentence + `extractedColors[]`.
-
-Legacy `GET .../observability/intent?userMessage=` remains for turn-table intent cells.
+**Turn intent lookup** — `GET /api/projects/{projectId}/observability/intent?userMessage=` (turn-table intent cells).
 
 ## Code entry points
 
@@ -142,7 +138,7 @@ Legacy `GET .../observability/intent?userMessage=` remains for turn-table intent
 | [`src/lib/metrics/aggregateObservabilityMetrics.ts`](../src/lib/metrics/aggregateObservabilityMetrics.ts) | Admin + per-project turn aggregation |
 | [`src/app/api/projects/[projectId]/observability/bootstrap/route.ts`](../src/app/api/projects/[projectId]/observability/bootstrap/route.ts) | Conversations + health bootstrap |
 | [`src/app/api/projects/[projectId]/observability/analyze/route.ts`](../src/app/api/projects/[projectId]/observability/analyze/route.ts) | Parallel Monitor session analyze |
-| [`src/app/api/projects/[projectId]/observability/intent/route.ts`](../src/app/api/projects/[projectId]/observability/intent/route.ts) | On-demand POST /intent probe |
+| [`src/app/api/projects/[projectId]/observability/intent/route.ts`](../src/app/api/projects/[projectId]/observability/intent/route.ts) | Turn-table GET /intent lookup |
 | [`src/lib/observability/`](../src/lib/observability/) | Client, redaction, turn recording, builder_type normalization |
 | [`src/lib/observability/recordCloneTurn.ts`](../src/lib/observability/recordCloneTurn.ts) | Clone wizard turn recording |
 | [`src/app/api/projects/[projectId]/code-agent/edit/stream/route.ts`](../src/app/api/projects/[projectId]/code-agent/edit/stream/route.ts) | Editor hooks + agent sub-span payload |

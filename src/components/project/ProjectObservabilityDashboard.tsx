@@ -1,24 +1,17 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Alert } from '@/components/ui/Alert';
 import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
 import { ObservabilityChartsPanel } from '@/components/project/ObservabilityChartsPanel';
 import { ObservabilityExecutivePanel } from '@/components/project/ObservabilityExecutivePanel';
 import { ObservabilityImprovementBriefPanel } from '@/components/project/ObservabilityImprovementBriefPanel';
-import {
-  ObservabilityIntentProbePanel,
-  type IntentProbeResult,
-} from '@/components/project/ObservabilityIntentProbePanel';
 import { ObservabilityIntentProfilePanel } from '@/components/project/ObservabilityIntentProfilePanel';
 import { ObservabilityLearningPanel } from '@/components/project/ObservabilityLearningPanel';
 import { ObservabilityLiveContextPanel } from '@/components/project/ObservabilityLiveContextPanel';
 import { ObservabilityStatCards } from '@/components/project/ObservabilityStatCards';
 import { ObservabilityTurnTable } from '@/components/project/ObservabilityTurnTable';
 import { TEXT } from '@/content/productTheme';
-import { DEFAULT_OBSERVABILITY_PROBE_MESSAGE } from '@/lib/observability/analyticsConstants';
 import type { MonitorDashboardCards } from '@/lib/observability/parseMonitorDashboard';
 import type { MonitorIntentProfileView } from '@/lib/observability/parseIntentProfile';
 import type { MonitorDashboardView } from '@/lib/observability/parseMonitorDashboard';
@@ -44,7 +37,6 @@ type BootstrapResponse = {
 type AnalyzeResponse = {
   ok: boolean;
   conversationId?: string;
-  probeMessage?: string;
   sessionSummary?: MonitorDashboardCards | null;
   intentProfile?: MonitorIntentProfileView | null;
   coachingContext?: {
@@ -62,9 +54,6 @@ type AnalyzeResponse = {
   errors?: Array<{ source: string; status: number; message: string }>;
   error?: string;
 };
-
-const INPUT_FOCUS =
-  'focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500/20';
 
 function resolveConversationOptions(bootstrap: BootstrapResponse): ConversationOption[] {
   if (bootstrap.conversations && bootstrap.conversations.length > 0) {
@@ -93,33 +82,24 @@ function ObservabilityDashboardSkeleton() {
   );
 }
 
-/** Per-project analytics dashboard — Site Monitor session analyze + probe. */
+/** Per-project analytics dashboard — Site Monitor session analyze. */
 export function ProjectObservabilityDashboard({ projectId }: { projectId: string }) {
   const [bootstrap, setBootstrap] = useState<BootstrapResponse | null>(null);
   const [bootstrapLoading, setBootstrapLoading] = useState(true);
   const [conversationId, setConversationId] = useState('');
-  const [probeInput, setProbeInput] = useState<string>(DEFAULT_OBSERVABILITY_PROBE_MESSAGE);
   const [analyzeData, setAnalyzeData] = useState<AnalyzeResponse | null>(null);
-  const [probeResult, setProbeResult] = useState<IntentProbeResult | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
-  const [probing, setProbing] = useState(false);
   const [analyzed, setAnalyzed] = useState(false);
-  const autoAnalyzeDone = useRef(false);
 
   const runAnalyze = useCallback(
-    async (targetConversationId: string, probeMessage?: string) => {
+    async (targetConversationId: string) => {
       if (!targetConversationId) return;
       setAnalyzing(true);
-      setProbeResult(null);
       try {
         const res = await fetch(`/api/projects/${projectId}/observability/analyze`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            conversationId: targetConversationId,
-            probeMessage:
-              (probeMessage ?? probeInput).trim() || DEFAULT_OBSERVABILITY_PROBE_MESSAGE,
-          }),
+          body: JSON.stringify({ conversationId: targetConversationId }),
         });
         const json = (await res.json()) as AnalyzeResponse;
         setAnalyzeData(json);
@@ -131,11 +111,11 @@ export function ProjectObservabilityDashboard({ projectId }: { projectId: string
         setAnalyzing(false);
       }
     },
-    [probeInput, projectId]
+    [projectId]
   );
 
   useEffect(() => {
-    autoAnalyzeDone.current = false;
+    setConversationId('');
     setAnalyzed(false);
     setAnalyzeData(null);
   }, [projectId]);
@@ -167,48 +147,9 @@ export function ProjectObservabilityDashboard({ projectId }: { projectId: string
   }, [projectId]);
 
   useEffect(() => {
-    if (bootstrapLoading || !bootstrap?.ok || !bootstrap.monitorEnabled) return;
-    const options = resolveConversationOptions(bootstrap);
-    if (options.length !== 1 || autoAnalyzeDone.current) return;
-    autoAnalyzeDone.current = true;
-    void runAnalyze(options[0].id, DEFAULT_OBSERVABILITY_PROBE_MESSAGE);
-  }, [bootstrap, bootstrapLoading, runAnalyze]);
-
-  const handleAnalyze = useCallback(async () => {
-    if (!conversationId) return;
-    await runAnalyze(conversationId);
-  }, [conversationId, runAnalyze]);
-
-  const handleProbe = useCallback(async () => {
-    if (!conversationId || !probeInput.trim()) return;
-    setProbing(true);
-    try {
-      const res = await fetch(`/api/projects/${projectId}/observability/intent`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userMessage: probeInput.trim(),
-          conversationId,
-        }),
-      });
-      const json = (await res.json()) as IntentProbeResult & {
-        ok?: boolean;
-        error?: string;
-        sentence?: string | null;
-        extractedColors?: string[];
-      };
-      setProbeResult({
-        intent: json.intent ?? json.sentence ?? null,
-        extractedColors: json.extractedColors ?? [],
-        unresolved: json.unresolved ?? false,
-        error: json.error,
-      });
-    } catch {
-      setProbeResult({ intent: null, extractedColors: [], unresolved: true, error: 'Probe failed' });
-    } finally {
-      setProbing(false);
-    }
-  }, [conversationId, probeInput, projectId]);
+    if (bootstrapLoading || !bootstrap?.ok || !bootstrap.monitorEnabled || !conversationId) return;
+    void runAnalyze(conversationId);
+  }, [bootstrap, bootstrapLoading, conversationId, runAnalyze]);
 
   const monitorEnabled = bootstrap?.monitorEnabled ?? false;
   const health = bootstrap?.health;
@@ -256,75 +197,39 @@ export function ProjectObservabilityDashboard({ projectId }: { projectId: string
               ) : null}
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label htmlFor="obs-conversation" className={`text-xs font-medium ${TEXT.tertiary}`}>
-                  Conversation
-                </label>
-                {singleConversation ? (
-                  <p className={`mt-1 text-sm ${TEXT.primary}`}>
-                    {conversationOptions[0].title}
-                    {conversationOptions[0].turnCount != null
-                      ? ` (${conversationOptions[0].turnCount} turns)`
-                      : ''}
-                  </p>
-                ) : (
-                  <select
-                    id="obs-conversation"
-                    value={conversationId}
-                    onChange={(e) => setConversationId(e.target.value)}
-                    disabled={!monitorEnabled}
-                    className="mt-1 w-full rounded-xl border border-[#d2d2d7]/80 bg-white px-3 py-2 text-sm text-[#1d1d1f]"
-                  >
-                    {conversationOptions.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.title}
-                        {c.turnCount != null ? ` (${c.turnCount} turns)` : ''}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                {singleConversation && analyzing ? (
-                  <p className={`text-xs mt-1 ${TEXT.muted}`}>Loading session analytics…</p>
-                ) : null}
-                {bootstrap.conversationsHint && !singleConversation ? (
-                  <p className={`text-xs mt-1 ${TEXT.muted}`}>{bootstrap.conversationsHint}</p>
-                ) : null}
-              </div>
-              <div>
-                <label htmlFor="obs-probe" className={`text-xs font-medium ${TEXT.tertiary}`}>
-                  Probe message
-                </label>
-                <Input
-                  id="obs-probe"
-                  type="text"
-                  value={probeInput}
-                  onChange={(e) => setProbeInput(e.target.value)}
-                  className={`mt-1 ${INPUT_FOCUS}`}
-                  disabled={!monitorEnabled}
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant="primaryBlue"
-                size="md"
-                onClick={() => void handleAnalyze()}
-                disabled={analyzing || !monitorEnabled || !conversationId}
-              >
-                {analyzing ? 'Analyzing…' : 'Analyze session'}
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                size="md"
-                onClick={() => void handleProbe()}
-                disabled={probing || !monitorEnabled || !conversationId || !probeInput.trim()}
-              >
-                {probing ? 'Probing…' : 'Probe intent'}
-              </Button>
+            <div>
+              <label htmlFor="obs-conversation" className={`text-xs font-medium ${TEXT.tertiary}`}>
+                Conversation
+              </label>
+              {singleConversation ? (
+                <p className={`mt-1 text-sm ${TEXT.primary}`}>
+                  {conversationOptions[0].title}
+                  {conversationOptions[0].turnCount != null
+                    ? ` (${conversationOptions[0].turnCount} turns)`
+                    : ''}
+                </p>
+              ) : (
+                <select
+                  id="obs-conversation"
+                  value={conversationId}
+                  onChange={(e) => setConversationId(e.target.value)}
+                  disabled={!monitorEnabled || analyzing}
+                  className="mt-1 w-full max-w-md rounded-xl border border-[#d2d2d7]/80 bg-white px-3 py-2 text-sm text-[#1d1d1f]"
+                >
+                  {conversationOptions.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.title}
+                      {c.turnCount != null ? ` (${c.turnCount} turns)` : ''}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {analyzing ? (
+                <p className={`text-xs mt-1 ${TEXT.muted}`}>Loading session analytics…</p>
+              ) : null}
+              {bootstrap.conversationsHint && !singleConversation ? (
+                <p className={`text-xs mt-1 ${TEXT.muted}`}>{bootstrap.conversationsHint}</p>
+              ) : null}
             </div>
           </div>
 
@@ -356,6 +261,7 @@ export function ProjectObservabilityDashboard({ projectId }: { projectId: string
                 monitorEnabled={monitorEnabled}
                 intentProfile={analyzeData?.intentProfile}
                 analyzed={analyzed}
+                analyzing={analyzing}
               />
             </div>
             <div className="lg:col-span-7">
@@ -363,13 +269,8 @@ export function ProjectObservabilityDashboard({ projectId }: { projectId: string
                 monitorEnabled={monitorEnabled}
                 liveContext={analyzeData?.coachingContext ?? null}
                 analyzed={analyzed}
+                analyzing={analyzing}
               />
-            </div>
-          </div>
-
-          <div className="grid lg:grid-cols-12 gap-4">
-            <div className="lg:col-span-5">
-              <ObservabilityIntentProbePanel result={probeResult} loading={probing} />
             </div>
           </div>
 
